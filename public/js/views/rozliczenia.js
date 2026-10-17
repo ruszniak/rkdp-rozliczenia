@@ -1,6 +1,7 @@
 import { h, icon, toast, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
+import { downloadXlsx } from '../xlsx.js';
 
 const PREF_KEY = 'rkdp-rozliczenia-v2';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch { return {}; } };
@@ -19,6 +20,20 @@ export async function fetchAll(build) {
 const AREAS = {
   ksiegowosc: { label: 'Księgowość', person: 'accountant_id', personLabel: 'Księgowa' },
   kadry: { label: 'Kadry i ZUS', person: 'hr_id', personLabel: 'Kadrowa' },
+};
+const GROUPS = {
+  osobowe: 'JDG i spółki osobowe',
+  kapitalowe: 'Spółki z o.o. i pełna księgowość',
+  nieaktywni: 'Zawieszeni i zakończeni',
+};
+const LAYOUT_MODES = {
+  separate: 'Osobna tabela dla każdej grupy',
+  active_one: 'Aktywni w jednej tabeli, zawieszeni osobno',
+  all_one: 'Wszystko w jednej tabeli',
+};
+const DEFAULT_LAYOUT = {
+  ksiegowosc: { groups: ['osobowe', 'kapitalowe', 'nieaktywni'], mode: 'separate' },
+  kadry: { groups: ['osobowe', 'kapitalowe', 'nieaktywni'], mode: 'active_one' },
 };
 const SECTIONS = {
   osobowe: { title: 'JDG i spółki osobowe', pitLabel: 'PIT' },
@@ -76,6 +91,44 @@ export async function renderRozliczenia(main, params) {
     return tasksFor('ksiegowosc', section).map(t => t.code === 'pit_cit' ? { ...t, label: SECTIONS[section].pitLabel } : t);
   };
 
+  // ---------- układ tabel (wybór grup, osobno / razem) ----------
+  const layout = () => {
+    const l = { ...DEFAULT_LAYOUT[prefs.area], ...(prefs.layout?.[prefs.area] || {}) };
+    l.groups = Object.keys(GROUPS).filter(g => l.groups.includes(g));
+    return l;
+  };
+  const setLayout = (patch) => {
+    prefs.layout = { ...(prefs.layout || {}), [prefs.area]: { ...layout(), ...patch } };
+    savePrefs(prefs); renderBody();
+  };
+  const groupRows = (area, g) => g === 'nieaktywni' ? inactiveIn(area) : rowsIn(area).filter(c => sectionOf(c) === g);
+  const colsForGroups = (area, groups) => {
+    if (area === 'kadry') return tasksFor('kadry');
+    const act = groups.filter(g => g !== 'nieaktywni');
+    if (act.length === 1) return colsFor('ksiegowosc', act[0]);
+    return tasksFor('ksiegowosc', 'kapitalowe'); // wspólna: PIT / CIT + wyciągi bankowe
+  };
+  // Lista tabel do pokazania / pobrania: [{ key, title, groups, all, rows, cols }]
+  function tablesModel() {
+    const area = prefs.area, l = layout();
+    const sorted = list => [...list].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    const make = (groups) => {
+      const all = sorted(groups.flatMap(g => groupRows(area, g)));
+      return { key: groups.join('+'), groups, title: groups.map(g => GROUPS[g]).join(' + '),
+        all, rows: filtered(all, area), cols: colsForGroups(area, groups),
+        inactiveOnly: groups.length === 1 && groups[0] === 'nieaktywni' };
+    };
+    const active = l.groups.filter(g => g !== 'nieaktywni');
+    if (l.mode === 'all_one') return l.groups.length ? [make(l.groups)] : [];
+    if (l.mode === 'active_one') return [...(active.length ? [make(active)] : []), ...(l.groups.includes('nieaktywni') ? [make(['nieaktywni'])] : [])];
+    return l.groups.map(g => make([g]));
+  }
+  // aktywni klienci w wybranych grupach – do kafelków
+  const selectedActive = (area) => {
+    const gs = layout().groups.filter(g => g !== 'nieaktywni');
+    return rowsIn(area).filter(c => gs.includes(sectionOf(c)));
+  };
+
   // ---------- nagłówek ----------
   const monthNav = h('div', { class: 'month' },
       h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, -1)}`, 'aria-label': 'Poprzedni miesiąc', 'data-tip': 'Poprzedni miesiąc' }, icon('left')),
@@ -96,7 +149,10 @@ export async function renderRozliczenia(main, params) {
     h('option', { value: '' }, 'Wszyscy klienci'), h('option', { value: 'nierozliczeni' }, 'Tylko nierozliczeni'),
     h('option', { value: 'braki' }, 'Z brakiem dokumentów'), h('option', { value: 'uwagi' }, 'Z uwagami / pytaniami'));
   showSel.value = prefs.show;
-  const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportCsv() }, icon('download'), 'Eksport');
+  const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: (ev) => exportMenu(ev.currentTarget) }, icon('download'), 'Pobierz');
+  const ICON_LAYOUT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>';
+  const layoutBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wybierz grupy klientów i czy mają być w jednej tabeli', onclick: (ev) => layoutMenu(ev.currentTarget) },
+    h('span', { html: ICON_LAYOUT, style: { display: 'inline-flex' } }), 'Układ tabel');
   const ICON_FS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   const ICON_FS_EXIT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
   const fsBtn = h('button', { class: 'btn btn-primary btn-sm', 'data-tip': 'Tabela na cały ekran (Esc – wyjście)' });
@@ -117,7 +173,7 @@ export async function renderRozliczenia(main, params) {
   document.addEventListener('fullscreenchange', onFsChange);
   document.addEventListener('keydown', onKey);
   setFs(false);
-  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, exportBtn, fsBtn);
+  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, exportBtn, fsBtn);
   const onFilter = () => { Object.assign(prefs, { q: search.value, person: personSel.value, show: showSel.value }); savePrefs(prefs); renderBody(); };
   search.addEventListener('input', onFilter);
   personSel.addEventListener('change', onFilter);
@@ -150,7 +206,7 @@ export async function renderRozliczenia(main, params) {
 
   function renderTiles() {
     const area = prefs.area;
-    const rows = rowsIn(area);
+    const rows = selectedActive(area);
     const settled = rows.filter(c => isSettled(c, area)).length;
     const toSend = rows.filter(c => pendingSend(c, area)).length;
     const miss = rows.filter(c => hasMissing(c, area)).length;
@@ -284,17 +340,17 @@ export async function renderRozliczenia(main, params) {
           c.status !== 'aktywny' ? h('span', { class: 'badge warn' }, c.status === 'zawieszony' ? 'zawieszony' : 'zakończony') : null))),
       h('td', { class: 'c-person' }, personCell(c, area)),
       area === 'kadry' ? h('td', {}, employeesCell(c)) : null,
-      cols.map(col => h('td', { class: 'c-task' }, checkbox(byClient.get(c.id)?.get(col.code), col, col.label))),
+      cols.map(col => h('td', { class: 'c-task' }, (col.applies_to && col.applies_to !== 'all' && col.applies_to !== sectionOf(c))
+        ? h('span', { class: 'muted small', 'data-tip': 'Nie dotyczy tej formy' }, '·')
+        : checkbox(byClient.get(c.id)?.get(col.code), col, col.label))),
       h('td', { class: 'c-sum' }, sumCell(c, area)),
       h('td', {}, noteCell(c)));
   }
 
-  function tableFor(area, section, rows) {
-    const cols = colsFor(area, section);
-    const allRows = section === 'nieaktywni' ? inactiveIn(area)
-      : area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section);
+  function tableFor(area, t) {
+    const cols = t.cols;
     const stat = (col) => {
-      const rel = allRows.map(c => byClient.get(c.id)?.get(col.code)).filter(e => e && e.status !== 'na');
+      const rel = t.all.map(c => byClient.get(c.id)?.get(col.code)).filter(e => e && e.status !== 'na');
       return `${rel.filter(e => e.status === 'done').length}/${rel.length}`;
     };
     const thead = h('thead', {}, h('tr', {},
@@ -304,35 +360,27 @@ export async function renderRozliczenia(main, params) {
       cols.map(col => h('th', { class: 'c-task', 'data-tip': col.description || col.label }, col.label, h('span', { class: 'sub' }, stat(col)))),
       h('th', { class: 'c-sum', 'data-tip': 'Rozliczony = wszystkie kratki „Zrobione” albo „Nie dotyczy”' }, 'Klient rozliczony'),
       h('th', { 'data-tip': 'Uwagi i pytania do klienta w tym miesiącu' }, 'Uwagi')));
-    const tbody = h('tbody', {}, rows.map(c => rowFor(c, area, cols)));
-    return h('div', { class: 'grid-wrap' + (section === 'nieaktywni' ? ' inactive' : '') }, h('table', { class: 'grid', 'data-section': section || 'kadry' }, thead, tbody));
+    const tbody = h('tbody', {}, t.rows.map(c => rowFor(c, area, cols)));
+    const table = h('table', { class: 'grid' }, thead, tbody);
+    table._cols = cols;
+    return h('div', { class: 'grid-wrap' + (t.inactiveOnly ? ' inactive' : '') }, table);
   }
 
   function renderBody() {
     const area = prefs.area;
+    const model = tablesModel();
     const out = [];
-    if (area === 'kadry') {
-      const rows = filtered(rowsIn('kadry'), 'kadry');
-      out.push(rows.length ? tableFor('kadry', null, rows) : emptyBox());
-    } else {
-      for (const section of ['osobowe', 'kapitalowe']) {
-        const all = rowsIn('ksiegowosc').filter(c => sectionOf(c) === section);
-        const rows = filtered(all, 'ksiegowosc');
-        const settled = all.filter(c => isSettled(c, 'ksiegowosc')).length;
-        out.push(h('div', { class: 'table-title' }, h('h2', {}, SECTIONS[section].title),
-          h('span', { class: 'muted small' }, `rozliczeni ${settled} z ${all.length}`)));
-        out.push(rows.length ? tableFor('ksiegowosc', section, rows) : emptyBox());
-      }
-    }
-    // zawieszeni i zakończeni – osobno, bez wpływu na podsumowania
-    const inactive = filtered(inactiveIn(area), area);
-    if (inactiveIn(area).length) {
-      const open = prefs.showInactive !== false;
-      out.push(h('div', { class: 'table-title' },
-        h('h2', {}, 'Zawieszeni i zakończeni'),
-        h('span', { class: 'muted small' }, `${inactiveIn(area).length} · nie liczą się do podsumowań`),
-        h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { prefs.showInactive = !open; savePrefs(prefs); renderBody(); } }, open ? 'Zwiń' : 'Pokaż')));
-      if (open) out.push(inactive.length ? tableFor(area, 'nieaktywni', inactive) : emptyBox());
+    if (!model.length) out.push(h('div', { class: 'card empty' }, 'Nie wybrano żadnej grupy – zaznacz grupy w „Układ tabel”.'));
+    for (const t of model) {
+      const act = t.all.filter(c => c.status === 'aktywny');
+      const settled = act.filter(c => isSettled(c, area)).length;
+      const collapsible = t.inactiveOnly;
+      const open = !collapsible || prefs.showInactive !== false;
+      out.push(h('div', { class: 'table-title' }, h('h2', {}, t.title),
+        h('span', { class: 'muted small' }, t.inactiveOnly ? `${t.all.length} · nie liczą się do podsumowań`
+          : `rozliczeni ${settled} z ${act.length}` + (act.length !== t.all.length ? ` · ${t.all.length - act.length} zawieszonych/zakończonych poza podsumowaniem` : '')),
+        collapsible ? h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { prefs.showInactive = !open; savePrefs(prefs); renderBody(); } }, open ? 'Zwiń' : 'Pokaż') : null));
+      if (open) out.push(t.rows.length ? tableFor(area, t) : emptyBox());
     }
     body.replaceChildren(...out);
     renderTiles(); renderTabs();
@@ -343,8 +391,7 @@ export async function renderRozliczenia(main, params) {
     const c = clientMap.get(clientId);
     body.querySelectorAll(`tr[data-client="${clientId}"]`).forEach(tr => {
       const area = tr.dataset.area;
-      const section = tr.closest('table').dataset.section;
-      tr.replaceWith(rowFor(c, area, colsFor(area, section === 'kadry' ? null : section)));
+      tr.replaceWith(rowFor(c, area, tr.closest('table')._cols));
     });
     renderTiles(); renderTabs();
   }
@@ -434,29 +481,149 @@ export async function renderRozliczenia(main, params) {
         h('button', { class: 'btn btn-primary btn-sm', onclick: save }, 'Zapisz'))));
   }
 
+  // ---------- menu układu ----------
+  const chkStyle = { textTransform: 'none', letterSpacing: 0, fontSize: '13.5px', fontWeight: 500, color: 'var(--ink)', padding: '5px 0' };
+  function layoutMenu(anchor) {
+    const l = layout();
+    const box = h('div', { class: 'pop-body' },
+      h('label', {}, 'Pokaż grupy'),
+      Object.entries(GROUPS).map(([g, title]) => {
+        const cb = h('input', { type: 'checkbox', checked: l.groups.includes(g) });
+        cb.addEventListener('change', () => {
+          const groups = cb.checked ? [...layout().groups, g] : layout().groups.filter(x => x !== g);
+          setLayout({ groups });
+        });
+        return h('label', { class: 'check', style: chkStyle }, cb, title);
+      }),
+      h('div', { class: 'sep' }),
+      h('label', {}, 'Układ'),
+      Object.entries(LAYOUT_MODES).map(([m, title]) => {
+        const rb = h('input', { type: 'radio', name: 'layout-mode', checked: l.mode === m });
+        rb.addEventListener('change', () => setLayout({ mode: m }));
+        return h('label', { class: 'check', style: chkStyle }, rb, title);
+      }),
+      h('div', { class: 'row', style: { marginTop: '8px' } },
+        h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { setLayout({ ...DEFAULT_LAYOUT[prefs.area] }); closePop(); } }, 'Przywróć domyślny'),
+        h('button', { class: 'btn btn-primary btn-sm', onclick: closePop }, 'Gotowe')));
+    openPop(anchor, box);
+  }
+
+  function exportMenu(anchor) {
+    const item = (label, sub, fn) => h('button', { class: 'opt', onclick: () => { closePop(); fn(); } },
+      h('span', {}, h('b', {}, label), h('div', { class: 'small muted' }, sub)));
+    openPop(anchor, [h('label', {}, 'Pobierz widoczne tabele'),
+      item('Excel (.xlsx)', 'kolory statusów, każda tabela w osobnym arkuszu', exportXlsx),
+      item('PDF', 'wydruk poziomy – wybierz „Zapisz jako PDF”', exportPdf),
+      item('CSV', 'prosty plik tekstowy (średniki)', exportCsv)]);
+  }
+
   // ---------- eksport ----------
+  const statusText = (e) => !e ? '' : (e.status === 'todo' || e.status === 'in_progress') ? '' : STATUS[e.status].label;
+  const statusStyle = (e) => !e ? 'normal' : ({ done: 'done', na: 'na', missing_docs: 'missing' }[e.status] || 'todo');
+  const empText = (c) => c.has_employees === true ? 'Tak' : c.has_employees === false ? (sectionOf(c) === 'osobowe' ? 'JDG bez pracowników' : 'Nie') : '';
+  const filterInfo = () => {
+    const parts = [];
+    if (prefs.q) parts.push(`szukaj: „${prefs.q}”`);
+    if (prefs.person) parts.push(`${AREAS[prefs.area].personLabel.toLowerCase()}: ${prefs.person === 'me' ? 'moi klienci' : prefs.person === 'none' ? 'bez przypisania' : memberById(prefs.person)?.short_name}`);
+    if (prefs.show) parts.push(showSel.options[showSel.selectedIndex]?.text?.toLowerCase());
+    return parts.length ? 'Filtry: ' + parts.join(', ') : 'Bez filtrów';
+  };
+  const fileBase = () => `rozliczenia_${prefs.area === 'kadry' ? 'kadry-zus' : 'ksiegowosc'}_${period}`;
+
+  function exportXlsx() {
+    const area = prefs.area;
+    const sheets = tablesModel().map(t => {
+      const header = ['Klient', 'Forma', AREAS[area].personLabel, ...(area === 'kadry' ? ['Pracownicy'] : []), ...t.cols.map(c => c.label), 'Klient rozliczony', 'Uwagi', 'Pytania / problemy'];
+      const rows = [
+        [{ v: `${AREAS[area].label} – ${t.title} – ${periodLabel(period)}`, s: 'title' }],
+        [{ v: `RKDP · wygenerowano ${new Date().toLocaleString('pl-PL')} · ${filterInfo()}`, s: 'sub' }],
+        header.map(v => ({ v, s: 'header' })),
+        ...t.rows.map(c => {
+          const m = byClient.get(c.id);
+          const cs = cellsOf(c, area), done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
+          return [
+            { v: c.name + (c.status !== 'aktywny' ? ` (${c.status === 'zawieszony' ? 'zawieszony' : 'zakończony'})` : ''), s: 'wrap' },
+            LEGAL_SHORT[c.legal_form] || '', memberById(c[AREAS[area].person])?.short_name || '',
+            ...(area === 'kadry' ? [empText(c)] : []),
+            ...t.cols.map(col => { const e = m?.get(col.code); return { v: statusText(e), s: e ? statusStyle(e) : 'normal' }; }),
+            isSettled(c, area) ? { v: 'Rozliczony', s: 'settled' } : { v: `${done}/${cs.length}`, s: cs.some(e => e.status === 'missing_docs') ? 'missing' : 'todo' },
+            { v: noteMap.get(c.id)?.notes || '', s: 'wrap' }, { v: noteMap.get(c.id)?.questions || '', s: 'wrap' }];
+        })];
+      const widths = [38, 11, 14, ...(area === 'kadry' ? [20] : []), ...t.cols.map(() => 16), 18, 40, 40];
+      const short = { osobowe: 'JDG i osobowe', kapitalowe: 'Sp. z o.o.', nieaktywni: 'Zawieszeni' };
+      return { name: t.groups.map(g => short[g]).join(' + '), rows, widths, freeze: { row: 3, col: 1 } };
+    });
+    if (!sheets.length) return toast('Brak tabel do pobrania', true);
+    downloadXlsx(fileBase() + '.xlsx', sheets);
+  }
+
+  function exportPdf() {
+    const area = prefs.area;
+    const esc = (v) => String(v ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const mark = (e) => !e ? '' : `<span class="m m-${e.status === 'in_progress' ? 'todo' : e.status}">${STATUS[e.status].mark || ''}</span>`;
+    const tables = tablesModel().map(t => {
+      const head = `<tr><th class="l">Klient</th><th class="l">${AREAS[area].personLabel}</th>${area === 'kadry' ? '<th>Pracownicy</th>' : ''}${t.cols.map(c => `<th>${esc(c.label)}</th>`).join('')}<th>Rozliczony</th><th class="l">Uwagi</th></tr>`;
+      const rows = t.rows.map(c => {
+        const m = byClient.get(c.id);
+        const cs = cellsOf(c, area), done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
+        const n = noteMap.get(c.id) || {};
+        return `<tr class="${isSettled(c, area) ? 'ok' : ''}"><td class="l"><b>${esc(c.name)}</b> <span class="f">${esc(LEGAL_SHORT[c.legal_form] || '')}${c.status !== 'aktywny' ? ' · ' + esc(c.status) : ''}</span></td>
+          <td class="l">${esc(memberById(c[AREAS[area].person])?.short_name || '')}</td>
+          ${area === 'kadry' ? `<td>${esc(empText(c))}</td>` : ''}
+          ${t.cols.map(col => `<td>${mark(m?.get(col.code))}</td>`).join('')}
+          <td>${isSettled(c, area) ? '<b class="s">✓</b>' : `${done}/${cs.length}`}</td>
+          <td class="l n">${esc([n.notes, n.questions && 'Pytania: ' + n.questions].filter(Boolean).join(' · '))}</td></tr>`;
+      }).join('');
+      return `<h2>${esc(t.title)} <small>${t.rows.length} klientów</small></h2><table><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+    }).join('');
+    const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>${esc(fileBase())}</title>
+<style>
+@page{size:A4 landscape;margin:10mm}
+*{box-sizing:border-box}body{font-family:Montserrat,Arial,sans-serif;color:#1D1A16;font-size:9.5px;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #7A5A37;padding-bottom:6px;margin-bottom:8px}
+header h1{font-size:16px;margin:0}header p{margin:2px 0 0;color:#6A6157}
+header img{height:28px}
+h2{font-size:12px;margin:12px 0 4px}h2 small{font-weight:400;color:#6A6157}
+table{width:100%;border-collapse:collapse;page-break-inside:auto}
+thead{display:table-header-group}tr{page-break-inside:avoid}
+th{background:#F0E9DE;color:#4A433B;font-size:8.5px;padding:4px;border-bottom:1px solid #DCCFBC}
+td{padding:3px 4px;border-bottom:1px solid #E3D9CA;text-align:center;vertical-align:middle}
+.l{text-align:left}.f{color:#8F8579;font-size:8px}.n{font-size:8px;color:#4A433B;max-width:220px}
+tr.ok td{background:#EAF2E5}
+.m{display:inline-block;width:14px;height:14px;line-height:12px;border-radius:3px;border:1.2px solid #CFC4B4;font-weight:700;font-size:10px}
+.m-done{background:#3E6B47;border-color:#3E6B47;color:#fff}.m-na{background:#EFE9E0;color:#A79C8E}
+.m-missing_docs{background:#F6E1DA;border-color:#A4462F;color:#A4462F}
+.s{color:#3E6B47}.legend{margin-top:8px;color:#6A6157;font-size:8.5px}
+</style></head><body>
+<header><div><h1>${esc(AREAS[area].label)} – ${esc(periodLabel(period))}</h1><p>${esc(filterInfo())} · wygenerowano ${esc(new Date().toLocaleString('pl-PL'))}</p></div>
+<img src="${location.origin}/logo-rkdp.png" alt="RKDP"></header>
+${tables || '<p>Brak danych.</p>'}
+<p class="legend"><span class="m m-done">✓</span> zrobione &nbsp; <span class="m m-na">–</span> nie dotyczy &nbsp; <span class="m m-missing_docs">!</span> brak dokumentów &nbsp; <span class="m"></span> do zrobienia</p>
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) return toast('Przeglądarka zablokowała nowe okno – zezwól na wyskakujące okna dla tej strony.', true);
+    w.document.open(); w.document.write(html); w.document.close();
+    const go = () => { w.focus(); w.print(); };
+    const img = w.document.querySelector('img');
+    if (img && !img.complete) { img.onload = go; img.onerror = go; } else setTimeout(go, 200);
+  }
+
   function exportCsv() {
     const area = prefs.area;
-    const out = [];
-    const sections = [...(area === 'kadry' ? [null] : ['osobowe', 'kapitalowe']), 'nieaktywni'];
-    for (const section of sections) {
-      const cols = colsFor(area, section);
-      const rows = filtered(section === 'nieaktywni' ? inactiveIn(area)
-        : area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section), area);
-      if (section === 'nieaktywni' && !rows.length) continue;
-      if (section) out.push([section === 'nieaktywni' ? 'Zawieszeni i zakończeni' : SECTIONS[section].title]);
-      out.push(['Klient', AREAS[area].personLabel, ...(area === 'kadry' ? ['Pracownicy'] : []),
-        ...cols.map(t => t.label), 'Rozliczony', 'Uwagi', 'Pytania']);
-      rows.forEach(c => {
+    const out = [[`${AREAS[area].label} – ${periodLabel(period)}`], [filterInfo()], []];
+    for (const t of tablesModel()) {
+      out.push([t.title]);
+      out.push(['Klient', 'Forma', AREAS[area].personLabel, ...(area === 'kadry' ? ['Pracownicy'] : []), ...t.cols.map(c => c.label), 'Rozliczony', 'Uwagi', 'Pytania']);
+      t.rows.forEach(c => {
         const m = byClient.get(c.id);
-        out.push([c.name, memberById(c[AREAS[area].person])?.short_name || '',
-          ...(area === 'kadry' ? [c.has_employees === true ? 'tak' : c.has_employees === false ? 'nie' : ''] : []),
-          ...cols.map(t => { const e = m?.get(t.code); return e ? (e.status === 'todo' || e.status === 'in_progress' ? '' : STATUS[e.status].label) : ''; }),
+        out.push([c.name, LEGAL_SHORT[c.legal_form] || '', memberById(c[AREAS[area].person])?.short_name || '',
+          ...(area === 'kadry' ? [empText(c)] : []),
+          ...t.cols.map(col => statusText(m?.get(col.code))),
           isSettled(c, area) ? 'tak' : 'nie', noteMap.get(c.id)?.notes || '', noteMap.get(c.id)?.questions || '']);
       });
       out.push([]);
     }
-    downloadCsv(`rozliczenia_${area}_${period}.csv`, out);
+    downloadCsv(fileBase() + '.csv', out);
   }
 
   main.replaceChildren(head, tiles, deadlines, banner, toolbar, legend, body);
