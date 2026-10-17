@@ -60,6 +60,11 @@ export async function renderRozliczenia(main, params) {
   };
   const isSettled = (c, area) => { const cs = cellsOf(c, area); return cs.length > 0 && cs.every(e => e.status === 'done' || e.status === 'na'); };
   const hasMissing = (c, area) => cellsOf(c, area).some(e => e.status === 'missing_docs');
+  // JPK VAT (księgowość) / ZUS (kadry) jeszcze niewysłane: kratka nie jest „Zrobione” ani „Nie dotyczy”
+  const pendingSend = (c, area) => {
+    const e = byClient.get(c.id)?.get(area === 'kadry' ? 'zus_wyslany' : 'jpk');
+    return !!e && e.status !== 'done' && e.status !== 'na';
+  };
   const hasNote = c => !!(noteMap.get(c.id)?.notes?.trim() || noteMap.get(c.id)?.questions?.trim());
   // aktywni liczą się do podsumowań; zawieszeni i zakończeni idą do osobnej tabeli
   const withCells = (area) => clients.filter(c => cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
@@ -147,7 +152,7 @@ export async function renderRozliczenia(main, params) {
     const area = prefs.area;
     const rows = rowsIn(area);
     const settled = rows.filter(c => isSettled(c, area)).length;
-    const todo = rows.reduce((n, c) => n + cellsOf(c, area).filter(e => e.status === 'todo' || e.status === 'in_progress').length, 0);
+    const toSend = rows.filter(c => pendingSend(c, area)).length;
     const miss = rows.filter(c => hasMissing(c, area)).length;
     const nts = rows.filter(hasNote).length;
     const pct = rows.length ? Math.round(settled / rows.length * 100) : 0;
@@ -157,7 +162,7 @@ export async function renderRozliczenia(main, params) {
     tiles.replaceChildren(
       h('div', { class: 'card tile dark' }, h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
         h('span', { class: 'num' }, `${settled} / ${rows.length}`), h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } }))),
-      tile(todo, 'Kratek do zrobienia', 'nierozliczeni'),
+      tile(toSend, area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania', 'do_wyslania'),
       tile(miss, 'Klientów z brakiem dokumentów', 'braki'),
       tile(nts, 'Klientów z uwagami', 'uwagi'));
   }
@@ -198,6 +203,7 @@ export async function renderRozliczenia(main, params) {
       if (prefs.show === 'nierozliczeni' && isSettled(c, area)) return false;
       if (prefs.show === 'braki' && !hasMissing(c, area)) return false;
       if (prefs.show === 'uwagi' && !hasNote(c)) return false;
+      if (prefs.show === 'do_wyslania' && !pendingSend(c, area)) return false;
       if (prefs.show === 'z_prac' && c.has_employees !== true) return false;
       if (prefs.show === 'jdg_bez' && !(c.has_employees === false && sectionOf(c) === 'osobowe')) return false;
       return true;
@@ -344,7 +350,9 @@ export async function renderRozliczenia(main, params) {
   }
 
   function renderShowSel() {
-    const opts = [['', 'Wszyscy klienci'], ['nierozliczeni', 'Tylko nierozliczeni'], ['braki', 'Z brakiem dokumentów'], ['uwagi', 'Z uwagami / pytaniami']];
+    const opts = [['', 'Wszyscy klienci'], ['nierozliczeni', 'Tylko nierozliczeni'],
+      ['do_wyslania', prefs.area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania'],
+      ['braki', 'Z brakiem dokumentów'], ['uwagi', 'Z uwagami / pytaniami']];
     if (prefs.area === 'kadry') opts.push(['z_prac', 'Firmy z pracownikami'], ['jdg_bez', 'JDG bez pracowników']);
     else if (['z_prac', 'jdg_bez'].includes(prefs.show)) prefs.show = '';
     showSel.replaceChildren(...opts.map(([v, l]) => h('option', { value: v }, l)));
