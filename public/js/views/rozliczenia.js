@@ -208,7 +208,7 @@ export async function renderRozliczenia(main, params) {
   const empLabel = (c, v) => v === true ? 'Tak' : v === false ? (sectionOf(c) === 'osobowe' ? 'JDG bez pracowników' : 'Nie') : '?';
   function employeesCell(c) {
     const v = c.has_employees;
-    const cls = v === true ? 'yes' : v === false ? 'no' : 'unk';
+    const cls = v === true || (v === false && sectionOf(c) === 'osobowe') ? 'yes' : v === false ? 'no' : 'unk';
     return h('button', { class: `pill ${cls}`, disabled: !editClients,
       'data-tip': (v === false && sectionOf(c) === 'osobowe' ? 'JDG bez pracowników – rozliczamy tylko ZUS właściciela, PIT-4 nie dotyczy' : 'Czy firma zatrudnia pracowników / zleceniobiorców') + (editClients ? ' · kliknij, aby zmienić' : ''),
       onclick: (ev) => employeesMenu(ev.currentTarget, c) }, empLabel(c, v));
