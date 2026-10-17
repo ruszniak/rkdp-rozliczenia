@@ -249,6 +249,25 @@ async function viewMatters(main, params) {
   render();
 }
 
+// Szybkie dodanie klienta (np. przy zakładaniu sprawy) – pełne dane uzupełnisz później na karcie klienta
+function quickClientDialog(onCreated) {
+  const c = { kind: 'firma' };
+  modal('Nowy klient M2 TAX', h('div', {},
+    fieldsGrid([['name', 'Nazwa / imię i nazwisko', 'text', null, true], ['kind', 'Rodzaj', 'select', { firma: 'Firma', osoba: 'Osoba fizyczna' }],
+      ['nip', 'NIP', 'text'], ['address', 'Adres', 'text', null, true], ['contact_person', 'Osoba kontaktowa', 'text'],
+      ['phone', 'Telefon', 'tel'], ['email', 'E-mail', 'email'],
+      ['billing_type', 'Rozliczenie', 'select', BILLING_TYPE], ['hourly_rate', 'Stawka godzinowa (zł netto)', 'number']], c),
+    h('p', { class: 'hint', style: { marginTop: '10px' } }, 'Pozostałe dane (AML, abonament, kontakty) uzupełnisz później na karcie klienta.')),
+  (close) => [
+    h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+      if (!c.name) return toast('Podaj nazwę klienta', true);
+      const { data, error } = await sb.from('m2_clients').insert({ ...c, kind: c.kind || 'firma' }).select('id,name,hourly_rate,billing_type').single();
+      if (error) return fail(error);
+      toast(`Dodano klienta: ${data.name}`); close(); onCreated(data);
+    } }, 'Dodaj klienta')]);
+}
+
 async function viewMatter(main, id, params) {
   const isNew = id === 'nowa';
   const clients = await fetchAll(() => sb.from('m2_clients').select('id,name,hourly_rate,billing_type').eq('status', 'aktywny').order('name'));
@@ -289,11 +308,19 @@ async function viewMatter(main, id, params) {
     toast(isNew ? 'Utworzono sprawę' : 'Zapisano');
     if (isNew) location.hash = `${BASE}/sprawa/${data.id}`; else Object.assign(m, row);
   }
-  const formCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Dane sprawy')),
-    fieldsGrid(defs, draft), h('div', { class: 'savebar' }, saveBtn));
+  const gridBox = h('div');
+  const buildGrid = () => gridBox.replaceChildren(fieldsGrid(defs, draft));
+  buildGrid();
+  const addClientBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => quickClientDialog((c) => {
+    clients.push(c); clients.sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    defs[1][3] = Object.fromEntries(clients.map(x => [x.id, x.name]));
+    draft.client_id = c.id; buildGrid();
+  }) }, icon('plus'), 'Nowy klient');
+  const formCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Dane sprawy'), addClientBtn),
+    gridBox, h('div', { class: 'savebar' }, saveBtn));
 
   if (isNew) {
-    main.replaceChildren(...header('sprawy', 'Nowa sprawa', clients.length ? null : 'Najpierw dodaj klienta w zakładce Klienci.'), formCard);
+    main.replaceChildren(...header('sprawy', 'Nowa sprawa', clients.length ? 'Wybierz klienta z listy albo dodaj nowego przyciskiem „Nowy klient”.' : 'Dodaj klienta przyciskiem „Nowy klient” – zapisze się w bazie klientów M2 TAX.'), formCard);
     return;
   }
 
