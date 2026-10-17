@@ -1,8 +1,8 @@
-import { h, icon, toast, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv } from '../ui.js';
-import { sb, state, memberById, activeTasks } from '../store.js';
-import { STATUS, STATUS_ORDER, LEGAL_SHORT, FORM_GROUP, deadlinesFor } from '../dict.js';
+import { h, icon, toast, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials } from '../ui.js';
+import { sb, state, memberById, canEditClients } from '../store.js';
+import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
 
-const PREF_KEY = 'rkdp-rozliczenia-filtry';
+const PREF_KEY = 'rkdp-rozliczenia-v2';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch { return {}; } };
 const savePrefs = p => { try { localStorage.setItem(PREF_KEY, JSON.stringify(p)); } catch { /* prywatne okno */ } };
 
@@ -16,27 +16,33 @@ export async function fetchAll(build) {
   }
 }
 
-const GROUP_ORDER = { jdg: 0, osobowe: 1, kapitalowe: 2 };
-const groupOf = c => FORM_GROUP[c.legal_form] || 'inne';
+const AREAS = {
+  ksiegowosc: { label: 'Księgowość', person: 'accountant_id', personLabel: 'Księgowa' },
+  kadry: { label: 'Kadry i ZUS', person: 'hr_id', personLabel: 'Kadrowa' },
+};
+const SECTIONS = {
+  osobowe: { title: 'JDG i spółki osobowe', pitLabel: 'PIT' },
+  kapitalowe: { title: 'Spółki z o.o. i pełna księgowość', pitLabel: 'CIT' },
+};
+const ICON_NOTE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
 export async function renderRozliczenia(main, params) {
   const period = /^\d{4}-\d{2}$/.test(params.get('okres') || '') ? params.get('okres') : defaultPeriod();
   const pdate = period + '-01';
-  const prefs = { q: '', group: '', person: '', show: '', ...loadPrefs() };
-  const tasks = activeTasks();
+  const prefs = { area: 'ksiegowosc', q: '', person: '', show: '', ...loadPrefs() };
+  if (params.get('widok') && AREAS[params.get('widok')]) prefs.area = params.get('widok');
+  const editClients = canEditClients();
 
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie rozliczeń…'));
-
   const [clients, entries, notes] = await Promise.all([
     fetchAll(() => sb.from('clients')
-      .select('id,name,status,legal_form,bookkeeping,vat_status,pit_form,cit_type,client_assignments(member_id)')
-      .order('name')),
-    fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,assignee_id,updated_by,updated_at').eq('period', pdate)),
+      .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id').order('name')),
+    fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at').eq('period', pdate)),
     fetchAll(() => sb.from('period_notes').select('client_id,notes,questions').eq('period', pdate)),
   ]);
 
-  // indeksy
-  const byClient = new Map();          // client_id -> Map(task_code -> entry)
+  const tasksAll = state.taskTypes.filter(t => t.active);
+  const byClient = new Map();
   for (const e of entries) {
     if (!byClient.has(e.client_id)) byClient.set(e.client_id, new Map());
     byClient.get(e.client_id).set(e.task_code, e);
@@ -45,66 +51,104 @@ export async function renderRozliczenia(main, params) {
   const clientMap = new Map(clients.map(c => [c.id, c]));
   const missing = clients.filter(c => c.status === 'aktywny' && !byClient.has(c.id));
 
-  const rowsAll = () => clients.filter(c => byClient.has(c.id))
-    .sort((a, b) => (GROUP_ORDER[groupOf(a)] ?? 3) - (GROUP_ORDER[groupOf(b)] ?? 3) || a.name.localeCompare(b.name, 'pl'));
-
-  const isSettled = c => {
-    const m = byClient.get(c.id);
-    return m && m.size > 0 && [...m.values()].every(e => e.status === 'done' || e.status === 'na');
+  // kolumny dla obszaru / sekcji
+  const tasksFor = (area, section) => tasksAll.filter(t => t.area === area && (area === 'kadry' || t.applies_to === 'all' || t.applies_to === section));
+  const cellsOf = (c, area) => {
+    const m = byClient.get(c.id); if (!m) return [];
+    const list = area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', sectionOf(c));
+    return list.map(t => m.get(t.code)).filter(Boolean);
   };
-  const hasMissing = c => [...(byClient.get(c.id)?.values() || [])].some(e => e.status === 'missing_docs');
-  const hasQuestion = c => !!noteMap.get(c.id)?.questions?.trim();
+  const isSettled = (c, area) => { const cs = cellsOf(c, area); return cs.length > 0 && cs.every(e => e.status === 'done' || e.status === 'na'); };
+  const hasMissing = (c, area) => cellsOf(c, area).some(e => e.status === 'missing_docs');
+  const hasNote = c => !!(noteMap.get(c.id)?.notes?.trim() || noteMap.get(c.id)?.questions?.trim());
+  const rowsIn = (area) => clients.filter(c => cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
 
   // ---------- nagłówek ----------
-  const monthNav = h('div', { class: 'month' },
-    h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, -1)}`, title: 'Poprzedni miesiąc', 'aria-label': 'Poprzedni miesiąc' }, icon('left')),
-    h('span', { class: 'label' }, periodLabel(period)),
-    h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, 1)}`, title: 'Następny miesiąc', 'aria-label': 'Następny miesiąc' }, icon('right')));
-
   const head = h('div', { class: 'page-head' },
-    h('div', {}, h('p', { class: 'eyebrow' }, 'Rozliczenia miesięczne'),
-      h('h1', { style: { marginTop: '6px' } }, 'Kto jest rozliczony?')),
-    monthNav);
+    h('h1', {}, 'Rozliczenia miesięczne'),
+    h('div', { class: 'month' },
+      h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, -1)}`, 'aria-label': 'Poprzedni miesiąc', 'data-tip': 'Poprzedni miesiąc' }, icon('left')),
+      h('span', { class: 'label' }, periodLabel(period)),
+      h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, 1)}`, 'aria-label': 'Następny miesiąc', 'data-tip': 'Następny miesiąc' }, icon('right'))));
 
-  // ---------- kafelki ----------
+  const tabsBox = h('div', { class: 'tabs', role: 'tablist' });
   const tiles = h('div', { class: 'tiles' });
-  const renderTiles = () => {
-    const rows = rowsAll();
-    const settled = rows.filter(isSettled).length;
-    const open = entries.filter(e => e.status === 'todo' || e.status === 'in_progress').length;
-    const miss = rows.filter(hasMissing).length;
-    const q = rows.filter(hasQuestion).length;
-    const pct = rows.length ? Math.round(settled / rows.length * 100) : 0;
-    tiles.replaceChildren(
-      h('div', { class: 'card tile dark' }, h('span', { class: 'lbl' }, 'Klienci rozliczeni'),
-        h('span', { class: 'num' }, `${settled} / ${rows.length}`),
-        h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } }))),
-      tileBtn(open, 'Zadań do zrobienia', 'nierozliczeni'),
-      tileBtn(miss, 'Klientów z brakiem dokumentów', 'braki'),
-      tileBtn(q, 'Pytań do wyjaśnienia', 'pytania'));
-  };
-  const tileBtn = (n, lbl, show) => h('button', { class: 'card tile', style: { textAlign: 'left', cursor: 'pointer' },
-    onclick: () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
-  h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n));
-
-  // ---------- terminy ----------
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const deadlines = h('div', { class: 'panel deadlines' },
-    h('b', {}, 'Terminy za ' + periodLabel(period).toLowerCase() + ':'),
-    deadlinesFor(period).map(d => h('span', { class: 'dl' + (d.date < today ? ' late' : '') },
-      d.label, h('b', {}, d.date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' })),
-      d.moved ? h('span', { class: 'small muted' }, '(przesunięty)') : null)));
-
-  // ---------- baner otwierania miesiąca ----------
+  const deadlines = h('div', { class: 'panel deadlines' });
   const banner = h('div', { class: 'card', style: { padding: '18px 22px', marginBottom: '18px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' } });
-  const renderBanner = () => {
+  const body = h('div');
+
+  // ---------- filtry ----------
+  const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj klienta…', value: prefs.q, 'aria-label': 'Szukaj klienta' });
+  const personSel = h('select', { class: 'select', 'aria-label': 'Osoba' });
+  const showSel = h('select', { class: 'select', 'aria-label': 'Pokaż' },
+    h('option', { value: '' }, 'Wszyscy klienci'), h('option', { value: 'nierozliczeni' }, 'Tylko nierozliczeni'),
+    h('option', { value: 'braki' }, 'Z brakiem dokumentów'), h('option', { value: 'uwagi' }, 'Z uwagami / pytaniami'));
+  showSel.value = prefs.show;
+  const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportCsv() }, icon('download'), 'Eksport');
+  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, exportBtn);
+  const onFilter = () => { Object.assign(prefs, { q: search.value, person: personSel.value, show: showSel.value }); savePrefs(prefs); renderBody(); };
+  search.addEventListener('input', onFilter);
+  personSel.addEventListener('change', onFilter);
+  showSel.addEventListener('change', onFilter);
+
+  const legend = h('div', { class: 'legend' },
+    ['done', 'na', 'missing_docs', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
+    h('span', { class: 'muted' }, '· kliknij kratkę, aby zmienić · najedź na nagłówek, aby zobaczyć opis'));
+
+  function renderTabs() {
+    tabsBox.replaceChildren(...Object.entries(AREAS).map(([k, a]) => {
+      const rows = rowsIn(k);
+      const open = rows.filter(c => !isSettled(c, k)).length;
+      return h('button', { class: prefs.area === k ? 'on' : '', role: 'tab', 'aria-selected': String(prefs.area === k),
+        onclick: () => { prefs.area = k; prefs.person = ''; savePrefs(prefs); renderAll(); } },
+      a.label, h('span', { class: 'n', 'data-tip': 'Nierozliczeni klienci' }, open));
+    }));
+  }
+
+  function renderPersonSel() {
+    const a = AREAS[prefs.area];
+    personSel.replaceChildren(
+      h('option', { value: '' }, `${a.personLabel}: wszyscy`),
+      h('option', { value: 'me' }, 'Moi klienci'),
+      h('option', { value: 'none' }, `Bez przypisanej osoby`),
+      state.members.filter(m => m.active).map(m => h('option', { value: m.id }, `${a.personLabel}: ${m.short_name}`)));
+    personSel.value = prefs.person || '';
+  }
+
+  function renderTiles() {
+    const area = prefs.area;
+    const rows = rowsIn(area);
+    const settled = rows.filter(c => isSettled(c, area)).length;
+    const todo = rows.reduce((n, c) => n + cellsOf(c, area).filter(e => e.status === 'todo' || e.status === 'in_progress').length, 0);
+    const miss = rows.filter(c => hasMissing(c, area)).length;
+    const nts = rows.filter(hasNote).length;
+    const pct = rows.length ? Math.round(settled / rows.length * 100) : 0;
+    const tile = (n, lbl, show) => h('button', { class: 'card tile' + (prefs.show === show ? ' on' : ''), style: { textAlign: 'left', cursor: 'pointer' },
+      onclick: () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
+    h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n));
+    tiles.replaceChildren(
+      h('div', { class: 'card tile dark' }, h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
+        h('span', { class: 'num' }, `${settled} / ${rows.length}`), h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } }))),
+      tile(todo, 'Kratek do zrobienia', 'nierozliczeni'),
+      tile(miss, 'Klientów z brakiem dokumentów', 'braki'),
+      tile(nts, 'Klientów z uwagami', 'uwagi'));
+  }
+
+  function renderDeadlines() {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    deadlines.replaceChildren(h('b', {}, `Terminy za ${periodLabel(period).toLowerCase()}:`), ...
+      deadlinesFor(period, prefs.area).map(d => h('span', { class: 'dl' + (d.date < today ? ' late' : ''), 'data-tip': d.moved ? 'Termin przesunięty na najbliższy dzień roboczy' : null },
+        d.label, h('b', {}, d.date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }) + (d.moved ? '*' : '')))));
+  }
+
+  function renderBanner() {
     if (!missing.length) { banner.hidden = true; return; }
     banner.hidden = false;
     const none = entries.length === 0;
     banner.replaceChildren(
       h('div', {}, h('h3', {}, none ? `Lista na ${periodLabel(period).toLowerCase()} nie jest jeszcze otwarta` : `${missing.length} aktywnych klientów nie ma jeszcze listy w tym miesiącu`),
         h('p', { class: 'hint', style: { marginTop: '4px' } },
-          'Pozycje „nie dotyczy” ustawią się automatycznie według profilu klienta (VAT, PIT/CIT, ZUS, pracownicy). Gdy profil nie jest uzupełniony, przejmiemy układ z poprzedniego miesiąca.')),
+          '„Nie dotyczy” ustawi się samo według profilu klienta (VAT, PIT/CIT, ZUS, pracownicy). Gdy profil nie jest uzupełniony, przejmiemy układ z poprzedniego miesiąca.')),
       h('button', { class: 'btn btn-primary', onclick: async (e) => {
         e.target.disabled = true;
         const { data, error } = await sb.rpc('generate_period', { p_period: pdate });
@@ -112,223 +156,264 @@ export async function renderRozliczenia(main, params) {
         toast(`Utworzono ${data} pozycji`);
         renderRozliczenia(main, params);
       } }, none ? 'Otwórz miesiąc' : 'Dodaj brakujących klientów'));
-  };
+  }
 
-  // ---------- filtry ----------
-  const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj klienta…', value: prefs.q, 'aria-label': 'Szukaj klienta' });
-  const groupSel = h('select', { class: 'select', 'aria-label': 'Forma' },
-    h('option', { value: '' }, 'Wszystkie formy'), h('option', { value: 'jdg' }, 'JDG'),
-    h('option', { value: 'osobowe' }, 'Spółki osobowe'), h('option', { value: 'kapitalowe' }, 'Sp. z o.o. / S.A.'),
-    h('option', { value: 'inne' }, 'Pozostałe'));
-  groupSel.value = prefs.group;
-  const personSel = h('select', { class: 'select', 'aria-label': 'Osoba' }, h('option', { value: '' }, 'Wszyscy pracownicy'),
-    state.members.filter(m => m.active).map(m => h('option', { value: m.id }, m.short_name)));
-  personSel.value = prefs.person;
-  const showSel = h('select', { class: 'select', 'aria-label': 'Pokaż' },
-    h('option', { value: '' }, 'Wszyscy klienci'), h('option', { value: 'nierozliczeni' }, 'Tylko nierozliczeni'),
-    h('option', { value: 'braki' }, 'Z brakiem dokumentów'), h('option', { value: 'pytania' }, 'Z pytaniami'));
-  showSel.value = prefs.show;
-  const onFilter = () => {
-    Object.assign(prefs, { q: search.value, group: groupSel.value, person: personSel.value, show: showSel.value });
-    savePrefs(prefs); renderBody();
-  };
-  search.addEventListener('input', onFilter);
-  [groupSel, personSel, showSel].forEach(s => s.addEventListener('change', onFilter));
-
-  const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportCsv() }, icon('download'), 'Eksport do Excela');
-  const toolbar = h('div', { class: 'toolbar' }, search, groupSel, personSel, showSel, exportBtn);
-
-  // ---------- tabela ----------
-  const thead = h('thead');
-  const tbody = h('tbody');
-  const table = h('table', { class: 'grid' }, thead, tbody);
-  const gridWrap = h('div', { class: 'grid-wrap' }, table);
-  const emptyBox = h('div', { class: 'card empty', hidden: true });
-
-  const filtered = () => {
+  // ---------- filtrowanie ----------
+  const filtered = (rows, area) => {
     const q = prefs.q.trim().toLowerCase();
-    return rowsAll().filter(c => {
+    const field = AREAS[area].person;
+    return rows.filter(c => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
-      if (prefs.group && groupOf(c) !== prefs.group) return false;
-      if (prefs.person) {
-        const assigned = c.client_assignments?.some(a => a.member_id === prefs.person);
-        const inCells = [...byClient.get(c.id).values()].some(e => e.assignee_id === prefs.person);
-        if (!assigned && !inCells) return false;
-      }
-      if (prefs.show === 'nierozliczeni' && isSettled(c)) return false;
-      if (prefs.show === 'braki' && !hasMissing(c)) return false;
-      if (prefs.show === 'pytania' && !hasQuestion(c)) return false;
+      if (prefs.person === 'me' && c[field] !== state.me.id) return false;
+      if (prefs.person === 'none' && c[field]) return false;
+      if (prefs.person && !['me', 'none'].includes(prefs.person) && c[field] !== prefs.person) return false;
+      if (prefs.show === 'nierozliczeni' && isSettled(c, area)) return false;
+      if (prefs.show === 'braki' && !hasMissing(c, area)) return false;
+      if (prefs.show === 'uwagi' && !hasNote(c)) return false;
       return true;
     });
   };
 
-  function renderHead() {
-    const rows = rowsAll();
-    thead.replaceChildren(h('tr', {},
-      h('th', { class: 'c-name' }, 'Klient'),
-      tasks.map(t => {
-        const relevant = rows.map(c => byClient.get(c.id).get(t.code)).filter(e => e && e.status !== 'na');
-        const done = relevant.filter(e => e.status === 'done').length;
-        return h('th', {}, t.label, h('div', { class: 'small', style: { fontWeight: 500, marginTop: '2px' } }, `${done}/${relevant.length}`));
-      }),
-      h('th', { class: 'c-note' }, 'Uwagi'),
-      h('th', { class: 'c-note' }, 'Pytania / problemy')));
+  // ---------- komórki ----------
+  function checkbox(entry, task, headerLabel) {
+    if (!entry) return h('span', { class: 'muted small' }, '');
+    const st = STATUS[entry.status];
+    const who = entry.updated_by && entry.updated_by !== 'system'
+      ? (state.members.find(m => m.email === entry.updated_by)?.short_name || entry.updated_by) : null;
+    const tip = `${headerLabel}: ${st.label}` + (who ? `\nZmienił(a): ${who}, ${new Date(entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
+    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}`, 'data-tip': tip, 'aria-label': tip,
+      onclick: (ev) => statusMenu(ev.currentTarget, entry, headerLabel) }, st.mark);
   }
 
-  function statusButton(entry) {
-    if (!entry) return h('span', { class: 'muted small' }, '—');
-    const st = STATUS[entry.status];
-    const who = entry.assignee_id ? memberById(entry.assignee_id)?.short_name : null;
-    let text = st.short || st.label;
-    if ((entry.status === 'todo') && who) text = who;
-    else if (entry.status === 'in_progress' && who) text = `W toku · ${who}`;
-    const b = h('button', {
-      class: `st st-${entry.status}` + (entry.status === 'todo' && who ? ' assigned' : ''),
-      title: `${st.label}${who ? ' · ' + who : ''}${entry.updated_by && entry.updated_by !== 'system' ? '\nZmienione: ' + entry.updated_by + ', ' + new Date(entry.updated_at).toLocaleString('pl-PL') : ''}`,
-      onclick: (ev) => openMenu(ev.currentTarget, entry),
-    }, text);
-    b.dataset.entry = entry.id;
+  function personCell(c, area) {
+    const field = AREAS[area].person;
+    const m = c[field] ? memberById(c[field]) : null;
+    const b = h('button', { class: 'person' + (m ? '' : ' unassigned'), disabled: !editClients,
+      'data-tip': editClients ? `Kliknij, aby zmienić: ${AREAS[area].personLabel.toLowerCase()}` : null,
+      onclick: (ev) => personMenu(ev.currentTarget, c, field) },
+    h('span', { class: 'av' }, m ? initials(m.full_name) : '+'), m ? m.short_name : 'przypisz');
     return b;
   }
 
-  function noteCell(c, field) {
-    const n = noteMap.get(c.id) || {};
-    const div = h('div', { class: 'note-cell' + (field === 'questions' ? ' q' : ''), tabindex: '0', role: 'button',
-      'data-ph': field === 'questions' ? '' : '', title: 'Kliknij, aby edytować' }, n[field] || '');
-    const edit = () => {
-      const ta = h('textarea', { class: 'note-edit' }, n[field] || '');
-      div.replaceWith(ta); ta.focus();
-      ta.addEventListener('keydown', e => { if (e.key === 'Escape') { ta.replaceWith(div); } });
-      ta.addEventListener('blur', async () => {
-        const val = ta.value.trim() || null;
-        if ((n[field] || null) === val) { ta.replaceWith(div); return; }
-        const cur = noteMap.get(c.id) || { client_id: c.id };
-        const payload = { client_id: c.id, period: pdate, notes: cur.notes ?? null, questions: cur.questions ?? null, [field]: val };
-        const { error } = await sb.from('period_notes').upsert(payload, { onConflict: 'client_id,period' });
-        if (error) { fail(error); ta.replaceWith(div); return; }
-        noteMap.set(c.id, { ...cur, [field]: val });
-        const fresh = noteCell(c, field); ta.replaceWith(fresh);
-        renderTiles();
-      });
-    };
-    div.addEventListener('click', edit);
-    div.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); edit(); } });
-    return div;
+  function employeesCell(c) {
+    const v = c.has_employees;
+    const cls = v === true ? 'yes' : v === false ? 'no' : 'unk';
+    return h('button', { class: `pill ${cls}`, disabled: !editClients,
+      'data-tip': 'Czy firma zatrudnia pracowników / zleceniobiorców' + (editClients ? ' · kliknij, aby zmienić' : ''),
+      onclick: async () => {
+        const next = v === true ? false : true;
+        const { error } = await sb.from('clients').update({ has_employees: next }).eq('id', c.id);
+        if (error) return fail(error);
+        c.has_employees = next;
+        // PIT-4 w tym miesiącu idzie za odpowiedzią
+        const e = byClient.get(c.id)?.get('pit4');
+        if (e && ((next === false && e.status === 'todo') || (next === true && e.status === 'na'))) {
+          await setStatus(e, next ? 'todo' : 'na');
+        } else refreshRow(c.id);
+      } }, v === true ? 'Tak' : v === false ? 'Nie' : '?');
   }
 
-  function rowFor(c) {
-    const m = byClient.get(c.id);
-    const settled = isSettled(c);
-    const owners = (c.client_assignments || []).map(a => memberById(a.member_id)?.short_name).filter(Boolean);
-    const tr = h('tr', { class: settled ? 'settled' : null, 'data-client': c.id },
+  function sumCell(c, area) {
+    const cs = cellsOf(c, area);
+    const done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
+    if (cs.length && done === cs.length) return h('span', { class: 'sum ok' }, '✓ Rozliczony');
+    if (cs.some(e => e.status === 'missing_docs')) return h('span', { class: 'sum bad', 'data-tip': 'Brakuje dokumentów' }, `! ${done}/${cs.length}`);
+    return h('span', { class: 'sum no', 'data-tip': `Zrobione ${done} z ${cs.length}` }, `${done}/${cs.length}`);
+  }
+
+  function noteCell(c) {
+    const n = noteMap.get(c.id) || {};
+    const has = !!(n.notes?.trim()), q = !!(n.questions?.trim());
+    const tip = (has ? `Uwagi: ${n.notes}` : '') + (has && q ? '\n' : '') + (q ? `Pytania: ${n.questions}` : '') || 'Dodaj uwagę lub pytanie';
+    return h('button', { class: 'note-btn' + (has || q ? ' has' : '') + (q ? ' q' : ''), 'data-tip': tip, 'aria-label': 'Uwagi',
+      html: ICON_NOTE + (q ? '<span class="dot"></span>' : ''), onclick: (ev) => notesMenu(ev.currentTarget, c) });
+  }
+
+  function rowFor(c, area, cols) {
+    const settled = isSettled(c, area);
+    return h('tr', { class: settled ? 'settled' : null, 'data-client': c.id, 'data-area': area },
       h('td', { class: 'c-name' }, h('div', { class: 'cname' },
-        h('span', { class: 'tick ' + (settled ? 'ok' : 'no'), title: settled ? 'Rozliczony' : 'Nierozliczony' }, settled ? '✓' : ''),
-        h('div', {}, h('a', { href: `#/klient/${c.id}` }, c.name),
-          h('div', { class: 'meta' },
-            h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?'),
-            c.status !== 'aktywny' ? h('span', { class: 'badge warn' }, c.status === 'zawieszony' ? 'zawieszony' : 'zakończony') : null,
-            owners.length ? h('span', { class: 'small muted' }, owners.join(', ')) : null)))),
-      tasks.map(t => h('td', {}, statusButton(m.get(t.code)))),
-      h('td', { class: 'c-note' }, noteCell(c, 'notes')),
-      h('td', { class: 'c-note' }, noteCell(c, 'questions')));
-    return tr;
+        h('a', { href: `#/klient/${c.id}` }, c.name),
+        h('div', { class: 'meta' }, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?'),
+          c.status !== 'aktywny' ? h('span', { class: 'badge warn' }, c.status === 'zawieszony' ? 'zawieszony' : 'zakończony') : null))),
+      h('td', { class: 'c-person' }, personCell(c, area)),
+      area === 'kadry' ? h('td', {}, employeesCell(c)) : null,
+      cols.map(col => h('td', { class: 'c-task' }, checkbox(byClient.get(c.id)?.get(col.code), col, col.label))),
+      h('td', { class: 'c-sum' }, sumCell(c, area)),
+      h('td', {}, noteCell(c)));
+  }
+
+  function tableFor(area, section, rows) {
+    const cols = (area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', section)).map(t => ({
+      ...t, label: t.code === 'pit_cit' && section ? SECTIONS[section].pitLabel : t.label,
+    }));
+    const allRows = area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section);
+    const stat = (col) => {
+      const rel = allRows.map(c => byClient.get(c.id)?.get(col.code)).filter(e => e && e.status !== 'na');
+      return `${rel.filter(e => e.status === 'done').length}/${rel.length}`;
+    };
+    const thead = h('thead', {}, h('tr', {},
+      h('th', { class: 'c-name' }, 'Klient'),
+      h('th', { class: 'c-person' }, AREAS[area].personLabel),
+      area === 'kadry' ? h('th', { 'data-tip': 'Czy firma zatrudnia pracowników lub zleceniobiorców' }, 'Pracownicy') : null,
+      cols.map(col => h('th', { class: 'c-task', 'data-tip': col.description || col.label }, col.label, h('span', { class: 'sub' }, stat(col)))),
+      h('th', { class: 'c-sum', 'data-tip': 'Rozliczony = wszystkie kratki „Zrobione” albo „Nie dotyczy”' }, 'Klient rozliczony'),
+      h('th', { 'data-tip': 'Uwagi i pytania do klienta w tym miesiącu' }, 'Uwagi')));
+    const tbody = h('tbody', {}, rows.map(c => rowFor(c, area, cols)));
+    return h('div', { class: 'grid-wrap' }, h('table', { class: 'grid', 'data-section': section || 'kadry' }, thead, tbody));
   }
 
   function renderBody() {
-    const rows = filtered();
-    tbody.replaceChildren(...rows.map(rowFor));
-    const totalRows = rowsAll().length;
-    emptyBox.hidden = rows.length > 0;
-    gridWrap.hidden = rows.length === 0;
-    emptyBox.textContent = totalRows === 0
-      ? 'Brak listy na ten miesiąc. Użyj przycisku „Otwórz miesiąc” powyżej.'
-      : 'Żaden klient nie pasuje do filtrów.';
-    renderHead();
+    const area = prefs.area;
+    const out = [];
+    if (area === 'kadry') {
+      const rows = filtered(rowsIn('kadry'), 'kadry');
+      out.push(rows.length ? tableFor('kadry', null, rows) : emptyBox());
+    } else {
+      for (const section of ['osobowe', 'kapitalowe']) {
+        const all = rowsIn('ksiegowosc').filter(c => sectionOf(c) === section);
+        const rows = filtered(all, 'ksiegowosc');
+        const settled = all.filter(c => isSettled(c, 'ksiegowosc')).length;
+        out.push(h('div', { class: 'table-title' }, h('h2', {}, SECTIONS[section].title),
+          h('span', { class: 'muted small' }, `rozliczeni ${settled} z ${all.length}`)));
+        out.push(rows.length ? tableFor('ksiegowosc', section, rows) : emptyBox());
+      }
+    }
+    body.replaceChildren(...out);
+    renderTiles(); renderTabs();
   }
+  const emptyBox = () => h('div', { class: 'card empty' }, entries.length ? 'Żaden klient nie pasuje do filtrów.' : 'Brak listy na ten miesiąc – użyj przycisku „Otwórz miesiąc”.');
 
   function refreshRow(clientId) {
-    const tr = tbody.querySelector(`tr[data-client="${clientId}"]`);
     const c = clientMap.get(clientId);
-    if (tr && c) tr.replaceWith(rowFor(c));
-    renderTiles(); renderHead();
+    body.querySelectorAll(`tr[data-client="${clientId}"]`).forEach(tr => {
+      const area = tr.dataset.area;
+      const section = tr.closest('table').dataset.section;
+      const cols = (area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', section)).map(t => ({
+        ...t, label: t.code === 'pit_cit' ? SECTIONS[section]?.pitLabel || t.label : t.label }));
+      tr.replaceWith(rowFor(c, area, cols));
+    });
+    renderTiles(); renderTabs();
   }
 
-  // ---------- menu statusu ----------
-  function openMenu(anchor, entry) {
-    document.querySelector('.pop')?.remove();
-    const pop = h('div', { class: 'pop', role: 'menu' });
-    const set = async (patch) => {
-      pop.remove();
-      const before = { status: entry.status, assignee_id: entry.assignee_id };
-      Object.assign(entry, patch);
-      refreshRow(entry.client_id);
-      const { error } = await sb.from('checklist_entries').update(patch).eq('id', entry.id);
-      if (error) { Object.assign(entry, before); refreshRow(entry.client_id); fail(error, 'Nie zapisano'); }
-    };
-    STATUS_ORDER.forEach(s => pop.append(h('button', { class: 'opt' + (entry.status === s ? ' cur' : ''), role: 'menuitem',
-      onclick: () => set({ status: s }) }, h('span', { class: 'dot', style: { background: STATUS[s].color } }), STATUS[s].label)));
-    pop.append(h('div', { class: 'sep' }), h('label', {}, 'Kto się zajmuje'));
-    const sel = h('select', { class: 'select', onchange: () => set({ assignee_id: sel.value || null }) },
-      h('option', { value: '' }, '— nikt —'),
-      state.members.filter(m => m.active).map(m => h('option', { value: m.id }, m.full_name)));
-    sel.value = entry.assignee_id || '';
-    pop.append(sel);
+  function renderAll() {
+    renderPersonSel(); renderDeadlines(); renderBanner(); renderBody();
+  }
+
+  // ---------- zapisy ----------
+  async function setStatus(entry, status) {
+    const before = entry.status;
+    entry.status = status; entry.updated_by = state.me.email; entry.updated_at = new Date().toISOString();
+    refreshRow(entry.client_id);
+    const { error } = await sb.from('checklist_entries').update({ status }).eq('id', entry.id);
+    if (error) { entry.status = before; refreshRow(entry.client_id); fail(error, 'Nie zapisano'); }
+  }
+
+  // ---------- menu ----------
+  function openPop(anchor, content) {
+    closePop();
+    const pop = h('div', { class: 'pop', role: 'menu' }, content);
     document.body.append(pop);
     const r = anchor.getBoundingClientRect();
     const pw = pop.offsetWidth, ph = pop.offsetHeight;
     pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pw - 8)) + 'px';
     pop.style.top = (r.bottom + ph + 8 > innerHeight ? Math.max(8, r.top - ph - 6) : r.bottom + 6) + 'px';
-    pop.querySelector('.opt.cur, .opt')?.focus();
     const close = (e) => {
       if (e.type === 'keydown' && e.key !== 'Escape') return;
       if (e.type === 'mousedown' && pop.contains(e.target)) return;
-      pop.remove(); cleanupPop();
+      closePop();
     };
-    const cleanupPop = () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); gridWrap.removeEventListener('scroll', close2); };
-    const close2 = () => { pop.remove(); cleanupPop(); };
-    setTimeout(() => { document.addEventListener('mousedown', close); document.addEventListener('keydown', close); gridWrap.addEventListener('scroll', close2, { passive: true }); });
+    pop._cleanup = () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+    setTimeout(() => { document.addEventListener('mousedown', close); document.addEventListener('keydown', close); });
+    (pop.querySelector('textarea, .opt.cur, .opt') || pop).focus?.();
+    return pop;
+  }
+  function closePop() { const p = document.querySelector('.pop'); if (p) { p._cleanup?.(); p.remove(); } }
+
+  function statusMenu(anchor, entry, label) {
+    openPop(anchor, [h('label', {}, label),
+      STATUS_ORDER.map(s => h('button', { class: 'opt' + (entry.status === s ? ' cur' : ''), role: 'menuitem',
+        onclick: () => { closePop(); if (entry.status !== s) setStatus(entry, s); } },
+      h('span', { class: `cb cb-${s}`, style: { width: '22px', height: '22px', fontSize: '12px' } }, STATUS[s].mark),
+      s === 'todo' ? 'Wyczyść (do zrobienia)' : STATUS[s].label))]);
+  }
+
+  function personMenu(anchor, c, field) {
+    const label = field === 'accountant_id' ? 'Księgowa' : 'Kadrowa';
+    const pick = async (id) => {
+      closePop();
+      const before = c[field];
+      c[field] = id; refreshRow(c.id);
+      const { error } = await sb.from('clients').update({ [field]: id }).eq('id', c.id);
+      if (error) { c[field] = before; refreshRow(c.id); fail(error); } else toast(`${label}: ${id ? memberById(id).short_name : 'brak'}`);
+    };
+    openPop(anchor, [h('label', {}, label),
+      state.members.filter(m => m.active).map(m => h('button', { class: 'opt' + (c[field] === m.id ? ' cur' : ''), onclick: () => pick(m.id) },
+        h('span', { class: 'person', style: { padding: 0 } }, h('span', { class: 'av' }, initials(m.full_name))), m.full_name)),
+      h('div', { class: 'sep' }),
+      h('button', { class: 'opt', onclick: () => pick(null) }, 'Usuń przypisanie')]);
+  }
+
+  function notesMenu(anchor, c) {
+    const n = noteMap.get(c.id) || {};
+    const ta1 = h('textarea', { placeholder: 'Np. trzeba zrobić w piątek, zaimportuj faktury…' }, n.notes || '');
+    const ta2 = h('textarea', { placeholder: 'Np. jak ująć straty? brak pełnomocnictwa…' }, n.questions || '');
+    const save = async () => {
+      const payload = { client_id: c.id, period: pdate, notes: ta1.value.trim() || null, questions: ta2.value.trim() || null };
+      const { error } = await sb.from('period_notes').upsert(payload, { onConflict: 'client_id,period' });
+      if (error) return fail(error);
+      noteMap.set(c.id, payload); closePop(); refreshRow(c.id); toast('Zapisano');
+    };
+    openPop(anchor, h('div', { class: 'pop-body' },
+      h('label', {}, `Uwagi – ${c.name}`), ta1,
+      h('label', {}, 'Pytania / problemy'), ta2,
+      h('div', { class: 'row' }, h('button', { class: 'btn btn-ghost btn-sm', onclick: closePop }, 'Anuluj'),
+        h('button', { class: 'btn btn-primary btn-sm', onclick: save }, 'Zapisz'))));
   }
 
   // ---------- eksport ----------
   function exportCsv() {
-    const rows = filtered();
-    const out = [['Lp.', 'Nazwa firmy', 'Forma', ...tasks.map(t => t.label), 'Rozliczony', 'Uwagi', 'Pytania / problemy']];
-    rows.forEach((c, i) => {
-      const m = byClient.get(c.id);
-      out.push([i + 1, c.name, LEGAL_SHORT[c.legal_form] || '',
-        ...tasks.map(t => {
-          const e = m.get(t.code); if (!e) return '';
-          const who = e.assignee_id ? memberById(e.assignee_id)?.short_name : '';
-          return e.status === 'todo' ? (who || 'do zrobienia') : STATUS[e.status].label + (e.status === 'in_progress' && who ? ` (${who})` : '');
-        }),
-        isSettled(c) ? 'tak' : 'nie', noteMap.get(c.id)?.notes || '', noteMap.get(c.id)?.questions || '']);
-    });
-    downloadCsv(`rozliczenia_${period}.csv`, out);
+    const area = prefs.area;
+    const out = [];
+    const sections = area === 'kadry' ? [null] : ['osobowe', 'kapitalowe'];
+    for (const section of sections) {
+      const cols = area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', section);
+      const rows = filtered(area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section), area);
+      if (section) out.push([SECTIONS[section].title]);
+      out.push(['Klient', AREAS[area].personLabel, ...(area === 'kadry' ? ['Pracownicy'] : []),
+        ...cols.map(t => t.code === 'pit_cit' && section ? SECTIONS[section].pitLabel : t.label), 'Rozliczony', 'Uwagi', 'Pytania']);
+      rows.forEach(c => {
+        const m = byClient.get(c.id);
+        out.push([c.name, memberById(c[AREAS[area].person])?.short_name || '',
+          ...(area === 'kadry' ? [c.has_employees === true ? 'tak' : c.has_employees === false ? 'nie' : ''] : []),
+          ...cols.map(t => { const e = m?.get(t.code); return e ? (e.status === 'todo' || e.status === 'in_progress' ? '' : STATUS[e.status].label) : ''; }),
+          isSettled(c, area) ? 'tak' : 'nie', noteMap.get(c.id)?.notes || '', noteMap.get(c.id)?.questions || '']);
+      });
+      out.push([]);
+    }
+    downloadCsv(`rozliczenia_${area}_${period}.csv`, out);
   }
 
-  main.replaceChildren(head, tiles, deadlines, banner, toolbar, gridWrap, emptyBox);
-  renderBanner(); renderTiles(); renderBody();
+  main.replaceChildren(head, tabsBox, tiles, deadlines, banner, toolbar, legend, body);
+  renderAll();
 
   // ---------- zmiany na żywo od innych osób ----------
   const channel = sb.channel('rozliczenia-' + period)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist_entries', filter: `period=eq.${pdate}` }, (p) => {
       const row = p.new;
-      if (!row || !row.client_id || !clientMap.has(row.client_id)) return;
-      if (p.eventType === 'DELETE') return;
+      if (!row?.client_id || !clientMap.has(row.client_id) || p.eventType === 'DELETE') return;
       if (!byClient.has(row.client_id)) byClient.set(row.client_id, new Map());
       const cur = byClient.get(row.client_id).get(row.task_code);
       if (cur) Object.assign(cur, row); else { byClient.get(row.client_id).set(row.task_code, row); entries.push(row); }
-      if (document.querySelector('.pop')) return; // nie przerywaj otwartego menu
-      refreshRow(row.client_id);
+      if (!document.querySelector('.pop')) refreshRow(row.client_id);
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'period_notes', filter: `period=eq.${pdate}` }, (p) => {
       const row = p.new;
       if (!row?.client_id || !clientMap.has(row.client_id)) return;
       noteMap.set(row.client_id, row);
-      if (document.activeElement?.classList.contains('note-edit')) return;
-      refreshRow(row.client_id);
+      if (!document.querySelector('.pop')) refreshRow(row.client_id);
     })
     .subscribe();
 
-  return () => { sb.removeChannel(channel); document.querySelector('.pop')?.remove(); };
+  return () => { sb.removeChannel(channel); closePop(); };
 }

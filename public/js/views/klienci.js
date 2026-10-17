@@ -66,7 +66,7 @@ export async function renderKlienci(main) {
     counter.textContent = `${rows.length} z ${clients.length}`;
     tbody.replaceChildren(...rows.map(c => {
       const comp = completeness(c, c.client_partners?.length);
-      const owners = (c.client_assignments || []).map(a => memberById(a.member_id)?.short_name).filter(Boolean);
+      const acc = memberById(c.accountant_id)?.short_name, hr = memberById(c.hr_id)?.short_name;
       return h('tr', { class: 'click', onclick: () => { location.hash = `#/klient/${c.id}`; } },
         h('td', {}, h('a', { href: `#/klient/${c.id}`, style: { fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' } }, c.name),
           c.status !== 'aktywny' ? h('div', {}, h('span', { class: 'badge warn' }, CLIENT_STATUS[c.status])) : null),
@@ -74,7 +74,8 @@ export async function renderKlienci(main) {
         h('td', { class: 'small' }, taxSummary(c) || h('span', { class: 'muted' }, '—')),
         h('td', { class: 'small' }, c.phone ? h('a', { href: 'tel:' + c.phone.replace(/\s/g, ''), onclick: e => e.stopPropagation() }, c.phone) : '',
           c.email ? h('div', {}, h('a', { href: 'mailto:' + c.email, onclick: e => e.stopPropagation() }, c.email)) : ''),
-        h('td', { class: 'small' }, owners.join(', ')),
+        h('td', { class: 'small' }, acc ? h('div', {}, 'Księgowość: ', h('b', {}, acc)) : null, hr ? h('div', {}, 'Kadry: ', h('b', {}, hr)) : null,
+          !acc && !hr ? h('span', { class: 'muted' }, '—') : null),
         h('td', {}, h('span', { class: 'pct', title: comp.missing ? `Brakuje ${comp.missing} pól` : 'Profil kompletny' },
           h('span', { class: 'bar' }, h('i', { style: { width: comp.pct + '%' } })), comp.pct + '%')));
     }));
@@ -90,12 +91,12 @@ export async function renderKlienci(main) {
     const yn = v => v === true ? 'tak' : v === false ? 'nie' : '';
     downloadCsv('klienci_rkdp.csv', [
       ['Nazwa', 'Status', 'Forma', 'Księgowość', 'NIP', 'REGON', 'KRS', 'Adres', 'Osoba kontaktowa', 'E-mail', 'Telefon',
-        'PIT', 'Zaliczki PIT', 'ZUS', 'CIT', 'VAT', 'VAT-UE', 'Pracownicy', 'Umowa', 'UPL-1', 'Wynagrodzenie netto', 'Opiekunowie'],
+        'PIT', 'Zaliczki PIT', 'ZUS', 'CIT', 'VAT', 'VAT-UE', 'Pracownicy', 'Umowa', 'UPL-1', 'Wynagrodzenie netto', 'Księgowa', 'Kadrowa'],
       ...list().map(c => [c.name, CLIENT_STATUS[c.status], opt(LEGAL_FORM, c.legal_form), opt(BOOKKEEPING, c.bookkeeping),
         c.nip, c.regon, c.krs, c.address, c.contact_person, c.email, c.phone, opt(PIT_FORM, c.pit_form), opt(ADVANCES, c.pit_advances),
         opt(ZUS_TYPE, c.zus_type), opt(CIT_TYPE, c.cit_type), opt(VAT_STATUS, c.vat_status), yn(c.vat_ue), yn(c.has_employees),
         yn(c.contract_signed), yn(c.upl1), c.monthly_fee ?? '',
-        (c.client_assignments || []).map(a => memberById(a.member_id)?.short_name).filter(Boolean).join(', ')]),
+        memberById(c.accountant_id)?.short_name || '', memberById(c.hr_id)?.short_name || '']),
     ]);
   } }, icon('download'), 'Eksport');
 
@@ -116,7 +117,7 @@ export async function renderKlienci(main) {
       addBtn),
     h('div', { class: 'toolbar' }, search, statusSel, groupSel, counter, exportBtn),
     h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-      h('thead', {}, h('tr', {}, ['Klient', 'Forma', 'Rozliczenia', 'Kontakt', 'Obsługuje', 'Profil'].map(t => h('th', {}, t)))),
+      h('thead', {}, h('tr', {}, ['Klient', 'Forma', 'Rozliczenia', 'Kontakt', 'Księgowa / kadrowa', 'Profil'].map(t => h('th', {}, t)))),
       tbody)));
   render();
   if (!clients.length) tbody.replaceChildren(h('tr', {}, h('td', { colspan: 6, class: 'empty' }, 'Nie masz jeszcze przypisanych klientów.')));

@@ -1,13 +1,13 @@
 // Słowniki i terminy
 
 export const STATUS = {
-  todo:         { label: 'Do zrobienia',   color: '#B9AE9F' },
-  in_progress:  { label: 'W toku',         color: '#D9B98E' },
-  missing_docs: { label: 'Brak dokumentów', short: 'Brak dok.', color: '#A4462F' },
-  done:         { label: 'Zrobione',       color: '#3E6B47' },
-  na:           { label: 'nie dotyczy',    color: '#E3D9CA' },
+  todo:         { label: 'Do zrobienia',    mark: '',  color: '#FFFFFF' },
+  in_progress:  { label: 'Do zrobienia',    mark: '',  color: '#FFFFFF' },
+  missing_docs: { label: 'Brak dokumentów', mark: '!', color: '#A4462F' },
+  done:         { label: 'Zrobione',        mark: '✓', color: '#3E6B47' },
+  na:           { label: 'Nie dotyczy',     mark: '–', color: '#D8CFC1' },
 };
-export const STATUS_ORDER = ['todo', 'in_progress', 'missing_docs', 'done', 'na'];
+export const STATUS_ORDER = ['done', 'na', 'missing_docs', 'todo'];
 
 export const LEGAL_FORM = {
   jdg: 'JDG',
@@ -31,6 +31,10 @@ export const FORM_GROUP = {
   spolka_komandytowa: 'osobowe', spzoo: 'kapitalowe', spolka_akcyjna: 'kapitalowe',
 };
 export const isPartnership = f => FORM_GROUP[f] === 'osobowe';
+// do której tabeli księgowej trafia klient (tak samo jak client_section w bazie)
+export const sectionOf = c => FORM_GROUP[c.legal_form] === 'kapitalowe' ? 'kapitalowe'
+  : (c.legal_form === 'jdg' || FORM_GROUP[c.legal_form] === 'osobowe') ? 'osobowe'
+  : c.bookkeeping === 'pelna' ? 'kapitalowe' : 'osobowe';
 export const isCompany = f => FORM_GROUP[f] === 'kapitalowe';
 
 export const CLIENT_STATUS = { aktywny: 'Aktywny', zawieszony: 'Zawieszony', zakonczony: 'Współpraca zakończona' };
@@ -106,17 +110,21 @@ function businessDay(d) {
   return d;
 }
 
-export function deadlinesFor(period) {
+export function deadlinesFor(period, area = 'ksiegowosc') {
   const [y, m] = period.split('-').map(Number);
   const mk = (day) => {
     const nominal = new Date(y, m, day); // miesiąc po okresie
     const real = businessDay(new Date(nominal));
     return { date: real, moved: real.getDate() !== day };
   };
-  return [
-    { label: 'ZUS (sp. z o.o.)', ...mk(15) },
-    { label: 'ZUS (JDG, spółki osobowe)', ...mk(20) },
-    { label: 'PIT / CIT / PIT-4R', ...mk(20) },
-    { label: 'VAT i JPK_V7', ...mk(25) },
-  ];
+  return area === 'kadry'
+    ? [
+      { label: 'ZUS – spółki z o.o.', ...mk(15) },
+      { label: 'ZUS – JDG i spółki osobowe', ...mk(20) },
+      { label: 'PIT-4 (zaliczki od wynagrodzeń)', ...mk(20) },
+    ]
+    : [
+      { label: 'PIT / CIT', ...mk(20) },
+      { label: 'VAT i JPK_V7', ...mk(25) },
+    ];
 }

@@ -6,7 +6,7 @@ import { fetchAll } from './rozliczenia.js';
 export async function renderZespol(main) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const [clients, assigns] = await Promise.all([
-    fetchAll(() => sb.from('clients').select('id,name,status').order('name')),
+    fetchAll(() => sb.from('clients').select('id,name,status,accountant_id,hr_id').order('name')),
     fetchAll(() => sb.from('client_assignments').select('client_id,member_id')),
   ]);
   const reloadMembers = async () => {
@@ -25,12 +25,14 @@ export async function renderZespol(main) {
       const active = h('input', { type: 'checkbox', checked: m.active, disabled: m.id === state.me.id });
       active.addEventListener('change', () => update(m, { active: active.checked }));
       const count = assigns.filter(a => a.member_id === m.id).length;
+      const nAcc = clients.filter(c => c.accountant_id === m.id).length, nHr = clients.filter(c => c.hr_id === m.id).length;
       return h('tr', {},
         h('td', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, m.email)),
         h('td', {}, m.short_name),
         h('td', {}, role),
         h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany')),
-        h('td', {}, h('button', { class: 'btn btn-ghost btn-sm', onclick: () => renderAssign(m) }, `Klienci (${count})`)));
+        h('td', { class: 'small' }, `księgowość: ${nAcc}`, h('br'), `kadry: ${nHr}`),
+        h('td', {}, h('button', { class: 'btn btn-ghost btn-sm', onclick: () => renderAssign(m) }, `Dodatkowy dostęp (${count})`)));
     }));
   }
   async function update(m, patch) {
@@ -80,7 +82,7 @@ export async function renderZespol(main) {
       h('div', { class: 'section-head' }, h('h2', {}, `Klienci: ${m.full_name}`),
         h('button', { class: 'btn btn-ghost btn-sm', onclick: () => assignPanel.replaceChildren() }, 'Zamknij')),
       h('p', { class: 'hint', style: { marginBottom: '12px' } }, m.role === 'limited'
-        ? 'Ta osoba zobaczy wyłącznie zaznaczonych klientów.'
+        ? 'Ta osoba widzi klientów, u których jest księgową lub kadrową, oraz dodatkowo zaznaczonych tutaj.'
         : 'Ta osoba ma pełny dostęp; zaznaczenie oznacza tylko, że jest opiekunem klienta.'),
       filter, listBox));
     draw();
@@ -97,9 +99,13 @@ export async function renderZespol(main) {
       rule.value = t.rule; rule.addEventListener('change', () => updTask(t, { rule: rule.value }));
       const sort = h('input', { class: 'input', type: 'number', value: t.sort, style: { width: '80px' } });
       sort.addEventListener('change', () => updTask(t, { sort: Number(sort.value) || t.sort }));
+      const desc = h('input', { class: 'input', value: t.description || '', placeholder: 'Opis widoczny po najechaniu', style: { width: '100%' } });
+      desc.addEventListener('change', () => updTask(t, { description: desc.value.trim() || null }));
+      const area = h('select', { class: 'select' }, h('option', { value: 'ksiegowosc' }, 'Księgowość'), h('option', { value: 'kadry' }, 'Kadry i ZUS'));
+      area.value = t.area; area.addEventListener('change', () => updTask(t, { area: area.value }));
       const act = h('input', { type: 'checkbox', checked: t.active });
       act.addEventListener('change', () => updTask(t, { active: act.checked }));
-      return h('tr', {}, h('td', {}, label), h('td', {}, rule), h('td', {}, sort), h('td', {}, h('label', { class: 'check' }, act, 'widoczna')));
+      return h('tr', {}, h('td', {}, label, h('div', { style: { marginTop: '6px' } }, desc)), h('td', {}, area), h('td', {}, rule), h('td', {}, sort), h('td', {}, h('label', { class: 'check' }, act, 'widoczna')));
     }));
   }
   async function updTask(t, patch) {
@@ -112,7 +118,7 @@ export async function renderZespol(main) {
     if (!label?.trim()) return;
     const code = label.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) || 'kolumna';
     const sort = Math.max(0, ...state.taskTypes.map(t => t.sort)) + 10;
-    const { data, error } = await sb.from('task_types').insert({ code, label: label.trim(), sort, rule: 'always' }).select().single();
+    const { data, error } = await sb.from('task_types').insert({ code, label: label.trim(), sort, rule: 'always', area: 'ksiegowosc' }).select().single();
     if (error) return fail(error);
     state.taskTypes.push(data); renderTasks();
     toast('Dodano kolumnę. Pojawi się w miesiącach otwieranych od teraz (lub po „Dodaj brakujących”).');
@@ -124,7 +130,7 @@ export async function renderZespol(main) {
     h('section', { class: 'card section' },
       h('div', { class: 'section-head' }, h('h2', {}, 'Zespół')),
       h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-        h('thead', {}, h('tr', {}, ['Osoba', 'Skrót', 'Dostęp', 'Konto', 'Przypisania'].map(t => h('th', {}, t)))), teamBody)),
+        h('thead', {}, h('tr', {}, ['Osoba', 'Skrót', 'Dostęp', 'Konto', 'Prowadzi', 'Wgląd do innych'].map(t => h('th', {}, t)))), teamBody)),
       addForm,
       h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Logować się mogą wyłącznie aktywne adresy z tej listy. Zablokowanie konta działa natychmiast.')),
     assignPanel,
@@ -132,6 +138,6 @@ export async function renderZespol(main) {
       h('div', { class: 'section-head' }, h('h2', {}, 'Kolumny listy kontrolnej'), addTask),
       h('p', { class: 'hint', style: { marginBottom: '12px' } }, 'Reguła decyduje, kiedy przy otwieraniu miesiąca kolumna dostaje automatycznie „nie dotyczy”.'),
       h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-        h('thead', {}, h('tr', {}, ['Nazwa', 'Reguła „nie dotyczy”', 'Kolejność', ''].map(t => h('th', {}, t)))), taskBody))));
+        h('thead', {}, h('tr', {}, ['Nazwa i opis', 'Zakładka', 'Reguła „nie dotyczy”', 'Kolejność', ''].map(t => h('th', {}, t)))), taskBody))));
   renderTeam(); renderTasks();
 }

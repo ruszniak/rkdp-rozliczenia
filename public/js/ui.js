@@ -84,3 +84,31 @@ export function downloadCsv(filename, rows) {
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// Podpowiedzi po najechaniu: dowolny element z atrybutem data-tip
+let tipEl = null;
+export function initTooltips() {
+  if (tipEl) return;
+  tipEl = document.createElement('div');
+  tipEl.className = 'tip'; tipEl.hidden = true; tipEl.setAttribute('role', 'tooltip');
+  document.body.append(tipEl);
+  const show = (target) => {
+    const text = target.getAttribute('data-tip');
+    if (!text) return;
+    tipEl.textContent = text;
+    tipEl.hidden = false;
+    const r = target.getBoundingClientRect();
+    const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+    let left = r.left + r.width / 2 - tw / 2;
+    left = Math.max(8, Math.min(left, innerWidth - tw - 8));
+    let top = r.top - th - 8;
+    if (top < 8) top = r.bottom + 8;
+    tipEl.style.left = left + 'px'; tipEl.style.top = top + 'px';
+  };
+  document.addEventListener('mouseover', (e) => {
+    const t = e.target.closest?.('[data-tip]');
+    if (t) show(t); else tipEl.hidden = true;
+  });
+  document.addEventListener('focusin', (e) => { const t = e.target.closest?.('[data-tip]'); if (t) show(t); });
+  ['scroll', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { tipEl.hidden = true; }, true));
+}

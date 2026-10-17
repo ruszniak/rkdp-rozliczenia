@@ -164,10 +164,27 @@ export async function renderKlient(main, id) {
 
   // ---------- przypisania ----------
   const assigned = new Set((assigns || []).map(a => a.member_id));
+  const roleSelect = (field, label) => {
+    const sel = h('select', { class: 'select', disabled: !editable },
+      h('option', { value: '' }, '— nie przypisano —'),
+      state.members.filter(m => m.active).map(m => h('option', { value: m.id }, m.full_name)));
+    sel.value = c[field] || '';
+    sel.addEventListener('change', async () => {
+      const v = sel.value || null;
+      const { error: e } = await sb.from('clients').update({ [field]: v }).eq('id', id);
+      if (e) { sel.value = c[field] || ''; return fail(e); }
+      c[field] = v; draft[field] = v;
+      toast(`${label}: ${v ? memberById(v).short_name : 'brak'}`);
+    });
+    return h('label', { class: 'field' }, h('span', {}, label), sel);
+  };
   const assignBox = h('section', { class: 'card section' },
     h('div', { class: 'section-head' }, h('h2', {}, 'Obsługują')),
+    h('div', { class: 'form-grid', style: { marginBottom: '18px' } },
+      roleSelect('accountant_id', 'Księgowa'), roleSelect('hr_id', 'Kadrowa')),
+    h('p', { class: 'hint', style: { marginBottom: '8px', fontWeight: 600 } }, 'Dodatkowy dostęp'),
     h('p', { class: 'hint', style: { marginBottom: '12px' } }, isAdmin()
-      ? 'Osoby z ograniczonym dostępem widzą tylko klientów, przy których są zaznaczone.'
+      ? 'Księgowa i kadrowa zawsze widzą klienta. Tu możesz dać wgląd dodatkowym osobom z ograniczonym dostępem.'
       : 'Przypisania zmienia administrator.'),
     h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
       state.members.filter(m => m.active).map(m => {

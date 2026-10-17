@@ -1,4 +1,4 @@
-import { h, initials, toast } from './ui.js';
+import { h, initials, toast, initTooltips } from './ui.js';
 import { sb, state } from './store.js';
 import { renderLogin } from './views/login.js';
 import { renderRozliczenia } from './views/rozliczenia.js';
@@ -98,4 +98,5 @@ sb.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT' && state.session) location.reload();
 });
 
+initTooltips();
 start();
