@@ -3,6 +3,7 @@ import { sb, state, memberById, canEditClients } from '../store.js';
 import { LEGAL_SHORT, FORM_GROUP, VAT_SHORT, PIT_SHORT, CIT_SHORT, ZUS_SHORT, CLIENT_STATUS, isCompany, isPartnership,
   LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS } from '../dict.js';
 import { fetchAll } from './rozliczenia.js';
+import { lookupNip, validNip, cleanNip } from '../nip.js';
 
 const PREF_KEY = 'rkdp-klienci-filtry';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch { return {}; } };
@@ -102,9 +103,17 @@ export async function renderKlienci(main) {
 
   const addBtn = canEditClients()
     ? h('button', { class: 'btn btn-primary', onclick: async () => {
-      const name = prompt('Nazwa nowego klienta:');
-      if (!name?.trim()) return;
-      const { data, error } = await sb.from('clients').insert({ name: name.trim() }).select('id').single();
+      const val = prompt('Podaj NIP (dane pobiorę z Białej listy VAT) albo nazwę nowego klienta:');
+      if (!val?.trim()) return;
+      let row = { name: val.trim() };
+      if (validNip(val)) {
+        try {
+          const r = await lookupNip(val);
+          if (r.found) row = { name: r.name, nip: r.nip, regon: r.regon, krs: r.krs, address: r.address };
+          else { const n = prompt('Nie znaleziono tego NIP w wykazie VAT. Podaj nazwę klienta:'); if (!n?.trim()) return; row = { name: n.trim(), nip: cleanNip(val) }; }
+        } catch (e) { return fail(e); }
+      }
+      const { data, error } = await sb.from('clients').insert(row).select('id').single();
       if (error) return fail(error);
       location.hash = `#/klient/${data.id}`;
     } }, icon('plus'), 'Dodaj klienta')

@@ -306,3 +306,5 @@ a.mini-matter:hover{background:#FAF4EA}
   .dl-row>.small:not(.dl-main){grid-column:2}
   .tl-item{grid-template-columns:1fr}
 }
+.nip-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;margin-bottom:14px}
+.nip-bar .eyebrow{margin-right:4px}

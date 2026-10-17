@@ -3,6 +3,7 @@ import { sb, state, memberById, canEditClients, isAdmin, activeTasks } from '../
 import { LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, CIT_ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS, CLIENT_STATUS,
   STATUS, FIELD_LABELS, isCompany, isPartnership } from '../dict.js';
 import { completeness } from './klienci.js';
+import { nipLookupBar, mergeNipData } from '../nip.js';
 
 const YESNO = { true: 'Tak', false: 'Nie' };
 const isJdg = c => c.legal_form === 'jdg';
@@ -291,7 +292,8 @@ export async function renderKlient(main, id) {
       h('div', {}, h('p', { class: 'eyebrow' }, 'Karta klienta'), titleEl, compEl),
       editable ? null : h('span', { class: 'badge' }, 'Tylko podgląd')),
     h('div', { class: 'two' },
-      h('div', {}, sectionsBox, partnersBox,
+      h('div', {}, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null,
+        sectionsBox, partnersBox,
         editable ? h('div', { class: 'savebar' }, saveInfo, saveBtn) : null),
       h('div', {}, assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 

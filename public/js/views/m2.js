@@ -7,6 +7,7 @@ import {
 } from '../m2/dict.js';
 import { orderBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
+import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 
 const BASE = '#/doradztwo';
 const SUBNAV = [
@@ -252,11 +253,14 @@ async function viewMatters(main, params) {
 // Szybkie dodanie klienta (np. przy zakładaniu sprawy) – pełne dane uzupełnisz później na karcie klienta
 function quickClientDialog(onCreated) {
   const c = { kind: 'firma' };
-  modal('Nowy klient M2 TAX', h('div', {},
-    fieldsGrid([['name', 'Nazwa / imię i nazwisko', 'text', null, true], ['kind', 'Rodzaj', 'select', { firma: 'Firma', osoba: 'Osoba fizyczna' }],
+  const grid = h('div');
+  const build = () => grid.replaceChildren(fieldsGrid([['name', 'Nazwa / imię i nazwisko', 'text', null, true], ['kind', 'Rodzaj', 'select', { firma: 'Firma', osoba: 'Osoba fizyczna' }],
       ['nip', 'NIP', 'text'], ['address', 'Adres', 'text', null, true], ['contact_person', 'Osoba kontaktowa', 'text'],
       ['phone', 'Telefon', 'tel'], ['email', 'E-mail', 'email'],
-      ['billing_type', 'Rozliczenie', 'select', BILLING_TYPE], ['hourly_rate', 'Stawka godzinowa (zł netto)', 'number']], c),
+      ['billing_type', 'Rozliczenie', 'select', BILLING_TYPE], ['hourly_rate', 'Stawka godzinowa (zł netto)', 'number']], c));
+  build();
+  modal('Nowy klient M2 TAX', h('div', {},
+    nipLookupBar('', (r) => { mergeNipData(c, r); c.aml_notes = vatLine(r); build(); }), grid,
     h('p', { class: 'hint', style: { marginTop: '10px' } }, 'Pozostałe dane (AML, abonament, kontakty) uzupełnisz później na karcie klienta.')),
   (close) => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
@@ -463,10 +467,20 @@ async function viewClient(main, id) {
     toast(isNew ? 'Dodano klienta' : 'Zapisano');
     if (isNew) location.hash = `${BASE}/klient/${data.id}`;
   }
-  const form = h('div', {}, ...sections.map(([title, defs]) => h('section', { class: 'card section' },
+  const sectionsBox = h('div');
+  const buildSections = () => sectionsBox.replaceChildren(...sections.map(([title, defs]) => h('section', { class: 'card section' },
     h('div', { class: 'section-head' }, h('h2', {}, title)),
     title.startsWith('AML') ? h('p', { class: 'hint', style: { marginBottom: '12px' } }, 'Doradca podatkowy jest instytucją obowiązaną – przed rozpoczęciem współpracy zidentyfikuj klienta i beneficjenta rzeczywistego oraz oceń ryzyko.') : null,
-    fieldsGrid(defs, draft))), h('div', { class: 'savebar' }, saveBtn));
+    fieldsGrid(defs, draft))));
+  buildSections();
+  const nipBar = nipLookupBar(draft.nip, (r) => {
+    mergeNipData(draft, r);
+    if (draft.kind !== 'osoba') draft.kind = 'firma';
+    const line = vatLine(r) + (r.representatives?.length ? ` · reprezentacja: ${r.representatives.join(', ')}` : '');
+    draft.aml_notes = [draft.aml_notes, line].filter(Boolean).join('\n');
+    buildSections();
+  });
+  const form = h('div', {}, nipBar, sectionsBox, h('div', { class: 'savebar' }, saveBtn));
   if (isNew) { main.replaceChildren(...header('klienci', 'Nowy klient'), form); return; }
 
   const [contacts, matters, orders] = await Promise.all([
