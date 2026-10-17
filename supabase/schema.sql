@@ -458,6 +458,17 @@ create policy notes_update on public.period_notes for update to authenticated
 create policy audit_select on public.audit_log for select to authenticated
   using (public.is_admin() or (client_id is not null and public.can_see_client(client_id)));
 
+-- Uszczelnienie funkcji (zalecenia doradcy bezpieczeństwa Supabase)
+alter function public.current_email() set search_path = public;
+alter function public.is_admin() set search_path = public;
+alter function public.has_full_access() set search_path = public;
+alter function public.touch_row() set search_path = public;
+revoke execute on function public.can_see_client(uuid), public.current_member_id(), public.current_role_name(),
+  public.is_admin(), public.has_full_access(), public.current_email(), public.generate_period(date) from public, anon;
+grant execute on function public.can_see_client(uuid), public.current_member_id(), public.current_role_name(),
+  public.is_admin(), public.has_full_access(), public.current_email(), public.generate_period(date) to authenticated;
+revoke execute on function public.guard_new_auth_user(), public.write_audit(), public.touch_row() from public, anon, authenticated;
+
 -- Zmiany na żywo (inni widzą Twoje kliknięcia bez odświeżania)
 alter publication supabase_realtime add table public.checklist_entries, public.period_notes;
 
