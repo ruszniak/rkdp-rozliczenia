@@ -238,7 +238,7 @@ async function viewMatters(main, params) {
         h('td', { class: 'small' }, n ? h('span', { class: n.due_date < today ? 'err' : '' }, h('b', {}, fmtDate(n.due_date)), h('div', { class: 'muted' }, n.title)) : h('span', { class: 'muted' }, '—')));
     }) : [h('tr', {}, h('td', { colspan: 7, class: 'empty' }, matters.length ? 'Brak spraw dla wybranych filtrów.' : 'Nie ma jeszcze spraw. Dodaj pierwszą przyciskiem „Nowa sprawa”.'))]));
   };
-  search.addEventListener('input', () => { f.q = search.value; render(); });
+  let st1; search.addEventListener('input', () => { clearTimeout(st1); st1 = setTimeout(() => { f.q = search.value; render(); }, 180); });
   st.addEventListener('change', () => { f.status = st.value; render(); });
   ty.addEventListener('change', () => { f.type = ty.value; render(); });
   pe.addEventListener('change', () => { f.person = pe.value; render(); });
@@ -423,7 +423,7 @@ async function viewClients(main) {
       h('td', { class: 'small' }, String(openCount.get(c.id) || 0))))
       : [h('tr', {}, h('td', { colspan: 5, class: 'empty' }, clients.length ? 'Brak wyników.' : 'Dodaj pierwszego klienta M2 TAX.'))]));
   };
-  search.addEventListener('input', render); st.addEventListener('change', render);
+  let st2; search.addEventListener('input', () => { clearTimeout(st2); st2 = setTimeout(render, 180); }); st.addEventListener('change', render);
   main.replaceChildren(...header('klienci', 'Klienci M2 TAX', 'Osobna baza klientów doradztwa – dane, kontakty, stawki i weryfikacja AML.',
     h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/klient/nowy` }, icon('plus'), 'Nowy klient')),
   h('div', { class: 'toolbar' }, search, st),

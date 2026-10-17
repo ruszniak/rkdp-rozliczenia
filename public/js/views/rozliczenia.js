@@ -67,12 +67,25 @@ export async function renderRozliczenia(main, params) {
   const missing = clients.filter(c => c.status === 'aktywny' && !byClient.has(c.id));
 
   // kolumny dla obszaru / sekcji
-  const tasksFor = (area, section) => tasksAll.filter(t => t.area === area && (area === 'kadry' || t.applies_to === 'all' || t.applies_to === section));
-  const cellsOf = (c, area) => {
-    const m = byClient.get(c.id); if (!m) return [];
-    const list = area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', sectionOf(c));
-    return list.map(t => m.get(t.code)).filter(Boolean);
+  // pamięć podręczna obliczeń – tabela przerysowuje się bez ponownego liczenia wszystkiego
+  const tasksCache = new Map();
+  const tasksFor = (area, section) => {
+    const k = area + '|' + (area === 'kadry' ? '' : section);
+    if (!tasksCache.has(k)) tasksCache.set(k, tasksAll.filter(t => t.area === area && (area === 'kadry' || t.applies_to === 'all' || t.applies_to === section)));
+    return tasksCache.get(k);
   };
+  const cellsCache = new Map();
+  const cellsOf = (c, area) => {
+    const k = c.id + '|' + area;
+    let v = cellsCache.get(k);
+    if (!v) {
+      const m = byClient.get(c.id);
+      v = !m ? [] : (area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', sectionOf(c))).map(t => m.get(t.code)).filter(Boolean);
+      cellsCache.set(k, v);
+    }
+    return v;
+  };
+  const rowsCache = new Map();
   // do statusu „rozliczony” liczą się tylko kolumny oznaczone counts_to_settled (np. bez wyciągów bankowych)
   const countsCode = new Set(tasksAll.filter(t => t.counts_to_settled !== false).map(t => t.code));
   const requiredOf = (c, area) => cellsOf(c, area).filter(e => countsCode.has(e.task_code));
@@ -85,7 +98,10 @@ export async function renderRozliczenia(main, params) {
   };
   const hasNote = c => !!(noteMap.get(c.id)?.notes?.trim() || noteMap.get(c.id)?.questions?.trim());
   // aktywni liczą się do podsumowań; zawieszeni i zakończeni idą do osobnej tabeli
-  const withCells = (area) => clients.filter(c => cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+  const withCells = (area) => {
+    if (!rowsCache.has(area)) rowsCache.set(area, clients.filter(c => cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl')));
+    return rowsCache.get(area);
+  };
   const rowsIn = (area) => withCells(area).filter(c => c.status === 'aktywny');
   const inactiveIn = (area) => withCells(area).filter(c => c.status !== 'aktywny');
   const colsFor = (area, section) => {
@@ -178,7 +194,8 @@ export async function renderRozliczenia(main, params) {
   setFs(false);
   const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, exportBtn, fsBtn);
   const onFilter = () => { Object.assign(prefs, { q: search.value, person: personSel.value, show: showSel.value }); savePrefs(prefs); renderBody(); };
-  search.addEventListener('input', onFilter);
+  let searchTimer;
+  search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(onFilter, 180); });
   personSel.addEventListener('change', onFilter);
   showSel.addEventListener('change', onFilter);
 
@@ -391,13 +408,18 @@ export async function renderRozliczenia(main, params) {
   }
   const emptyBox = () => h('div', { class: 'card empty' }, entries.length ? 'Żaden klient nie pasuje do filtrów.' : 'Brak listy na ten miesiąc – użyj przycisku „Otwórz miesiąc”.');
 
+  let summaryQueued = false;
+  const queueSummary = () => {
+    if (summaryQueued) return; summaryQueued = true;
+    requestAnimationFrame(() => { summaryQueued = false; renderTiles(); renderTabs(); });
+  };
   function refreshRow(clientId) {
     const c = clientMap.get(clientId);
     body.querySelectorAll(`tr[data-client="${clientId}"]`).forEach(tr => {
       const area = tr.dataset.area;
       tr.replaceWith(rowFor(c, area, tr.closest('table')._cols));
     });
-    renderTiles(); renderTabs();
+    queueSummary();
   }
 
   function renderShowSel() {
@@ -640,7 +662,9 @@ ${tables || '<p>Brak danych.</p>'}
       if (!row?.client_id || !clientMap.has(row.client_id) || p.eventType === 'DELETE') return;
       if (!byClient.has(row.client_id)) byClient.set(row.client_id, new Map());
       const cur = byClient.get(row.client_id).get(row.task_code);
-      if (cur) Object.assign(cur, row); else { byClient.get(row.client_id).set(row.task_code, row); entries.push(row); }
+      if (cur && cur.status === row.status) return; // własna zmiana – już narysowana
+      if (cur) Object.assign(cur, row);
+      else { byClient.get(row.client_id).set(row.task_code, row); entries.push(row); cellsCache.clear(); rowsCache.clear(); }
       if (!document.querySelector('.pop')) refreshRow(row.client_id);
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'period_notes', filter: `period=eq.${pdate}` }, (p) => {

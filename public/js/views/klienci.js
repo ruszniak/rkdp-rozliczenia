@@ -83,7 +83,8 @@ export async function renderKlienci(main) {
   };
 
   const onFilter = () => { Object.assign(prefs, { q: search.value, status: statusSel.value, group: groupSel.value }); savePrefs(prefs); render(); };
-  search.addEventListener('input', onFilter);
+  let searchTimer;
+  search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(onFilter, 180); });
   statusSel.addEventListener('change', onFilter);
   groupSel.addEventListener('change', onFilter);
 
