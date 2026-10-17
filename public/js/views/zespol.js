@@ -103,9 +103,11 @@ export async function renderZespol(main) {
       desc.addEventListener('change', () => updTask(t, { description: desc.value.trim() || null }));
       const area = h('select', { class: 'select' }, h('option', { value: 'ksiegowosc' }, 'Księgowość'), h('option', { value: 'kadry' }, 'Kadry i ZUS'));
       area.value = t.area; area.addEventListener('change', () => updTask(t, { area: area.value }));
+      const req = h('input', { type: 'checkbox', checked: t.counts_to_settled !== false });
+      req.addEventListener('change', () => updTask(t, { counts_to_settled: req.checked }));
       const act = h('input', { type: 'checkbox', checked: t.active });
       act.addEventListener('change', () => updTask(t, { active: act.checked }));
-      return h('tr', {}, h('td', {}, label, h('div', { style: { marginTop: '6px' } }, desc)), h('td', {}, area), h('td', {}, rule), h('td', {}, sort), h('td', {}, h('label', { class: 'check' }, act, 'widoczna')));
+      return h('tr', {}, h('td', {}, label, h('div', { style: { marginTop: '6px' } }, desc)), h('td', {}, area), h('td', {}, rule), h('td', {}, sort), h('td', {}, h('label', { class: 'check' }, act, 'widoczna'), h('label', { class: 'check', style: { marginTop: '6px' } }, req, 'liczy się do „rozliczony”')));
     }));
   }
   async function updTask(t, patch) {

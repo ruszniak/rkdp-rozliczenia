@@ -73,7 +73,10 @@ export async function renderRozliczenia(main, params) {
     const list = area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', sectionOf(c));
     return list.map(t => m.get(t.code)).filter(Boolean);
   };
-  const isSettled = (c, area) => { const cs = cellsOf(c, area); return cs.length > 0 && cs.every(e => e.status === 'done' || e.status === 'na'); };
+  // do statusu „rozliczony” liczą się tylko kolumny oznaczone counts_to_settled (np. bez wyciągów bankowych)
+  const countsCode = new Set(tasksAll.filter(t => t.counts_to_settled !== false).map(t => t.code));
+  const requiredOf = (c, area) => cellsOf(c, area).filter(e => countsCode.has(e.task_code));
+  const isSettled = (c, area) => { const cs = requiredOf(c, area); return cs.length > 0 && cs.every(e => e.status === 'done' || e.status === 'na'); };
   const hasMissing = (c, area) => cellsOf(c, area).some(e => e.status === 'missing_docs');
   // JPK VAT (księgowość) / ZUS (kadry) jeszcze niewysłane: kratka nie jest „Zrobione” ani „Nie dotyczy”
   const pendingSend = (c, area) => {
@@ -316,7 +319,7 @@ export async function renderRozliczenia(main, params) {
   }
 
   function sumCell(c, area) {
-    const cs = cellsOf(c, area);
+    const cs = requiredOf(c, area);
     const done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
     if (cs.length && done === cs.length) return h('span', { class: 'sum ok' }, '✓ Rozliczony');
     if (cs.some(e => e.status === 'missing_docs')) return h('span', { class: 'sum bad', 'data-tip': 'Brakuje dokumentów' }, `! ${done}/${cs.length}`);
@@ -357,7 +360,8 @@ export async function renderRozliczenia(main, params) {
       h('th', { class: 'c-name' }, 'Klient'),
       h('th', { class: 'c-person' }, AREAS[area].personLabel),
       area === 'kadry' ? h('th', { 'data-tip': 'Czy firma zatrudnia pracowników lub zleceniobiorców' }, 'Pracownicy') : null,
-      cols.map(col => h('th', { class: 'c-task', 'data-tip': col.description || col.label }, col.label, h('span', { class: 'sub' }, stat(col)))),
+      cols.map(col => h('th', { class: 'c-task' + (col.counts_to_settled === false ? ' optional' : ''), 'data-tip': (col.description || col.label) + (col.counts_to_settled === false ? '\nNie wpływa na status „Klient rozliczony”.' : '') },
+        col.label, h('span', { class: 'sub' }, stat(col) + (col.counts_to_settled === false ? ' · info' : '')))),
       h('th', { class: 'c-sum', 'data-tip': 'Rozliczony = wszystkie kratki „Zrobione” albo „Nie dotyczy”' }, 'Klient rozliczony'),
       h('th', { 'data-tip': 'Uwagi i pytania do klienta w tym miesiącu' }, 'Uwagi')));
     const tbody = h('tbody', {}, t.rows.map(c => rowFor(c, area, cols)));
@@ -540,7 +544,7 @@ export async function renderRozliczenia(main, params) {
         header.map(v => ({ v, s: 'header' })),
         ...t.rows.map(c => {
           const m = byClient.get(c.id);
-          const cs = cellsOf(c, area), done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
+          const cs = requiredOf(c, area), done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
           return [
             { v: c.name + (c.status !== 'aktywny' ? ` (${c.status === 'zawieszony' ? 'zawieszony' : 'zakończony'})` : ''), s: 'wrap' },
             LEGAL_SHORT[c.legal_form] || '', memberById(c[AREAS[area].person])?.short_name || '',
@@ -565,7 +569,7 @@ export async function renderRozliczenia(main, params) {
       const head = `<tr><th class="l">Klient</th><th class="l">${AREAS[area].personLabel}</th>${area === 'kadry' ? '<th>Pracownicy</th>' : ''}${t.cols.map(c => `<th>${esc(c.label)}</th>`).join('')}<th>Rozliczony</th><th class="l">Uwagi</th></tr>`;
       const rows = t.rows.map(c => {
         const m = byClient.get(c.id);
-        const cs = cellsOf(c, area), done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
+        const cs = requiredOf(c, area), done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
         const n = noteMap.get(c.id) || {};
         return `<tr class="${isSettled(c, area) ? 'ok' : ''}"><td class="l"><b>${esc(c.name)}</b> <span class="f">${esc(LEGAL_SHORT[c.legal_form] || '')}${c.status !== 'aktywny' ? ' · ' + esc(c.status) : ''}</span></td>
           <td class="l">${esc(memberById(c[AREAS[area].person])?.short_name || '')}</td>

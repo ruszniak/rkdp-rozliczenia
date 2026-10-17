@@ -251,3 +251,4 @@ body.focus-mode .top-bar{margin:0 0 12px}
 body.focus-mode .toolbar{margin-bottom:10px}
 body.focus-mode .grid-wrap{max-height:calc(100vh - 150px)}
 body.focus-mode .table-title{margin:14px 0 8px}
+.grid thead th.optional{color:#A0968A;font-style:italic}
