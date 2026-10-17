@@ -92,7 +92,27 @@ export async function renderRozliczenia(main, params) {
     h('option', { value: 'braki' }, 'Z brakiem dokumentów'), h('option', { value: 'uwagi' }, 'Z uwagami / pytaniami'));
   showSel.value = prefs.show;
   const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportCsv() }, icon('download'), 'Eksport');
-  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, exportBtn);
+  const ICON_FS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+  const ICON_FS_EXIT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+  const fsBtn = h('button', { class: 'btn btn-primary btn-sm', 'data-tip': 'Tabela na cały ekran (Esc – wyjście)' });
+  const setFs = (on) => {
+    document.body.classList.toggle('focus-mode', on);
+    fsBtn.replaceChildren(h('span', { html: on ? ICON_FS_EXIT : ICON_FS, style: { display: 'inline-flex' } }), on ? 'Zamknij pełny ekran' : 'Pełny ekran');
+  };
+  fsBtn.addEventListener('click', async () => {
+    const on = !document.body.classList.contains('focus-mode');
+    setFs(on);
+    try {
+      if (on && !document.fullscreenElement) await document.documentElement.requestFullscreen?.();
+      if (!on && document.fullscreenElement) await document.exitFullscreen?.();
+    } catch { /* przeglądarka nie pozwala – zostaje tryb w oknie */ }
+  });
+  const onFsChange = () => { if (!document.fullscreenElement && document.body.classList.contains('focus-mode')) setFs(false); };
+  const onKey = (e) => { if (e.key === 'Escape' && document.body.classList.contains('focus-mode') && !document.querySelector('.pop')) setFs(false); };
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('keydown', onKey);
+  setFs(false);
+  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, exportBtn, fsBtn);
   const onFilter = () => { Object.assign(prefs, { q: search.value, person: personSel.value, show: showSel.value }); savePrefs(prefs); renderBody(); };
   search.addEventListener('input', onFilter);
   personSel.addEventListener('change', onFilter);
@@ -452,5 +472,10 @@ export async function renderRozliczenia(main, params) {
     })
     .subscribe();
 
-  return () => { sb.removeChannel(channel); closePop(); };
+  return () => {
+    sb.removeChannel(channel); closePop();
+    document.removeEventListener('fullscreenchange', onFsChange); document.removeEventListener('keydown', onKey);
+    document.body.classList.remove('focus-mode');
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  };
 }

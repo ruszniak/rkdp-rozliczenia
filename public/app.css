@@ -243,3 +243,11 @@ footer.foot a{color:var(--label)}
 .grid tbody tr.settled:hover td{background:#DCE8D5}
 .grid tbody tr.settled td.c-name a{color:#2F5537}
 .grid tbody tr.settled .sum.ok{background:var(--ok);color:#fff}
+/* tryb pełnego ekranu tabeli */
+body.focus-mode .site-header, body.focus-mode footer.foot, body.focus-mode .tiles,
+body.focus-mode .deadlines, body.focus-mode .legend{display:none}
+body.focus-mode main.wrap{max-width:none;padding:12px 16px 24px}
+body.focus-mode .top-bar{margin:0 0 12px}
+body.focus-mode .toolbar{margin-bottom:10px}
+body.focus-mode .grid-wrap{max-height:calc(100vh - 150px)}
+body.focus-mode .table-title{margin:14px 0 8px}
