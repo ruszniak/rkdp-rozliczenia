@@ -237,3 +237,9 @@ footer.foot a{color:var(--label)}
 .top-bar .month{justify-self:end}
 .tabs button{padding:12px 26px;font-size:15px}
 @media (max-width:820px){.top-bar{grid-template-columns:1fr;justify-items:center}.top-bar>div:first-child{display:none}.top-bar .month{justify-self:center}}
+/* rozliczony klient – cały wiersz podświetlony */
+.grid tbody tr.settled td{background:#E9F1E4}
+.grid tbody tr.settled:nth-child(even) td{background:#E3EDDD}
+.grid tbody tr.settled:hover td{background:#DCE8D5}
+.grid tbody tr.settled td.c-name a{color:#2F5537}
+.grid tbody tr.settled .sum.ok{background:var(--ok);color:#fff}
