@@ -10,5 +10,5 @@
   "dependencies": {
     "@supabase/supabase-js": "2.45.4"
   },
-  "engines": { "node": ">=18" }
+  "engines": { "node": "22.x" }
 }
