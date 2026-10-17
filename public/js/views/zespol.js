@@ -2,6 +2,7 @@ import { h, toast, fail } from '../ui.js';
 import { sb, state } from '../store.js';
 import { ROLE, RULE } from '../dict.js';
 import { fetchAll } from './rozliczenia.js';
+import { downloadBackup } from '../backup.js';
 
 export async function renderZespol(main) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
@@ -152,6 +153,19 @@ export async function renderZespol(main) {
       h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
         h('thead', {}, h('tr', {}, ['Nazwa i opis', 'Zakładka', 'Reguła „nie dotyczy”', 'Kolejność', ''].map(t => h('th', {}, t)))), taskBody))));
   renderTeam(); renderTasks();
+
+  // ---------- kopia danych ----------
+  const backupBtn = h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+    backupBtn.disabled = true;
+    try { const n = await downloadBackup(t => { backupBtn.textContent = 'Pobieranie… ' + t; }); toast(`Kopia pobrana (${n} wierszy)`); }
+    catch (e) { fail(e, 'Nie udało się zrobić kopii'); }
+    finally { backupBtn.disabled = false; backupBtn.textContent = 'Pobierz kopię danych'; }
+  } }, 'Pobierz kopię danych');
+  main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Kopia zapasowa'), backupBtn),
+    h('p', { class: 'hint' }, 'Plik ZIP ze wszystkimi danymi aplikacji (klienci, rozliczenia, notatki, Doradztwo M2 TAX, historia zmian) – w formacie JSON i Excel. ',
+      'Niezależnie od tego co noc wykonywana jest automatyczna, zaszyfrowana kopia bazy w GitHubie. ',
+      'Plik zawiera dane osobowe – trzymaj go na zaszyfrowanym dysku.')));
 
   // ---------- ustawienia M2 TAX ----------
   const [{ data: settings }, { data: signers }] = await Promise.all([

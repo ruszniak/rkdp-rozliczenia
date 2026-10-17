@@ -1,0 +1,59 @@
+# Nocna, zaszyfrowana kopia bazy Supabase (schemat public + dane).
+# Wymagane sekrety repozytorium (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     – connection string „Session pooler” z Supabase (Connect → Session pooler), z hasłem do bazy
+#   BACKUP_PASSPHRASE   – długie hasło do zaszyfrowania kopii (zapisz je w menedżerze haseł – bez niego kopii nie otworzysz)
+# Kopie: zakładka Actions → „Kopia bazy” → wybrany przebieg → Artifacts. Przechowywane 90 dni.
+name: Kopia bazy
+
+on:
+  schedule:
+    - cron: '15 1 * * *'   # codziennie ok. 3:15 w nocy czasu polskiego
+  workflow_dispatch:        # przycisk „Run workflow” – kopia na żądanie
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Sprawdzenie sekretów
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          [ -n "$DB" ] || { echo "::error::Brak sekretu SUPABASE_DB_URL"; exit 1; }
+          [ ${#PASS} -ge 16 ] || { echo "::error::Brak sekretu BACKUP_PASSPHRASE (min. 16 znaków)"; exit 1; }
+
+      - name: Instalacja pg_dump 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Zrzut i szyfrowanie
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          STAMP=$(TZ=Europe/Warsaw date +%Y-%m-%d_%H-%M)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          mkdir -p out
+          /usr/lib/postgresql/17/bin/pg_dump "$DB" --schema=public --no-owner --no-privileges --format=custom --file=baza.dump
+          /usr/lib/postgresql/17/bin/pg_restore --list baza.dump | grep -c "TABLE DATA" | xargs echo "Tabele z danymi:"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASS" --symmetric --cipher-algo AES256 \
+              --output "out/rkdp-baza-$STAMP.dump.gpg" baza.dump
+          rm -f baza.dump
+          ls -la out
+
+      - name: Zapis kopii
+        uses: actions/upload-artifact@v4
+        with:
+          name: rkdp-baza-${{ env.STAMP }}
+          path: out/
+          retention-days: 90
+          if-no-files-found: error

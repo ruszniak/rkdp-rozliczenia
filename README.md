@@ -43,3 +43,22 @@ opodatkowania, ZUS, VAT, CIT, wspólnicy) i historią zmian.
 - Eksport do Excela (CSV) z widoku miesiąca i listy klientów.
 
 Wykonanie: [druslak](https://ruszniak.io)
+
+## Kopie zapasowe
+
+**Automatyczna (co noc, ok. 3:15)** – `.github/workflows/kopia-bazy.yml` robi zrzut schematu `public` z danymi,
+szyfruje go (AES-256, gpg) i zapisuje jako artefakt przebiegu w zakładce *Actions* (przechowywany 90 dni).
+Jednorazowa konfiguracja w GitHub → Settings → Secrets and variables → Actions → *New repository secret*:
+
+- `SUPABASE_DB_URL` – Supabase → *Connect* → *Session pooler* → URI, z wpisanym hasłem do bazy,
+- `BACKUP_PASSPHRASE` – własne długie hasło (min. 16 znaków), zapisane w menedżerze haseł.
+
+Odtworzenie:
+
+```bash
+gpg --decrypt rkdp-baza-RRRR-MM-DD_GG-MM.dump.gpg > baza.dump
+pg_restore --list baza.dump                                  # podgląd zawartości
+pg_restore --clean --if-exists --no-owner -d "$SUPABASE_DB_URL" baza.dump   # nadpisuje bazę!
+```
+
+**Ręczna** – Zespół i ustawienia → *Pobierz kopię danych* (tylko administrator): ZIP z `dane.json` i `dane.xlsx`.
