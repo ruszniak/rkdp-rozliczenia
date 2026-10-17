@@ -178,6 +178,8 @@ export async function renderRozliczenia(main, params) {
       if (prefs.show === 'nierozliczeni' && isSettled(c, area)) return false;
       if (prefs.show === 'braki' && !hasMissing(c, area)) return false;
       if (prefs.show === 'uwagi' && !hasNote(c)) return false;
+      if (prefs.show === 'z_prac' && c.has_employees !== true) return false;
+      if (prefs.show === 'jdg_bez' && !(c.has_employees === false && sectionOf(c) === 'osobowe')) return false;
       return true;
     });
   };
@@ -203,22 +205,32 @@ export async function renderRozliczenia(main, params) {
     return b;
   }
 
+  const empLabel = (c, v) => v === true ? 'Tak' : v === false ? (sectionOf(c) === 'osobowe' ? 'JDG bez pracowników' : 'Nie') : '?';
   function employeesCell(c) {
     const v = c.has_employees;
     const cls = v === true ? 'yes' : v === false ? 'no' : 'unk';
     return h('button', { class: `pill ${cls}`, disabled: !editClients,
-      'data-tip': 'Czy firma zatrudnia pracowników / zleceniobiorców' + (editClients ? ' · kliknij, aby zmienić' : ''),
-      onclick: async () => {
-        const next = v === true ? false : true;
-        const { error } = await sb.from('clients').update({ has_employees: next }).eq('id', c.id);
-        if (error) return fail(error);
-        c.has_employees = next;
-        // PIT-4 w tym miesiącu idzie za odpowiedzią
-        const e = byClient.get(c.id)?.get('pit4');
-        if (e && ((next === false && e.status === 'todo') || (next === true && e.status === 'na'))) {
-          await setStatus(e, next ? 'todo' : 'na');
-        } else refreshRow(c.id);
-      } }, v === true ? 'Tak' : v === false ? 'Nie' : '?');
+      'data-tip': (v === false && sectionOf(c) === 'osobowe' ? 'JDG bez pracowników – rozliczamy tylko ZUS właściciela, PIT-4 nie dotyczy' : 'Czy firma zatrudnia pracowników / zleceniobiorców') + (editClients ? ' · kliknij, aby zmienić' : ''),
+      onclick: (ev) => employeesMenu(ev.currentTarget, c) }, empLabel(c, v));
+  }
+  function employeesMenu(anchor, c) {
+    const pick = async (next) => {
+      closePop();
+      if (c.has_employees === next) return;
+      const { error } = await sb.from('clients').update({ has_employees: next }).eq('id', c.id);
+      if (error) return fail(error);
+      c.has_employees = next;
+      // PIT-4 w tym miesiącu idzie za odpowiedzią
+      const e = byClient.get(c.id)?.get('pit4');
+      if (e && ((next === false && e.status === 'todo') || (next === true && e.status === 'na'))) await setStatus(e, next ? 'todo' : 'na');
+      else refreshRow(c.id);
+    };
+    const opt = (val, label, cls) => h('button', { class: 'opt' + (c.has_employees === val ? ' cur' : ''), onclick: () => pick(val) },
+      h('span', { class: `pill ${cls}`, style: { minWidth: '18px', height: '18px', padding: 0 } }), label);
+    openPop(anchor, [h('label', {}, 'Pracownicy'),
+      opt(true, 'Tak – ma pracowników', 'yes'),
+      opt(false, sectionOf(c) === 'osobowe' ? 'JDG bez pracowników' : 'Nie – bez pracowników', 'no'),
+      opt(null, 'Nie wiadomo', 'unk')]);
   }
 
   function sumCell(c, area) {
@@ -311,8 +323,16 @@ export async function renderRozliczenia(main, params) {
     renderTiles(); renderTabs();
   }
 
+  function renderShowSel() {
+    const opts = [['', 'Wszyscy klienci'], ['nierozliczeni', 'Tylko nierozliczeni'], ['braki', 'Z brakiem dokumentów'], ['uwagi', 'Z uwagami / pytaniami']];
+    if (prefs.area === 'kadry') opts.push(['z_prac', 'Firmy z pracownikami'], ['jdg_bez', 'JDG bez pracowników']);
+    else if (['z_prac', 'jdg_bez'].includes(prefs.show)) prefs.show = '';
+    showSel.replaceChildren(...opts.map(([v, l]) => h('option', { value: v }, l)));
+    showSel.value = prefs.show;
+  }
+
   function renderAll() {
-    renderPersonSel(); renderDeadlines(); renderBanner(); renderBody();
+    renderShowSel(); renderPersonSel(); renderDeadlines(); renderBanner(); renderBody();
   }
 
   // ---------- zapisy ----------

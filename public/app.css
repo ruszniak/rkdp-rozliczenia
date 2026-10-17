@@ -147,7 +147,7 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:26px;padding:0 10px;border-radius:99px;font-size:12px;font-weight:700;border:0;cursor:pointer}
 .pill[disabled]{cursor:default}
 .pill.yes{background:var(--dark);color:var(--gold)}
-.pill.no{background:#EFE9E0;color:#8F8579}
+.pill.no{background:#EFE9E0;color:#8F8579;white-space:nowrap}
 .pill.unk{background:none;border:1.5px dashed var(--line-2);color:#A79C8E}
 .sum{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:99px;white-space:nowrap}
 .sum.ok{background:var(--ok-bg);color:var(--ok)}
