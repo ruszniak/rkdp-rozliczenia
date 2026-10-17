@@ -61,17 +61,24 @@ export async function renderRozliczenia(main, params) {
   const isSettled = (c, area) => { const cs = cellsOf(c, area); return cs.length > 0 && cs.every(e => e.status === 'done' || e.status === 'na'); };
   const hasMissing = (c, area) => cellsOf(c, area).some(e => e.status === 'missing_docs');
   const hasNote = c => !!(noteMap.get(c.id)?.notes?.trim() || noteMap.get(c.id)?.questions?.trim());
-  const rowsIn = (area) => clients.filter(c => cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+  // aktywni liczą się do podsumowań; zawieszeni i zakończeni idą do osobnej tabeli
+  const withCells = (area) => clients.filter(c => cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+  const rowsIn = (area) => withCells(area).filter(c => c.status === 'aktywny');
+  const inactiveIn = (area) => withCells(area).filter(c => c.status !== 'aktywny');
+  const colsFor = (area, section) => {
+    if (area === 'kadry') return tasksFor('kadry');
+    if (section === 'nieaktywni') return tasksFor('ksiegowosc', 'kapitalowe');
+    return tasksFor('ksiegowosc', section).map(t => t.code === 'pit_cit' ? { ...t, label: SECTIONS[section].pitLabel } : t);
+  };
 
   // ---------- nagłówek ----------
-  const head = h('div', { class: 'page-head' },
-    h('h1', {}, 'Rozliczenia miesięczne'),
-    h('div', { class: 'month' },
+  const monthNav = h('div', { class: 'month' },
       h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, -1)}`, 'aria-label': 'Poprzedni miesiąc', 'data-tip': 'Poprzedni miesiąc' }, icon('left')),
       h('span', { class: 'label' }, periodLabel(period)),
-      h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, 1)}`, 'aria-label': 'Następny miesiąc', 'data-tip': 'Następny miesiąc' }, icon('right'))));
+      h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, 1)}`, 'aria-label': 'Następny miesiąc', 'data-tip': 'Następny miesiąc' }, icon('right')));
 
   const tabsBox = h('div', { class: 'tabs', role: 'tablist' });
+  const head = h('div', { class: 'top-bar' }, h('div'), tabsBox, monthNav);
   const tiles = h('div', { class: 'tiles' });
   const deadlines = h('div', { class: 'panel deadlines' });
   const banner = h('div', { class: 'card', style: { padding: '18px 22px', marginBottom: '18px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' } });
@@ -244,10 +251,9 @@ export async function renderRozliczenia(main, params) {
   }
 
   function tableFor(area, section, rows) {
-    const cols = (area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', section)).map(t => ({
-      ...t, label: t.code === 'pit_cit' && section ? SECTIONS[section].pitLabel : t.label,
-    }));
-    const allRows = area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section);
+    const cols = colsFor(area, section);
+    const allRows = section === 'nieaktywni' ? inactiveIn(area)
+      : area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section);
     const stat = (col) => {
       const rel = allRows.map(c => byClient.get(c.id)?.get(col.code)).filter(e => e && e.status !== 'na');
       return `${rel.filter(e => e.status === 'done').length}/${rel.length}`;
@@ -260,7 +266,7 @@ export async function renderRozliczenia(main, params) {
       h('th', { class: 'c-sum', 'data-tip': 'Rozliczony = wszystkie kratki „Zrobione” albo „Nie dotyczy”' }, 'Klient rozliczony'),
       h('th', { 'data-tip': 'Uwagi i pytania do klienta w tym miesiącu' }, 'Uwagi')));
     const tbody = h('tbody', {}, rows.map(c => rowFor(c, area, cols)));
-    return h('div', { class: 'grid-wrap' }, h('table', { class: 'grid', 'data-section': section || 'kadry' }, thead, tbody));
+    return h('div', { class: 'grid-wrap' + (section === 'nieaktywni' ? ' inactive' : '') }, h('table', { class: 'grid', 'data-section': section || 'kadry' }, thead, tbody));
   }
 
   function renderBody() {
@@ -279,6 +285,16 @@ export async function renderRozliczenia(main, params) {
         out.push(rows.length ? tableFor('ksiegowosc', section, rows) : emptyBox());
       }
     }
+    // zawieszeni i zakończeni – osobno, bez wpływu na podsumowania
+    const inactive = filtered(inactiveIn(area), area);
+    if (inactiveIn(area).length) {
+      const open = prefs.showInactive !== false;
+      out.push(h('div', { class: 'table-title' },
+        h('h2', {}, 'Zawieszeni i zakończeni'),
+        h('span', { class: 'muted small' }, `${inactiveIn(area).length} · nie liczą się do podsumowań`),
+        h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { prefs.showInactive = !open; savePrefs(prefs); renderBody(); } }, open ? 'Zwiń' : 'Pokaż')));
+      if (open) out.push(inactive.length ? tableFor(area, 'nieaktywni', inactive) : emptyBox());
+    }
     body.replaceChildren(...out);
     renderTiles(); renderTabs();
   }
@@ -289,9 +305,7 @@ export async function renderRozliczenia(main, params) {
     body.querySelectorAll(`tr[data-client="${clientId}"]`).forEach(tr => {
       const area = tr.dataset.area;
       const section = tr.closest('table').dataset.section;
-      const cols = (area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', section)).map(t => ({
-        ...t, label: t.code === 'pit_cit' ? SECTIONS[section]?.pitLabel || t.label : t.label }));
-      tr.replaceWith(rowFor(c, area, cols));
+      tr.replaceWith(rowFor(c, area, colsFor(area, section === 'kadry' ? null : section)));
     });
     renderTiles(); renderTabs();
   }
@@ -375,13 +389,15 @@ export async function renderRozliczenia(main, params) {
   function exportCsv() {
     const area = prefs.area;
     const out = [];
-    const sections = area === 'kadry' ? [null] : ['osobowe', 'kapitalowe'];
+    const sections = [...(area === 'kadry' ? [null] : ['osobowe', 'kapitalowe']), 'nieaktywni'];
     for (const section of sections) {
-      const cols = area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', section);
-      const rows = filtered(area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section), area);
-      if (section) out.push([SECTIONS[section].title]);
+      const cols = colsFor(area, section);
+      const rows = filtered(section === 'nieaktywni' ? inactiveIn(area)
+        : area === 'kadry' ? rowsIn('kadry') : rowsIn('ksiegowosc').filter(c => sectionOf(c) === section), area);
+      if (section === 'nieaktywni' && !rows.length) continue;
+      if (section) out.push([section === 'nieaktywni' ? 'Zawieszeni i zakończeni' : SECTIONS[section].title]);
       out.push(['Klient', AREAS[area].personLabel, ...(area === 'kadry' ? ['Pracownicy'] : []),
-        ...cols.map(t => t.code === 'pit_cit' && section ? SECTIONS[section].pitLabel : t.label), 'Rozliczony', 'Uwagi', 'Pytania']);
+        ...cols.map(t => t.label), 'Rozliczony', 'Uwagi', 'Pytania']);
       rows.forEach(c => {
         const m = byClient.get(c.id);
         out.push([c.name, memberById(c[AREAS[area].person])?.short_name || '',
@@ -394,7 +410,7 @@ export async function renderRozliczenia(main, params) {
     downloadCsv(`rozliczenia_${area}_${period}.csv`, out);
   }
 
-  main.replaceChildren(head, tabsBox, tiles, deadlines, banner, toolbar, legend, body);
+  main.replaceChildren(head, tiles, deadlines, banner, toolbar, legend, body);
   renderAll();
 
   // ---------- zmiany na żywo od innych osób ----------
