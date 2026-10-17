@@ -117,8 +117,9 @@ export async function renderRozliczenia(main, params) {
     personSel.replaceChildren(
       h('option', { value: '' }, `${a.personLabel}: wszyscy`),
       h('option', { value: 'me' }, 'Moi klienci'),
-      h('option', { value: 'none' }, `Bez przypisanej osoby`),
-      state.members.filter(m => m.active).map(m => h('option', { value: m.id }, `${a.personLabel}: ${m.short_name}`)));
+      h('option', { value: 'none' }, 'Bez przypisanej osoby'),
+      h('optgroup', { label: `${a.personLabel}:` },
+        state.members.filter(m => m.active).map(m => h('option', { value: m.id }, m.full_name))));
     personSel.value = prefs.person || '';
   }
 
