@@ -1,0 +1,9 @@
+node_modules/
+public/vendor/
+public/config.js
+.vercel
+.env*
+# dane klientów nigdy nie trafiają do repozytorium
+*.xlsx
+import_*.sql
+dane/

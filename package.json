@@ -1,0 +1,14 @@
+{
+  "name": "rkdp-rozliczenia",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RKDP — wewnętrzna aplikacja do śledzenia rozliczeń klientów biura",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4"
+  },
+  "engines": { "node": ">=18" }
+}
