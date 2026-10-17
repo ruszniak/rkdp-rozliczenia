@@ -10,9 +10,10 @@ copyFileSync(join(pkgDir, 'dist/umd/supabase.js'), 'public/vendor/supabase.js');
 
 const env = process.env;
 const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL;
-const key = env.SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY;
+const key = env.SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  || env.SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !key) {
-  console.error('Brak zmiennych SUPABASE_URL i SUPABASE_ANON_KEY w ustawieniach projektu Vercel.');
+  console.error('Brak zmiennych NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY w ustawieniach projektu Vercel.');
   process.exit(1);
 }
 if (/service_role|sb_secret_/.test(key) || /"role"\s*:\s*"service_role"/.test(Buffer.from(key.split('.')[1] || '', 'base64').toString())) {
