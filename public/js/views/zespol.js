@@ -24,11 +24,18 @@ export async function renderZespol(main) {
       role.addEventListener('change', () => update(m, { role: role.value }));
       const active = h('input', { type: 'checkbox', checked: m.active, disabled: m.id === state.me.id });
       active.addEventListener('change', () => update(m, { active: active.checked }));
+      const mods = m.modules || ['rozliczenia'];
+      const modBox = (key, label) => {
+        const cb = h('input', { type: 'checkbox', checked: mods.includes(key), disabled: m.id === state.me.id });
+        cb.addEventListener('change', () => update(m, { modules: cb.checked ? [...new Set([...mods, key])] : mods.filter(x => x !== key) }));
+        return h('label', { class: 'check small' }, cb, label);
+      };
       const count = assigns.filter(a => a.member_id === m.id).length;
       const nAcc = clients.filter(c => c.accountant_id === m.id).length, nHr = clients.filter(c => c.hr_id === m.id).length;
       return h('tr', {},
         h('td', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, m.email)),
         h('td', {}, m.short_name),
+        h('td', {}, modBox('rozliczenia', 'Rozliczenia'), h('br'), modBox('doradztwo', 'Doradztwo M2 TAX')),
         h('td', {}, role),
         h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany')),
         h('td', { class: 'small' }, `księgowość: ${nAcc}`, h('br'), `kadry: ${nHr}`),
@@ -47,14 +54,17 @@ export async function renderZespol(main) {
     const short = h('input', { class: 'input', placeholder: 'Skrót (np. Kuba)', required: true });
     const role = h('select', { class: 'select' }, Object.entries(ROLE).map(([k, v]) => h('option', { value: k }, v)));
     role.value = 'limited';
+    const mod = h('select', { class: 'select', 'aria-label': 'Moduł' }, h('option', { value: 'rozliczenia' }, 'Moduł: Rozliczenia'),
+      h('option', { value: 'doradztwo' }, 'Moduł: Doradztwo M2 TAX'), h('option', { value: 'oba' }, 'Moduł: oba'));
     return h('form', { class: 'toolbar', style: { marginTop: '14px' }, onsubmit: async (e) => {
       e.preventDefault();
-      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: role.value });
+      const modules = mod.value === 'oba' ? ['rozliczenia', 'doradztwo'] : [mod.value];
+      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: role.value, modules });
       if (error) return fail(error);
       toast('Dodano. Ta osoba może się teraz zalogować kodem z e-maila.');
       e.target.reset(); role.value = 'limited';
       await reloadMembers(); renderTeam();
-    } }, email, name, short, role, h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, 'Dodaj osobę'));
+    } }, email, name, short, role, mod, h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, 'Dodaj osobę'));
   })();
 
   function renderAssign(m) {
@@ -132,7 +142,7 @@ export async function renderZespol(main) {
     h('section', { class: 'card section' },
       h('div', { class: 'section-head' }, h('h2', {}, 'Zespół')),
       h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-        h('thead', {}, h('tr', {}, ['Osoba', 'Skrót', 'Dostęp', 'Konto', 'Prowadzi', 'Wgląd do innych'].map(t => h('th', {}, t)))), teamBody)),
+        h('thead', {}, h('tr', {}, ['Osoba', 'Skrót', 'Moduły', 'Dostęp (Rozliczenia)', 'Konto', 'Prowadzi', 'Wgląd do innych'].map(t => h('th', {}, t)))), teamBody)),
       addForm,
       h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Logować się mogą wyłącznie aktywne adresy z tej listy. Zablokowanie konta działa natychmiast.')),
     assignPanel,
@@ -142,4 +152,32 @@ export async function renderZespol(main) {
       h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
         h('thead', {}, h('tr', {}, ['Nazwa i opis', 'Zakładka', 'Reguła „nie dotyczy”', 'Kolejność', ''].map(t => h('th', {}, t)))), taskBody))));
   renderTeam(); renderTasks();
+
+  // ---------- ustawienia M2 TAX ----------
+  const [{ data: settings }, { data: signers }] = await Promise.all([
+    sb.from('app_settings').select('key,value'), sb.from('m2_signers').select('*').order('sort')]);
+  const sv = Object.fromEntries((settings || []).map(r => [r.key, r.value]));
+  const setInput = (key, label, ph) => {
+    const inp = h('input', { class: 'input', value: sv[key] || '', placeholder: ph, style: { width: '100%' } });
+    inp.addEventListener('change', async () => {
+      let v = inp.value.trim() || null;
+      const m = v && v.match(/src="([^"]+)"/); if (m) v = m[1].replace(/&amp;/g, '&'); // wklejony cały kod <iframe>
+      const { error } = await sb.from('app_settings').upsert({ key, value: v }); if (error) return fail(error);
+      inp.value = v || ''; toast('Zapisano');
+    });
+    return h('label', { class: 'field wide' }, h('span', {}, label), inp);
+  };
+  const sgBody = h('tbody', {}, ...(signers || []).map(sg => {
+    const f = (k, w) => { const i = h('input', { class: 'input', value: sg[k] || '', style: { width: w || '100%' } });
+      i.addEventListener('change', async () => { const { error } = await sb.from('m2_signers').update({ [k]: i.value.trim() || null }).eq('id', sg.id); if (error) return fail(error); toast('Zapisano'); });
+      return i; };
+    return h('tr', {}, h('td', {}, f('full_name')), h('td', {}, f('title')), h('td', {}, f('license_no', '110px')), h('td', {}, f('role_label')));
+  }));
+  main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Doradztwo M2 TAX – ustawienia')),
+    h('div', { class: 'form-grid' },
+      setInput('m2_google_calendar_src', 'Kalendarz Google M2 TAX – identyfikator kalendarza albo kod/link do osadzenia', 'np. kancelaria@m2tax.pl albo https://calendar.google.com/calendar/embed?src=…'),
+      setInput('m2_zoho_bookings_url', 'Zoho Bookings – adres strony rezerwacji', 'https://…zohobookings.eu/…')),
+    h('p', { class: 'eyebrow', style: { margin: '18px 0 8px' } }, 'Podpisujący zlecenia'),
+    h('div', { class: 'list-wrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, ...['Imię i nazwisko', 'Tytuł', 'Nr wpisu', 'Funkcja'].map(t => h('th', {}, t)))), sgBody))));
 }

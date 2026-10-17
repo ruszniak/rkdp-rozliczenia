@@ -17,7 +17,8 @@ export const state = {
   taskTypes: [],
 };
 
-export const canEditClients = () => ['admin', 'full'].includes(state.me?.role);
+export const canEditClients = () => ['admin', 'full'].includes(state.me?.role) && hasModule('rozliczenia');
 export const isAdmin = () => state.me?.role === 'admin';
 export const memberById = id => state.members.find(m => m.id === id);
 export const activeTasks = () => state.taskTypes.filter(t => t.active);
+export const hasModule = (m) => (state.me?.modules || ['rozliczenia']).includes(m);

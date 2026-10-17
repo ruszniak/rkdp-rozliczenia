@@ -1,10 +1,11 @@
 import { h, initials, toast, initTooltips } from './ui.js';
-import { sb, state } from './store.js';
+import { sb, state, hasModule } from './store.js';
 import { renderLogin } from './views/login.js';
 import { renderRozliczenia } from './views/rozliczenia.js';
 import { renderKlienci } from './views/klienci.js';
 import { renderKlient } from './views/klient.js';
 import { renderZespol } from './views/zespol.js';
+import { renderM2 } from './views/m2.js';
 
 const app = document.getElementById('app');
 let cleanup = null;
@@ -21,12 +22,13 @@ function layout(active) {
   const link = (href, label, key) => h('a', { href, class: active === key ? 'active' : null }, label);
   const header = h('header', { class: 'site-header' },
     h('div', { class: 'wrap nav' },
-      h('a', { class: 'nav-brand', href: '#/rozliczenia' },
+      h('a', { class: 'nav-brand', href: hasModule('rozliczenia') ? '#/rozliczenia' : '#/doradztwo' },
         h('img', { src: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego' }),
-        h('span', {}, 'Rozliczenia')),
+        h('span', {}, active === 'doradztwo' ? 'Doradztwo' : 'Rozliczenia')),
       h('nav', { class: 'nav-links' },
-        link('#/rozliczenia', 'Rozliczenia', 'rozliczenia'),
-        link('#/klienci', 'Klienci', 'klienci'),
+        hasModule('rozliczenia') ? link('#/rozliczenia', 'Rozliczenia', 'rozliczenia') : null,
+        hasModule('rozliczenia') ? link('#/klienci', 'Klienci', 'klienci') : null,
+        hasModule('doradztwo') ? link('#/doradztwo', 'Doradztwo podatkowe', 'doradztwo') : null,
         me.role === 'admin' ? link('#/zespol', 'Zespół i ustawienia', 'zespol') : null),
       h('div', { class: 'nav-user' },
         h('span', { class: 'who' }, me.full_name),
@@ -62,9 +64,11 @@ async function route() {
   if (cleanup) { try { cleanup(); } catch { /* */ } cleanup = null; }
   document.querySelector('.pop')?.remove();
   const { parts, params } = parseHash();
-  const view = parts[0] || 'rozliczenia';
+  const view = parts[0] || (hasModule('rozliczenia') ? 'rozliczenia' : 'doradztwo');
   try {
-    if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
+    if (view === 'doradztwo' && hasModule('doradztwo')) cleanup = await renderM2(layout('doradztwo'), parts, params);
+    else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('doradztwo'), ['doradztwo'], params);
+    else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
     else if (view === 'klient') cleanup = await renderKlient(layout('klienci'), parts[1]);
     else if (view === 'zespol' && state.me.role === 'admin') cleanup = await renderZespol(layout('zespol'));
     else cleanup = await renderRozliczenia(layout('rozliczenia'), params);

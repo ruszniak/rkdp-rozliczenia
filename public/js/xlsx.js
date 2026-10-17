@@ -86,12 +86,12 @@ const CRC_TABLE = (() => {
 })();
 const crc32 = (buf) => { let c = 0xFFFFFFFF; for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
 
-function zip(files) {
+export function zip(files) {
   const enc = new TextEncoder();
   const parts = [], central = [];
   let offset = 0;
   for (const f of files) {
-    const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+    const name = enc.encode(f.name), data = typeof f.data === 'string' ? enc.encode(f.data) : f.data, crc = crc32(data);
     const local = new DataView(new ArrayBuffer(30));
     local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true); local.setUint16(6, 0x0800, true);
     local.setUint16(8, 0, true); local.setUint16(10, 0, true); local.setUint16(12, 0x21, true);

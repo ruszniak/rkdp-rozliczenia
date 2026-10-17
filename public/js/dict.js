@@ -104,7 +104,7 @@ function holidays(y) {
   return set;
 }
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-function businessDay(d) {
+export function businessDay(d) {
   const hol = holidays(d.getFullYear());
   while (d.getDay() === 0 || d.getDay() === 6 || hol.has(iso(d))) d.setDate(d.getDate() + 1);
   return d;
