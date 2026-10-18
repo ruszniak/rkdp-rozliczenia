@@ -5,6 +5,7 @@ import { LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, CIT_ADVANCES, ZUS_TYPE, CI
 import { completeness } from './klienci.js';
 import { nipLookupBar, mergeNipData } from '../nip.js';
 import { dokumentyDialog } from '../rkdp/docs.js';
+import { clientTicketsBox } from './zgloszenia.js';
 
 const YESNO = { true: 'Tak', false: 'Nie' };
 const isJdg = c => c.legal_form === 'jdg';
@@ -298,7 +299,7 @@ export async function renderKlient(main, id) {
       h('div', {}, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null,
         sectionsBox, partnersBox,
         editable ? h('div', { class: 'savebar' }, saveInfo, saveBtn) : null),
-      h('div', {}, assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
+      h('div', {}, clientTicketsBox(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);
