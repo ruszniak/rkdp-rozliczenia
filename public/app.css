@@ -46,7 +46,19 @@ button,input,select,textarea{font:inherit;color:inherit}
 .nav{display:flex;align-items:center;justify-content:space-between;height:72px;gap:20px}
 .nav-brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--ink)}
 .nav-brand img{height:40px;width:auto}
-.nav-brand span{font-family:var(--serif);font-weight:700;font-size:15px;padding-left:14px;border-left:1px solid var(--line-2);color:var(--bronze)}
+.brand-logo{display:flex;align-items:center}
+.mod-label,.mod-switch{font-family:var(--serif);font-weight:700;font-size:15px;padding:4px 0 4px 14px;border:0;border-left:1px solid var(--line-2);color:var(--bronze);background:none}
+.mod-wrap{position:relative}
+.mod-switch{cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.mod-switch:hover{color:var(--bronze-dark)}
+.mod-switch .caret{font-size:11px;transition:transform .15s}
+.mod-switch[aria-expanded="true"] .caret{transform:rotate(180deg)}
+.mod-menu{position:absolute;top:calc(100% + 12px);left:0;z-index:60;min-width:300px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px rgba(29,26,22,.14);padding:6px;display:grid;gap:2px}
+.mod-menu[hidden]{display:none}
+.mod-menu a{display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}
+.mod-menu a:hover,.mod-menu a.on{background:var(--panel)}
+.mod-menu a.on{color:var(--bronze-dark)}
+.mod-menu img{height:30px;width:84px;object-fit:contain;object-position:left center}
 .nav-links{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
 .nav-links a{color:var(--ink);text-decoration:none;padding:8px 14px;border-radius:999px}
 .nav-links a:hover{color:var(--bronze)}
@@ -55,7 +67,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 .avatar{width:34px;height:34px;border-radius:999px;background:var(--dark);color:var(--gold);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
 @media (max-width:820px){
   .nav{height:auto;flex-wrap:wrap;padding:12px 0;gap:10px}
-  .nav-brand span{display:none}
   .nav-links{order:3;width:100%;overflow-x:auto}
   .nav-user .who{display:none}
 }

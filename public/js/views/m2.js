@@ -10,9 +10,6 @@ import { fetchAll } from './rozliczenia.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 
 const BASE = '#/doradztwo';
-const SUBNAV = [
-  ['', 'Pulpit'], ['sprawy', 'Sprawy'], ['klienci', 'Klienci'], ['kalendarz', 'Kalendarz'], ['zlecenia', 'Zlecenia'], ['spotkania', 'Spotkania'],
-];
 const members = () => state.members.filter(m => m.active && (m.modules || []).includes('doradztwo'));
 const who = id => memberById(id)?.short_name || '';
 const memberOpts = () => Object.fromEntries(members().map(m => [m.id, m.full_name]));
@@ -20,10 +17,7 @@ const memberOpts = () => Object.fromEntries(members().map(m => [m.id, m.full_nam
 // ---------- wspólne elementy ----------
 function header(active, title, sub, actions) {
   return [
-    h('div', { class: 'm2-top' },
-      h('img', { src: '/m2tax-logo.png', alt: 'M2 TAX', class: 'm2-logo' }),
-      h('nav', { class: 'tabs m2-tabs' }, ...SUBNAV.map(([k, l]) => h('a', { href: k ? `${BASE}/${k}` : BASE, class: active === k ? 'on' : '' }, l)))),
-    h('div', { class: 'page-head' },
+    h('div', { class: 'page-head', style: { marginTop: '28px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, 'Doradztwo podatkowe · M2 TAX'), h('h1', { style: { marginTop: '6px' } }, title),
         sub ? h('p', { class: 'sub' }, sub) : null),
       actions ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, ...[].concat(actions)) : null),
