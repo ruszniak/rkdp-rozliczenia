@@ -7,6 +7,8 @@ import {
 } from '../m2/dict.js';
 import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
+import { pps1Defaults, pps1Scope, printPps1 } from '../m2/pps1.js';
+import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 
 const BASE = '#/doradztwo';
@@ -420,8 +422,13 @@ async function viewMatter(main, id, params) {
     toast('Usunięto sprawę'); location.hash = `${BASE}/sprawy`;
   } }, 'Usuń sprawę') : null;
 
+  const poaBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+    const { data: cl } = await sb.from('m2_clients').select('*').eq('id', m.client_id).maybeSingle();
+    const { data: od } = await sb.from('m2_orders').select('params').eq('id', m.order_id).maybeSingle();
+    pelnomocnictwoDialog({ client: cl, params: { ...(od?.params || {}), matter_type: m.matter_type, authority: m.authority || od?.params?.authority, tax: m.tax_kind || od?.params?.tax, period: m.tax_period || od?.params?.period, ref_no: m.case_ref || od?.params?.ref_no } });
+  } }, 'Pełnomocnictwo');
   main.replaceChildren(...header('sprawy', `${m.number} · ${m.title}`, null,
-    [statusPill(m.status), delMatter].filter(Boolean)),
+    [statusPill(m.status), poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
   h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, timeCard, ordersCard)));
@@ -663,6 +670,73 @@ function rowsEditor(P, key, autoFn, onChange) {
   render();
   box.refresh = () => { if (!custom()) render(); };
   return box;
+}
+
+// ---- Pełnomocnictwo: PPS-1 (urzędowy formularz) albo na papierze firmowym M2 TAX ----
+async function pelnomocnictwoDialog({ client, params = {}, defaultSignerId = null }) {
+  const signers = await fetchAll(() => sb.from('m2_signers').select('*').eq('active', true).order('sort'));
+  if (!client) return toast('Najpierw wybierz klienta', true);
+  const mine = signers.find(x => x.full_name === state.me.full_name);
+  const first = signers.find(x => x.id === defaultSignerId) || mine || signers[0];
+  const d = pps1Defaults({ client, params, signer: first, scope: pps1Scope(params) });
+  d.kind = 'pps1';
+  d.who = first?.id || '';
+  const box = h('div');
+  const signerOpts = (both) => ({ ...Object.fromEntries(signers.map(x => [x.id, `${x.full_name} (nr ${x.license_no || '—'})`])), ...(both ? { oba: 'Obaj (każdy samodzielnie)' } : {}) });
+  const build = () => {
+    const pps = d.kind === 'pps1';
+    if (pps && d.who === 'oba') d.who = first?.id || '';
+    const sg = signers.find(x => x.id === d.who);
+    const warn = pps && sg && (!sg.nip || !sg.ae_address)
+      ? h('p', { class: 'err small', style: { margin: '0 0 10px' } }, `Brak NIP lub adresu do doręczeń elektronicznych dla: ${sg.full_name}. Uzupełnij w Zespół i ustawienia → Podpisujący.`) : null;
+    box.replaceChildren(
+      fieldsGrid([
+        ['kind', 'Rodzaj pełnomocnictwa', 'select', { pps1: 'PPS-1 – urzędowy formularz (organy podatkowe)', firmowe: 'Na papierze firmowym M2 TAX (np. sąd administracyjny)' }, true],
+        ['who', 'Pełnomocnik', 'select', signerOpts(!pps)],
+        ['date', 'Data', 'date'],
+        ['organ', 'Organ (sąd), do którego składane jest pełnomocnictwo', 'list', AUTHORITIES, true],
+        ['scope', pps ? 'Poz. 71 – wskazanie sprawy i zakresu' : 'Zakres – „do reprezentowania Mocodawcy …”', 'textarea'],
+        ['reps', d.client_kind === 'osoba' ? 'Mocodawca (imię i nazwisko)' : 'Reprezentanci mocodawcy (max 3) – każda osoba w osobnej linii: „Jan Kowalski – prezes zarządu”', 'textarea'],
+      ], d, (k) => { if (k === 'kind' || k === 'who') build(); }),
+      warn || '',
+      pps ? h('div', {},
+        h('p', { class: 'eyebrow', style: { margin: '14px 0 8px' } }, 'Dane do formularza PPS-1'),
+        fieldsGrid([
+          ['submitter', 'Poz. 4 – składa', 'select', { pelnomocnik: 'Pełnomocnik – doradca podatkowy (kwadraty 2 i 6)', mocodawca: 'Mocodawca (kwadrat 1)' }],
+          ['client_kind', 'Poz. 5 – rodzaj podmiotu', 'select', { firma: 'Podmiot niebędący osobą fizyczną', osoba: 'Osoba fizyczna' }],
+          ['client_nip', 'Poz. 1 – NIP mocodawcy', 'text'], ['client_name', 'Poz. 6 – nazwa pełna / nazwisko, imię', 'text', null, true],
+          ['c_country', '13. Kraj', 'text'], ['c_voiv', '14. Województwo', 'text'], ['c_county', '15. Powiat', 'text'], ['c_commune', '16. Gmina', 'text'],
+          ['c_street', '17. Ulica', 'text'], ['c_house', '18. Nr domu', 'text'], ['c_flat', '19. Nr lokalu', 'text'],
+          ['c_city', '20. Miejscowość', 'text'], ['c_zip', '21. Kod pocztowy', 'text'],
+          ['client_phone', '22. Telefon (nieobowiązkowe)', 'text'], ['client_email', '23. E-mail (nieobowiązkowe)', 'text'], ['client_ae', '24. Adres elektroniczny mocodawcy (nieobowiązkowe)', 'text'],
+          ['delivery', '35. Pełnomocnik do doręczeń', 'select', { tak: 'tak', nie: 'nie' }], ['further', 'E.2 – dalsze pełnomocnictwo', 'select', { tak: 'tak', nie: 'nie' }],
+          ['fee', '80. Opłata skarbowa', 'select', { dolaczono: 'dołączono dowód zapłaty', w3dni: 'dowód zostanie dołączony w ciągu 3 dni', brak: 'nie zaznaczaj' }],
+        ], d, (k) => { if (k === 'client_kind') build(); }))
+        : h('p', { class: 'hint', style: { marginTop: '10px' } }, 'Pełnomocnictwo procesowe (WSA, NSA) generuje się samo, gdy w umowie wybrano rodzaj pełnomocnictwa „procesowe”; w innym przypadku – szczególne.'));
+  };
+  build();
+  const fileBase = () => `Pelnomocnictwo_${d.kind === 'pps1' ? 'PPS-1_' : ''}${(client.name || '').replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 40)}`;
+  const firmDoc = () => {
+    const chosen = d.who === 'oba' ? signers : signers.filter(x => x.id === d.who);
+    const o = { order_date: d.date, params: { ...params, authority: d.organ, client_reps: d.reps, poa_scope: d.scope && d.scope !== pps1Scope(params) ? d.scope : null } };
+    return poaBlocks(o, client, chosen, { standalone: true });
+  };
+  modal('Pełnomocnictwo', box, (close) => [
+    h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Zamknij'),
+    h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+      if (d.kind === 'pps1') return toast('Formularz PPS-1 pobierasz jako PDF', true);
+      const bytes = await buildOrderDocx(firmDoc());
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+      a.download = fileBase() + '.docx'; document.body.append(a); a.click(); a.remove();
+    } }, icon('download'), 'Word'),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: () => {
+      const sg = signers.find(x => x.id === d.who);
+      if (d.kind === 'pps1') { if (!printPps1(d, sg)) toast('Zezwól na wyskakujące okna, aby zapisać PDF', true); return; }
+      const w = window.open('', '_blank'); if (!w) return toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
+      w.document.open(); w.document.write(printableHtml(firmDoc(), fileBase(), location.origin + '/m2tax-logo.png')); w.document.close();
+      setTimeout(() => { w.focus(); w.print(); }, 600);
+    } }, icon('download'), 'PDF'),
+  ]);
 }
 
 let orderCssInjected = false;
@@ -937,7 +1011,9 @@ async function viewOrder(main, id, params) {
   const title = draft.id ? docLabel(draft) : (isUmowa() ? 'Nowa umowa' : 'Nowe zlecenie');
   const subTitle = draft.id ? `Klient: ${client()?.name || '—'}` : 'Wybierz rodzaj dokumentu. Po zapisaniu automatycznie założy się sprawa – możesz ją potem edytować.';
   main.replaceChildren(...header('zlecenia', title, subTitle,
-    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn, delBtn].filter(Boolean)),
+    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn,
+      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id }) }, 'Pełnomocnictwo'),
+      delBtn].filter(Boolean)),
   typeSwitch || '',
   h('div', { class: 'order-layout' }, h('div', {}, h('section', { class: 'card section' }, formBox), mattersCard || ''), h('div', { class: 'paper-wrap' }, preview)));
 }

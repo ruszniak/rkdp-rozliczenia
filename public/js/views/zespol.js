@@ -229,13 +229,13 @@ export async function renderZespol(main) {
     const f = (k, w) => { const i = h('input', { class: 'input', value: sg[k] || '', style: { width: w || '100%' } });
       i.addEventListener('change', async () => { const { error } = await sb.from('m2_signers').update({ [k]: i.value.trim() || null }).eq('id', sg.id); if (error) return fail(error); toast('Zapisano'); });
       return i; };
-    return h('tr', {}, h('td', {}, f('full_name')), h('td', {}, f('title')), h('td', {}, f('license_no', '110px')), h('td', {}, f('role_label')));
+    return h('tr', {}, h('td', {}, f('full_name')), h('td', {}, f('title')), h('td', {}, f('license_no', '90px')), h('td', {}, f('role_label')), h('td', {}, f('nip', '130px')), h('td', {}, f('ae_address', '240px')));
   }));
   main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
     h('div', { class: 'section-head' }, h('h2', {}, 'Doradztwo M2 TAX – ustawienia')),
     h('div', { class: 'form-grid' },
       setInput('m2_google_calendar_src', 'Kalendarz Google M2 TAX – identyfikator kalendarza albo kod/link do osadzenia', 'np. kancelaria@m2tax.pl albo https://calendar.google.com/calendar/embed?src=…'),
       setInput('m2_zoho_bookings_url', 'Zoho Bookings – adres strony rezerwacji', 'https://…zohobookings.eu/…')),
-    h('p', { class: 'eyebrow', style: { margin: '18px 0 8px' } }, 'Podpisujący zlecenia'),
-    h('div', { class: 'list-wrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, ...['Imię i nazwisko', 'Tytuł', 'Nr wpisu', 'Funkcja'].map(t => h('th', {}, t)))), sgBody))));
+    h('p', { class: 'eyebrow', style: { margin: '18px 0 8px' } }, 'Podpisujący zlecenia i pełnomocnicy (PPS-1)'),
+    h('div', { class: 'list-wrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, ...['Imię i nazwisko', 'Tytuł', 'Nr wpisu', 'Funkcja', 'NIP (PPS-1)', 'Adres do doręczeń elektronicznych'].map(t => h('th', {}, t)))), sgBody))));
 }

@@ -292,7 +292,7 @@ a.mini-matter:hover{background:#FAF4EA}
 .tl-item{display:grid;grid-template-columns:86px 1fr;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line);font-size:13.5px}
 .tl-date{color:var(--muted);font-size:12.5px;font-weight:600}
 .modal-back{position:fixed;inset:0;z-index:70;background:rgba(29,26,22,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
-.modal{background:var(--card);border-radius:16px;box-shadow:0 30px 60px rgba(0,0,0,.25);padding:22px 24px;width:100%;max-width:640px}
+.modal{background:var(--card);border-radius:16px;box-shadow:0 30px 60px rgba(0,0,0,.25);padding:22px 24px;width:100%;max-width:640px;max-height:86vh;overflow:auto}
 .cal-wrap{overflow-x:auto}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--card)}
 .cal-h{background:var(--panel);font-size:12px;font-weight:700;color:var(--label);padding:8px 10px}

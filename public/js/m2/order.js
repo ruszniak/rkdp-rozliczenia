@@ -462,7 +462,7 @@ export function poaDefaultScope(p) {
   return `${before}${what ? ` w sprawie (${what})` : ''}`;
 }
 
-export function poaBlocks(o, client, signers) {
+export function poaBlocks(o, client, signers, { standalone = false } = {}) {
   const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
   const c = client || {};
   const sg = (signers || []).length ? signers : [{ full_name: P, license_no: P }];
@@ -471,7 +471,7 @@ export function poaBlocks(o, client, signers) {
   const court = /p\.p\.s\.a|procesow/i.test(p.poa_type || matterTemplate(p.matter_type).poa);
   const scope = (p.poa_scope || '').trim().replace(/[.\s]+$/, '') || poaDefaultScope(p);
   const B = [];
-  B.push({ t: 'att', text: 'Załącznik nr 4 – Pełnomocnictwo' });
+  if (!standalone) B.push({ t: 'att', text: 'Załącznik nr 4 – Pełnomocnictwo' });
   B.push({ t: 'title', text: court ? 'PEŁNOMOCNICTWO PROCESOWE' : 'PEŁNOMOCNICTWO SZCZEGÓLNE' });
   B.push({ t: 'meta', text: `${p.place || FIRM.city}, dnia ${dateLong(o.order_date)}` });
   B.push({ t: 'intro', text: c.kind === 'osoba' ? `${party} (dalej: Mocodawca),` : `${party}, reprezentowana przez ${reps.length ? reps.join(' oraz ') : P} (dalej: Mocodawca),` });
