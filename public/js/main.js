@@ -3,6 +3,7 @@ import { sb, state, hasModule } from './store.js';
 import { renderLogin } from './views/login.js';
 import { renderRozliczenia } from './views/rozliczenia.js';
 import { renderKlienci } from './views/klienci.js';
+import { renderSprawozdania } from './views/sprawozdania.js';
 import { renderKlient } from './views/klient.js';
 import { renderZespol } from './views/zespol.js';
 import { renderM2 } from './views/m2.js';
@@ -20,7 +21,7 @@ function parseHash() {
 
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/rozliczenia', need: 'rozliczenia',
-    tabs: [['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci']] },
+    tabs: [['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/sprawozdania', 'Sprawozdania', 'sprawozdania']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia'], ['#/doradztwo/spotkania', 'Spotkania', 'm2:spotkania']] },
@@ -102,6 +103,7 @@ async function route() {
     else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
     else if (view === 'klient') cleanup = await renderKlient(layout('klienci'), parts[1]);
+    else if (view === 'sprawozdania') cleanup = await renderSprawozdania(layout('sprawozdania'), parts[1]);
     else if (view === 'zespol' && state.me.role === 'admin') cleanup = await renderZespol(layout('zespol'));
     else cleanup = await renderRozliczenia(layout('rozliczenia'), params);
   } catch (err) {

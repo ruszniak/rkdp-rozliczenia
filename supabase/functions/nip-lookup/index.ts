@@ -1,6 +1,5 @@
-// Wyszukiwanie kontrahenta po NIP – Biała lista VAT (Ministerstwo Finansów).
+// Wyszukiwanie kontrahenta po NIP – Biała lista VAT (Ministerstwo Finansów) oraz odpis z KRS.
 // Wywołać może tylko zalogowany, aktywny członek zespołu (sprawdzane w bazie).
-// Miejsce na GUS BIR: gdy pojawi się sekret GUS_BIR_KEY, można go tu dołożyć.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -32,6 +31,39 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
+
+    // Odpis aktualny z KRS (API Ministerstwa Sprawiedliwości): { krs: '0000812185' }
+    if (body.krs !== undefined) {
+      const krs = String(body.krs || '').replace(/\D/g, '').padStart(10, '0');
+      if (!/^\d{10}$/.test(krs) || krs === '0000000000') return json({ error: 'Nieprawidłowy numer KRS.' }, 400);
+      let r = await fetch(`https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/${krs}?rejestr=P&format=json`, { headers: { Accept: 'application/json' } });
+      if (r.status === 404) r = await fetch(`https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/${krs}?rejestr=S&format=json`, { headers: { Accept: 'application/json' } });
+      if (r.status === 404) return json({ found: false, krs });
+      if (!r.ok) return json({ error: `KRS odpowiedział błędem (${r.status}).` }, 502);
+      const j = await r.json().catch(() => null);
+      const d = j?.odpis?.dane;
+      if (!d) return json({ found: false, krs });
+      const person = (p: any) => ({
+        last: p?.nazwisko?.nazwiskoICzlon || '', first: [p?.imiona?.imie, p?.imiona?.imieDrugie].filter(Boolean).join(' '),
+        entity: p?.nazwa || null,
+      });
+      const d1 = d.dzial1 || {}, d2 = d.dzial2 || {}, d3 = d.dzial3 || {};
+      const sp = d1.siedzibaIAdres || {};
+      const filings = d3?.wzmiankiOZlozonychDokumentach?.wzmiankaOZlozeniuRocznegoSprawozdaniaFinansowego || [];
+      return json({
+        found: true, krs, source: 'KRS – odpis aktualny (Ministerstwo Sprawiedliwości)', checkedAt: date,
+        stanZDnia: j?.odpis?.naglowekA?.stanZDnia || null,
+        name: d1?.danePodmiotu?.nazwa || null, legalForm: d1?.danePodmiotu?.formaPrawna || null,
+        nip: d1?.danePodmiotu?.identyfikatory?.nip || null, regon: d1?.danePodmiotu?.identyfikatory?.regon || null,
+        seat: sp.siedziba || null, address: sp.adres || null,
+        capital: d1?.kapital?.wysokoscKapitaluZakladowego?.wartosc || null,
+        shareholders: (d1.wspolnicySpzoo || []).map((w: any) => ({ ...person(w), shares: w.posiadaneUdzialy || '', whole: !!w.czyPosiadaCaloscUdzialow })),
+        boardName: d2?.reprezentacja?.nazwaOrganu || null, representation: d2?.reprezentacja?.sposobReprezentacji || null,
+        board: (d2?.reprezentacja?.sklad || []).filter((p: any) => !p.czyZawieszona).map((p: any) => ({ ...person(p), role: p.funkcjaWOrganie || '' })),
+        supervisory: (d2?.organNadzoru || []).flatMap((o: any) => (o.sklad || []).map((p: any) => ({ ...person(p), role: p.funkcjaWOrganie || 'członek rady nadzorczej' }))),
+        filings: filings.map((f: any) => ({ filed: f.dataZlozenia || null, period: f.zaOkresOdDo || null })),
+      });
+    }
 
     // Tryb zbiorczy: { nips: [...] } – po 30 NIP-ów w jednym zapytaniu do Białej listy
     if (Array.isArray(body.nips)) {

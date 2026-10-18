@@ -557,6 +557,7 @@ export const ORDER_CSS = `
 `;
 
 function letterhead(logoUrl, brand = M2_BRAND) {
+  if (brand.plain) return '';
   return `<div class="lh"><img src="${esc(logoUrl)}" alt="${esc(brand.alt)}"><div class="firm">${brand.lines.map(esc).join('<br>')}</div></div>`;
 }
 const footer = (brand = M2_BRAND) => `<div class="ft">${esc(brand.foot1)}<br>${esc(brand.foot2)}</div>`;
@@ -679,6 +680,7 @@ function docxBody(blocks) {
 const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
 
 function headerXml(hasLogo, brand = M2_BRAND) {
+  if (brand.plain) return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}>${para('', { after: 0 })}</w:hdr>`;
   const cx = 1530000, cy = Math.round(cx * brand.ratio);
   const logo = hasLogo ? `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="10" name="Logo M2 TAX"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="10" name="logo.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdLogo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>` : run('M2 TAX', { b: true, sz: 32, font: 'Montserrat' });
   const small = t => run(t, { sz: 14, color: '5D6068' });
@@ -693,7 +695,7 @@ function footerXml(brand = M2_BRAND) {
 
 export async function buildOrderDocx(blocks, brand = M2_BRAND) {
   let logo = null;
-  try { logo = new Uint8Array(await (await fetch(brand.logo)).arrayBuffer()); } catch { /* bez logo */ }
+  if (brand.logo) try { logo = new Uint8Array(await (await fetch(brand.logo)).arrayBuffer()); } catch { /* bez logo */ }
   const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document ${NS}><w:body>${docxBody(blocks)}<w:sectPr><w:headerReference w:type="default" r:id="rIdHdr"/><w:footerReference w:type="default" r:id="rIdFtr"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1650" w:right="1134" w:bottom="1250" w:left="1134" w:header="500" w:footer="420" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
