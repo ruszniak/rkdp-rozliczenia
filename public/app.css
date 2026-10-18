@@ -360,3 +360,18 @@ a.mini-matter:hover{background:#FAF4EA}
 .tk-mini{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);text-decoration:none;color:inherit}
 .tk-mini:hover b{text-decoration:underline}
 @media (max-width:760px){.tk-actions{justify-content:flex-start}}
+.list tr.tk-off td{opacity:.55}
+
+/* ---- Pulpit RKDP ---- */
+.pl-dl{display:grid;grid-template-columns:1fr auto 70px;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.pl-dl:first-of-type{border-top:0}
+.pl-dl span:last-child{text-align:right}
+.pl-dl.soon b{color:var(--warn)}
+.pl-dl.past{opacity:.5}
+.pl-prog{display:flex;align-items:center;gap:12px;margin:-4px 0 8px}
+.pl-prog .bar{flex:1;margin:0;height:8px}
+.pl-infos{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.pl-info{display:block;padding:8px 12px;border-radius:10px;background:var(--prog-bg);color:var(--bronze-dark);text-decoration:none;font-size:13.5px}
+.pl-info:hover{background:var(--gold-soft)}
+.pl-team td,.pl-team th{white-space:nowrap}
+.pl-team td:not(:first-child),.pl-team th:not(:first-child){text-align:center}

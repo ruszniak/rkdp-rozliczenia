@@ -6,6 +6,7 @@ import { renderKlienci } from './views/klienci.js';
 import { renderSprawozdania } from './views/sprawozdania.js';
 import { renderProfil } from './views/profil.js';
 import { renderZgloszenia } from './views/zgloszenia.js';
+import { renderPulpit } from './views/pulpit.js';
 import { renderKlient } from './views/klient.js';
 import { renderZespol } from './views/zespol.js';
 import { renderM2 } from './views/m2.js';
@@ -22,8 +23,8 @@ function parseHash() {
 }
 
 const MODULES = {
-  rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/rozliczenia', need: 'rozliczenia',
-    tabs: [['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/sprawozdania', 'Sprawozdania', 'sprawozdania']] },
+  rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/sprawozdania', 'Sprawozdania', 'sprawozdania']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia'], ['#/doradztwo/spotkania', 'Spotkania', 'm2:spotkania']] },
@@ -98,7 +99,7 @@ async function route() {
   document.querySelector('.pop')?.remove();
   const { parts, params } = parseHash();
   const startMod = remembered() === 'm2' && hasModule('doradztwo') ? 'doradztwo' : null;
-  const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'rozliczenia' : 'doradztwo');
+  const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'pulpit' : 'doradztwo');
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');
   try {
     if (view === 'profil') cleanup = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
@@ -106,6 +107,7 @@ async function route() {
     else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
     else if (view === 'klient') cleanup = await renderKlient(layout('klienci'), parts[1]);
+    else if (view === 'pulpit') cleanup = await renderPulpit(layout('pulpit'));
     else if (view === 'zgloszenia') cleanup = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
     else if (view === 'sprawozdania') cleanup = await renderSprawozdania(layout('sprawozdania'), parts[1]);
     else if (view === 'zespol' && state.me.role === 'admin') cleanup = await renderZespol(layout('zespol'));

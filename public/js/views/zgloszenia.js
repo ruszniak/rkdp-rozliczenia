@@ -11,7 +11,7 @@ export const TK_CAT = {
   klient: 'Pytanie / prośba klienta', dokumenty: 'Brakujące dokumenty', deklaracja: 'Deklaracja / rozliczenie', kadry: 'Kadry i płace',
   korekta: 'Korekta', urzad: 'Pismo z urzędu (US, ZUS)', rejestr: 'Zmiany rejestrowe (KRS, CEIDG)', umowa: 'Umowa / pełnomocnictwo', wewn: 'Sprawa wewnętrzna', inne: 'Inne',
 };
-const TK_SOURCE = { '': '—', telefon: 'Telefon', email: 'E-mail', osobiscie: 'Osobiście', saldeo: 'Saldeo', komunikator: 'SMS / komunikator', wewn: 'Wewnętrzne' };
+const TK_SOURCE = { '': '—', telefon: 'Telefon', email: 'E-mail', osobiscie: 'Osobiście', saldeo: 'Saldeo', komunikator: 'SMS / komunikator', wewn: 'Wewnętrzne', cykliczne: 'Zadanie cykliczne' };
 const PRIO_ORDER = { pilny: 0, wysoki: 1, normalny: 2, niski: 3 };
 
 const HELP = `Rejestr zgłoszeń to lista spraw do załatwienia w biurze – od prośby klienta przez brakujące dokumenty po pisma z urzędu.
@@ -22,6 +22,7 @@ const HELP = `Rejestr zgłoszeń to lista spraw do załatwienia w biurze – od 
 • Komentarze: każdy może dopisać notatkę. Zmiany statusu, terminu, priorytetu i odpowiedzialnego zapisują się same.
 • Kafelki u góry filtrują listę: otwarte, moje, po terminie, na dziś.
 • Zgłoszenia klienta widać też na jego karcie.
+• Zadania cykliczne (przycisk „↻ Zadania cykliczne”): np. „co miesiąc do 10. – zebrać dokumenty od klienta X”. Zgłoszenie tworzy się samo kilka dni przed terminem.
 • Kto widzi: osoby z pełnym dostępem wszystko; pozostali – zgłoszenia swoich klientów, utworzone przez siebie i przypisane do siebie. Usuwa tylko administrator.`;
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -78,8 +79,13 @@ export async function newTicketDialog({ client = null, onSaved } = {}) {
 }
 
 // ---------- lista ----------
+export const generateRecurring = () => sb.rpc('rkdp_generate_recurring').then(r => r.data || 0, () => 0);
+
 export async function renderZgloszenia(main, id, params) {
+  if (id === 'cykliczne') return renderTemplates(main);
   if (id) return renderTicket(main, id);
+  const created = await generateRecurring();
+  if (created) toast(`Utworzono zgłoszenia cykliczne: ${created}`);
   const [tickets, clients] = await Promise.all([
     fetchAll(() => sb.from('rkdp_tickets').select('*').order('created_at', { ascending: false })),
     loadClients(),
@@ -138,7 +144,9 @@ export async function renderZgloszenia(main, id, params) {
       h('div', {}, h('p', { class: 'eyebrow' }, 'Rejestr zgłoszeń'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Zgłoszenia', infoTip(HELP, 'Zgłoszenia – instrukcja')),
         h('p', { class: 'sub' }, 'Sprawy do załatwienia: kto, co, do kiedy – z komentarzami i historią.')),
-      h('button', { class: 'btn btn-primary', onclick: () => newTicketDialog().catch(e => fail(e)) }, icon('plus'), 'Nowe zgłoszenie')),
+      h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+        h('a', { class: 'btn btn-outline', href: `${BASE}/cykliczne` }, '↻ Zadania cykliczne'),
+        h('button', { class: 'btn btn-primary', onclick: () => newTicketDialog().catch(e => fail(e)) }, icon('plus'), 'Nowe zgłoszenie'))),
     tiles,
     h('div', { class: 'toolbar' }, search, filterSel, personSel, catSel, counter),
     h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
@@ -276,4 +284,107 @@ export function clientTicketsBox(client) {
   }
   load();
   return box;
+}
+
+// ---------- zadania cykliczne ----------
+const FREQ = { miesiac: 'Co miesiąc', kwartal: 'Co kwartał', rok: 'Co roku', tydzien: 'Co tydzień' };
+const WEEKDAY = { 1: 'poniedziałek', 2: 'wtorek', 3: 'środa', 4: 'czwartek', 5: 'piątek', 6: 'sobota', 7: 'niedziela' };
+const MONTH_GEN = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
+export function freqText(t) {
+  const d = Number(t.due_day), m = Number(t.due_month);
+  if (t.frequency === 'tydzien') return `co tydzień – ${WEEKDAY[d] || ''}`;
+  if (t.frequency === 'kwartal') return `co kwartał – ${d}. dnia ${m}. miesiąca kwartału`;
+  if (t.frequency === 'rok') return `co roku – ${d} ${MONTH_GEN[m - 1] || ''}`;
+  return `co miesiąc – do ${d}. dnia`;
+}
+const TPL_HELP = `Zadanie cykliczne samo tworzy zgłoszenie w rejestrze – np. „co miesiąc do 10. – zebrać dokumenty od klienta X”.
+
+• Częstotliwość: co tydzień, co miesiąc, co kwartał albo co roku – z dniem terminu.
+• „Utwórz … dni przed terminem” – zgłoszenie pojawi się na liście z wyprzedzeniem (np. 7 dni przed terminem).
+• Zgłoszenie dostaje osobę odpowiedzialną, klienta, kategorię i priorytet z szablonu; dalej obsługujesz je jak każde inne.
+• Zgłoszenia tworzą się przy wejściu do aplikacji (pulpit lub zgłoszenia) – nic nie trzeba uruchamiać ręcznie.
+• Szablon można wstrzymać (odznacz „aktywne”) albo usunąć – już utworzone zgłoszenia zostają.`;
+
+function templateDialog(tpl, clients, onSaved) {
+  const t = tpl ? { ...tpl, client_id: tpl.client_id || '', assignee_id: tpl.assignee_id || '', description: tpl.description || '' }
+    : { title: '', description: '', client_id: '', category: 'dokumenty', priority: 'normalny', assignee_id: state.me.id, frequency: 'miesiac', due_day: 10, due_month: 1, lead_days: 7, active: true };
+  const box = h('div');
+  const sel = (key, opts, label, wide) => {
+    const el = h('select', { class: 'select' }, ...Object.entries(opts).map(([k, v]) => h('option', { value: k }, v)));
+    el.value = String(t[key] ?? '');
+    el.addEventListener('change', () => { t[key] = el.value; if (key === 'frequency') { if (el.value === 'tydzien' && t.due_day > 7) t.due_day = 1; if (el.value === 'kwartal' && t.due_month > 3) t.due_month = 1; draw(); } else preview(); });
+    return h('label', { class: 'field' + (wide ? ' wide' : '') }, h('span', {}, label), el);
+  };
+  const inp = (key, label, o = {}) => {
+    const el = o.area ? h('textarea', { class: 'input', rows: 3 }, t[key] ?? '') : h('input', { class: 'input', type: o.type || 'text', min: o.min, max: o.max, value: t[key] ?? '', placeholder: o.ph || '' });
+    el.addEventListener('input', () => { t[key] = o.type === 'number' ? Number(el.value) : el.value; preview(); });
+    return h('label', { class: 'field' + (o.wide || o.area ? ' wide' : '') }, h('span', {}, label), el);
+  };
+  const pv = h('p', { class: 'hint wide', style: { marginTop: '4px' } });
+  const preview = () => { pv.textContent = `Termin: ${freqText(t)}. Zgłoszenie pojawi się ${Number(t.lead_days) || 0} dni przed terminem.`; };
+  const days = Object.fromEntries(Array.from({ length: 31 }, (_, i) => [i + 1, `${i + 1}.`]));
+  function draw() {
+    const act = h('input', { type: 'checkbox', checked: t.active !== false });
+    act.addEventListener('change', () => { t.active = act.checked; });
+    box.replaceChildren(h('div', { class: 'form-grid' },
+      inp('title', 'Co trzeba zrobić', { wide: true, ph: 'np. Zebrać dokumenty za poprzedni miesiąc' }),
+      inp('description', 'Opis (opcjonalnie)', { area: true }),
+      sel('client_id', { '': '— bez klienta —', ...Object.fromEntries(clients.map(c => [c.id, c.name])) }, 'Klient'),
+      sel('assignee_id', { '': '— nieprzypisane —', ...Object.fromEntries(teamOpts().map(m => [m.id, m.full_name])) }, 'Odpowiedzialny'),
+      sel('category', TK_CAT, 'Kategoria'), sel('priority', TK_PRIO, 'Priorytet'),
+      sel('frequency', FREQ, 'Jak często'),
+      t.frequency === 'tydzien' ? sel('due_day', WEEKDAY, 'Dzień tygodnia') : sel('due_day', days, 'Dzień miesiąca (termin)'),
+      t.frequency === 'rok' ? sel('due_month', Object.fromEntries(MONTH_GEN.map((m, i) => [i + 1, m])), 'Miesiąc') : null,
+      t.frequency === 'kwartal' ? sel('due_month', { 1: '1. miesiąc kwartału (sty, kwi, lip, paź)', 2: '2. miesiąc kwartału (lut, maj, sie, lis)', 3: '3. miesiąc kwartału (mar, cze, wrz, gru)' }, 'Miesiąc kwartału') : null,
+      inp('lead_days', 'Utwórz zgłoszenie … dni przed terminem', { type: 'number', min: 0, max: 60 }),
+      h('label', { class: 'check', style: { alignSelf: 'end' } }, act, 'aktywne'),
+      pv));
+    preview();
+  }
+  draw();
+  modal(tpl ? 'Zadanie cykliczne' : 'Nowe zadanie cykliczne', box, (close) => [
+    tpl ? h('button', { class: 'btn btn-danger btn-sm', onclick: async () => {
+      if (!confirm('Usunąć zadanie cykliczne? Utworzone już zgłoszenia zostaną.')) return;
+      const { error } = await sb.from('rkdp_ticket_templates').delete().eq('id', tpl.id);
+      if (error) return fail(error);
+      close(); toast('Usunięto'); onSaved();
+    } }, 'Usuń') : null,
+    h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+      if (!String(t.title).trim()) return toast('Wpisz, co trzeba zrobić', true);
+      const row = { title: t.title.trim(), description: (t.description || '').trim() || null, client_id: t.client_id || null, assignee_id: t.assignee_id || null,
+        category: t.category, priority: t.priority, frequency: t.frequency, due_day: Number(t.due_day), due_month: Number(t.due_month) || 1,
+        lead_days: Math.max(0, Math.min(60, Number(t.lead_days) || 0)), active: t.active !== false };
+      const q = tpl ? sb.from('rkdp_ticket_templates').update({ ...row, next_due: null }).eq('id', tpl.id) : sb.from('rkdp_ticket_templates').insert({ ...row, created_by: state.me.id });
+      const { error } = await q;
+      if (error) return fail(error);
+      close(); toast('Zapisano'); await generateRecurring(); onSaved();
+    } }, 'Zapisz'),
+  ], { wide: true });
+}
+
+async function renderTemplates(main) {
+  const [rows, clients] = await Promise.all([
+    fetchAll(() => sb.from('rkdp_ticket_templates').select('*').order('next_due')),
+    loadClients(),
+  ]);
+  const cname = Object.fromEntries(clients.map(c => [c.id, c.name]));
+  const reload = () => renderTemplates(main);
+  const canEdit = t => t.created_by === state.me.id || ['admin', 'full'].includes(state.me.role);
+  main.replaceChildren(
+    h('a', { href: BASE, class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Wszystkie zgłoszenia'),
+    h('div', { class: 'page-head', style: { marginTop: '10px' } },
+      h('div', {}, h('p', { class: 'eyebrow' }, 'Rejestr zgłoszeń'),
+        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Zadania cykliczne', infoTip(TPL_HELP, 'Zadania cykliczne – instrukcja')),
+        h('p', { class: 'sub' }, 'Szablony, z których zgłoszenia tworzą się same – co tydzień, miesiąc, kwartał albo rok.')),
+      h('button', { class: 'btn btn-primary', onclick: () => templateDialog(null, clients, reload) }, icon('plus'), 'Nowe zadanie cykliczne')),
+    h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
+      h('thead', {}, h('tr', {}, ...['Zadanie', 'Kiedy', 'Następny termin', 'Kto', ''].map(x => h('th', {}, x)))),
+      h('tbody', {}, ...(rows.length ? rows.map(t => h('tr', { class: 'click' + (t.active ? '' : ' tk-off'), onclick: () => canEdit(t) ? templateDialog(t, clients, reload) : toast('Ten szablon może zmienić autor albo osoba z pełnym dostępem', true) },
+        h('td', {}, h('b', {}, t.title), h('div', { class: 'small muted' }, [cname[t.client_id], TK_CAT[t.category]].filter(Boolean).join(' · '))),
+        h('td', { class: 'small' }, freqText(t), h('div', { class: 'muted' }, `zgłoszenie ${t.lead_days} dni wcześniej`)),
+        h('td', {}, t.active ? (t.next_due ? dShort(t.next_due) : '—') : h('span', { class: 'tk-st anulowane' }, 'wstrzymane')),
+        h('td', {}, avatar(t.assignee_id)),
+        h('td', { class: 'small muted' }, t.last_created ? `ostatnio: ${dShort(t.last_created)}` : '')))
+        : [h('tr', {}, h('td', { colspan: 5, class: 'empty' }, 'Brak zadań cyklicznych. Dodaj pierwsze – np. „co miesiąc do 10. – zebrać dokumenty od klienta X”.'))])))));
 }
