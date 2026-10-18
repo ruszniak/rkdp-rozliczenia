@@ -10,6 +10,9 @@ export const FIRM = {
   email: 'kancelaria@m2tax.pl',
   phones: '883 643 565 · 534 909 534',
   web: 'www.m2tax.pl',
+  regon: '54465563600000',
+  court: 'Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',
+  city: 'Wrocław',
 };
 
 export const MATTER_TYPE = {
