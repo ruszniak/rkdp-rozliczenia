@@ -707,6 +707,8 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
   const KINDS = { pps1: 'PPS-1 – urzędowy formularz (organy podatkowe)', szczegolne: 'Szczególne – na papierze firmowym M2 TAX', procesowe: 'Procesowe – na papierze firmowym M2 TAX (WSA, NSA)' };
   function build() {
     const pps = d.kind === 'pps1';
+    if (!pps && d.scope === pps1Scope(params)) d.scope = '';
+    if (pps && !d.scope) d.scope = pps1Scope(params);
     const sg = signers.find(x => x.id === d.who);
     const warn = pps && sg && (!sg.nip || !sg.ae_address)
       ? h('p', { class: 'err small', style: { margin: '0 0 10px' } }, `Brak NIP lub adresu do doręczeń elektronicznych dla: ${sg.full_name}. Uzupełnij w Zespół i ustawienia → Podpisujący.`) : null;
@@ -751,7 +753,7 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
           ['further', 'E.2 – dalsze pełnomocnictwo', 'select', { tak: 'tak', nie: 'nie' }],
           ['fee', '80. Opłata skarbowa', 'select', { dolaczono: 'dołączono dowód zapłaty', w3dni: 'dowód zostanie dołączony w ciągu 3 dni', brak: 'nie zaznaczaj' }],
         ], d, (k) => { if (k === 'client_kind') build(); }))
-        : null);
+        : '');
   }
   build();
 
