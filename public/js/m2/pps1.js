@@ -54,7 +54,7 @@ export function pps1Defaults({ client, params = {}, signer, scope }) {
     client_email: params.client_email || c.email || '',
     client_ae: '',
     signer_id: signer?.id || '',
-    delivery: 'tak',
+    delivery: false,          // poz. 35 – zaznaczasz ręcznie
     further: 'tak',
     scope: scope || '',
     reps: osoba ? `${c.name || ''}` : (params.client_reps || ''),
@@ -109,7 +109,7 @@ export function pps1Items(d, signer) {
   at(1, 280.0, 665.9, s.license_no || '');
   at(1, 53.3, 690.0, sn.last); at(1, 225.8, 690.0, sn.first);
   // C.1 c.d. (str. 2): doręczenia, adres elektroniczny
-  if (d.delivery === 'tak') it.push(check(2, 162.6, 60.5));
+  if (d.delivery === true || d.delivery === 'tak') it.push(check(2, 162.6, 60.5));
   at(2, 312.3, 55.6, s.ae_address, { keep: true });
   // C.2 – adres do doręczeń w kraju (POLSKA jest nadrukowane)
   const M = M2_DELIVERY;

@@ -458,8 +458,9 @@ export function poaDefaultScope(p) {
   const lc = x => /^.[A-ZĄĆĘŁŃÓŚŹŻ]/.test(x) ? x : x.charAt(0).toLowerCase() + x.slice(1);
   const what = [MATTER_TYPE[p.matter_type] ? `rodzaj: ${lc(MATTER_TYPE[p.matter_type])}` : null,
     p.tax ? `podatek: ${p.tax}` : null, p.period ? `okres: ${p.period}` : null, p.ref_no ? `sygnatura / znak: ${p.ref_no}` : null].filter(Boolean).join('; ');
-  const before = p.authority ? `przed organem (sądem): ${p.authority},` : tpl.organ ? `przed organem (sądem): ${P},` : 'przed organami podatkowymi, organami Krajowej Administracji Skarbowej i sądami administracyjnymi';
-  return `${before}${what ? ` w sprawie (${what})` : ''}`;
+  const named = p.authority || (tpl.organ ? P : null);
+  if (named) return `przed organem (sądem): ${named}${what ? `, w sprawie (${what})` : ''}`;
+  return `przed organami podatkowymi, organami Krajowej Administracji Skarbowej i sądami administracyjnymi${what ? ` w sprawie (${what})` : ''}`;
 }
 
 export function poaBlocks(o, client, signers, { standalone = false } = {}) {
@@ -469,7 +470,7 @@ export function poaBlocks(o, client, signers, { standalone = false } = {}) {
   const reps = (p.client_reps || '').split('\n').map(x => x.trim()).filter(Boolean);
   const party = (p.client_party || defaultClientParty(c) || P).trim().replace(/[,.\s]+$/, '');
   const court = /p\.p\.s\.a|procesow/i.test(p.poa_type || matterTemplate(p.matter_type).poa);
-  const scope = (p.poa_scope || '').trim().replace(/[.\s]+$/, '') || poaDefaultScope(p);
+  const scope = (p.poa_scope || '').trim().replace(/[.\s]+$/, '') || poaDefaultScope({ ...p, matter_type: o.params?.matter_type });
   const B = [];
   if (!standalone) B.push({ t: 'att', text: 'Załącznik nr 4 – Pełnomocnictwo' });
   B.push({ t: 'title', text: court ? 'PEŁNOMOCNICTWO PROCESOWE' : 'PEŁNOMOCNICTWO SZCZEGÓLNE' });
