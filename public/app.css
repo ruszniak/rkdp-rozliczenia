@@ -324,3 +324,9 @@ a.mini-matter:hover{background:#FAF4EA}
 .pw-rules li::before{content:"○";display:inline-block;width:18px;color:var(--line)}
 .pw-rules li.ok{color:var(--ink)}
 .pw-rules li.ok::before{content:"✓";color:var(--ok);font-weight:700}
+.rows-ed table{width:100%;border-collapse:collapse}
+.rows-ed td{padding:3px 4px 3px 0;vertical-align:middle}
+.rows-ed td:first-child{width:40%}
+.rows-ed td:last-child{width:34px}
+.rows-ed .input{height:38px;font-size:13px;width:100%}
+.rows-ed .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}

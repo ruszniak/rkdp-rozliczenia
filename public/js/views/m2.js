@@ -5,7 +5,7 @@ import {
   MATTER_TYPE, MATTER_STATUS, OPEN_STATUSES, AUTHORITIES, TAX_KINDS, FEE_TYPE, BILLING_TYPE, SUBSCRIPTIONS, AML_RISK,
   DEADLINE_KIND, JOURNAL_KIND, ORDER_STATUS, DEADLINE_RULES, computeDeadline, limitationDate, fmtDate, todayIso, addDaysIso, money, hours,
 } from '../m2/dict.js';
-import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate } from '../m2/order.js';
+import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 
@@ -635,6 +635,36 @@ async function viewOrders(main, params) {
 
 const VARIANTS = { A: 'Wariant A – ryczałt', B: 'Wariant B – stawka godzinowa', AB: 'A albo B – klient wybiera (drugi skreśla)', C: 'Wariant C – abonament miesięczny' };
 
+// Edytowalna tabela załącznika: wiersze automatyczne, a po pierwszej zmianie – własne (zapisywane w params[key])
+function rowsEditor(P, key, autoFn, onChange) {
+  const box = h('div', { class: 'rows-ed' });
+  const custom = () => Array.isArray(P[key]) && P[key].length > 0;
+  const render = () => {
+    const rows = custom() ? P[key] : autoFn();
+    const tbody = h('tbody');
+    const collect = () => [...tbody.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('input')].map(i => i.value));
+    rows.forEach((r, i) => {
+      const a = h('input', { class: 'input', value: r[0] ?? '', 'aria-label': 'Pole' });
+      const b = h('input', { class: 'input', value: r[1] ?? '', 'aria-label': 'Treść' });
+      [a, b].forEach(el => el.addEventListener('input', () => { const was = custom(); P[key] = collect(); if (!was) status.replaceChildren(...statusEls()); onChange(); }));
+      tbody.append(h('tr', {}, h('td', {}, a), h('td', {}, b), h('td', {}, h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Usuń wiersz', onclick: () => {
+        const cur = collect(); cur.splice(i, 1); P[key] = cur.length ? cur : [['', '']]; render(); onChange();
+      } }, '✕'))));
+    });
+    const statusEls = () => custom()
+      ? [h('span', { class: 'hint' }, 'Tabela zmieniona ręcznie – zmiany w polach powyżej już do niej nie trafiają.'),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { delete P[key]; render(); onChange(); } }, 'Przywróć automatyczną')]
+      : [h('span', { class: 'hint' }, 'Wypełnia się automatycznie z pól powyżej. Możesz zmienić dowolną komórkę.')];
+    const status = h('span', { style: { display: 'contents' } }, ...statusEls());
+    box.replaceChildren(h('table', {}, tbody), h('div', { class: 'bar' },
+      h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => { P[key] = [...collect(), ['', '']]; render(); onChange(); box.querySelector('tr:last-child input')?.focus(); } }, '+ Wiersz'),
+      status));
+  };
+  render();
+  box.refresh = () => { if (!custom()) render(); };
+  return box;
+}
+
 let orderCssInjected = false;
 async function viewOrder(main, id, params) {
   if (!orderCssInjected) { document.head.append(h('style', {}, ORDER_CSS)); orderCssInjected = true; }
@@ -666,6 +696,7 @@ async function viewOrder(main, id, params) {
   let matterType = 'konsultacja';
   let subjectTouched = !!o.subject;
   const isUmowa = () => draft.doc_type === 'umowa';
+  let refreshEditors = () => {};
   // podpisujący: osoba przygotowująca dokument jako pierwsza (jak we wzorze umowy)
   const chosenSigners = () => (isUmowa() ? signers.filter(x => (draft.signer_ids || []).includes(x.id)) : signers.filter(x => x.id === draft.signer_id))
     .sort((a, b) => (b.full_name === state.me.full_name) - (a.full_name === state.me.full_name));
@@ -739,7 +770,7 @@ async function viewOrder(main, id, params) {
         const cb = h('input', { type: 'checkbox', checked: (draft.signer_ids || []).includes(x.id) });
         cb.addEventListener('change', () => {
           const set = new Set(draft.signer_ids || []); cb.checked ? set.add(x.id) : set.delete(x.id);
-          draft.signer_ids = signers.map(y => y.id).filter(i => set.has(i)); renderPreview();
+          draft.signer_ids = signers.map(y => y.id).filter(i => set.has(i)); refreshEditors(); renderPreview();
         });
         return h('label', { class: 'check' }, cb, `${x.full_name} (nr ${x.license_no})`);
       })));
@@ -751,9 +782,22 @@ async function viewOrder(main, id, params) {
         else if (P.matter_type !== 'abonament' && P.variant === 'C') P.variant = 'A';
         buildForm();
       }
-      renderPreview();
+      refreshEditors(); renderPreview();
     };
     const tpl = matterTemplate(P.matter_type);
+    const ed1 = rowsEditor(P, 'att1', () => att1AutoRows(draft, client(), chosenSigners()), renderPreview);
+    const ed2 = rowsEditor(P, 'att2', () => att2AutoRows(draft), renderPreview);
+    refreshEditors = () => { ed1.refresh(); ed2.refresh(); };
+    const att4Sel = h('select', { class: 'select' }, ...Object.entries({ firmowe: 'Pełnomocnictwo na papierze firmowym M2 TAX (do podpisu klienta)', urzedowy: 'Urzędowy formularz (np. PPS-1) – dołączany odrębnie', brak: 'Bez załącznika nr 4' }).map(([k, v]) => h('option', { value: k }, v)));
+    att4Sel.value = att4Mode(P);
+    const poaScope = h('textarea', { class: 'input', rows: 3, placeholder: poaDefaultScope(P) }, P.poa_scope || '');
+    poaScope.addEventListener('input', () => { P.poa_scope = poaScope.value.trim() || null; renderPreview(); });
+    const poaBox = h('label', { class: 'field wide', hidden: att4Sel.value !== 'firmowe' }, h('span', {}, 'Zakres pełnomocnictwa – „do reprezentowania Mocodawcy …” (puste = jak w podpowiedzi, z danych sprawy)'), poaScope);
+    att4Sel.addEventListener('change', () => { P.att4 = att4Sel.value; poaBox.hidden = att4Sel.value !== 'firmowe'; renderPreview(); });
+    const attSection = [
+      h('p', { class: 'small', style: { fontWeight: 600, margin: '4px 0 6px' } }, 'Załącznik nr 1 – Zakres Sprawy'), ed1,
+      h('p', { class: 'small', style: { fontWeight: 600, margin: '16px 0 6px' } }, 'Załącznik nr 2 – Stawki za czynności dodatkowe'), ed2,
+      h('div', { class: 'form-grid', style: { marginTop: '16px' } }, h('label', { class: 'field wide' }, h('span', {}, 'Załącznik nr 4 – pełnomocnictwo'), att4Sel), poaBox)];
     formBox.replaceChildren(
       h('div', { class: 'form-grid' }, clientBox),
       fieldsGrid([['order_date', 'Data zawarcia', 'date'], ['status', 'Status', 'select', statusOpts]], draft, onAny),
@@ -793,6 +837,7 @@ async function viewOrder(main, id, params) {
           ['liability_amount', 'Limit – kwota (zł)', 'number'],
           ['rate_partner', 'Stawka partnera / doradcy (zł netto/h)', 'number'], ['rate_consultant', 'Stawka konsultanta (zł netto/h)', 'number'],
         ], P, onParam)),
+      ...sub('Załączniki', ...attSection),
       ...sub('Inne', fieldsGrid([['extra_terms', 'Dodatkowe postanowienia (trafią do § 14) – każda linia to osobny ustęp', 'textarea']], draft, onAny)));
   }
 

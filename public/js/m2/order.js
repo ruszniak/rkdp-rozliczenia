@@ -384,34 +384,15 @@ export function contractBlocks(o, client, signers) {
 
   B.push({ t: 'sign2',
     left: { label: 'ZLECENIOBIORCA', firm: null, people: sg.map(signerCap) },
-    right: { label: 'ZLECENIODAWCA', firm: c.name || P, people: c.kind === 'osoba' ? [c.name || P] : (reps.length ? reps : [`${P} – ${P}`]) } });
+    right: { label: 'ZLECENIODAWCA', firm: c.kind === 'osoba' ? null : (c.name || P), people: c.kind === 'osoba' ? [c.name || P] : (reps.length ? reps : [`${P} – ${P}`]) } });
 
   // Załączniki
-  const poa = p.poa_type || tpl.poa;
-  const row = (label, val, relevant = true) => (val ? [label, val] : relevant ? [label, P] : null);
   B.push({ t: 'pb' });
   B.push({ t: 'att', text: 'Załącznik nr 1 – Zakres Sprawy' });
-  B.push({ t: 'kv', head: ['Pole', 'Treść'], rows: [
-    row('Rodzaj sprawy', MATTER_TYPE[p.matter_type]),
-    row('Opis Sprawy i zakres czynności', p.description, false),
-    row('Organ / sąd', p.authority, tpl.organ),
-    row('Sygnatura / znak pisma / nr upoważnienia', p.ref_no, false),
-    row('Data doręczenia pisma, od którego biegnie termin', p.served_date ? dateShort(p.served_date) : null, !!tpl.served),
-    row('Podatek', p.tax, tpl.organ),
-    row('Okres', p.period, tpl.organ),
-    ['Doradcy', sg.map(x => x.full_name).join(', ')],
-    ['Rodzaj pełnomocnictwa', poa],
-    ['Osoba do kontaktu po stronie Zleceniodawcy', [p.contact_person || c.contact_person, p.client_email || c.email, p.client_phone || c.phone].filter(Boolean).join(', ') || '[imię i nazwisko, stanowisko, e-mail, tel.]'],
-    row('Biuro rachunkowe Zleceniodawcy', p.accounting_office, false),
-    ['Wybrany wariant wynagrodzenia', both ? 'A / B' : isA ? 'A – ryczałt' : isB ? 'B – stawka godzinowa' : 'C – abonament'],
-  ].filter(Boolean) });
+  B.push({ t: 'kv', head: ['Pole', 'Treść'], rows: att1Rows(o, c, sg) });
   B.push({ t: 'gap' });
   B.push({ t: 'att', text: 'Załącznik nr 2 – Stawki za czynności dodatkowe' });
-  B.push({ t: 'kv', head: ['Czynność', 'Stawka netto'], rows: [
-    ['Godzina pracy partnera / doradcy podatkowego', zl(p.rate_partner) || P],
-    ['Godzina pracy konsultanta podatkowego', zl(p.rate_consultant) || P],
-    ['Udział w czynnościach poza Wrocławiem', `${zl(p.rate_partner) || P} za godzinę + koszty z § 6 ust. 6`],
-  ] });
+  B.push({ t: 'kv', head: ['Czynność', 'Stawka netto'], rows: att2Rows(o) });
   B.push({ t: 'gap' });
   B.push({ t: 'att', text: 'Załącznik nr 3 – Klauzula informacyjna RODO' });
   [
@@ -422,11 +403,94 @@ export function contractBlocks(o, client, signers) {
     'Osobie, której dane dotyczą, przysługuje prawo dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, sprzeciwu oraz skargi do Prezesa Urzędu Ochrony Danych Osobowych – z ograniczeniami wynikającymi z tajemnicy zawodowej doradcy podatkowego.',
     'Podanie danych jest warunkiem zawarcia i wykonania Umowy.',
   ].forEach((x, i) => B.push({ t: 'ust', n: `${i + 1}.`, text: x }));
-  if (!/^nie dotyczy/.test(poa)) {
+  const poa = p.poa_type || tpl.poa;
+  const att4 = att4Mode(p);
+  if (att4 === 'firmowe') { B.push({ t: 'pb' }); B.push(...poaBlocks(o, c, sg)); }
+  else if (att4 === 'urzedowy') {
     B.push({ t: 'gap' });
     B.push({ t: 'att', text: `Załącznik nr 4 – Pełnomocnictwo ${poa}` });
     B.push({ t: 'small', text: /PPS-1/.test(poa) ? 'Urzędowy formularz PPS-1 – dołączany odrębnie.' : 'Dokument pełnomocnictwa – dołączany odrębnie.' });
   }
+  return B;
+}
+
+// ---- Załącznik nr 1 i 2: wiersze automatyczne albo poprawione ręcznie (params.att1 / params.att2) ----
+const cleanRows = rows => (rows || []).filter(r => r && (String(r[0] || '').trim() || String(r[1] || '').trim())).map(r => [String(r[0] || ''), String(r[1] || '')]);
+
+export function att1AutoRows(o, client, signers) {
+  const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
+  const tpl = matterTemplate(p.matter_type);
+  const c = client || {};
+  const sg = (signers || []).length ? signers : [{ full_name: P }];
+  const v = p.variant || 'A';
+  const row = (label, val, relevant = true) => (val ? [label, val] : relevant ? [label, P] : null);
+  return [
+    row('Rodzaj sprawy', MATTER_TYPE[p.matter_type]),
+    row('Opis Sprawy i zakres czynności', p.description, false),
+    row('Organ / sąd', p.authority, tpl.organ),
+    row('Sygnatura / znak pisma / nr upoważnienia', p.ref_no, false),
+    row('Data doręczenia pisma, od którego biegnie termin', p.served_date ? dateShort(p.served_date) : null, !!tpl.served),
+    row('Podatek', p.tax, tpl.organ),
+    row('Okres', p.period, tpl.organ),
+    ['Doradcy', sg.map(x => x.full_name).join(', ')],
+    ['Rodzaj pełnomocnictwa', p.poa_type || tpl.poa],
+    ['Osoba do kontaktu po stronie Zleceniodawcy', [p.contact_person || c.contact_person, p.client_email || c.email, p.client_phone || c.phone].filter(Boolean).join(', ') || '[imię i nazwisko, stanowisko, e-mail, tel.]'],
+    row('Biuro rachunkowe Zleceniodawcy', p.accounting_office, false),
+    ['Wybrany wariant wynagrodzenia', v === 'AB' ? 'A / B' : v === 'A' ? 'A – ryczałt' : v === 'B' ? 'B – stawka godzinowa' : 'C – abonament'],
+  ].filter(Boolean);
+}
+export function att2AutoRows(o) {
+  const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
+  return [
+    ['Godzina pracy partnera / doradcy podatkowego', zl(p.rate_partner) || P],
+    ['Godzina pracy konsultanta podatkowego', zl(p.rate_consultant) || P],
+    ['Udział w czynnościach poza Wrocławiem', `${zl(p.rate_partner) || P} za godzinę + koszty z § 6 ust. 6`],
+  ];
+}
+export const att1Rows = (o, c, sg) => (o.params?.att1?.length ? cleanRows(o.params.att1) : att1AutoRows(o, c, sg));
+export const att2Rows = o => (o.params?.att2?.length ? cleanRows(o.params.att2) : att2AutoRows(o));
+
+// ---- Załącznik nr 4: pełnomocnictwo na papierze firmowym ----
+export const att4Mode = p => p.att4 || (/^nie dotyczy/.test(p.poa_type || matterTemplate(p.matter_type).poa) ? 'brak' : 'firmowe');
+
+export function poaDefaultScope(p) {
+  const tpl = matterTemplate(p.matter_type);
+  const lc = x => /^.[A-ZĄĆĘŁŃÓŚŹŻ]/.test(x) ? x : x.charAt(0).toLowerCase() + x.slice(1);
+  const what = [MATTER_TYPE[p.matter_type] ? `rodzaj: ${lc(MATTER_TYPE[p.matter_type])}` : null,
+    p.tax ? `podatek: ${p.tax}` : null, p.period ? `okres: ${p.period}` : null, p.ref_no ? `sygnatura / znak: ${p.ref_no}` : null].filter(Boolean).join('; ');
+  const before = p.authority ? `przed organem (sądem): ${p.authority},` : tpl.organ ? `przed organem (sądem): ${P},` : 'przed organami podatkowymi, organami Krajowej Administracji Skarbowej i sądami administracyjnymi';
+  return `${before}${what ? ` w sprawie (${what})` : ''}`;
+}
+
+export function poaBlocks(o, client, signers) {
+  const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
+  const c = client || {};
+  const sg = (signers || []).length ? signers : [{ full_name: P, license_no: P }];
+  const reps = (p.client_reps || '').split('\n').map(x => x.trim()).filter(Boolean);
+  const party = (p.client_party || defaultClientParty(c) || P).trim().replace(/[,.\s]+$/, '');
+  const court = /p\.p\.s\.a|procesow/i.test(p.poa_type || matterTemplate(p.matter_type).poa);
+  const scope = (p.poa_scope || '').trim().replace(/[.\s]+$/, '') || poaDefaultScope(p);
+  const B = [];
+  B.push({ t: 'att', text: 'Załącznik nr 4 – Pełnomocnictwo' });
+  B.push({ t: 'title', text: court ? 'PEŁNOMOCNICTWO PROCESOWE' : 'PEŁNOMOCNICTWO SZCZEGÓLNE' });
+  B.push({ t: 'meta', text: `${p.place || FIRM.city}, dnia ${dateLong(o.order_date)}` });
+  B.push({ t: 'intro', text: c.kind === 'osoba' ? `${party} (dalej: Mocodawca),` : `${party}, reprezentowana przez ${reps.length ? reps.join(' oraz ') : P} (dalej: Mocodawca),` });
+  B.push({ t: 'intro', text: `udziela niniejszym pełnomocnictwa ${court ? 'procesowego' : 'szczególnego'} następującym doradcom podatkowym działającym w ramach ${FIRM.name}, ${FIRM.address}:` });
+  sg.forEach(x => B.push({ t: 'bullet', text: `${x.full_name} – doradca podatkowy, nr wpisu na listę doradców podatkowych ${x.license_no || P};` }));
+  B.push({ t: 'intro', text: `każdemu z nich do samodzielnego działania, do reprezentowania Mocodawcy ${scope}.` });
+  B.push({ t: 'intro', text: 'Pełnomocnictwo obejmuje umocowanie do dokonywania wszelkich czynności w tej sprawie, w szczególności do:' });
+  [
+    'składania i odbierania pism, wniosków, wyjaśnień, oświadczeń i dokumentów oraz do doręczeń;',
+    'przeglądania akt sprawy, sporządzania z nich notatek, odpisów i kopii;',
+    'udziału w czynnościach dowodowych, przesłuchaniach i rozprawach;',
+    court ? 'wnoszenia skarg, skarg kasacyjnych, zażaleń, wniosków i innych pism procesowych;' : 'wnoszenia odwołań, zażaleń, zastrzeżeń, wniosków i innych środków przewidzianych w przepisach;',
+    'udzielania dalszych pełnomocnictw (substytucji) doradcom podatkowym.',
+  ].forEach((x, i) => B.push({ t: 'pkt', n: `${i + 1})`, text: x }));
+  B.push({ t: 'intro', text: 'Pełnomocnictwo jest ważne do zakończenia sprawy albo do jego odwołania.' });
+  B.push({ t: 'sign2', left: { label: 'MOCODAWCA', firm: c.kind === 'osoba' ? null : (c.name || P), people: c.kind === 'osoba' ? [c.name || P] : (reps.length ? reps : [`${P} – ${P}`]) },
+    right: { label: 'PEŁNOMOCNICY (przyjęcie)', firm: null, people: sg.map(x => `${x.full_name} – doradca podatkowy`) } });
+  B.push({ t: 'gap' });
+  B.push({ t: 'small', text: 'Opłata skarbowa od pełnomocnictwa: 17 zł (art. 1 ust. 1 pkt 2 ustawy o opłacie skarbowej), chyba że zachodzi zwolnienie.' });
   return B;
 }
 
