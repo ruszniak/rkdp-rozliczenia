@@ -4,6 +4,21 @@ import { FIRM, MATTER_TYPE } from './dict.js';
 import { zip } from '../xlsx.js';
 
 const P = '[……]';
+
+// Papier firmowy: M2 TAX (domyślny) albo RKDP
+export const M2_BRAND = {
+  key: 'm2', logo: '/m2tax-logo.png', ratio: 302 / 900, alt: 'M2 TAX',
+  lines: [FIRM.name, `${FIRM.address} · ${FIRM.web}`, `${FIRM.email} · tel. ${FIRM.phones}`],
+  foot1: `KRS ${FIRM.krs} · NIP ${FIRM.nip} · REGON ${FIRM.regon}`, foot2: FIRM.court,
+  firmName: FIRM.name, firmAddress: FIRM.address, city: 'Wrocław',
+};
+export const RKDP_BRAND = {
+  key: 'rkdp', logo: '/logo-rkdp.png', ratio: 189 / 640, alt: 'RKDP',
+  lines: ['RKDP spółka doradztwa podatkowego sp. z o.o.', 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław · www.rkdp.pl', 'kancelaria@rkdp.pl'],
+  foot1: 'KRS 0000812185 · NIP 8992871126 · REGON 384812329 · kapitał zakładowy 50 000 zł',
+  foot2: 'Siedziba: ul. Czereśniowa 28d, 55-010 Ozorzyce · Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',
+  firmName: 'RKDP spółka doradztwa podatkowego sp. z o.o.', firmAddress: 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław', city: 'Wrocław',
+};
 const MONTHS_GEN = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
 
 export function dateLong(iso) {
@@ -463,7 +478,7 @@ export function poaDefaultScope(p) {
   return `przed organami podatkowymi, organami Krajowej Administracji Skarbowej i sądami administracyjnymi${what ? ` w sprawie (${what})` : ''}`;
 }
 
-export function poaBlocks(o, client, signers, { standalone = false } = {}) {
+export function poaBlocks(o, client, signers, { standalone = false, brand = M2_BRAND } = {}) {
   const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
   const c = client || {};
   const sg = (signers || []).length ? signers : [{ full_name: P, license_no: P }];
@@ -474,9 +489,9 @@ export function poaBlocks(o, client, signers, { standalone = false } = {}) {
   const B = [];
   if (!standalone) B.push({ t: 'att', text: 'Załącznik nr 4 – Pełnomocnictwo' });
   B.push({ t: 'title', text: court ? 'PEŁNOMOCNICTWO PROCESOWE' : 'PEŁNOMOCNICTWO SZCZEGÓLNE' });
-  B.push({ t: 'meta', text: `${p.place || FIRM.city}, dnia ${dateLong(o.order_date)}` });
+  B.push({ t: 'meta', text: `${p.place || brand.city}, dnia ${dateLong(o.order_date)}` });
   B.push({ t: 'intro', text: c.kind === 'osoba' ? `${party} (dalej: Mocodawca),` : `${party}, reprezentowana przez ${reps.length ? reps.join(' oraz ') : P} (dalej: Mocodawca),` });
-  B.push({ t: 'intro', text: `udziela niniejszym pełnomocnictwa ${court ? 'procesowego' : 'szczególnego'} następującym doradcom podatkowym działającym w ramach ${FIRM.name}, ${FIRM.address}:` });
+  B.push({ t: 'intro', text: `udziela niniejszym pełnomocnictwa ${court ? 'procesowego' : 'szczególnego'} następującym doradcom podatkowym działającym w ramach ${brand.firmName}, ${brand.firmAddress}:` });
   sg.forEach(x => B.push({ t: 'bullet', text: `${x.full_name} – doradca podatkowy, nr wpisu na listę doradców podatkowych ${x.license_no || P};` }));
   B.push({ t: 'intro', text: `każdemu z nich do samodzielnego działania, do reprezentowania Mocodawcy ${scope}.` });
   B.push({ t: 'intro', text: 'Pełnomocnictwo obejmuje umocowanie do dokonywania wszelkich czynności w tej sprawie, w szczególności do:' });
@@ -541,10 +556,10 @@ export const ORDER_CSS = `
 @media print{.doc .pb{border:0;margin:0;break-before:page}.doc .pb::after{display:none}}
 `;
 
-function letterhead(logoUrl) {
-  return `<div class="lh"><img src="${esc(logoUrl)}" alt="M2 TAX"><div class="firm">${esc(FIRM.name)}<br>${esc(FIRM.address)} · ${esc(FIRM.web)}<br>${esc(FIRM.email)} · tel. ${esc(FIRM.phones)}</div></div>`;
+function letterhead(logoUrl, brand = M2_BRAND) {
+  return `<div class="lh"><img src="${esc(logoUrl)}" alt="${esc(brand.alt)}"><div class="firm">${brand.lines.map(esc).join('<br>')}</div></div>`;
 }
-const footer = () => `<div class="ft">KRS ${FIRM.krs} · NIP ${FIRM.nip} · REGON ${FIRM.regon}<br>${esc(FIRM.court)}</div>`;
+const footer = (brand = M2_BRAND) => `<div class="ft">${esc(brand.foot1)}<br>${esc(brand.foot2)}</div>`;
 
 function bodyHtml(blocks) {
   let html = '';
@@ -573,22 +588,22 @@ function bodyHtml(blocks) {
 const isCompact = blocks => blocks[0]?.text === 'ZLECENIE';
 
 // podgląd w aplikacji
-export function orderHtml(blocks, logoUrl) {
-  return `<div class="doc${isCompact(blocks) ? ' compact' : ''}">${letterhead(logoUrl)}${bodyHtml(blocks)}${footer()}</div>`;
+export function orderHtml(blocks, logoUrl, brand = M2_BRAND) {
+  return `<div class="doc${isCompact(blocks) ? ' compact' : ''}">${letterhead(logoUrl, brand)}${bodyHtml(blocks)}${footer(brand)}</div>`;
 }
 
 // pełny dokument do druku/PDF: nagłówek i stopka powtarzają się na każdej stronie
-export function printableHtml(blocks, title, logoUrl) {
+export function printableHtml(blocks, title, logoUrl, brand = M2_BRAND) {
   return `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
 <style>@page{size:A4;margin:12mm 17mm 16mm;
-@bottom-left{content:"KRS ${FIRM.krs} · NIP ${FIRM.nip} · REGON ${FIRM.regon}\\A ${FIRM.court}";white-space:pre;font:6.5pt Arial,sans-serif;color:#8a8c92;vertical-align:top;padding-top:4mm;border-top:.4pt solid #d6d2ca}
+@bottom-left{content:"${brand.foot1}\\A ${brand.foot2}";white-space:pre;font:6.5pt Arial,sans-serif;color:#8a8c92;vertical-align:top;padding-top:4mm;border-top:.4pt solid #d6d2ca}
 @bottom-right{content:"Strona " counter(page) " z " counter(pages);font:6.5pt Arial,sans-serif;color:#8a8c92;vertical-align:top;padding-top:4mm;border-top:.4pt solid #d6d2ca}}
 body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 table.page{width:100%;border-collapse:collapse}table.page>thead>tr>td,table.page>tfoot>tr>td,table.page>tbody>tr>td{padding:0}
 ${ORDER_CSS}
 .doc .lh{margin-bottom:10px}.doc .ft{margin-top:10px}</style></head>
-<body><div class="doc${isCompact(blocks) ? ' compact' : ''}"><table class="page"><thead><tr><td>${letterhead(logoUrl)}</td></tr></thead>
+<body><div class="doc${isCompact(blocks) ? ' compact' : ''}"><table class="page"><thead><tr><td>${letterhead(logoUrl, brand)}</td></tr></thead>
 <tbody><tr><td>${bodyHtml(blocks)}</td></tr></tbody></table></div></body></html>`;
 }
 
@@ -663,22 +678,22 @@ function docxBody(blocks) {
 
 const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
 
-function headerXml(hasLogo) {
-  const cx = 1530000, cy = Math.round(cx * 302 / 900);
+function headerXml(hasLogo, brand = M2_BRAND) {
+  const cx = 1530000, cy = Math.round(cx * brand.ratio);
   const logo = hasLogo ? `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="10" name="Logo M2 TAX"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="10" name="logo.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdLogo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>` : run('M2 TAX', { b: true, sz: 32, font: 'Montserrat' });
   const small = t => run(t, { sz: 14, color: '5D6068' });
-  const right = `<w:tc><w:tcPr><w:tcW w:w="5638" w:type="dxa"/><w:vAlign w:val="bottom"/></w:tcPr>${para(small(FIRM.name), { jc: 'right', after: 0 })}${para(small(`${FIRM.address} · ${FIRM.web}`), { jc: 'right', after: 0 })}${para(small(`${FIRM.email} · tel. ${FIRM.phones}`), { jc: 'right', after: 0 })}</w:tc>`;
+  const right = `<w:tc><w:tcPr><w:tcW w:w="5638" w:type="dxa"/><w:vAlign w:val="bottom"/></w:tcPr>${brand.lines.map(l => para(small(l), { jc: 'right', after: 0 })).join('')}</w:tc>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}><w:tbl><w:tblPr><w:tblW w:w="${W}" w:type="dxa"/><w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/><w:bottom w:val="single" w:sz="12" w:space="0" w:color="B08D57"/></w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/><w:bottom w:w="90" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="4000"/><w:gridCol w:w="5638"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="4000" w:type="dxa"/><w:vAlign w:val="bottom"/></w:tcPr>${para(logo, { after: 0 })}</w:tc>${right}</w:tr></w:tbl>${para('', { after: 0 })}</w:hdr>`;
 }
-function footerXml() {
+function footerXml(brand = M2_BRAND) {
   const r = t => run(t, { sz: 14, color: '8A8C92' });
   const fld = code => `<w:r><w:rPr><w:color w:val="8A8C92"/><w:sz w:val="14"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:color w:val="8A8C92"/><w:sz w:val="14"/></w:rPr><w:instrText xml:space="preserve"> ${code} </w:instrText></w:r><w:r><w:rPr><w:color w:val="8A8C92"/><w:sz w:val="14"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:color w:val="8A8C92"/><w:sz w:val="14"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:color w:val="8A8C92"/><w:sz w:val="14"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r>`;
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="5" w:color="D6D2CA"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="${W}"/></w:tabs><w:spacing w:after="0"/></w:pPr>${r(`KRS ${FIRM.krs}  |  NIP ${FIRM.nip}  |  REGON ${FIRM.regon}`)}<w:r><w:tab/></w:r>${r('Strona ')}${fld('PAGE')}${r(' z ')}${fld('NUMPAGES')}</w:p>${para(r(FIRM.court), { after: 0 })}</w:ftr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="5" w:color="D6D2CA"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="${W}"/></w:tabs><w:spacing w:after="0"/></w:pPr>${r(brand.foot1.replace(/ · /g, '  |  '))}<w:r><w:tab/></w:r>${r('Strona ')}${fld('PAGE')}${r(' z ')}${fld('NUMPAGES')}</w:p>${para(r(brand.foot2), { after: 0 })}</w:ftr>`;
 }
 
-export async function buildOrderDocx(blocks) {
+export async function buildOrderDocx(blocks, brand = M2_BRAND) {
   let logo = null;
-  try { logo = new Uint8Array(await (await fetch('/m2tax-logo.png')).arrayBuffer()); } catch { /* bez logo */ }
+  try { logo = new Uint8Array(await (await fetch(brand.logo)).arrayBuffer()); } catch { /* bez logo */ }
   const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document ${NS}><w:body>${docxBody(blocks)}<w:sectPr><w:headerReference w:type="default" r:id="rIdHdr"/><w:footerReference w:type="default" r:id="rIdFtr"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1650" w:right="1134" w:bottom="1250" w:left="1134" w:header="500" w:footer="420" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -694,8 +709,8 @@ export async function buildOrderDocx(blocks) {
     { name: 'word/_rels/header1.xml.rels', data: rels(logo ? `<Relationship Id="rIdLogo" Type="${R}image" Target="media/logo.png"/>` : '') },
     { name: 'word/document.xml', data: doc },
     { name: 'word/styles.xml', data: styles },
-    { name: 'word/header1.xml', data: headerXml(!!logo) },
-    { name: 'word/footer1.xml', data: footerXml() },
+    { name: 'word/header1.xml', data: headerXml(!!logo, brand) },
+    { name: 'word/footer1.xml', data: footerXml(brand) },
     ...(logo ? [{ name: 'word/media/logo.png', data: logo }] : []),
   ];
   return zip(files);

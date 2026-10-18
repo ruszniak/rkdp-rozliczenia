@@ -1,9 +1,10 @@
-import { h, icon, fail, downloadCsv } from '../ui.js';
+import { h, icon, fail, toast, modal, downloadCsv } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { LEGAL_SHORT, FORM_GROUP, VAT_SHORT, PIT_SHORT, CIT_SHORT, ZUS_SHORT, CLIENT_STATUS, isCompany, isPartnership,
   LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS } from '../dict.js';
 import { fetchAll } from './rozliczenia.js';
 import { lookupNip, validNip, cleanNip } from '../nip.js';
+import { dokumentyDialog } from '../rkdp/docs.js';
 
 const PREF_KEY = 'rkdp-klienci-filtry';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch { return {}; } };
@@ -120,12 +121,56 @@ export async function renderKlienci(main) {
     } }, icon('plus'), 'Dodaj klienta')
     : null;
 
+  // ---- masowa aktualizacja z Białej listy VAT ----
+  const wlBtn = canEditClients() ? h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+    const withNip = clients.filter(c => validNip(c.nip || ''));
+    if (!withNip.length) return toast('Żaden klient nie ma poprawnego NIP', true);
+    wlBtn.disabled = true; wlBtn.textContent = `Sprawdzam ${withNip.length} NIP…`;
+    const { data, error } = await sb.functions.invoke('nip-lookup', { body: { nips: withNip.map(c => cleanNip(c.nip)) } });
+    wlBtn.disabled = false; wlBtn.replaceChildren(icon('download'), 'Biała lista VAT');
+    if (error || data?.error) return fail(data?.error || error, 'Biała lista');
+    const res = data.results || {};
+    const changes = withNip.map(c => {
+      const r = res[cleanNip(c.nip)];
+      if (!r?.found) return { c, notFound: true, set: {} };
+      const set = {};
+      for (const k of ['address', 'regon', 'krs']) if (r[k] && (c[k] || '').trim() !== r[k]) set[k] = r[k];
+      return { c, r, set };
+    });
+    const rows = changes.filter(x => Object.keys(x.set).length || x.notFound);
+    const tbody = h('tbody', {}, ...(rows.length ? rows.map(x => {
+      const cb = h('input', { type: 'checkbox', checked: !x.notFound, disabled: x.notFound });
+      x.cb = cb;
+      const diff = Object.entries(x.set).map(([k, v]) => h('div', { class: 'small' }, h('b', {}, { address: 'Adres', regon: 'REGON', krs: 'KRS' }[k] + ': '),
+        x.c[k] ? h('span', { class: 'muted', style: { textDecoration: 'line-through' } }, x.c[k] + ' ') : '', v));
+      return h('tr', {}, h('td', {}, cb), h('td', {}, h('b', {}, x.c.name), h('div', { class: 'small muted' }, 'NIP ' + x.c.nip),
+          x.r && x.r.name ? h('div', { class: 'small muted' }, 'w rejestrze: ' + x.r.name) : null),
+        h('td', {}, x.notFound ? h('span', { class: 'badge warn' }, 'brak w wykazie VAT') : diff),
+        h('td', { class: 'small' }, x.r?.statusVat || ''));
+    }) : [h('tr', {}, h('td', { colspan: 4, class: 'empty' }, 'Wszystkie dane są aktualne.'))]));
+    modal(`Biała lista VAT – ${data.checkedAt}`, h('div', {},
+      h('p', { class: 'hint', style: { marginBottom: '10px' } }, `Sprawdzono ${withNip.length} klientów. Zaznaczone zmiany zostaną zapisane (adres, REGON, KRS). Nazwy klientów nie zmieniam. „Brak w wykazie VAT” oznacza podmiot niezarejestrowany jako podatnik VAT albo wykreślony.`),
+      h('div', { class: 'list-wrap', style: { maxHeight: '60vh', overflow: 'auto' } }, h('table', { class: 'list' },
+        h('thead', {}, h('tr', {}, ['', 'Klient', 'Zmiana', 'Status VAT'].map(t => h('th', {}, t)))), tbody))),
+    (close) => [
+      h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+      rows.some(x => !x.notFound) ? h('button', { class: 'btn btn-primary btn-sm', onclick: async (e) => {
+        const todo = rows.filter(x => x.cb?.checked && Object.keys(x.set).length);
+        e.currentTarget.disabled = true;
+        let ok = 0;
+        for (const x of todo) { const { error: e2 } = await sb.from('clients').update(x.set).eq('id', x.c.id); if (e2) { fail(e2); break; } Object.assign(x.c, x.set); ok++; }
+        toast(`Zaktualizowano ${ok} klientów`); close(); render();
+      } }, 'Zapisz zaznaczone') : null,
+    ], { wide: true });
+  } }, icon('download'), 'Biała lista VAT') : null;
+
   main.replaceChildren(
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, 'Baza klientów'), h('h1', { style: { marginTop: '6px' } }, 'Klienci'),
         h('p', { class: 'sub' }, 'Dane kontaktowe i profil rozliczeń: PIT, CIT, VAT, ZUS, wspólnicy.')),
-      addBtn),
-    h('div', { class: 'toolbar' }, search, statusSel, groupSel, counter, exportBtn),
+      h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+        h('button', { class: 'btn btn-outline', onclick: () => dokumentyDialog().catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'), addBtn)),
+    h('div', { class: 'toolbar' }, search, statusSel, groupSel, counter, exportBtn, wlBtn),
     h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
       h('thead', {}, h('tr', {}, ['Klient', 'Forma', 'Rozliczenia', 'Kontakt', 'Księgowa / kadrowa', 'Profil'].map(t => h('th', {}, t)))),
       tbody)));

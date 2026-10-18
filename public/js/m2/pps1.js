@@ -82,7 +82,7 @@ const strike = (page, x0, y0, x1) => ({ page, x: x0, y: y0 + 3.4, line: x1 - x0 
 
 export const BOX4_LABELS = { 1: 'mocodawca', 2: 'pełnomocnik', 3: 'dalszy pełnomocnik', 4: 'adwokat', 5: 'radca prawny', 6: 'doradca podatkowy' };
 
-export function pps1Items(d, signer) {
+export function pps1Items(d, signer, opts = {}) {
   const it = [];
   const txt = (page, x, y, text, o = {}) => { if (text) it.push({ page, x, y, text: o.keep ? String(text) : up(text), size: o.size || 9, w: o.w, wrap: o.wrap }); };
   const at = (page, labelX, labelY, text, o) => txt(page, labelX + 3, labelY + 9.5, text, o);
@@ -112,12 +112,12 @@ export function pps1Items(d, signer) {
   if (d.delivery === true || d.delivery === 'tak') it.push(check(2, 162.6, 60.5));
   at(2, 312.3, 55.6, s.ae_address, { keep: true });
   // C.2 – adres do doręczeń w kraju (POLSKA jest nadrukowane)
-  const M = M2_DELIVERY;
+  const M = opts.delivery || M2_DELIVERY;
   at(2, 195.3, 100.9, M.voiv); at(2, 415.2, 100.9, M.county);
   at(2, 53.8, 125.0, M.commune); at(2, 195.3, 125.0, M.street); at(2, 415.2, 125.0, M.house); at(2, 493.3, 125.0, M.flat);
   at(2, 53.8, 149.1, M.city); at(2, 415.2, 149.1, M.zip);
   // C.3
-  at(2, 53.8, 194.6, s.phone || FIRM.phones.split('·')[0].trim(), { keep: true }); at(2, 310.6, 194.6, s.email || FIRM.email, { keep: true });
+  at(2, 53.8, 194.6, opts.phone ?? (s.phone || FIRM.phones.split('·')[0].trim()), { keep: true }); at(2, 310.6, 194.6, opts.email ?? (s.email || FIRM.email), { keep: true });
   // D – zakres
   it.push({ page: 2, x: 57, y: 652, text: up(d.scope), size: 8.6, wrap: true, w: 488, h: 58 });
   // E
@@ -136,8 +136,8 @@ export function pps1Items(d, signer) {
   return it;
 }
 
-export function pps1Html(d, signer, origin = location.origin) {
-  const items = pps1Items(d, signer);
+export function pps1Html(d, signer, origin = location.origin, opts = {}) {
+  const items = pps1Items(d, signer, opts);
   const page = n => `<div class="pg" style="background-image:url('${origin}/m2/pps1-${n}.png')">${items.filter(i => i.page === n).map(i => {
     if (i.line) return `<span class="ln" style="left:${i.x}pt;top:${i.y}pt;width:${i.line}pt"></span>`;
     const st = [`left:${i.x}pt`, `top:${i.y}pt`, `font-size:${i.size}pt`];
@@ -156,10 +156,10 @@ export function pps1Html(d, signer, origin = location.origin) {
 @media print{body{background:#fff}.pg{margin:0}}</style></head><body>${[1, 2, 3].map(page).join('')}</body></html>`;
 }
 
-export function printPps1(d, signer) {
+export function printPps1(d, signer, opts = {}) {
   const w = window.open('', '_blank');
   if (!w) return false;
-  w.document.open(); w.document.write(pps1Html(d, signer)); w.document.close();
+  w.document.open(); w.document.write(pps1Html(d, signer, location.origin, opts)); w.document.close();
   const imgs = [1, 2, 3].map(n => { const im = new Image(); im.src = `${location.origin}/m2/pps1-${n}.png`; return im.decode().catch(() => {}); });
   Promise.all(imgs).then(() => setTimeout(() => { w.focus(); w.print(); }, 300));
   return true;

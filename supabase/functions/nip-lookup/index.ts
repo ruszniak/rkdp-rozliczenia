@@ -30,11 +30,33 @@ Deno.serve(async (req: Request) => {
     const { data: memberId, error: authErr } = await sb.rpc('current_member_id');
     if (authErr || !memberId) return json({ error: 'Brak dostępu' }, 403);
 
-    const { nip } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
+
+    // Tryb zbiorczy: { nips: [...] } – po 30 NIP-ów w jednym zapytaniu do Białej listy
+    if (Array.isArray(body.nips)) {
+      const list = [...new Set(body.nips.map((n: unknown) => String(n || '').replace(/\D/g, '')).filter(validNip))].slice(0, 300);
+      const results: Record<string, unknown> = {};
+      for (let i = 0; i < list.length; i += 30) {
+        const chunk = list.slice(i, i + 30);
+        const r = await fetch(`https://wl-api.mf.gov.pl/api/search/nips/${chunk.join(',')}?date=${date}`, { headers: { Accept: 'application/json' } });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) return json({ error: j?.message || `Biała lista VAT odpowiedziała błędem (${r.status}).`, partial: results }, 502);
+        for (const e of (j?.result?.entries || [])) {
+          const s = (e.subjects || [])[0];
+          results[e.identifier] = s ? {
+            found: true, name: s.name || null, nip: s.nip || e.identifier, regon: s.regon || null, krs: s.krs || null,
+            statusVat: s.statusVat || null, address: s.workingAddress || s.residenceAddress || null,
+          } : { found: false };
+        }
+      }
+      return json({ checkedAt: date, source: 'Biała lista VAT (Ministerstwo Finansów)', results });
+    }
+
+    const { nip } = body;
     const clean = String(nip || '').replace(/\D/g, '');
     if (!validNip(clean)) return json({ error: 'Nieprawidłowy numer NIP (błędna suma kontrolna).' }, 400);
 
-    const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
     const r = await fetch(`https://wl-api.mf.gov.pl/api/search/nip/${clean}?date=${date}`, { headers: { Accept: 'application/json' } });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return json({ error: j?.message || `Biała lista VAT odpowiedziała błędem (${r.status}).` }, 502);

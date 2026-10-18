@@ -4,6 +4,7 @@ import { LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, CIT_ADVANCES, ZUS_TYPE, CI
   STATUS, FIELD_LABELS, isCompany, isPartnership } from '../dict.js';
 import { completeness } from './klienci.js';
 import { nipLookupBar, mergeNipData } from '../nip.js';
+import { dokumentyDialog } from '../rkdp/docs.js';
 
 const YESNO = { true: 'Tak', false: 'Nie' };
 const isJdg = c => c.legal_form === 'jdg';
@@ -290,7 +291,9 @@ export async function renderKlient(main, id) {
     h('a', { href: '#/klienci', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Wszyscy klienci'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, 'Karta klienta'), titleEl, compEl),
-      editable ? null : h('span', { class: 'badge' }, 'Tylko podgląd')),
+      h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+        editable ? null : h('span', { class: 'badge' }, 'Tylko podgląd'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => dokumentyDialog({ client: { ...c, ...draft } }).catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'))),
     h('div', { class: 'two' },
       h('div', {}, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null,
         sectionsBox, partnersBox,

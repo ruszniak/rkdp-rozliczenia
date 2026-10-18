@@ -112,3 +112,17 @@ export function initTooltips() {
   document.addEventListener('focusin', (e) => { const t = e.target.closest?.('[data-tip]'); if (t) show(t); });
   ['scroll', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { tipEl.hidden = true; }, true));
 }
+
+// Okno dialogowe (wspólne): actions(close) zwraca listę przycisków
+export function modal(title, body, actions, { wide = false } = {}) {
+  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const back = h('div', { class: 'modal-back', onmousedown: (e) => { if (e.target === back) close(); } },
+    h('div', { class: 'modal', role: 'dialog', 'aria-label': title, style: wide ? { maxWidth: '980px' } : null },
+      h('div', { class: 'section-head' }, h('h2', {}, title), h('button', { class: 'icon-btn', 'aria-label': 'Zamknij', onclick: close }, '✕')),
+      body, h('div', { class: 'row', style: { justifyContent: 'flex-end', display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' } }, ...actions(close).filter(Boolean))));
+  document.body.append(back);
+  document.addEventListener('keydown', onKey);
+  back.querySelector('input, select, textarea')?.focus();
+  return close;
+}
