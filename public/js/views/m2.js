@@ -5,7 +5,7 @@ import {
   MATTER_TYPE, MATTER_STATUS, OPEN_STATUSES, AUTHORITIES, TAX_KINDS, FEE_TYPE, BILLING_TYPE, SUBSCRIPTIONS, AML_RISK,
   DEADLINE_KIND, JOURNAL_KIND, ORDER_STATUS, DEADLINE_RULES, computeDeadline, limitationDate, fmtDate, todayIso, addDaysIso, money, hours,
 } from '../m2/dict.js';
-import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, CONTRACT_DEFAULTS, defaultClientParty } from '../m2/order.js';
+import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 
@@ -633,8 +633,7 @@ async function viewOrders(main, params) {
   render();
 }
 
-const CONTROL_KINDS = { 'kontrola podatkowa': 'Kontrola podatkowa', 'kontrola celno-skarbowa': 'Kontrola celno-skarbowa' };
-const VARIANTS = { A: 'Wariant A – ryczałt', B: 'Wariant B – stawka godzinowa', AB: 'Oba warianty – klient wybiera (drugi skreśla)' };
+const VARIANTS = { A: 'Wariant A – ryczałt', B: 'Wariant B – stawka godzinowa', AB: 'A albo B – klient wybiera (drugi skreśla)', C: 'Wariant C – abonament miesięczny' };
 
 let orderCssInjected = false;
 async function viewOrder(main, id, params) {
@@ -679,8 +678,7 @@ async function viewOrder(main, id, params) {
   // ---- przedmiot umowy z danych kontroli ----
   const autoSubject = () => {
     if (!isUmowa() || subjectTouched) return;
-    const k = P.control_kind === 'kontrola celno-skarbowa' ? 'kontroli celno-skarbowej' : 'kontroli podatkowej';
-    draft.subject = `Reprezentacja w ${k}${P.tax ? ` – ${P.tax}` : ''}${P.period ? ` ${P.period}` : ''}`;
+    draft.subject = contractSubject(P);
   };
 
   // ---- klient ----
@@ -746,7 +744,16 @@ async function viewOrder(main, id, params) {
         return h('label', { class: 'check' }, cb, `${x.full_name} (nr ${x.license_no})`);
       })));
     const subjEl = fieldsGrid([['subject', 'Przedmiot (na liście i jako tytuł sprawy)', 'text', null, true]], draft, () => { subjectTouched = true; renderPreview(); });
-    const onParam = (k) => { if (['control_kind', 'tax', 'period'].includes(k)) { autoSubject(); subjEl.querySelector('input').value = draft.subject || ''; } renderPreview(); };
+    const onParam = (k) => {
+      if (['matter_type', 'tax', 'period'].includes(k)) { autoSubject(); subjEl.querySelector('input').value = draft.subject || ''; }
+      if (k === 'matter_type') {
+        if (P.matter_type === 'abonament' && P.variant !== 'C') P.variant = 'C';
+        else if (P.matter_type !== 'abonament' && P.variant === 'C') P.variant = 'A';
+        buildForm();
+      }
+      renderPreview();
+    };
+    const tpl = matterTemplate(P.matter_type);
     formBox.replaceChildren(
       h('div', { class: 'form-grid' }, clientBox),
       fieldsGrid([['order_date', 'Data zawarcia', 'date'], ['status', 'Status', 'select', statusOpts]], draft, onAny),
@@ -755,22 +762,32 @@ async function viewOrder(main, id, params) {
           ['client_party', 'Opis Zleceniodawcy w komparycji (uzupełnia się z karty klienta – popraw w razie potrzeby)', 'textarea'],
           ['client_reps', 'Reprezentanci Zleceniodawcy – każda osoba w osobnej linii, np. „Jan Kowalski – prezes zarządu”', 'textarea'],
         ], P, onParam), signerBoxes),
-      ...sub('Kontrola – Załącznik nr 1',
-        fieldsGrid([
-          ['control_kind', 'Rodzaj kontroli', 'select', CONTROL_KINDS], ['authority', 'Organ', 'list', ['Naczelnik Urzędu Skarbowego', 'Naczelnik Urzędu Celno-Skarbowego']],
-          ['auth_no', 'Nr upoważnienia', 'text'], ['served_date', 'Data doręczenia zawiadomienia / upoważnienia', 'date'],
-          ['tax', 'Podatek', 'list', ['podatek od towarów i usług (VAT)', 'podatek dochodowy od osób prawnych (CIT)', 'podatek dochodowy od osób fizycznych (PIT)', 'podatek od czynności cywilnoprawnych (PCC)']],
-          ['period', 'Okres objęty kontrolą (np. 01/2023–12/2023)', 'text'],
-          ['poa_type', 'Rodzaj pełnomocnictwa', 'text'],
-          ['contact_person', 'Osoba do kontaktu u Zleceniodawcy', 'text'], ['client_email', 'E-mail Zleceniodawcy', 'email'], ['client_phone', 'Telefon Zleceniodawcy', 'tel'],
-          ['accounting_office', 'Biuro rachunkowe Zleceniodawcy (nazwa, osoba, kontakt)', 'text', null, true],
-        ], P, onParam), subjEl),
+      ...sub('Sprawa – Załącznik nr 1',
+        fieldsGrid([['matter_type', 'Rodzaj sprawy (od niego zależy zakres, czas trwania i pełnomocnictwo)', 'select', MATTER_TYPE, true]], P, onParam),
+        (() => {
+          const g = fieldsGrid([
+            ['description', 'Opis sprawy (opcjonalnie – trafi do Załącznika nr 1)', 'textarea'],
+            ['authority', 'Organ / sąd', 'list', AUTHORITIES], ['ref_no', 'Sygnatura / znak pisma / nr upoważnienia', 'text'],
+            ['served_date', 'Data doręczenia pisma (od którego biegnie termin)', 'date'],
+            ['tax', 'Podatek', 'list', ['podatek od towarów i usług (VAT)', 'podatek dochodowy od osób prawnych (CIT)', 'podatek dochodowy od osób fizycznych (PIT)', 'podatek od czynności cywilnoprawnych (PCC)', 'podatek od nieruchomości']],
+            ['period', 'Okres (np. 01/2023–12/2023 albo 2024 r.)', 'text'],
+            ['poa_type', `Rodzaj pełnomocnictwa (puste = ${tpl.poa})`, 'text', null, true],
+            ['scope', 'Zakres czynności – każda linia to punkt § 2 ust. 2 (puste = standardowy zakres dla rodzaju sprawy, widoczny w podglądzie)', 'textarea'],
+            ['end_text', `Czas trwania umowy (puste = „${tpl.end}”)`, 'text', null, true],
+            ['contact_person', 'Osoba do kontaktu u Zleceniodawcy', 'text'], ['client_email', 'E-mail Zleceniodawcy', 'email'], ['client_phone', 'Telefon Zleceniodawcy', 'tel'],
+            ['accounting_office', 'Biuro rachunkowe Zleceniodawcy (nazwa, osoba, kontakt)', 'text', null, true],
+          ], P, onParam);
+          const ta = [...g.querySelectorAll('label')].find(l => l.textContent.startsWith('Zakres czynności'))?.querySelector('textarea');
+          if (ta) { ta.placeholder = tpl.scope.map(x => '• ' + x).join('\n'); ta.rows = 6; }
+          return g;
+        })(), subjEl),
       ...sub('Wynagrodzenie – § 6 i Załącznik nr 2',
         fieldsGrid([
           ['variant', 'Wariant', 'select', VARIANTS],
           ['lump_sum', 'Wariant A: ryczałt (zł netto)', 'number'], ['lump_days', 'Ryczałt płatny w ciągu (dni)', 'number'],
           ['hourly_rate', 'Wariant B: stawka godzinowa (zł netto)', 'number'], ['advance', 'Wariant B: zaliczka (zł netto, opcjonalnie)', 'number'],
           ['advance_days', 'Zaliczka płatna w ciągu (dni)', 'number'], ['payment_days', 'Faktury płatne w ciągu (dni)', 'number'],
+          ['monthly_fee', 'Wariant C: abonament (zł netto / mies.)', 'number'], ['monthly_hours', 'Wariant C: godzin w abonamencie', 'number'],
           ['travel_pct', 'Czas dojazdu rozliczany w', 'select', { 100: '100% stawki', 50: '50% stawki' }],
           ['liability', 'Limit odpowiedzialności (§ 7)', 'select', { trzykrotnosc: 'trzykrotność wynagrodzenia netto', kwota: 'kwota' }],
           ['liability_amount', 'Limit – kwota (zł)', 'number'],
@@ -801,8 +818,8 @@ async function viewOrder(main, id, params) {
       fee_type: draft.fee_type || null, fee_amount: draft.fee_amount ?? null, payment_days: draft.payment_days ?? 14,
     };
     if (isUmowa()) {
-      r.fee_type = P.variant === 'B' ? 'godzinowa' : P.variant === 'AB' ? 'mieszana' : 'ryczalt';
-      r.fee_amount = P.variant === 'B' ? (P.hourly_rate ?? null) : (P.lump_sum ?? null);
+      r.fee_type = P.variant === 'B' ? 'godzinowa' : P.variant === 'AB' ? 'mieszana' : P.variant === 'C' ? 'abonament' : 'ryczalt';
+      r.fee_amount = P.variant === 'B' ? (P.hourly_rate ?? null) : P.variant === 'C' ? (P.monthly_fee ?? null) : (P.lump_sum ?? null);
       r.payment_days = P.payment_days ?? 7;
       r.signer_id = r.signer_ids?.[0] || null;
     }
@@ -825,10 +842,11 @@ async function viewOrder(main, id, params) {
       const lead = memberOf(sgs[0]) || state.me.id;
       const matter = {
         order_id: data.id, title: data.subject, status: 'nowa', opened_at: data.order_date,
-        matter_type: isUmowa() ? (P.control_kind === 'kontrola celno-skarbowa' ? 'kontrola_ucs' : 'kontrola_podatkowa') : matterType,
+        matter_type: isUmowa() ? (P.matter_type || 'inne') : matterType,
         lead_id: lead, second_id: (sgs.map(memberOf).find(x => x && x !== lead)) || null,
         fee_type: data.fee_type, fee_amount: data.fee_amount,
-        ...(isUmowa() ? { authority: P.authority || null, case_ref: P.auth_no || null, tax_kind: P.tax || null, tax_period: P.period || null, poa_type: P.poa_type || null } : {}),
+        ...(isUmowa() ? { authority: P.authority || null, case_ref: P.ref_no || null, tax_kind: P.tax || null, tax_period: P.period || null,
+          poa_type: /^nie dotyczy/.test(P.poa_type || matterTemplate(P.matter_type).poa) ? null : (P.poa_type || matterTemplate(P.matter_type).poa), description: P.description || null } : {}),
       };
       const { data: mt, error: e2 } = await sb.from('m2_matters').insert(matter).select('id,number').single();
       if (e2) fail(e2, 'Zapisano dokument, ale nie udało się założyć sprawy');

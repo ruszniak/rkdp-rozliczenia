@@ -1,6 +1,6 @@
 // Dokumenty M2 TAX na papierze firmowym: ZLECENIE (krótkie, 1 strona) i UMOWA (wg wzoru kancelarii).
 // Jedna treść (lista bloków) → podgląd, PDF (druk) i Word (.docx).
-import { FIRM } from './dict.js';
+import { FIRM, MATTER_TYPE } from './dict.js';
 import { zip } from '../xlsx.js';
 
 const P = '[……]';
@@ -104,14 +104,106 @@ export function orderBlocks(o, client, signer) {
   return B;
 }
 
-// ===================== UMOWA (wzór: reprezentacja w kontroli) =====================
+// ===================== UMOWA (ogólna – dla każdej sprawy podatkowej) =====================
+// Zakres (§ 2 ust. 2), czas trwania (§ 11 ust. 1) i domyślne pełnomocnictwo zależą od rodzaju sprawy.
+const KONTROLA = [
+  'analizuje zawiadomienie o zamiarze wszczęcia kontroli lub upoważnienie do jej przeprowadzenia, w tym jego prawidłowość formalną, zakres przedmiotowy i podmiotowy oraz terminy;',
+  'doradza Zleceniodawcy w kwestii skorzystania – przed wszczęciem kontroli lub w terminach wynikających z przepisów – z uprawnienia do złożenia korekty deklaracji (art. 81b Ordynacji podatkowej), z zastrzeżeniem ust. 4;',
+  'przygotowuje Zleceniodawcę do kontroli, w tym przeprowadza przegląd dokumentacji objętej Zakresem Sprawy i wskazuje obszary ryzyka;',
+  'uczestniczy, jako pełnomocnik, w czynnościach kontrolnych, w tym w badaniu ksiąg i dokumentów, oględzinach, przesłuchaniach świadków i Zleceniodawcy (lub osób go reprezentujących), w miejscu prowadzenia kontroli lub w siedzibie Organu;',
+  'przygotowuje i składa w imieniu Zleceniodawcy pisma, wyjaśnienia, wnioski dowodowe, zażalenia i inne pisma procesowe, w tym wnioski o przedłużenie terminów oraz sprzeciw wobec czynności kontrolnych podejmowanych z naruszeniem przepisów (art. 59 ustawy – Prawo przedsiębiorców);',
+  'weryfikuje przestrzeganie przez Organ ograniczeń czasu trwania kontroli (art. 55 ustawy – Prawo przedsiębiorców) oraz zakazu równoczesnego prowadzenia kontroli (art. 54 tej ustawy);',
+  'analizuje protokół z badania ksiąg sporządzony w toku kontroli i w razie potrzeby składa do niego zastrzeżenia (art. 193 Ordynacji podatkowej);',
+  'analizuje protokół kontroli (lub wynik kontroli celno-skarbowej), przygotowuje i składa zastrzeżenia lub wyjaśnienia w ustawowym terminie (art. 291 Ordynacji podatkowej / art. 83 ustawy o KAS) oraz doradza w zakresie złożenia korekty deklaracji po zakończeniu kontroli (art. 81b Ordynacji podatkowej / art. 82 ustawy o KAS);',
+  'informuje Zleceniodawcę o przebiegu kontroli, jej skutkach i dalszych możliwych działaniach.',
+];
+const PPS1 = 'szczególne (PPS-1)';
+export const MATTER_TEMPLATES = {
+  konsultacja: { poa: 'nie dotyczy', organ: false, end: 'do przekazania Zleceniodawcy opinii (analizy) podatkowej i udzielenia wyjaśnień do niej w terminie 14 dni od jej przekazania', scope: [
+    'analizuje stan faktyczny oraz dokumenty przekazane przez Zleceniodawcę;',
+    'identyfikuje skutki podatkowe i ryzyka oraz wskazuje możliwe rozwiązania;',
+    'sporządza i przekazuje Zleceniodawcy opinię (analizę) podatkową w formie dokumentowej;',
+    'udziela wyjaśnień do opinii, w tym podczas spotkania lub konsultacji telefonicznej.'] },
+  interpretacja: { poa: PPS1, organ: true, end: 'do doręczenia interpretacji indywidualnej albo innego rozstrzygnięcia kończącego postępowanie w sprawie jej wydania', scope: [
+    'analizuje stan faktyczny lub zdarzenie przyszłe i ustala z Zleceniodawcą zakres pytań;',
+    'przygotowuje wniosek o wydanie interpretacji indywidualnej wraz ze stanowiskiem Zleceniodawcy i jego uzasadnieniem;',
+    'składa wniosek do Dyrektora Krajowej Informacji Skarbowej w imieniu Zleceniodawcy;',
+    'odpowiada na wezwania do uzupełnienia braków wniosku;',
+    'analizuje wydaną interpretację i informuje Zleceniodawcę o jej skutkach oraz o możliwości jej zaskarżenia.'] },
+  wis: { poa: PPS1, organ: true, end: 'do doręczenia wiążącej informacji stawkowej albo innego rozstrzygnięcia kończącego postępowanie w sprawie jej wydania', scope: [
+    'analizuje towar lub usługę oraz ich klasyfikację;',
+    'przygotowuje wniosek o wydanie wiążącej informacji stawkowej (WIS) wraz z opisem towaru lub usługi;',
+    'składa wniosek do Dyrektora Krajowej Informacji Skarbowej w imieniu Zleceniodawcy i odpowiada na wezwania;',
+    'analizuje wydaną WIS i informuje Zleceniodawcę o jej skutkach oraz o możliwości jej zaskarżenia.'] },
+  czynnosci_sprawdzajace: { poa: PPS1, organ: true, served: true, end: 'do zakończenia czynności sprawdzających', scope: [
+    'analizuje wezwanie Organu i jego podstawę prawną;',
+    'przygotowuje i składa odpowiedzi, wyjaśnienia oraz zestawienia dokumentów;',
+    'reprezentuje Zleceniodawcę w kontaktach z Organem jako pełnomocnik;',
+    'doradza w zakresie ewentualnej korekty deklaracji;',
+    'informuje Zleceniodawcę o wyniku czynności i dalszych możliwych działaniach.'] },
+  kontrola_podatkowa: { poa: PPS1, organ: true, served: true, end: 'do dnia złożenia zastrzeżeń lub wyjaśnień do protokołu kontroli (lub wyniku kontroli celno-skarbowej), a jeżeli nie zostaną złożone – do dnia upływu terminu na ich złożenie', scope: KONTROLA, kontrola: true },
+  kontrola_ucs: { poa: PPS1, organ: true, served: true, end: 'do dnia złożenia zastrzeżeń do wyniku kontroli celno-skarbowej, a jeżeli nie zostaną złożone – do dnia upływu terminu na ich złożenie', scope: KONTROLA, kontrola: true },
+  postepowanie_podatkowe: { poa: PPS1, organ: true, served: true, end: 'do doręczenia decyzji organu pierwszej instancji albo innego rozstrzygnięcia kończącego postępowanie w tej instancji', scope: [
+    'analizuje postanowienie o wszczęciu postępowania, akta sprawy i zgromadzony materiał dowodowy;',
+    'przygotowuje i składa pisma, wyjaśnienia, wnioski dowodowe oraz zażalenia na postanowienia;',
+    'uczestniczy jako pełnomocnik w czynnościach postępowania, w tym w przesłuchaniach i przeglądaniu akt;',
+    'wypowiada się w sprawie zebranego materiału dowodowego (art. 200 Ordynacji podatkowej);',
+    'analizuje decyzję Organu i informuje Zleceniodawcę o możliwości i zasadności jej zaskarżenia.'] },
+  odwolanie: { poa: PPS1, organ: true, served: true, end: 'do doręczenia rozstrzygnięcia organu drugiej instancji', scope: [
+    'analizuje decyzję (postanowienie) organu pierwszej instancji oraz akta sprawy;',
+    'przygotowuje i wnosi odwołanie (zażalenie) w ustawowym terminie;',
+    'reprezentuje Zleceniodawcę w postępowaniu odwoławczym, w tym składa pisma i wnioski dowodowe;',
+    'wypowiada się w sprawie zebranego materiału dowodowego;',
+    'analizuje rozstrzygnięcie organu drugiej instancji i informuje o możliwości wniesienia skargi do sądu administracyjnego.'] },
+  wsa: { poa: 'procesowe (art. 35 p.p.s.a.)', organ: true, served: true, end: 'do doręczenia wyroku wojewódzkiego sądu administracyjnego wraz z uzasadnieniem albo innego orzeczenia kończącego postępowanie', scope: [
+    'analizuje rozstrzygnięcie Organu i akta sprawy pod kątem zasadności skargi;',
+    'przygotowuje i wnosi skargę do wojewódzkiego sądu administracyjnego za pośrednictwem Organu, w tym – jeżeli jest to uzasadnione – wniosek o wstrzymanie wykonania;',
+    'reprezentuje Zleceniodawcę przed sądem, składa pisma procesowe i uczestniczy w rozprawie;',
+    'analizuje wyrok wraz z uzasadnieniem i informuje o możliwości wniesienia skargi kasacyjnej.'] },
+  nsa: { poa: 'procesowe (art. 35 p.p.s.a.)', organ: true, served: true, end: 'do doręczenia orzeczenia Naczelnego Sądu Administracyjnego kończącego postępowanie', scope: [
+    'analizuje wyrok wojewódzkiego sądu administracyjnego wraz z uzasadnieniem;',
+    'przygotowuje i wnosi skargę kasacyjną albo odpowiedź na skargę kasacyjną;',
+    'reprezentuje Zleceniodawcę przed Naczelnym Sądem Administracyjnym, składa pisma procesowe i uczestniczy w rozprawie;',
+    'informuje Zleceniodawcę o rozstrzygnięciu i jego skutkach.'] },
+  egzekucja: { poa: PPS1, organ: true, served: true, end: 'do rozpatrzenia środków i wniosków złożonych w Zakresie Sprawy przez organ ostatniej instancji', scope: [
+    'analizuje tytuł wykonawczy, zawiadomienia i czynności egzekucyjne lub zabezpieczające;',
+    'przygotowuje i składa zarzuty, wnioski (w szczególności o umorzenie, zawieszenie, odroczenie lub rozłożenie na raty) oraz zażalenia;',
+    'reprezentuje Zleceniodawcę przed organem egzekucyjnym i wierzycielem;',
+    'informuje Zleceniodawcę o rozstrzygnięciach i dalszych możliwych działaniach.'] },
+  podatki_lokalne: { poa: PPS1, organ: true, served: true, end: 'do doręczenia rozstrzygnięcia organu pierwszej instancji w Zakresie Sprawy', scope: [
+    'analizuje decyzję, wezwanie lub informację organu podatkowego oraz stan faktyczny nieruchomości;',
+    'przygotowuje i składa pisma, wyjaśnienia, korekty informacji lub deklaracji oraz wnioski;',
+    'reprezentuje Zleceniodawcę przed Organem jako pełnomocnik;',
+    'informuje Zleceniodawcę o rozstrzygnięciu i o możliwości jego zaskarżenia.'] },
+  nadplata: { poa: PPS1, organ: true, end: 'do doręczenia rozstrzygnięcia w sprawie stwierdzenia nadpłaty lub zwrotu podatku', scope: [
+    'analizuje rozliczenia i dokumenty pod kątem powstania nadpłaty lub prawa do zwrotu podatku;',
+    'przygotowuje wniosek o stwierdzenie nadpłaty (zwrot podatku) wraz z korektą deklaracji i uzasadnieniem;',
+    'reprezentuje Zleceniodawcę w postępowaniu w sprawie stwierdzenia nadpłaty lub zwrotu;',
+    'informuje Zleceniodawcę o rozstrzygnięciu i o możliwości jego zaskarżenia.'] },
+  optymalizacja: { poa: 'nie dotyczy', organ: false, end: 'do przekazania Zleceniodawcy raportu z rekomendacją i zakończenia wsparcia we wdrożeniu, nie dłużej jednak niż 3 miesiące od przekazania raportu', scope: [
+    'analizuje sytuację podatkową, strukturę działalności i planowane zdarzenia;',
+    'przedstawia warianty rozwiązań wraz z oceną skutków podatkowych i ryzyk, w tym w zakresie klauzuli przeciwko unikaniu opodatkowania i raportowania schematów podatkowych (MDR);',
+    'sporządza raport z rekomendacją;',
+    'wspiera Zleceniodawcę we wdrożeniu wybranego rozwiązania w zakresie doradztwa podatkowego.'] },
+  abonament: { poa: 'nie dotyczy (w razie potrzeby szczególne PPS-1)', organ: false, end: 'na czas nieokreślony', scope: [
+    'udziela bieżących konsultacji podatkowych telefonicznie, w formie dokumentowej i na spotkaniach;',
+    'analizuje dokumenty i zdarzenia gospodarcze przedstawione przez Zleceniodawcę;',
+    'sporządza krótkie opinie i odpowiedzi na pytania podatkowe;',
+    'współpracuje z księgową lub biurem rachunkowym Zleceniodawcy w zakresie rozliczeń podatkowych.'] },
+  inne: { poa: PPS1, organ: false, end: 'do wykonania czynności objętych Zakresem Sprawy', scope: [
+    'analizuje stan faktyczny oraz dokumenty przekazane przez Zleceniodawcę;',
+    'wykonuje czynności doradztwa podatkowego opisane w Załączniku nr 1;',
+    'informuje Zleceniodawcę o wynikach i dalszych możliwych działaniach.'] },
+};
+export const matterTemplate = t => MATTER_TEMPLATES[t] || MATTER_TEMPLATES.inne;
+
 export const CONTRACT_DEFAULTS = {
   place: 'Wrocław',
-  control_kind: 'kontrola podatkowa',
-  poa_type: 'szczególne (PPS-1)',
+  matter_type: 'konsultacja',
   variant: 'A',
-  lump_sum: null, lump_days: 2,
-  hourly_rate: 500, advance: null, advance_days: 2,
+  lump_sum: null, lump_days: 7,
+  hourly_rate: 500, advance: null, advance_days: 7,
+  monthly_fee: null, monthly_hours: 2,
   travel_pct: '100',
   liability: 'trzykrotnosc', liability_amount: null,
   rate_partner: 500, rate_consultant: 500,
@@ -125,77 +217,76 @@ export function defaultClientParty(c) {
   return `${c.name} z siedzibą pod adresem: ${c.address || P}${reg}, NIP ${c.nip || P}${c.regon ? `, REGON ${c.regon}` : ''}`;
 }
 
+export function contractSubject(p) {
+  return `${MATTER_TYPE[p.matter_type] || 'Doradztwo podatkowe'}${p.tax ? ` – ${p.tax}` : ''}${p.period ? ` ${p.period}` : ''}`;
+}
+
 export function contractBlocks(o, client, signers) {
   const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
+  const tpl = matterTemplate(p.matter_type);
   const c = client || {};
   const sg = (signers || []).length ? signers : [{ full_name: P, license_no: P }];
   const reps = (p.client_reps || '').split('\n').map(x => x.trim()).filter(Boolean);
-  const isA = p.variant === 'A' || p.variant === 'AB', isB = p.variant === 'B' || p.variant === 'AB', both = p.variant === 'AB';
+  const v = p.variant || 'A';
+  const isA = v === 'A' || v === 'AB', isB = v === 'B' || v === 'AB', isC = v === 'C', both = v === 'AB';
+  const scope = (p.scope || '').split('\n').map(x => x.replace(/^\s*[-•*\d.)]+\s*/, '').trim()).filter(Boolean);
+  const scopeList = scope.length ? scope.map((x, i) => x.replace(/[.;]$/, '') + (i === scope.length - 1 ? '.' : ';')) : tpl.scope;
+  const endText = (p.end_text || '').trim().replace(/[.\s]+$/, '') || tpl.end;
   const B = [];
   let s = 0, n = 0;
   const sec = t => { B.push({ t: 'h', text: `§ ${++s}. ${t}` }); n = 0; };
   const ust = (text, k) => { B.push({ t: 'ust', n: `${++n}.`, text }); (k || []).forEach((x, i) => B.push({ t: 'pkt', n: `${i + 1})`, text: x })); };
   const intro = text => B.push({ t: 'intro', text });
 
-  B.push({ t: 'title', text: p.title || 'UMOWA O ŚWIADCZENIE USŁUG REPREZENTACJI PODATKOWEJ W TOKU KONTROLI' });
+  B.push({ t: 'title', text: 'UMOWA O ŚWIADCZENIE USŁUG DORADZTWA PODATKOWEGO' });
   intro(`zawarta w dniu ${dateLong(o.order_date)} ${p.place === 'Wrocław' ? 'we Wrocławiu' : `w miejscowości ${p.place || P}`} (dalej: Umowa) pomiędzy:`);
   intro(`${FIRM.name} z siedzibą we Wrocławiu, ${FIRM.address}, wpisaną do rejestru przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez ${FIRM.court}, pod nr KRS ${FIRM.krs}, NIP ${FIRM.nip}, REGON ${FIRM.regon}, reprezentowaną przez:`);
   sg.forEach(x => B.push({ t: 'bullet', text: signerAcc(x) + ',' }));
   intro('zwaną dalej Zleceniobiorcą lub M2 TAX,');
   B.push({ t: 'center', text: 'a' });
   const party = (p.client_party || defaultClientParty(c) || P).trim().replace(/[,.\s]+$/, '');
-  intro(c.kind === 'osoba' ? `${party},` : `${party}, reprezentowaną przez ${reps.length ? reps.join(' oraz ') : P},`);
-  intro(c.kind === 'osoba' ? 'zwanym dalej Zleceniodawcą,' : 'zwaną dalej Zleceniodawcą,');
+  if (c.kind === 'osoba') { intro(`${party},`); intro('zwanym dalej Zleceniodawcą,'); }
+  else { intro(`${party}, reprezentowaną przez ${reps.length ? reps.join(' oraz ') : P},`); intro('zwaną dalej Zleceniodawcą,'); }
   intro('łącznie zwanymi Stronami, a każda z osobna Stroną.');
-  intro('Strony zawierają Umowę na podstawie art. 734 i n. w zw. z art. 750 Kodeksu cywilnego, ustawy z dnia 5 lipca 1996 r. o doradztwie podatkowym oraz przepisów działu IV rozdziału 3a i działu VI Ordynacji podatkowej.');
+  intro('Strony zawierają Umowę na podstawie art. 734 i n. w zw. z art. 750 Kodeksu cywilnego oraz ustawy z dnia 5 lipca 1996 r. o doradztwie podatkowym.');
 
   sec('Definicje');
   B.push({ t: 'p', text: 'Ilekroć w Umowie jest mowa o:' });
   [
-    'Kontroli – rozumie się przez to kontrolę podatkową prowadzoną na podstawie działu VI Ordynacji podatkowej, a jeżeli Strony tak postanowią w Załączniku nr 1 – także kontrolę celno-skarbową prowadzoną na podstawie ustawy o Krajowej Administracji Skarbowej, wraz z poprzedzającymi je czynnościami sprawdzającymi.',
-    'Organie – rozumie się przez to organ podatkowy lub organ Krajowej Administracji Skarbowej wszczynający lub prowadzący Kontrolę, wskazany w Załączniku nr 1.',
-    'Zakresie Kontroli – rozumie się przez to podatek (podatki) i okres (okresy) rozliczeniowe objęte Kontrolą, określone w zawiadomieniu o zamiarze wszczęcia Kontroli lub w upoważnieniu do jej przeprowadzenia.',
+    'Sprawie – rozumie się przez to sprawę podatkową Zleceniodawcy określoną w Załączniku nr 1, w szczególności postępowanie, kontrolę, czynności sprawdzające, postępowanie przed sądem administracyjnym lub inną czynność doradztwa podatkowego.',
+    'Organie – rozumie się przez to organ podatkowy, organ Krajowej Administracji Skarbowej, Dyrektora Krajowej Informacji Skarbowej lub inny organ właściwy w Sprawie, a w postępowaniu sądowoadministracyjnym – także sąd administracyjny.',
+    'Zakresie Sprawy – rozumie się przez to podatek (podatki), okres (okresy) rozliczeniowe i czynności objęte Sprawą, określone w Załączniku nr 1.',
     'Doradcy – rozumie się przez to doradcę podatkowego będącego partnerem Zleceniobiorcy lub zatrudnionego przez Zleceniobiorcę, wpisanego na listę doradców podatkowych.',
     'Dniach roboczych – rozumie się przez to dni od poniedziałku do piątku, z wyłączeniem dni ustawowo wolnych od pracy.',
     'Ordynacji podatkowej – rozumie się przez to ustawę z dnia 29 sierpnia 1997 r. – Ordynacja podatkowa (t.j. z uwzględnieniem zmian).',
-    'Formie elektronicznej / dokumentowej – rozumie się przez to korespondencję prowadzoną na adresy e-mail wskazane w § 13 ust. 2.',
+    'Formie dokumentowej – rozumie się przez to korespondencję prowadzoną na adresy e-mail wskazane w § 13 ust. 2.',
   ].forEach((x, i) => B.push({ t: 'ust', n: `${i + 1}.`, text: x }));
 
   sec('Przedmiot Umowy');
-  ust('Zleceniodawca zleca, a Zleceniobiorca przyjmuje do wykonania usługę doradztwa podatkowego polegającą na reprezentowaniu Zleceniodawcy i udzielaniu mu pomocy w toku Kontroli prowadzonej przez Organ w Zakresie Kontroli wskazanym w Załączniku nr 1.');
-  ust('W ramach Umowy Zleceniobiorca, w szczególności:', [
-    'analizuje zawiadomienie o zamiarze wszczęcia Kontroli lub upoważnienie do jej przeprowadzenia, w tym jego prawidłowość formalną, zakres przedmiotowy i podmiotowy oraz terminy;',
-    'doradza Zleceniodawcy w kwestii skorzystania – przed wszczęciem Kontroli lub w terminach wynikających z przepisów – z uprawnienia do złożenia korekty deklaracji (art. 81b Ordynacji podatkowej), z zastrzeżeniem ust. 4;',
-    'przygotowuje Zleceniodawcę do Kontroli, w tym przeprowadza przegląd dokumentacji objętej Zakresem Kontroli i wskazuje obszary ryzyka;',
-    'uczestniczy, jako pełnomocnik, w czynnościach kontrolnych, w tym w badaniu ksiąg i dokumentów, oględzinach, przesłuchaniach świadków i Zleceniodawcy (lub osób go reprezentujących), w miejscu prowadzenia Kontroli lub w siedzibie Organu;',
-    'przygotowuje i składa w imieniu Zleceniodawcy pisma, wyjaśnienia, wnioski dowodowe, zażalenia i inne pisma procesowe, w tym wnioski o przedłużenie terminów oraz sprzeciw wobec czynności kontrolnych podejmowanych z naruszeniem przepisów (art. 59 ustawy – Prawo przedsiębiorców);',
-    'weryfikuje przestrzeganie przez Organ ograniczeń czasu trwania Kontroli (art. 55 ustawy – Prawo przedsiębiorców) oraz zakazu równoczesnego prowadzenia kontroli (art. 54 tej ustawy);',
-    'analizuje protokół z badania ksiąg sporządzony w toku Kontroli i w razie potrzeby składa do niego zastrzeżenia (art. 193 Ordynacji podatkowej);',
-    'analizuje protokół kontroli (lub wynik kontroli celno-skarbowej), przygotowuje i składa zastrzeżenia lub wyjaśnienia w ustawowym terminie (art. 291 Ordynacji podatkowej / art. 83 ustawy o KAS) oraz doradza w zakresie złożenia korekty deklaracji po zakończeniu Kontroli (art. 81b Ordynacji podatkowej / art. 82 ustawy o KAS);',
-    'informuje Zleceniodawcę o przebiegu Kontroli, jej skutkach i dalszych możliwych działaniach.',
-  ]);
-  ust('Umowa nie obejmuje – i wymaga zawarcia odrębnej umowy oraz odrębnego wynagrodzenia – w szczególności: (a) reprezentacji w postępowaniu podatkowym wszczętym po zakończeniu Kontroli, w tym w postępowaniu odwoławczym; (b) reprezentacji przed sądami administracyjnymi; (c) obrony lub reprezentacji w postępowaniu karnym skarbowym, w tym sporządzenia zawiadomienia o korekcie (czynnego żalu, art. 16 Kodeksu karnego skarbowego); (d) prowadzenia ksiąg rachunkowych, podatkowej księgi przychodów i rozchodów lub innych ewidencji, w tym ich odtwarzania lub korekty; (e) sporządzania deklaracji i korekt deklaracji; (f) opinii w sprawach nieobjętych Zakresem Kontroli.');
-  ust('Decyzję o złożeniu korekty deklaracji, zapłacie podatku, złożeniu czynnego żalu lub zastosowaniu się do zaleceń Organu podejmuje wyłącznie Zleceniodawca. Zleceniobiorca przedstawia rekomendację wraz z oceną skutków.');
-  ust('Zleceniobiorca zobowiązuje się do starannego działania, przy uwzględnieniu zawodowego charakteru swojej działalności (art. 355 § 2 Kodeksu cywilnego). Zleceniobiorca nie gwarantuje określonego wyniku Kontroli ani rozstrzygnięcia Organu.');
+  ust('Zleceniodawca zleca, a Zleceniobiorca przyjmuje do wykonania usługę doradztwa podatkowego w Sprawie, w Zakresie Sprawy wskazanym w Załączniku nr 1, polegającą na udzielaniu Zleceniodawcy porad i opinii podatkowych oraz – w zakresie, w jakim wymaga tego Sprawa – na reprezentowaniu go przed Organem.');
+  ust('W ramach Umowy Zleceniobiorca, w szczególności:', scopeList);
+  ust('Umowa nie obejmuje – i wymaga zawarcia odrębnej umowy lub aneksu oraz odrębnego wynagrodzenia – w szczególności: (a) reprezentacji w innych postępowaniach i instancjach niż wskazane w Załączniku nr 1, w tym w postępowaniu odwoławczym i przed sądami administracyjnymi, jeżeli nie są objęte Zakresem Sprawy; (b) obrony lub reprezentacji w postępowaniu karnym skarbowym, w tym sporządzenia zawiadomienia o korekcie (czynnego żalu, art. 16 Kodeksu karnego skarbowego); (c) prowadzenia ksiąg rachunkowych, podatkowej księgi przychodów i rozchodów lub innych ewidencji, w tym ich odtwarzania lub korekty; (d) sporządzania deklaracji i korekt deklaracji, jeżeli nie są objęte Zakresem Sprawy; (e) opinii w sprawach nieobjętych Zakresem Sprawy.');
+  ust('Decyzję o złożeniu korekty deklaracji, zapłacie podatku, złożeniu czynnego żalu, wniesieniu środka zaskarżenia lub zastosowaniu się do zaleceń Organu podejmuje wyłącznie Zleceniodawca. Zleceniobiorca przedstawia rekomendację wraz z oceną skutków.');
+  ust('Zleceniobiorca zobowiązuje się do starannego działania, przy uwzględnieniu zawodowego charakteru swojej działalności (art. 355 § 2 Kodeksu cywilnego). Zleceniobiorca nie gwarantuje określonego wyniku Sprawy ani rozstrzygnięcia Organu lub sądu.');
   ust('Zleceniobiorca wykonuje Umowę zgodnie z przepisami prawa, Zasadami Etyki Doradców Podatkowych i z zachowaniem niezależności zawodowej. Zleceniobiorca może odmówić wykonania polecenia Zleceniodawcy, jeżeli jego wykonanie byłoby sprzeczne z prawem lub zasadami etyki zawodowej.');
 
   sec('Pełnomocnictwa i osoby wykonujące Umowę');
-  ust(`Strony przyjmują do wiadomości, że pełnomocnikiem strony w Kontroli może być wyłącznie osoba fizyczna (art. 138a Ordynacji podatkowej). Czynności pełnomocnika wykonują w imieniu Zleceniobiorcy Doradcy: ${listPl([...sg.map(x => x.full_name), 'inny Doradca wskazany przez Zleceniobiorcę'])}.`);
-  ust(`W terminie 2 Dni roboczych od zawarcia Umowy Zleceniodawca udzieli Doradcom wskazanym przez Zleceniobiorcę pełnomocnictwa szczególnego (PPS-1) do reprezentowania w Kontroli w Zakresie Kontroli, obejmującego umocowanie do ustanowienia pełnomocnika substytucyjnego.`);
+  ust(`Czynności doradztwa podatkowego, w tym czynności pełnomocnika, wykonują w imieniu Zleceniobiorcy Doradcy: ${listPl([...sg.map(x => x.full_name), 'inny Doradca wskazany przez Zleceniobiorcę'])}. Strony przyjmują do wiadomości, że pełnomocnikiem w postępowaniu podatkowym, kontroli podatkowej i czynnościach sprawdzających może być wyłącznie osoba fizyczna (art. 138a Ordynacji podatkowej).`);
+  ust('Jeżeli wykonanie Umowy wymaga reprezentowania Zleceniodawcy, Zleceniodawca – w terminie 2 Dni roboczych od zawarcia Umowy albo od wezwania Zleceniobiorcy – udzieli Doradcom wskazanym przez Zleceniobiorcę pełnomocnictwa określonego w Załączniku nr 1, obejmującego umocowanie do ustanowienia pełnomocnika substytucyjnego.');
   ust('Opłatę skarbową od pełnomocnictwa (17 zł) ponosi Zleceniodawca. Zleceniobiorca może ją uiścić w imieniu Zleceniodawcy i obciążyć go jej kwotą na zasadach § 6 ust. 6.');
   ust('Zleceniobiorca może powierzyć wykonywanie czynności pomocniczych (analiza dokumentów, przygotowanie projektów pism) swoim pracownikom i współpracownikom, w tym konsultantom podatkowym, działającym pod nadzorem Doradcy. Za ich działania Zleceniobiorca odpowiada jak za własne.');
   ust('Zleceniodawca zobowiązuje się nie odwoływać pełnomocnictwa bez jednoczesnego wypowiedzenia Umowy i niezwłocznego zawiadomienia o tym Zleceniobiorcy; odwołanie pełnomocnictwa wszystkich Doradców bez wypowiedzenia Umowy traktuje się jako wypowiedzenie Umowy przez Zleceniodawcę ze skutkiem na dzień zawiadomienia Organu.');
-  ust('Zleceniodawca przyjmuje do wiadomości, że ustanowienie pełnomocnika powoduje, że doręczenia pism w Kontroli są kierowane do pełnomocnika, a czynności dokonane przez Organ z udziałem pełnomocnika wywołują skutki wobec Zleceniodawcy.');
+  ust('Zleceniodawca przyjmuje do wiadomości, że ustanowienie pełnomocnika powoduje, że doręczenia pism w Sprawie są kierowane do pełnomocnika, a czynności dokonane przez Organ z udziałem pełnomocnika wywołują skutki wobec Zleceniodawcy.');
 
   sec('Obowiązki Zleceniodawcy');
   ust('Zleceniodawca zobowiązuje się:', [
-    'przekazać Zleceniobiorcy niezwłocznie, nie później niż w terminie 1 Dnia roboczego od otrzymania, kopię każdego pisma Organu dotyczącego Kontroli, w tym zawiadomienia o zamiarze wszczęcia Kontroli, upoważnienia, wezwań i protokołów, jeżeli zostały doręczone bezpośrednio Zleceniodawcy;',
+    'przekazać Zleceniobiorcy niezwłocznie, nie później niż w terminie 1 Dnia roboczego od otrzymania, kopię każdego pisma Organu dotyczącego Sprawy, jeżeli zostało doręczone bezpośrednio Zleceniodawcy;',
     'przekazywać Zleceniobiorcy kompletne, rzetelne i zgodne ze stanem faktycznym informacje, dokumenty, księgi, ewidencje i wyjaśnienia – w terminach uzgodnionych przez Strony, a jeżeli termin nie został uzgodniony – nie później niż na 3 Dni robocze przed upływem terminu wyznaczonego przez Organ;',
-    'niezwłocznie informować Zleceniobiorcę o wszelkich okolicznościach mogących mieć wpływ na przebieg lub wynik Kontroli, w tym o innych toczących się kontrolach, postępowaniach i czynnościach sprawdzających;',
-    'zapewnić Zleceniobiorcy kontakt z biurem rachunkowym / główną księgową i osobami posiadającymi wiedzę o zdarzeniach objętych Kontrolą oraz zwolnić je z obowiązku zachowania poufności wobec Zleceniobiorcy;',
-    'uzgadniać ze Zleceniobiorcą przed dokonaniem: składanie pism i wyjaśnień do Organu, przekazywanie Organowi dokumentów, składanie korekt deklaracji i zapłatę podatku w Zakresie Kontroli, a w razie samodzielnego kontaktu z Organem – niezwłocznie informować o nim Zleceniobiorcę;',
+    'niezwłocznie informować Zleceniobiorcę o wszelkich okolicznościach mogących mieć wpływ na przebieg lub wynik Sprawy, w tym o innych toczących się kontrolach, postępowaniach i czynnościach sprawdzających;',
+    'zapewnić Zleceniobiorcy kontakt z biurem rachunkowym / główną księgową i osobami posiadającymi wiedzę o zdarzeniach objętych Sprawą oraz zwolnić je z obowiązku zachowania poufności wobec Zleceniobiorcy;',
+    'uzgadniać ze Zleceniobiorcą przed dokonaniem: składanie pism i wyjaśnień do Organu, przekazywanie Organowi dokumentów, składanie korekt deklaracji i zapłatę podatku w Zakresie Sprawy, a w razie samodzielnego kontaktu z Organem – niezwłocznie informować o nim Zleceniobiorcę;',
     'wskazać osobę do kontaktu, wymienioną w Załączniku nr 1, umocowaną do przekazywania informacji i podejmowania decyzji w imieniu Zleceniodawcy;',
-    'zapewnić osobie kontrolującej i Doradcy warunki do wykonywania czynności w miejscu prowadzenia Kontroli (art. 286 § 3 Ordynacji podatkowej);',
+    ...(tpl.kontrola ? ['zapewnić osobie kontrolującej i Doradcy warunki do wykonywania czynności w miejscu prowadzenia kontroli (art. 286 § 3 Ordynacji podatkowej);'] : []),
     'terminowo zapłacić wynagrodzenie i zwrócić koszty.',
   ]);
   ust('Zleceniobiorca nie odpowiada za skutki opóźnienia lub niewykonania czynności spowodowane naruszeniem przez Zleceniodawcę obowiązków z ust. 1, w tym za skutki przekazania informacji niepełnych lub nieprawdziwych. Zleceniobiorca nie ma obowiązku weryfikowania prawdziwości dokumentów i informacji otrzymanych od Zleceniodawcy, chyba że ich nieprawdziwość jest oczywista.');
@@ -207,25 +298,26 @@ export function contractBlocks(o, client, signers) {
     'pilnować terminów wynikających z pism Organu doręczonych pełnomocnikowi oraz informować Zleceniodawcę o terminach wymagających jego działania;',
     'przekazywać Zleceniodawcy kopie pism składanych do Organu oraz pism otrzymanych od Organu, w terminie 2 Dni roboczych od ich złożenia lub doręczenia;',
     'przedstawiać Zleceniodawcy do akceptacji projekty pism zawierających oświadczenia co do stanu faktycznego, w miarę możliwości na co najmniej 2 Dni robocze przed upływem terminu ich złożenia;',
-    'po zakończeniu Kontroli przekazać Zleceniodawcy pisemne podsumowanie jej wyniku wraz z rekomendacją dalszych działań;',
+    'po zakończeniu Sprawy przekazać Zleceniodawcy podsumowanie jej wyniku wraz z rekomendacją dalszych działań;',
     'przechowywać powierzone dokumenty z należytą starannością i zwrócić oryginały niezwłocznie po wykonaniu Umowy lub na żądanie Zleceniodawcy.',
   ]);
   ust('Zleceniobiorca może prowadzić dokumentację wykonania Umowy (akta sprawy), w tym kopie dokumentów, przez okres niezbędny do ochrony przed roszczeniami i wykonania obowiązków prawnych, nie krócej niż 5 lat od końca roku, w którym zakończono wykonywanie Umowy.');
   ust('Zleceniobiorca oświadcza, że na dzień zawarcia Umowy nie występuje konflikt interesów uniemożliwiający jej wykonanie. W razie jego powstania Zleceniobiorca niezwłocznie poinformuje o tym Zleceniodawcę i może wypowiedzieć Umowę z ważnych powodów.');
 
   sec('Wynagrodzenie i koszty');
-  const wA = `Wariant A – ryczałt: ${kwota(p.lump_sum)} za reprezentację w Kontroli w Zakresie Kontroli, płatne z góry, w całości, w terminie ${p.lump_days || 2} dni od zawarcia Umowy. Ryczałt obejmuje wszystkie czynności określone w § 2 ust. 2, bez względu na liczbę godzin pracy, aż do zakończenia Kontroli, tj. doręczenia protokołu kontroli (lub wyniku kontroli celno-skarbowej), łącznie z przygotowaniem i złożeniem zastrzeżeń lub wyjaśnień do protokołu kontroli (wyniku kontroli). Ryczałt nie obejmuje czynności wskazanych w § 2 ust. 3.`;
+  const wA = `Wariant A – ryczałt: ${kwota(p.lump_sum)} za wykonanie Umowy w Zakresie Sprawy, płatne z góry, w całości, w terminie ${p.lump_days || 7} dni od zawarcia Umowy. Ryczałt obejmuje wszystkie czynności określone w § 2 ust. 2, bez względu na liczbę godzin pracy, w okresie wskazanym w § 11 ust. 1. Ryczałt nie obejmuje czynności wskazanych w § 2 ust. 3.`;
   const wB = `Wariant B – stawka godzinowa: ${kwota(p.hourly_rate)} za każdą godzinę pracy, rozliczane w okresach miesięcznych, na podstawie zestawienia czynności (z dokładnością do 15 minut) przekazywanego wraz z fakturą.` +
-    (zl(p.advance) ? ` Zleceniodawca wpłaci zaliczkę w wysokości ${kwota(p.advance)} w terminie ${p.advance_days || 2} dni od zawarcia Umowy, rozliczaną z kolejnymi fakturami; niewykorzystana część zaliczki podlega zwrotowi po rozliczeniu Umowy.` : '');
+    (zl(p.advance) ? ` Zleceniodawca wpłaci zaliczkę w wysokości ${kwota(p.advance)} w terminie ${p.advance_days || 7} dni od zawarcia Umowy, rozliczaną z kolejnymi fakturami; niewykorzystana część zaliczki podlega zwrotowi po rozliczeniu Umowy.` : '');
+  const wC = `Wariant C – abonament: ${kwota(p.monthly_fee)} miesięcznie, obejmujący do ${p.monthly_hours || P} godzin pracy w miesiącu kalendarzowym, płatny z góry do 10. dnia każdego miesiąca. Czas pracy ponad limit rozliczany jest według stawek z Załącznika nr 2; niewykorzystane godziny nie przechodzą na kolejne miesiące.`;
   if (both) ust('Z tytułu wykonania Umowy Zleceniobiorcy przysługuje wynagrodzenie ustalone według wariantu zaznaczonego poniżej (niezaznaczony wariant skreślić):', [wA, wB]);
-  else ust(`Z tytułu wykonania Umowy Zleceniobiorcy przysługuje wynagrodzenie według ${isA ? 'Wariantu A' : 'Wariantu B'}:`, [isA ? wA : wB]);
+  else ust(`Z tytułu wykonania Umowy Zleceniobiorcy przysługuje wynagrodzenie według ${isA ? 'Wariantu A' : isB ? 'Wariantu B' : 'Wariantu C'}:`, [isA ? wA : isB ? wB : wC]);
   ust('Do wynagrodzenia dolicza się podatek od towarów i usług według obowiązującej stawki.');
   const payExc = both ? 'z zastrzeżeniem terminów płatności ryczałtu (Wariant A) i zaliczki (Wariant B) określonych w ust. 1'
-    : isA ? 'z zastrzeżeniem terminu płatności ryczałtu określonego w ust. 1' : (zl(p.advance) ? 'z zastrzeżeniem terminu płatności zaliczki określonego w ust. 1' : null);
+    : isA ? 'z zastrzeżeniem terminu płatności ryczałtu określonego w ust. 1' : isC ? 'z zastrzeżeniem terminu płatności abonamentu określonego w ust. 1' : (zl(p.advance) ? 'z zastrzeżeniem terminu płatności zaliczki określonego w ust. 1' : null);
   ust(`Wynagrodzenie płatne jest przelewem na rachunek bankowy Zleceniobiorcy wskazany na fakturze, w terminie ${p.payment_days || 7} dni od dnia wystawienia faktury${payExc ? `, ${payExc}` : ''}. Zleceniodawca akceptuje wystawianie i otrzymywanie faktur za pośrednictwem Krajowego Systemu e-Faktur, a gdy nie jest to obowiązkowe – w formie elektronicznej na adres e-mail wskazany w § 13.`);
-  ust(`Czas pracy obejmuje w szczególności: analizę dokumentów, przygotowanie pism, udział w czynnościach kontrolnych, czas dojazdu do miejsca Kontroli (rozliczany w ${p.travel_pct || 100}% stawki), korespondencję i spotkania ze Zleceniodawcą.`);
-  ust('Wynagrodzenie należy się Zleceniobiorcy niezależnie od wyniku Kontroli.');
-  ust('Niezależnie od wynagrodzenia Zleceniodawca zwraca Zleceniobiorcy udokumentowane koszty poniesione w związku z wykonaniem Umowy, w szczególności: opłaty skarbowe i administracyjne, koszty tłumaczeń, opinii biegłych i ekspertyz zleconych za zgodą Zleceniodawcy, koszty przejazdów poza Wrocław (2,00 zł netto za każdy kilometr lub cena biletu) oraz noclegów. Pojedynczy koszt przekraczający 300,00 zł netto wymaga uprzedniej akceptacji Zleceniodawcy w formie dokumentowej.');
+  ust(`Czas pracy obejmuje w szczególności: analizę dokumentów, przygotowanie pism, udział w czynnościach przed Organem, czas dojazdu do miejsca czynności (rozliczany w ${p.travel_pct || 100}% stawki), korespondencję i spotkania ze Zleceniodawcą.`);
+  ust('Wynagrodzenie należy się Zleceniobiorcy niezależnie od wyniku Sprawy.');
+  ust('Niezależnie od wynagrodzenia Zleceniodawca zwraca Zleceniobiorcy udokumentowane koszty poniesione w związku z wykonaniem Umowy, w szczególności: opłaty skarbowe, sądowe i administracyjne, koszty tłumaczeń, opinii biegłych i ekspertyz zleconych za zgodą Zleceniodawcy, koszty przejazdów poza Wrocław (2,00 zł netto za każdy kilometr lub cena biletu) oraz noclegów. Pojedynczy koszt przekraczający 300,00 zł netto wymaga uprzedniej akceptacji Zleceniodawcy w formie dokumentowej.');
   ust('W razie opóźnienia w zapłacie Zleceniobiorcy przysługują odsetki ustawowe za opóźnienie w transakcjach handlowych oraz rekompensata za koszty odzyskiwania należności na zasadach ustawy o przeciwdziałaniu nadmiernym opóźnieniom w transakcjach handlowych. Przy opóźnieniu przekraczającym 14 dni Zleceniobiorca może – po uprzednim wezwaniu – wstrzymać się z wykonywaniem dalszych czynności, z wyjątkiem czynności niecierpiących zwłoki, a następnie wypowiedzieć Umowę z ważnych powodów, zachowując obowiązki z § 12 ust. 2.');
 
   sec('Odpowiedzialność i ubezpieczenie');
@@ -249,7 +341,7 @@ export function contractBlocks(o, client, signers) {
   sec('Tajemnica zawodowa i poufność');
   ust('Zleceniobiorca, Doradcy oraz osoby, przy pomocy których Zleceniobiorca wykonuje Umowę, są obowiązani do zachowania w tajemnicy faktów i informacji, z którymi zapoznali się w związku z wykonywaniem Umowy, na zasadach art. 37 ustawy o doradztwie podatkowym. Obowiązek ten trwa bezterminowo, także po rozwiązaniu Umowy.');
   ust('Zleceniobiorca może ujawnić informacje objęte tajemnicą wyłącznie w zakresie, w jakim zwolnienie z tajemnicy lub obowiązek ich ujawnienia wynika z przepisów prawa, lub za zgodą Zleceniodawcy.');
-  ust('Zleceniodawca zobowiązuje się nie udostępniać osobom trzecim (z wyjątkiem swoich doradców, biegłych rewidentów i organów) opinii, analiz i projektów pism przygotowanych przez Zleceniobiorcę bez jego zgody. Prawa autorskie do tych opracowań przysługują Zleceniobiorcy; Zleceniodawca może z nich korzystać na potrzeby własne w sprawie objętej Umową.');
+  ust('Zleceniodawca zobowiązuje się nie udostępniać osobom trzecim (z wyjątkiem swoich doradców, biegłych rewidentów i organów) opinii, analiz i projektów pism przygotowanych przez Zleceniobiorcę bez jego zgody. Prawa autorskie do tych opracowań przysługują Zleceniobiorcy; Zleceniodawca może z nich korzystać na potrzeby własne w Sprawie.');
 
   sec('Ochrona danych osobowych');
   ust('W zakresie danych osobowych przetwarzanych w związku z wykonywaniem Umowy, w tym danych pracowników, kontrahentów i reprezentantów Zleceniodawcy, Zleceniobiorca działa jako samodzielny administrator danych, wykonujący czynności doradztwa podatkowego na podstawie przepisów prawa i w warunkach tajemnicy zawodowej, a nie jako podmiot przetwarzający.');
@@ -262,9 +354,9 @@ export function contractBlocks(o, client, signers) {
   ust('Brak możliwości zastosowania środków bezpieczeństwa finansowego uprawnia Zleceniobiorcę do odmowy zawarcia lub rozwiązania Umowy ze skutkiem natychmiastowym, bez odpowiedzialności odszkodowawczej.');
 
   sec('Czas trwania i wypowiedzenie');
-  ust('Umowa zostaje zawarta na czas wykonania zlecenia, tj. do dnia złożenia zastrzeżeń lub wyjaśnień do protokołu kontroli (lub wyniku kontroli celno-skarbowej), a jeżeli nie zostaną złożone – do dnia upływu terminu na ich złożenie.');
-  ust('Jeżeli w toku Kontroli Organ rozszerzy jej zakres lub wszczęta zostanie kolejna kontrola, Strony uzgodnią rozszerzenie Umowy w drodze aneksu, w tym w formie dokumentowej (e-mail).');
-  ust('Każda ze Stron może wypowiedzieć Umowę w każdym czasie (art. 746 Kodeksu cywilnego), w formie dokumentowej. Zleceniobiorca może wypowiedzieć Umowę z ważnych powodów, w szczególności w razie: naruszenia przez Zleceniodawcę § 4 ust. 1, opóźnienia w zapłacie, o którym mowa w § 6 ust. 7, utraty zaufania, konfliktu interesów lub żądania działania sprzecznego z prawem lub zasadami etyki zawodowej.');
+  ust(endText === 'na czas nieokreślony' ? 'Umowa zostaje zawarta na czas nieokreślony.' : `Umowa zostaje zawarta na czas wykonania zlecenia, tj. ${endText}.`);
+  ust('Jeżeli w toku Sprawy jej zakres ulegnie rozszerzeniu (w szczególności w razie rozszerzenia kontroli, wszczęcia kolejnego postępowania lub potrzeby wniesienia środka zaskarżenia), Strony uzgodnią rozszerzenie Umowy w drodze aneksu, w tym w formie dokumentowej (e-mail).');
+  ust('Każda ze Stron może wypowiedzieć Umowę w każdym czasie (art. 746 Kodeksu cywilnego), w formie dokumentowej' + (isC ? ', przy czym abonament należny jest do końca miesiąca kalendarzowego, w którym nastąpiło wypowiedzenie' : '') + '. Zleceniobiorca może wypowiedzieć Umowę z ważnych powodów, w szczególności w razie: naruszenia przez Zleceniodawcę § 4 ust. 1, opóźnienia w zapłacie, o którym mowa w § 6 ust. 7, utraty zaufania, konfliktu interesów lub żądania działania sprzecznego z prawem lub zasadami etyki zawodowej.');
   ust('W razie wypowiedzenia Umowy przez którąkolwiek ze Stron Zleceniobiorcy przysługuje wynagrodzenie za czynności wykonane do dnia rozwiązania Umowy' +
     (isA ? ' (w Wariancie A wynagrodzenie ryczałtowe nie podlega zwrotowi, chyba że Umowa została rozwiązana z przyczyn leżących po stronie Zleceniobiorcy – wówczas Zleceniobiorca zwraca część ryczałtu proporcjonalną do niewykonanej części Umowy)' : '') +
     ' oraz zwrot poniesionych kosztów.');
@@ -274,7 +366,7 @@ export function contractBlocks(o, client, signers) {
   ust('Do czasu skutecznego zawiadomienia Organu, nie dłużej jednak niż przez 14 dni od rozwiązania Umowy, Zleceniobiorca podejmuje wyłącznie czynności niecierpiące zwłoki, niezbędne do ochrony praw Zleceniodawcy, chyba że Zleceniodawca na piśmie zwolni go z tego obowiązku.');
 
   sec('Komunikacja');
-  ust('Strony porozumiewają się w formie dokumentowej (e-mail), telefonicznie lub na spotkaniach. Ustalenia istotne dla przebiegu Kontroli Strony potwierdzają w formie dokumentowej.');
+  ust('Strony porozumiewają się w formie dokumentowej (e-mail), telefonicznie lub na spotkaniach. Ustalenia istotne dla przebiegu Sprawy Strony potwierdzają w formie dokumentowej.');
   ust('Adresy do korespondencji:', [
     `Zleceniobiorca: ${FIRM.email}, tel. ${FIRM.phones.split('·')[0].trim()};`,
     `Zleceniodawca: ${p.client_email || c.email || P}, tel. ${p.client_phone || c.phone || P}, osoba do kontaktu: ${p.contact_person || c.contact_person || P};`,
@@ -292,44 +384,49 @@ export function contractBlocks(o, client, signers) {
 
   B.push({ t: 'sign2',
     left: { label: 'ZLECENIOBIORCA', firm: null, people: sg.map(signerCap) },
-    right: { label: 'ZLECENIODAWCA', firm: c.name || P, people: reps.length ? reps : [`${P} – ${P}`] } });
+    right: { label: 'ZLECENIODAWCA', firm: c.name || P, people: c.kind === 'osoba' ? [c.name || P] : (reps.length ? reps : [`${P} – ${P}`]) } });
 
   // Załączniki
+  const poa = p.poa_type || tpl.poa;
+  const row = (label, val, relevant = true) => (val ? [label, val] : relevant ? [label, P] : null);
   B.push({ t: 'pb' });
-  B.push({ t: 'att', text: 'Załącznik nr 1 – Zakres zlecenia' });
+  B.push({ t: 'att', text: 'Załącznik nr 1 – Zakres Sprawy' });
   B.push({ t: 'kv', head: ['Pole', 'Treść'], rows: [
-    ['Rodzaj kontroli', p.control_kind || P],
-    ['Organ', p.authority || P],
-    ['Nr upoważnienia', p.auth_no || P],
-    ['Data doręczenia zawiadomienia / upoważnienia', p.served_date ? dateShort(p.served_date) : P],
-    ['Podatek', p.tax || P],
-    ['Okres objęty kontrolą', p.period || P],
-    ['Doradcy (pełnomocnicy)', sg.map(x => x.full_name).join(', ')],
-    ['Rodzaj pełnomocnictwa', p.poa_type || P],
-    ['Osoba do kontaktu po stronie Zleceniodawcy', p.contact_full || [p.contact_person || c.contact_person, p.client_email || c.email, p.client_phone || c.phone].filter(Boolean).join(', ') || '[imię i nazwisko, stanowisko, e-mail, tel.]'],
-    ['Biuro rachunkowe Zleceniodawcy', p.accounting_office || '[nazwa, osoba, kontakt]'],
-    ['Wybrany wariant wynagrodzenia', both ? 'A / B' : isA ? 'A – ryczałt' : 'B – stawka godzinowa'],
-  ] });
+    row('Rodzaj sprawy', MATTER_TYPE[p.matter_type]),
+    row('Opis Sprawy i zakres czynności', p.description, false),
+    row('Organ / sąd', p.authority, tpl.organ),
+    row('Sygnatura / znak pisma / nr upoważnienia', p.ref_no, false),
+    row('Data doręczenia pisma, od którego biegnie termin', p.served_date ? dateShort(p.served_date) : null, !!tpl.served),
+    row('Podatek', p.tax, tpl.organ),
+    row('Okres', p.period, tpl.organ),
+    ['Doradcy', sg.map(x => x.full_name).join(', ')],
+    ['Rodzaj pełnomocnictwa', poa],
+    ['Osoba do kontaktu po stronie Zleceniodawcy', [p.contact_person || c.contact_person, p.client_email || c.email, p.client_phone || c.phone].filter(Boolean).join(', ') || '[imię i nazwisko, stanowisko, e-mail, tel.]'],
+    row('Biuro rachunkowe Zleceniodawcy', p.accounting_office, false),
+    ['Wybrany wariant wynagrodzenia', both ? 'A / B' : isA ? 'A – ryczałt' : isB ? 'B – stawka godzinowa' : 'C – abonament'],
+  ].filter(Boolean) });
   B.push({ t: 'gap' });
   B.push({ t: 'att', text: 'Załącznik nr 2 – Stawki za czynności dodatkowe' });
   B.push({ t: 'kv', head: ['Czynność', 'Stawka netto'], rows: [
     ['Godzina pracy partnera / doradcy podatkowego', zl(p.rate_partner) || P],
     ['Godzina pracy konsultanta podatkowego', zl(p.rate_consultant) || P],
-    ['Udział w czynności kontrolnej poza Wrocławiem', `${zl(p.rate_partner) || P} + koszty z § 6 ust. 6`],
+    ['Udział w czynnościach poza Wrocławiem', `${zl(p.rate_partner) || P} za godzinę + koszty z § 6 ust. 6`],
   ] });
   B.push({ t: 'gap' });
   B.push({ t: 'att', text: 'Załącznik nr 3 – Klauzula informacyjna RODO' });
   [
     `Administratorem danych osobowych jest ${FIRM.name}, ${FIRM.address}, e-mail: ${FIRM.email}.`,
-    'Dane przetwarzane są w celu zawarcia i wykonania Umowy oraz reprezentacji Zleceniodawcy w Kontroli (art. 6 ust. 1 lit. b i c RODO), wykonania obowiązków prawnych, w tym podatkowych i wynikających z ustawy o przeciwdziałaniu praniu pieniędzy (art. 6 ust. 1 lit. c RODO), a także dochodzenia roszczeń i kontaktu z osobami reprezentującymi Zleceniodawcę (art. 6 ust. 1 lit. f RODO).',
+    'Dane przetwarzane są w celu zawarcia i wykonania Umowy oraz reprezentacji Zleceniodawcy w Sprawie (art. 6 ust. 1 lit. b i c RODO), wykonania obowiązków prawnych, w tym podatkowych i wynikających z ustawy o przeciwdziałaniu praniu pieniędzy (art. 6 ust. 1 lit. c RODO), a także dochodzenia roszczeń i kontaktu z osobami reprezentującymi Zleceniodawcę (art. 6 ust. 1 lit. f RODO).',
     'Odbiorcami danych mogą być organy podatkowe i organy KAS, sądy, dostawcy usług IT, poczty elektronicznej, księgowi i ubezpieczyciel OC Zleceniobiorcy.',
     'Dane przechowywane są przez czas wykonywania Umowy, a następnie przez okres przedawnienia roszczeń i okres wymagany przepisami podatkowymi i AML (co najmniej 5 lat).',
     'Osobie, której dane dotyczą, przysługuje prawo dostępu do danych, ich sprostowania, usunięcia, ograniczenia przetwarzania, sprzeciwu oraz skargi do Prezesa Urzędu Ochrony Danych Osobowych – z ograniczeniami wynikającymi z tajemnicy zawodowej doradcy podatkowego.',
     'Podanie danych jest warunkiem zawarcia i wykonania Umowy.',
   ].forEach((x, i) => B.push({ t: 'ust', n: `${i + 1}.`, text: x }));
-  B.push({ t: 'gap' });
-  B.push({ t: 'att', text: 'Załącznik nr 4 – Pełnomocnictwo szczególne (PPS-1)' });
-  B.push({ t: 'small', text: 'Urzędowy formularz PPS-1 – dołączany odrębnie.' });
+  if (!/^nie dotyczy/.test(poa)) {
+    B.push({ t: 'gap' });
+    B.push({ t: 'att', text: `Załącznik nr 4 – Pełnomocnictwo ${poa}` });
+    B.push({ t: 'small', text: /PPS-1/.test(poa) ? 'Urzędowy formularz PPS-1 – dołączany odrębnie.' : 'Dokument pełnomocnictwa – dołączany odrębnie.' });
+  }
   return B;
 }
 
