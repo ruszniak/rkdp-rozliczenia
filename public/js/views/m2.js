@@ -10,6 +10,7 @@ import { fetchAll } from './rozliczenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
+import { printMatterReport } from '../m2/report.js';
 
 const BASE = '#/doradztwo';
 const members = () => state.members.filter(m => m.active && (m.modules || []).includes('doradztwo'));
@@ -427,8 +428,36 @@ async function viewMatter(main, id, params) {
     const { data: od } = await sb.from('m2_orders').select('params').eq('id', m.order_id).maybeSingle();
     pelnomocnictwoDialog({ client: cl, kind: ['wsa', 'nsa'].includes(m.matter_type) ? 'procesowe' : 'pps1', params: { ...(od?.params || {}), matter_type: m.matter_type, authority: m.authority || od?.params?.authority, tax: m.tax_kind || od?.params?.tax, period: m.tax_period || od?.params?.period, ref_no: m.case_ref || od?.params?.ref_no } });
   } }, 'Pełnomocnictwo');
+  const reportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => {
+    const o = { kind: 'pelny', from: '', to: '', billableOnly: false };
+    const box = h('div');
+    const draw = () => {
+      const radio = (k, label, hint) => {
+        const el = h('input', { type: 'radio', name: 'rk', checked: o.kind === k });
+        el.addEventListener('change', () => { o.kind = k; draw(); });
+        return h('label', { class: 'check', style: { alignItems: 'flex-start', marginBottom: '8px' } }, el, h('span', {}, h('b', {}, label), h('div', { class: 'hint' }, hint)));
+      };
+      const dt = (key, label) => { const el = h('input', { class: 'input', type: 'date', value: o[key] }); el.addEventListener('change', () => { o[key] = el.value; }); return h('label', { class: 'field' }, h('span', {}, label), el); };
+      const bo = h('input', { type: 'checkbox', checked: o.billableOnly }); bo.addEventListener('change', () => { o.billableOnly = bo.checked; });
+      box.replaceChildren(
+        radio('pelny', 'Raport sprawy – pełne podsumowanie', 'Dane sprawy, opis, terminy, dziennik i czas pracy z sumami.'),
+        radio('godziny', 'Zestawienie godzin', `Sam czas pracy z sumą${rate ? ' i wartością wg stawki' : ''} – np. do rozliczenia z klientem.`),
+        radio('dziennik', 'Dziennik sprawy', 'Same wpisy dziennika: korespondencja, czynności, notatki.'),
+        h('div', { class: 'form-grid', style: { marginTop: '6px' } }, dt('from', 'Od (opcjonalnie)'), dt('to', 'Do (opcjonalnie)')),
+        o.kind === 'godziny' ? h('label', { class: 'check', style: { marginTop: '10px' } }, bo, 'tylko czas do rozliczenia') : null,
+        h('p', { class: 'hint', style: { marginTop: '8px' } }, o.kind === 'pelny' ? 'Okres zawęża dziennik i czas pracy; terminy są pokazane wszystkie.' : 'Puste daty = cały okres sprawy.'));
+    };
+    draw();
+    modal('Raport PDF', box, close => [
+      h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+      h('button', { class: 'btn btn-primary btn-sm', onclick: () => {
+        if (!printMatterReport(o.kind, { m, client, ord, deadlines, journal, time, rate, from: o.from, to: o.to, billableOnly: o.billableOnly })) return toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
+        close();
+      } }, icon('download'), 'PDF'),
+    ]);
+  } }, icon('download'), 'Raport PDF');
   main.replaceChildren(...header('sprawy', `${m.number} · ${m.title}`, null,
-    [statusPill(m.status), poaBtn, delMatter].filter(Boolean)),
+    [statusPill(m.status), reportBtn, poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
   h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, timeCard, ordersCard)));

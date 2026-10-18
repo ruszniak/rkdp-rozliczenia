@@ -545,6 +545,16 @@ export const ORDER_CSS = `
 .doc table.kv th,.doc table.kv td{border:1px solid #cfc9bf;padding:5px 8px;text-align:left;vertical-align:top}
 .doc table.kv th{background:#f3eee6;font-family:Montserrat,Arial,sans-serif;font-size:8pt;letter-spacing:.06em;text-transform:uppercase;color:#5d4a33}
 .doc table.kv td:first-child{width:42%;color:#3b3d42}
+.doc table.rt{width:100%;border-collapse:collapse;margin:2px 0 8px;font-size:9pt;page-break-inside:auto}
+.doc table.rt tr{page-break-inside:avoid}
+.doc table.rt th,.doc table.rt td{border-bottom:1px solid #ddd6ca;padding:5px 6px;text-align:left;vertical-align:top}
+.doc table.rt th{background:#f3eee6;font-family:Montserrat,Arial,sans-serif;font-size:7.5pt;letter-spacing:.05em;text-transform:uppercase;color:#5d4a33;border-bottom:1px solid #cfc9bf}
+.doc table.rt td.num,.doc table.rt th.num{text-align:right;white-space:nowrap}
+.doc table.rt td.nw{white-space:nowrap}
+.doc table.rt tr.sum td{font-weight:700;border-top:1.5px solid #8a7458;border-bottom:0;background:#faf7f2}
+.doc table.rt .sub{display:block;color:#5d6068;font-size:8.5pt;white-space:pre-wrap;margin-top:2px}
+.doc table.rt .late{color:#a4462f;font-weight:700}
+.doc table.rt .ok{color:#3e6b47}
 .doc .sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px;break-inside:avoid}
 .doc .sign .line{border-top:1px solid #1c1d21;padding-top:5px;margin-top:40px;font-size:9.5pt}
 .doc .sign2{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:26px;break-inside:avoid}
@@ -573,12 +583,14 @@ function bodyHtml(blocks) {
     else if (b.t === 'parties') html += `<div class="parties">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div>${x.lines.map(esc).join('<br>')}</div>`).join('')}</div>`;
     else if (b.t === 'h') html += `<h2>${esc(b.text)}</h2>`;
     else if (b.t === 'p') html += `<p>${esc(b.text)}</p>`;
+    else if (b.t === 'pre') html += `<p style="white-space:pre-wrap;text-align:left">${esc(b.text)}</p>`;
     else if (b.t === 'ust') html += `<div class="ust"><span>${esc(b.n)}</span><span>${esc(b.text)}</span></div>`;
     else if (b.t === 'pkt') html += `<div class="pkt"><span>${esc(b.n)}</span><span>${esc(b.text)}</span></div>`;
     else if (b.t === 'att') html += `<div class="att">${esc(b.text)}</div>`;
     else if (b.t === 'gap') html += '<div class="gap"></div>';
     else if (b.t === 'small') html += `<p class="small">${esc(b.text)}</p>`;
     else if (b.t === 'pb') html += '<div class="pb"></div>';
+    else if (b.t === 'table') html += `<table class="rt"><thead><tr>${b.head.map((x, i) => `<th class="${(b.cls || [])[i] || ''}">${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr class="${r.cls || ''}">${(r.cells || r).map((c, i) => `<td class="${(b.cls || [])[i] || ''}">${c && typeof c === 'object' ? `${c.cls ? `<span class="${c.cls}">` : ''}${esc(c.text)}${c.cls ? '</span>' : ''}${c.sub ? `<span class="sub">${esc(c.sub)}</span>` : ''}` : esc(c ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     else if (b.t === 'kv') html += `<table class="kv"><thead><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     else if (b.t === 'sign') html += `<div class="sign">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div><div class="line">${x.lines.map(esc).join('<br>')}</div></div>`).join('')}</div>`;
     else if (b.t === 'sign2') html += `<div class="sign2">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div>${x.firm ? `<div class="firmname">${esc(x.firm)}</div>` : ''}${x.people.map(pp => `<div class="person">${esc(pp)}</div>`).join('')}</div>`).join('')}</div>`;
