@@ -62,3 +62,14 @@ pg_restore --clean --if-exists --no-owner -d "$SUPABASE_DB_URL" baza.dump   # na
 ```
 
 **Ręczna** – Zespół i ustawienia → *Pobierz kopię danych* (tylko administrator): ZIP z `dane.json` i `dane.xlsx`.
+
+## Logowanie
+
+Hasło + kod z e-maila (migracja `006_logowanie_haslo_kod.sql`). Dostęp do danych egzekwuje baza: `current_member_id()`
+zwraca osobę tylko dla sesji potwierdzonej w `auth_verified_sessions` (hasło + kod, hasło + zapamiętana przeglądarka
+albo kod + właśnie ustawione hasło) i aktywnej w ciągu `session_idle_minutes`. Hasło można ustawić tylko przy
+`team_members.can_set_password = true` (trigger na `auth.users`), więc sam dostęp do skrzynki e-mail nie wystarczy
+do zmiany hasła. Administrator zarządza tym w *Zespół i ustawienia* (kolumna „Logowanie”, sekcja „Bezpieczeństwo logowania”).
+
+Gdy administrator zgubi hasło i nie ma drugiego administratora – w Supabase → SQL Editor:
+`update public.team_members set can_set_password = true where email = 'michal@ruszniak.io';`

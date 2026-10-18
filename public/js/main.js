@@ -6,6 +6,7 @@ import { renderKlienci } from './views/klienci.js';
 import { renderKlient } from './views/klient.js';
 import { renderZespol } from './views/zespol.js';
 import { renderM2 } from './views/m2.js';
+import { logout as endSession, startIdleWatch, takeLogoutReason } from './session.js';
 
 const app = document.getElementById('app');
 let cleanup = null;
@@ -43,9 +44,8 @@ function layout(active) {
 }
 
 async function logout() {
-  await sb.auth.signOut();
   location.hash = '';
-  location.reload();
+  await endSession();
 }
 
 async function loadContext() {
@@ -80,8 +80,21 @@ async function route() {
 }
 
 async function start() {
+  const reason = takeLogoutReason();
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { renderLogin(app); return; }
+  if (!session) { renderLogin(app, reason); return; }
+  // nowe logowanie (hasło + kod): baza musi potwierdzić, że sesja przeszła oba kroki i nie wygasła
+  let idleMinutes = null;
+  const { data: mode } = await sb.rpc('login_mode');
+  if (mode === 'haslo_kod') {
+    const { data: st, error } = await sb.rpc('auth_state');
+    if (error || !st?.verified) {
+      await sb.auth.signOut({ scope: 'local' });
+      renderLogin(app, reason || (st?.member ? 'Sesja wygasła albo wymaga ponownego logowania hasłem i kodem.' : ''));
+      return;
+    }
+    idleMinutes = st.idle_minutes;
+  }
   state.session = session;
   try {
     await loadContext();
@@ -90,10 +103,11 @@ async function start() {
     return;
   }
   if (!state.me) {
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope: 'local' });
     renderLogin(app, 'Ten adres nie ma dostępu do aplikacji.');
     return;
   }
+  if (idleMinutes) { await sb.rpc('auth_touch'); startIdleWatch(idleMinutes); }
   window.addEventListener('hashchange', route);
   route();
 }

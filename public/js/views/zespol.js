@@ -10,6 +10,10 @@ export async function renderZespol(main) {
     fetchAll(() => sb.from('clients').select('id,name,status,accountant_id,hr_id').order('name')),
     fetchAll(() => sb.from('client_assignments').select('client_id,member_id')),
   ]);
+  let devices = [];
+  const loadDevices = async () => { const { data, error } = await sb.from('auth_devices').select('id,member_id,label,created_at,last_used_at,expires_at'); devices = error ? null : data; };
+  await loadDevices();
+  const fmtD = iso => iso ? new Date(iso).toLocaleDateString('pl-PL') : '';
   const reloadMembers = async () => {
     const { data, error } = await sb.from('team_members').select('*').order('full_name');
     if (error) throw error; state.members = data;
@@ -32,6 +36,26 @@ export async function renderZespol(main) {
         return h('label', { class: 'check small' }, cb, label);
       };
       const count = assigns.filter(a => a.member_id === m.id).length;
+      let loginCell = h('td', { class: 'small muted' }, '—');
+      if (devices !== null) {
+        const allow = h('input', { type: 'checkbox', checked: !!m.can_set_password });
+        allow.addEventListener('change', () => update(m, { can_set_password: allow.checked }));
+        const mine = devices.filter(d => d.member_id === m.id && new Date(d.expires_at) > new Date());
+        const revoke = h('button', { class: 'btn btn-ghost btn-sm', 'data-tip': 'Zapomina zapamiętane przeglądarki i kończy sesje tej osoby na innych urządzeniach (przy następnym wejściu musi podać hasło i kod).',
+          onclick: async () => {
+            if (!confirm(`Wylogować ${m.full_name} ze wszystkich urządzeń i zapomnieć zapamiętane przeglądarki?`)) return;
+            const { error } = await sb.rpc('admin_revoke_member', { p_member: m.id });
+            if (error) return fail(error);
+            toast('Wylogowano ze wszystkich urządzeń'); await loadDevices(); renderTeam();
+          } }, 'Wyloguj wszędzie');
+        loginCell = h('td', { class: 'small' },
+          m.password_set_at ? h('div', {}, `hasło ustawione ${fmtD(m.password_set_at)}`) : h('div', { class: 'muted' }, 'hasło nieustawione'),
+          h('label', { class: 'check small', 'data-tip': 'Pozwala jeden raz ustawić nowe hasło przez „Pierwsze logowanie / ustaw nowe hasło” (np. gdy ktoś zapomniał hasła). Po ustawieniu zgoda sama się wyłącza.' },
+            allow, 'zgoda na nowe hasło'),
+          h('div', { class: 'muted', 'data-tip': mine.map(d => `${d.label || 'przeglądarka'} – od ${fmtD(d.created_at)}, ostatnio ${fmtD(d.last_used_at || d.created_at)}`).join(' · ') || null },
+            `zapamiętane przeglądarki: ${mine.length}`),
+          revoke);
+      }
       const nAcc = clients.filter(c => c.accountant_id === m.id).length, nHr = clients.filter(c => c.hr_id === m.id).length;
       return h('tr', {},
         h('td', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, m.email)),
@@ -39,6 +63,7 @@ export async function renderZespol(main) {
         h('td', {}, modBox('rozliczenia', 'Rozliczenia'), h('br'), modBox('doradztwo', 'Doradztwo M2 TAX')),
         h('td', {}, role),
         h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany')),
+        loginCell,
         h('td', { class: 'small' }, `księgowość: ${nAcc}`, h('br'), `kadry: ${nHr}`),
         h('td', {}, h('button', { class: 'btn btn-ghost btn-sm', onclick: () => renderAssign(m) }, `Dodatkowy dostęp (${count})`)));
     }));
@@ -62,7 +87,7 @@ export async function renderZespol(main) {
       const modules = mod.value === 'oba' ? ['rozliczenia', 'doradztwo'] : [mod.value];
       const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: role.value, modules });
       if (error) return fail(error);
-      toast('Dodano. Ta osoba może się teraz zalogować kodem z e-maila.');
+      toast('Dodano. Ta osoba loguje się przez „Pierwsze logowanie”: kod z e-maila, potem własne hasło.');
       e.target.reset(); role.value = 'limited';
       await reloadMembers(); renderTeam();
     } }, email, name, short, role, mod, h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, 'Dodaj osobę'));
@@ -143,9 +168,9 @@ export async function renderZespol(main) {
     h('section', { class: 'card section' },
       h('div', { class: 'section-head' }, h('h2', {}, 'Zespół')),
       h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-        h('thead', {}, h('tr', {}, ['Osoba', 'Skrót', 'Moduły', 'Dostęp (Rozliczenia)', 'Konto', 'Prowadzi', 'Wgląd do innych'].map(t => h('th', {}, t)))), teamBody)),
+        h('thead', {}, h('tr', {}, ['Osoba', 'Skrót', 'Moduły', 'Dostęp (Rozliczenia)', 'Konto', 'Logowanie', 'Prowadzi', 'Wgląd do innych'].map(t => h('th', {}, t)))), teamBody)),
       addForm,
-      h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Logować się mogą wyłącznie aktywne adresy z tej listy. Zablokowanie konta działa natychmiast.')),
+      h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Logować się mogą wyłącznie aktywne adresy z tej listy: hasłem i kodem z e-maila (albo hasłem w zapamiętanej przeglądarce). Zablokowanie konta działa natychmiast.')),
     assignPanel,
     h('section', { class: 'card section', style: { marginTop: '16px' } },
       h('div', { class: 'section-head' }, h('h2', {}, 'Kolumny listy kontrolnej'), addTask),
@@ -161,6 +186,25 @@ export async function renderZespol(main) {
     catch (e) { fail(e, 'Nie udało się zrobić kopii'); }
     finally { backupBtn.disabled = false; backupBtn.textContent = 'Pobierz kopię danych'; }
   } }, 'Pobierz kopię danych');
+  const { data: secRows } = await sb.from('app_settings').select('key,value').in('key', ['session_idle_minutes', 'device_trust_days']);
+  const secVal = Object.fromEntries((secRows || []).map(r => [r.key, r.value]));
+  const secSelect = (key, label, opts, tip) => {
+    const sel = h('select', { class: 'select' }, opts.map(([v, t]) => h('option', { value: v }, t)));
+    sel.value = secVal[key] || opts[0][0];
+    sel.addEventListener('change', async () => {
+      const { error } = await sb.from('app_settings').upsert({ key, value: sel.value }); if (error) return fail(error);
+      toast('Zapisano – obowiązuje od następnego wejścia do aplikacji');
+    });
+    return h('label', { class: 'field', 'data-tip': tip }, h('span', {}, label), sel);
+  };
+  if (secRows?.length) main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Bezpieczeństwo logowania')),
+    h('div', { class: 'form-grid' },
+      secSelect('session_idle_minutes', 'Wylogowanie po bezczynności', [['60', '1 godzina'], ['120', '2 godziny'], ['240', '4 godziny'], ['480', '8 godzin'], ['720', '12 godzin']],
+        'Po tym czasie bez żadnej aktywności aplikacja wyloguje (sprawdza to też baza danych).'),
+      secSelect('device_trust_days', 'Pamiętanie przeglądarki', [['7', '7 dni'], ['14', '14 dni'], ['30', '30 dni'], ['60', '60 dni']],
+        'Jak długo w zapamiętanej przeglądarce wystarczy samo hasło, bez kodu z e-maila.')),
+    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Logowanie: hasło + kod z e-maila. W zapamiętanej przeglądarce wystarczy hasło. Nowe hasło można ustawić tylko za zgodą administratora (kolumna „Logowanie” wyżej).')));
   main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
     h('div', { class: 'section-head' }, h('h2', {}, 'Kopia zapasowa'), backupBtn),
     h('p', { class: 'hint' }, 'Plik ZIP ze wszystkimi danymi aplikacji (klienci, rozliczenia, notatki, Doradztwo M2 TAX, historia zmian) – w formacie JSON i Excel. ',
