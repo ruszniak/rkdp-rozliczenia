@@ -7,7 +7,7 @@ import {
 } from '../m2/dict.js';
 import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
-import { pps1Defaults, pps1Scope, printPps1 } from '../m2/pps1.js';
+import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 
@@ -701,8 +701,13 @@ async function pelnomocnictwoDialog({ client, params = {}, defaultSignerId = nul
       warn || '',
       pps ? h('div', {},
         h('p', { class: 'eyebrow', style: { margin: '14px 0 8px' } }, 'Dane do formularza PPS-1'),
+        h('div', { class: 'field wide', style: { marginBottom: '12px' } }, h('span', {}, 'Poz. 4 – podmiot składający pełnomocnictwo (zaznacz właściwe kwadraty)'),
+          h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 18px' } }, ...Object.entries(BOX4_LABELS).map(([n, l]) => {
+            const cb = h('input', { type: 'checkbox', checked: (d.box4 || []).includes(Number(n)) });
+            cb.addEventListener('change', () => { const set = new Set(d.box4 || []); cb.checked ? set.add(Number(n)) : set.delete(Number(n)); d.box4 = [...set].sort(); });
+            return h('label', { class: 'check small' }, cb, `${n}. ${l}`);
+          }))),
         fieldsGrid([
-          ['submitter', 'Poz. 4 – składa', 'select', { pelnomocnik: 'Pełnomocnik – doradca podatkowy (kwadraty 2 i 6)', mocodawca: 'Mocodawca (kwadrat 1)' }],
           ['client_kind', 'Poz. 5 – rodzaj podmiotu', 'select', { firma: 'Podmiot niebędący osobą fizyczną', osoba: 'Osoba fizyczna' }],
           ['client_nip', 'Poz. 1 – NIP mocodawcy', 'text'], ['client_name', 'Poz. 6 – nazwa pełna / nazwisko, imię', 'text', null, true],
           ['c_country', '13. Kraj', 'text'], ['c_voiv', '14. Województwo', 'text'], ['c_county', '15. Powiat', 'text'], ['c_commune', '16. Gmina', 'text'],

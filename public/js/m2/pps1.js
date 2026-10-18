@@ -45,7 +45,7 @@ export function pps1Defaults({ client, params = {}, signer, scope }) {
   const n = splitName(c.name);
   return {
     organ: params.authority || '',
-    submitter: 'pelnomocnik',
+    box4: [2],            // poz. 4 – zaznaczone kwadraty (1–6)
     client_nip: (c.nip || '').replace(/\D/g, ''),
     client_kind: osoba ? 'osoba' : 'firma',
     client_name: osoba ? `${n.last}, ${n.first}` : (c.name || ''),
@@ -80,6 +80,8 @@ const dateDigits = iso => iso ? iso.slice(8, 10) + iso.slice(5, 7) + iso.slice(0
 const check = (page, x0, y0) => ({ page, x: x0 + 3.1, y: y0 + 1.9, text: 'X', size: 9.5, bold: true });
 const strike = (page, x0, y0, x1) => ({ page, x: x0, y: y0 + 3.4, line: x1 - x0 });
 
+export const BOX4_LABELS = { 1: 'mocodawca', 2: 'pełnomocnik', 3: 'dalszy pełnomocnik', 4: 'adwokat', 5: 'radca prawny', 6: 'doradca podatkowy' };
+
 export function pps1Items(d, signer) {
   const it = [];
   const txt = (page, x, y, text, o = {}) => { if (text) it.push({ page, x, y, text: o.keep ? String(text) : up(text), size: o.size || 9, w: o.w, wrap: o.wrap }); };
@@ -91,8 +93,8 @@ export function pps1Items(d, signer) {
   if (d.client_nip) { it.push(...comb(1, 205.0, 386.9, 39.2, NIP_COMB, d.client_nip)); it.push(strike(1, 140.5, 30.5, 186.7)); }
   // A
   at(1, 54.1, 202.3, d.organ, { w: 500 });
-  if (d.submitter === 'mocodawca') it.push(check(1, 59.7, 233.1));
-  else { it.push(check(1, 139.5, 233.1)); it.push(check(1, 464.6, 233.1)); }
+  const BOX4 = { 1: 59.7, 2: 139.5, 3: 219.9, 4: 324.4, 5: 386.7, 6: 464.6 };
+  (d.box4 || []).forEach(n => BOX4[n] && it.push(check(1, BOX4[n], 233.1)));
   // B.1
   it.push(check(1, d.client_kind === 'osoba' ? 382.8 : 161.7, 313.0));
   at(1, 54.1, 330.7, d.client_name, { w: 252, size: d.client_name?.length > 52 ? 7.5 : 9 });
