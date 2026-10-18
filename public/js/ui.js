@@ -133,3 +133,26 @@ export function modal(title, body, actions, { wide = false } = {}) {
   back.querySelector('input, select, textarea')?.focus();
   return close;
 }
+
+// Telefon: tabele .list wyświetlane jako karty – każda komórka dostaje etykietę z nagłówka kolumny
+let tableObs = null;
+export function initMobileTables() {
+  if (tableObs) return;
+  let queued = false;
+  const label = () => {
+    queued = false;
+    document.querySelectorAll('table.list').forEach(t => {
+      const heads = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim());
+      if (!heads.length) return;
+      t.querySelectorAll('tbody tr').forEach(tr => {
+        let i = 0;
+        for (const td of tr.children) {
+          if (!td.hasAttribute('data-label')) td.setAttribute('data-label', td.colSpan > 1 ? '' : (heads[i] || ''));
+          i += td.colSpan || 1;
+        }
+      });
+    });
+  };
+  tableObs = new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(label); } });
+  tableObs.observe(document.body, { childList: true, subtree: true });
+}

@@ -36,6 +36,7 @@ async function newMode() {
 }
 
 export async function renderLogin(app, initialError = '') {
+  document.body.classList.remove('has-tabbar');
   let email = '', nonce = null;
   const errBox = h('p', { class: 'err', role: 'alert' }, initialError);
   const box = h('div', { class: 'login-box' });
