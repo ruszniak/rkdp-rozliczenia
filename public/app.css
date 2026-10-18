@@ -236,6 +236,7 @@ table.list{width:100%;border-collapse:collapse;font-size:13.5px}
 .spinner{padding:60px;text-align:center;color:var(--muted)}
 footer.foot{padding-top:24px;padding-bottom:32px;font-size:12px;color:var(--label);border-top:1px solid var(--line)}
 footer.foot a{color:var(--label)}
+footer.foot .owner{margin-top:6px}
 .pop textarea{width:100%;min-height:70px;font-size:13px;padding:8px 10px;border:1px solid var(--line-2);border-radius:8px;resize:vertical;margin:2px 0 8px}
 .pop .pop-body{padding:6px 8px;display:flex;flex-direction:column;gap:2px;width:300px}
 .pop .pop-body label{padding:4px 0}

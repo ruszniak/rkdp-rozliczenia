@@ -67,7 +67,8 @@ function layout(active) {
   const foot = h('footer', { class: 'wrap foot' },
     mod === 'm2' ? 'M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p.' : 'RKDP spółka doradztwa podatkowego sp. z o.o.',
     ' · aplikacja wewnętrzna · wykonanie: ',
-    h('a', { href: 'https://ruszniak.io', target: '_blank', rel: 'noopener' }, 'druslak'));
+    h('a', { href: 'https://ruszniak.io', target: '_blank', rel: 'noopener' }, 'druslak'),
+    h('div', { class: 'owner' }, `© ${new Date().getFullYear()} Właściciel oprogramowania: RKDP spółka doradztwa podatkowego sp. z o.o. Wszelkie prawa zastrzeżone.`));
   app.replaceChildren(header, main, foot);
   return main;
 }
