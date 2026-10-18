@@ -53,12 +53,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .mod-switch:hover{color:var(--bronze-dark)}
 .mod-switch .caret{font-size:11px;transition:transform .15s}
 .mod-switch[aria-expanded="true"] .caret{transform:rotate(180deg)}
-.mod-menu{position:absolute;top:calc(100% + 12px);left:0;z-index:60;min-width:300px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px rgba(29,26,22,.14);padding:6px;display:grid;gap:2px}
+.mod-menu{position:absolute;top:calc(100% + 12px);left:0;z-index:60;min-width:200px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px rgba(29,26,22,.14);padding:6px;display:grid;gap:2px}
 .mod-menu[hidden]{display:none}
-.mod-menu a{display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}
+.mod-menu a{display:flex;align-items:center;justify-content:center;padding:12px 18px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:600;font-size:14px}
 .mod-menu a:hover,.mod-menu a.on{background:var(--panel)}
 .mod-menu a.on{color:var(--bronze-dark)}
-.mod-menu img{height:30px;width:84px;object-fit:contain;object-position:left center}
+.mod-menu img{height:38px;width:auto;max-width:160px;object-fit:contain}
 .nav-links{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
 .nav-links a{color:var(--ink);text-decoration:none;padding:8px 14px;border-radius:999px}
 .nav-links a:hover{color:var(--bronze)}

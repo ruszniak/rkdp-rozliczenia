@@ -42,8 +42,9 @@ function layout(active) {
     if (mine.length < 2) return h('span', { class: 'mod-label' }, M.label);
     const menu = h('div', { class: 'mod-menu', role: 'menu', hidden: true }, ...mine.map(k => h('a', {
       href: MODULES[k].home, role: 'menuitem', class: k === mod ? 'on' : null,
-      onclick: () => { remember(k); menu.hidden = true; } },
-      h('img', { src: MODULES[k].logo, alt: '' }), h('span', {}, MODULES[k].full))));
+      onclick: () => { remember(k); menu.hidden = true; },
+      'aria-label': MODULES[k].full, title: MODULES[k].full },
+      h('img', { src: MODULES[k].logo, alt: MODULES[k].label }))));
     const btn = h('button', { class: 'mod-switch', type: 'button', 'aria-haspopup': 'menu', title: 'Zmień moduł',
       onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; e.currentTarget.setAttribute('aria-expanded', String(!menu.hidden)); } }, M.label, h('span', { class: 'caret' }, '▾'));
     return h('div', { class: 'mod-wrap' }, btn, menu);
