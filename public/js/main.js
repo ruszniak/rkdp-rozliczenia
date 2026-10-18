@@ -4,6 +4,7 @@ import { renderLogin } from './views/login.js';
 import { renderRozliczenia } from './views/rozliczenia.js';
 import { renderKlienci } from './views/klienci.js';
 import { renderSprawozdania } from './views/sprawozdania.js';
+import { renderProfil } from './views/profil.js';
 import { renderKlient } from './views/klient.js';
 import { renderZespol } from './views/zespol.js';
 import { renderM2 } from './views/m2.js';
@@ -61,8 +62,8 @@ function layout(active) {
         ...M.tabs.map(link),
         me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
       h('div', { class: 'nav-user' },
-        h('span', { class: 'who' }, me.full_name),
-        h('span', { class: 'avatar', title: me.email }, initials(me.full_name)),
+        h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
+        h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, initials(me.full_name)),
         h('button', { class: 'btn btn-ghost btn-sm', onclick: logout }, 'Wyloguj'))));
   const main = h('main', { class: 'wrap' });
   const foot = h('footer', { class: 'wrap foot' },
@@ -99,7 +100,8 @@ async function route() {
   const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'rozliczenia' : 'doradztwo');
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');
   try {
-    if (view === 'doradztwo' && hasModule('doradztwo')) cleanup = await renderM2(layout(m2key), parts, params);
+    if (view === 'profil') cleanup = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
+    else if (view === 'doradztwo' && hasModule('doradztwo')) cleanup = await renderM2(layout(m2key), parts, params);
     else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
     else if (view === 'klient') cleanup = await renderKlient(layout('klienci'), parts[1]);

@@ -173,6 +173,10 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px
 /* podpowiedź */
 .tip{position:fixed;z-index:90;max-width:320px;background:var(--dark);color:var(--bg);font-size:12.5px;line-height:1.45;padding:9px 12px;border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.25);pointer-events:none;white-space:pre-line}
 .tip b{color:var(--gold)}
+.tip.wide{max-width:min(460px,calc(100vw - 16px))}
+.info-i{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--gold,#b08d57);color:var(--gold,#b08d57);background:transparent;font:italic 700 12px/1 Georgia,serif;cursor:help;vertical-align:middle;margin-left:8px;padding:0;flex:none}
+.info-i:hover,.info-i:focus-visible{background:var(--gold,#b08d57);color:#fff;outline:none}
+.info-body{white-space:pre-line;font-size:14px;line-height:1.55}
 
 /* menu statusu */
 .pop{position:fixed;z-index:60;max-width:340px;background:var(--card);border:1px solid var(--line-2);border-radius:12px;box-shadow:0 18px 40px rgba(29,26,22,.18);padding:6px;min-width:210px}

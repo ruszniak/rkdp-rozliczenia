@@ -106,6 +106,7 @@ export function pps1Items(d, signer, opts = {}) {
   at(1, 54.1, 565.5, d.client_phone, { keep: true }); at(1, 280.0, 565.5, d.client_email, { keep: true }); at(1, 54.1, 589.5, d.client_ae, { keep: true });
   // C.1 – pełnomocnik
   if (s.nip) { it.push(...comb(1, 69.4, 251.3, 674.6, NIP_COMB, String(s.nip).replace(/\D/g, ''))); it.push(strike(1, 164.8, 665.9, 211.2)); }
+  else if (s.pesel) { it.push(...comb(1, 69.4, 251.3, 674.6, NIP_COMB, String(s.pesel).replace(/\D/g, ''))); it.push(strike(1, 147.0, 665.9, 159.3)); }
   at(1, 280.0, 665.9, s.license_no || '');
   at(1, 53.3, 690.0, sn.last); at(1, 225.8, 690.0, sn.first);
   // C.1 c.d. (str. 2): doręczenia, adres elektroniczny

@@ -7,6 +7,8 @@ import { pps1Defaults, printPps1, parseAddress, BOX4_LABELS } from '../m2/pps1.j
 import { poaBlocks, printableHtml, buildOrderDocx, RKDP_BRAND } from '../m2/order.js';
 import { lookupNip, validNip, cleanNip } from '../nip.js';
 import { fetchAll } from '../views/rozliczenia.js';
+import { loadTeamPoa } from '../views/profil.js';
+import { deliveryOf, contactOf } from './forms.js';
 
 const MONTHS_NOM = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 const nextMonth = () => { const d = new Date(); d.setMonth(d.getMonth() + 1); return `${MONTHS_NOM[d.getMonth()]} ${d.getFullYear()}`; };
@@ -138,12 +140,21 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     return h('label', { class: 'field wide', style: { marginBottom: '12px' } }, h('span', {}, 'Klient'), h('div', { style: { display: 'flex', gap: '8px' } }, sel, add));
   })();
 
+  const teamPoaReady = m => !!teamPoa[m.id]?.filled;
   const whoOpts = () => ({ doradca: `${advisor.full_name} – doradca podatkowy (dane uzupełnione)`,
-    ...Object.fromEntries(employees.map(m => ['emp:' + m.id, `${m.full_name} – pracownik (swoje dane wpisuje sam)`])), puste: 'Puste pola pełnomocnika' });
+    ...Object.fromEntries(employees.map(m => ['emp:' + m.id, `${m.full_name} – pracownik${teamPoaReady(m) ? ' (dane z profilu)' : ' (brak danych w profilu)'}`])), puste: 'Puste pola pełnomocnika' });
+  const teamPoa = await loadTeamPoa(employees).catch(() => ({}));
   const pelnomocnik = () => {
     if (d.who === 'doradca') return advisor;
-    if (d.who.startsWith('emp:')) { const m = employees.find(x => 'emp:' + x.id === d.who); return { mode: 'pracownik', full_name: m?.full_name || '' }; }
+    if (d.who.startsWith('emp:')) { const m = employees.find(x => 'emp:' + x.id === d.who); return teamPoa[m?.id] || { mode: 'pracownik', full_name: m?.full_name || '' }; }
     return { mode: 'puste', full_name: '' };
+  };
+  const whoHint = () => {
+    if (!d.who.startsWith('emp:')) return null;
+    const x = pelnomocnik();
+    const me = employees.find(m => 'emp:' + m.id === d.who)?.id === state.me?.id;
+    if (!x.filled) return h('p', { class: 'hint', style: { margin: '-4px 0 10px', color: '#a0522d' } }, me ? 'Nie masz jeszcze uzupełnionych danych – wpisz je w „Mój profil” (kliknij swoje nazwisko w prawym górnym rogu).' : 'Ta osoba nie uzupełniła jeszcze danych w „Mój profil” – wpisze się tylko imię i nazwisko.');
+    return h('p', { class: 'hint', style: { margin: '-4px 0 10px' } }, `Dane z „Mój profil”: ${[x.nip ? 'NIP' : x.pesel ? 'PESEL' : null, x.ae_address ? 'adres elektroniczny' : null, x.delivery === 'biuro' ? 'doręczenia na biuro' : 'własny adres', x.phone ? 'telefon' : null].filter(Boolean).join(', ')}.${!x.nip && !x.pesel && !me ? ' PESEL wpisze się tylko, gdy ta osoba wygeneruje dokument sama.' : ''}`);
   };
 
   function build() {
@@ -171,7 +182,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       ], c), h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Puste pola zostaną w umowie jako [POLE] do uzupełnienia. Treść umowy jest dokładnie z Twojego wzoru.'));
     } else if (t === 'upl1' || t === 'pel' || t === 'pps1') {
       const x = v[t];
-      parts.push(grid([['who', 'Pełnomocnik', 'select', whoOpts(), true]], d));
+      parts.push(grid([['who', 'Pełnomocnik', 'select', whoOpts(), true]], d, () => build()), whoHint());
       if (t === 'upl1') parts.push(grid([
         ['client_kind', 'Poz. 6 – rodzaj podmiotu', 'select', { firma: 'Podmiot niebędący osobą fizyczną', osoba: 'Osoba fizyczna' }],
         ['client_nip', 'Poz. 1 – NIP', 'text'], ['client_name', 'Poz. 7 – nazwa pełna / „Nazwisko, imię”', 'text', null, true],
@@ -240,8 +251,9 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       if (t === 'pel') return printOverlay(PEL_PAGES, pelItems(v.pel, pelnomocnik()), fname('PEL', 'pdf')) || toast('Zezwól na wyskakujące okna', true);
       if (t === 'pps1') {
         const p = pelnomocnik();
-        const signer = p.mode === 'doradca' ? p : { full_name: p.full_name };
-        const opts = p.mode === 'doradca' ? { delivery: RKDP_DELIVERY, phone: RKDP_CONTACT.phone, email: RKDP_CONTACT.email } : { delivery: {}, phone: '', email: '' };
+        const signer = p.mode === 'doradca' ? p : { full_name: p.full_name, nip: p.nip, pesel: p.pesel, ae_address: p.ae_address };
+        const C = contactOf(p);
+        const opts = { delivery: deliveryOf(p) || {}, phone: C.phone, email: C.email };
         return printPps1(v.pps1, signer, opts) || toast('Zezwól na wyskakujące okna', true);
       }
       if (t === 'procesowe') {

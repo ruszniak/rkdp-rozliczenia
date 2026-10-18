@@ -1,5 +1,35 @@
 // RKDP – zatwierdzanie sprawozdań finansowych: dane z KRS + protokół ZZW z uchwałami (Word / PDF).
-import { h, toast, fail, icon } from '../ui.js';
+import { h, toast, fail, icon, infoTip } from '../ui.js';
+
+const HELP = {
+  all: `Co wpisujesz:
+• Spółka: wybierasz spółkę z bazy klientów i klikasz „Pobierz z KRS”. Uzupełnia się firma, adres, kapitał, wspólnicy z liczbą udziałów i zarząd z funkcjami. Pokazuje się też, za jaki okres złożono ostatnie sprawozdanie.
+• Zgromadzenie: rok obrotowy, data, miejscowość i przewodniczący. Do wyboru tryb: bez formalnego zwołania (art. 240 KSH) albo zwołane przez zarząd.
+• Sprawozdanie: suma bilansowa i wynik netto (stratę wpisujesz z minusem). Przy zysku wybierasz kapitał zapasowy, dywidendę, pokrycie strat z lat ubiegłych albo własną treść. Przy stracie: pokrycie z zysków lat przyszłych, z kapitału zapasowego albo własną treść.
+• Dwa pola do zaznaczenia: uchwała o sprawozdaniu zarządu z działalności oraz pełny zakres sprawozdania (zmiany w kapitale, przepływy pieniężne).
+
+Co powstaje:
+• Protokół z porządkiem obrad i uchwałami: wybór przewodniczącego, porządek obrad, zatwierdzenie sprawozdania, podział zysku albo pokrycie straty i osobne absolutorium dla każdego członka zarządu.
+• Głosy liczą się same. Wspólnik, który jest też w zarządzie, nie głosuje nad własnym absolutorium (art. 244 KSH).
+• Na końcu jest lista obecności do podpisu.
+• Przy jednym wspólniku dokument przyjmuje formę uchwał jedynego wspólnika (art. 156 KSH), bez głosowań.
+• Dokument jest bez papieru RKDP, bo to dokument spółki. W stopce jest jej nazwa, KRS i NIP.
+• Protokoły zapisują się na liście w zakładce. Usuwać je może tylko administrator.
+
+Dwa ograniczenia KRS:
+• Zamaskowane nazwiska: darmowe API KRS ukrywa imiona i nazwiska (np. „R*******, M*****”). Wpisujesz je raz, a przy kolejnym protokole tej spółki podpowiedzą się same. Jeśli ta sama osoba jest wspólnikiem i członkiem zarządu, wystarczy ją wpisać w jednym miejscu.
+• Brakujący wspólnicy: KRS pokazuje tylko wspólników mających co najmniej 10% kapitału. Gdy udziały nie sumują się do kapitału, aplikacja ostrzega i podaje, ilu brakuje.`,
+  company: `Wybierz spółkę z bazy klientów i kliknij „Pobierz z KRS”. Uzupełnia się firma, adres, kapitał, wspólnicy z liczbą udziałów i zarząd z funkcjami. Pod polami pokaże się, za jaki okres złożono ostatnie sprawozdanie.`,
+  shareholders: `• Zamaskowane nazwiska: darmowe API KRS ukrywa imiona i nazwiska (np. „R*******, M*****”). Wpisujesz je raz, a przy kolejnym protokole tej spółki podpowiedzą się same. Jeśli ta sama osoba jest wspólnikiem i członkiem zarządu, wystarczy ją wpisać w jednym miejscu.
+• Brakujący wspólnicy: KRS pokazuje tylko wspólników mających co najmniej 10% kapitału. Gdy udziały nie sumują się do kapitału, aplikacja ostrzega i podaje, ilu brakuje.
+• Przy jednym wspólniku dokument przyjmuje formę uchwał jedynego wspólnika (art. 156 KSH), bez głosowań i listy obecności.`,
+  board: `Każdy członek zarządu dostaje osobną uchwałę o absolutorium. Głosy liczą się same – wspólnik, który jest też w zarządzie, nie głosuje nad własnym absolutorium (art. 244 KSH).`,
+  meeting: `Rok obrotowy, data, miejscowość i przewodniczący. Tryb do wyboru: bez formalnego zwołania, gdy reprezentowany jest cały kapitał i nikt nie zgłasza sprzeciwu (art. 240 KSH), albo zwołane przez zarząd (art. 238 KSH) – wtedy podaj datę wysłania zawiadomień.`,
+  fs: `• Suma bilansowa i wynik netto (stratę wpisujesz z minusem).
+• Przy zysku: kapitał zapasowy, dywidenda, pokrycie strat z lat ubiegłych albo własna treść. Przy stracie: pokrycie z zysków lat przyszłych, z kapitału zapasowego albo własna treść.
+• Zaznacz uchwałę o sprawozdaniu zarządu z działalności, jeśli spółka je sporządza, oraz pełny zakres sprawozdania (zmiany w kapitale, przepływy pieniężne) dla jednostek badanych.`,
+};
+const head2 = (text, tip, extra) => h('div', { class: 'section-head' }, h('h2', { style: { display: 'flex', alignItems: 'center' } }, text, infoTip(tip)), extra || null);
 import { sb, state, isAdmin } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { printableHtml, buildOrderDocx, zl } from '../m2/order.js';
@@ -21,7 +51,7 @@ export async function renderSprawozdania(main, id) {
   const cname = Object.fromEntries(clients.map(c => [c.id, c.name]));
   main.replaceChildren(
     h('div', { class: 'page-head' },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'Sprawozdania finansowe'), h('h1', { style: { marginTop: '6px' } }, 'Zatwierdzenie sprawozdania'),
+      h('div', {}, h('p', { class: 'eyebrow' }, 'Sprawozdania finansowe'), h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Zatwierdzenie sprawozdania', infoTip(HELP.all, 'Zatwierdzenie sprawozdania – instrukcja')),
         h('p', { class: 'sub' }, 'Protokół zwyczajnego zgromadzenia wspólników sp. z o.o. z uchwałami: sprawozdanie, podział zysku albo pokrycie straty, absolutoria. Dane spółki, wspólników i zarządu pobierane z KRS.')),
       h('a', { class: 'btn btn-primary', href: `${BASE}/nowy` }, icon('plus'), 'Nowy protokół')),
     h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
@@ -94,7 +124,7 @@ async function renderEditor(main, id) {
       });
       if (!p.place && p.seat) p.place = p.seat;
       const last = (r.filings || [])[0];
-      krsInfo.textContent = `Pobrano z KRS (stan na ${r.stanZDnia || r.checkedAt}). ${last ? `Ostatnie złożone sprawozdanie: ${last.period?.toLowerCase()} (złożone ${last.filed}).` : ''} KRS ukrywa imiona i nazwiska (np. „R*******”) – uzupełnij je raz, przy kolejnym protokole tej spółki podpowiedzą się same.`;
+      krsInfo.textContent = `Pobrano z KRS (stan na ${r.stanZDnia || r.checkedAt}). ${last ? `Ostatnie złożone sprawozdanie: ${last.period?.toLowerCase()} (złożone ${last.filed}).` : ''} Uzupełnij zamaskowane imiona i nazwiska (z gwiazdkami).`;
       markDirty(); build();
     } catch (e) { fail(e, 'Nie udało się pobrać odpisu z KRS'); }
     finally { krsBtn.disabled = false; krsBtn.replaceChildren(icon('download'), 'Pobierz z KRS'); }
@@ -173,7 +203,7 @@ async function renderEditor(main, id) {
     const recInp = inp(p, 'recorder', 'Protokolant (puste = przewodniczący)'); recInp.querySelector('input').setAttribute('list', 'zzw-people');
 
     box.replaceChildren(datalist,
-      h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Spółka'), krsBtn),
+      h('section', { class: 'card section' }, head2('Spółka', HELP.company, krsBtn),
         h('div', { class: 'form-grid' },
           h('label', { class: 'field wide' }, h('span', {}, 'Klient (spółka z bazy)'), clientSel),
           inp(p, 'krs', 'Numer KRS'), inp(p, 'nip', 'NIP'),
@@ -181,14 +211,14 @@ async function renderEditor(main, id) {
           inp(p, 'seat', 'Siedziba (miejscowość)'), inp(p, 'capital', 'Kapitał zakładowy (zł)', { num: true }),
           inp(p, 'address', 'Adres', { wide: true })),
         krsInfo),
-      h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, `Wspólnicy (${p.shareholders.length})`)),
+      h('section', { class: 'card section' }, head2(`Wspólnicy (${p.shareholders.length})`, HELP.shareholders),
         sharesWarn(),
         sole ? h('p', { class: 'hint' }, 'Jeden wspólnik – dokument przyjmie formę uchwał jedynego wspólnika (art. 156 KSH), bez głosowań i listy obecności.') : null,
         personRows(p.shareholders, 'sh')),
-      h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, `Zarząd – absolutoria (${p.board.length})`)),
+      h('section', { class: 'card section' }, head2(`Zarząd – absolutoria (${p.board.length})`, HELP.board),
         h('p', { class: 'hint' }, 'Każdy członek zarządu dostaje osobną uchwałę. Jeśli jest też wspólnikiem, nie głosuje nad własnym absolutorium (art. 244 KSH) – liczba głosów policzy się sama.'),
         personRows(p.board, 'board')),
-      h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Zgromadzenie')),
+      h('section', { class: 'card section' }, head2('Zgromadzenie', HELP.meeting),
         h('div', { class: 'form-grid' },
           inp(p, 'period_from', 'Rok obrotowy od', { type: 'date' }), inp(p, 'period_to', 'Rok obrotowy do', { type: 'date' }),
           inp(p, 'meeting_date', 'Data zgromadzenia', { type: 'date' }), inp(p, 'time', 'Godzina (opcjonalnie)', { ph: 'np. 10:00' }),
@@ -197,7 +227,7 @@ async function renderEditor(main, id) {
           !sole && p.convening === 'zwolane' ? inp(p, 'convened_on', 'Data wysłania zawiadomień', { type: 'date' }) : null,
           sole ? null : chairInp, sole ? null : inp(p, 'chair_g', 'Forma', { type: 'select', opts: { m: 'Przewodniczący', k: 'Przewodnicząca' } }),
           sole ? null : recInp, sole ? null : inp(p, 'recorder_g', 'Forma', { type: 'select', opts: { m: 'Protokolant', k: 'Protokolantka' } }))),
-      h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Sprawozdanie finansowe')),
+      h('section', { class: 'card section' }, head2('Sprawozdanie finansowe', HELP.fs),
         h('div', { class: 'form-grid' },
           inp(p, 'total', 'Suma bilansowa (zł)', { num: true, ph: 'np. 1250000,00' }),
           inp(p, 'result', 'Wynik finansowy netto (zł) – stratę wpisz z minusem', { num: true, ph: 'np. 84320,15 albo -12500,00', rebuild: true }),
@@ -240,7 +270,7 @@ async function renderEditor(main, id) {
   main.replaceChildren(
     h('a', { href: BASE, class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Wszystkie protokoły'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'Zatwierdzenie sprawozdania finansowego'), h('h1', { style: { marginTop: '6px' } }, p.company || 'Nowy protokół ZZW'),
+      h('div', {}, h('p', { class: 'eyebrow' }, 'Zatwierdzenie sprawozdania finansowego'), h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, p.company || 'Nowy protokół ZZW', infoTip(HELP.all, 'Zatwierdzenie sprawozdania – instrukcja')),
         h('p', { class: 'sub' }, 'Zgromadzenie odbywa się w ciągu 6 miesięcy po zakończeniu roku obrotowego (art. 231 § 1 KSH); sprawozdanie z uchwałą składa się do KRS w ciągu 15 dni od zatwierdzenia.'))),
     box,
     h('div', { class: 'savebar' }, saveInfo,

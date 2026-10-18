@@ -31,6 +31,16 @@ function boxComb(page, edges, top, bottom, chars) {
 const NIP_COMB = '└' + '────┴'.repeat(10) + '────┘';
 const DATE_COMB = '└────┴────┘-└────┴────┘-└────┴────┴────┴────┘';
 
+// adres do doręczeń / kontakt pełnomocnika: doradca → biuro RKDP; pracownik → wg „Mój profil”
+export function deliveryOf(p = {}) {
+  if (p.mode === 'doradca' || p.delivery === 'biuro') return RKDP_DELIVERY;
+  return p.delivery && typeof p.delivery === 'object' ? p.delivery : null;
+}
+export function contactOf(p = {}) {
+  if (p.mode === 'doradca') return RKDP_CONTACT;
+  return { phone: p.phone || '', email: p.email || '' };
+}
+
 // ============ UPL-1(6) ============
 export function upl1Defaults({ client = {}, reps = '' } = {}) {
   const a = parseAddress(client.address);
@@ -60,20 +70,20 @@ export function upl1Items(d, p = {}) {
   at(1, 54.7, 438.3, d.c_commune); at(1, 184.3, 438.3, d.c_street, { w: 270 }); at(1, 457.9, 438.3, d.c_house); at(1, 515.5, 438.3, d.c_flat);
   at(1, 54.7, 459.3, d.c_city, { w: 220 }); at(1, 277.9, 459.3, d.c_zip); at(1, 393.1, 459.3, d.c_post, { w: 170 });
   at(1, 54.7, 498.5, d.client_phone, { keep: true }); at(1, 54.7, 520.4, d.client_email, { keep: true });
-  // C – pełnomocnik
+  // C – pełnomocnik (doradca: dane z ustawień; pracownik: dane z „Mój profil”)
   const sn = splitName(p.full_name);
-  if (p.mode === 'doradca') {
-    if (p.nip) { it.push(...glyphComb(1, 223.4, 391.5, 605.8, NIP_COMB, digits(p.nip))); it.push({ page: 1, x: 165.2, y: 600.0, line: 45.4 }); }
-    at(1, 54.7, 617.9, sn.last); at(1, 313.9, 617.9, sn.first);
-    at(1, 319.0, 685.9, p.ae_address, { keep: true, size: 8 });
-    const M = RKDP_DELIVERY;
+  if (p.nip) { it.push(...glyphComb(1, 223.4, 391.5, 605.8, NIP_COMB, digits(p.nip))); it.push({ page: 1, x: 165.2, y: 600.0, line: 45.4 }); }
+  else if (p.pesel) { it.push(...glyphComb(1, 223.4, 391.5, 605.8, NIP_COMB, digits(p.pesel))); it.push({ page: 1, x: 146.6, y: 600.0, line: 12.4 }); }
+  if (p.full_name) { at(1, 54.7, 617.9, sn.last); at(1, 313.9, 617.9, sn.first); }
+  if (p.ae_address) at(1, 319.0, 685.9, p.ae_address, { keep: true, size: 8 });
+  const M = deliveryOf(p);
+  if (M) {
     at(2, 50.4, 62.5, M.country); at(2, 162.0, 62.5, M.voiv); at(2, 392.4, 62.5, M.county);
     at(2, 50.4, 86.5, M.commune); at(2, 187.2, 86.5, M.street); at(2, 453.6, 86.5, M.house); at(2, 511.2, 86.5, M.flat);
     at(2, 50.4, 110.5, M.city); at(2, 273.6, 110.5, M.zip); at(2, 360.0, 110.5, M.post);
-    at(2, 50.4, 158.6, RKDP_CONTACT.phone, { keep: true }); at(2, 50.4, 181.7, RKDP_CONTACT.email, { keep: true });
-  } else if (p.full_name) {
-    at(1, 54.7, 617.9, sn.last); at(1, 313.9, 617.9, sn.first);
   }
+  const C = contactOf(p);
+  at(2, 50.4, 158.6, C.phone, { keep: true }); at(2, 50.4, 181.7, C.email, { keep: true });
   // D – okres
   if (d.valid_from) it.push(...glyphComb(2, 170.0, 302.5, 238.6, DATE_COMB, dmy(d.valid_from)));
   if (d.valid_to) it.push(...glyphComb(2, 429.2, 561.7, 238.6, DATE_COMB, dmy(d.valid_to)));
@@ -133,13 +143,15 @@ export function pelItems(d, p = {}) {
   // pełnomocnik (str. 2)
   const sn = splitName(p.full_name);
   if (p.full_name) { box(2, 238.6, 313.0, 552.5, 330.7, sn.first); box(2, 238.6, 339.8, 552.5, 357.6, sn.last); }
-  if (d.p_pesel) it.push(...boxComb(2, PEL.pesel, 215.0, 232.8, digits(d.p_pesel)));
-  if (p.mode === 'doradca') {
-    const M = RKDP_DELIVERY;
+  const pesel = d.p_pesel || p.pesel;
+  if (pesel) it.push(...boxComb(2, PEL.pesel, 215.0, 232.8, digits(pesel)));
+  const M = deliveryOf(p);
+  if (M) {
     box(2, 238.6, 366.2, 552.5, 384.0, M.street); box(2, 238.6, 393.1, 310.1, 410.9, M.house); box(2, 399.4, 393.1, 470.9, 410.9, M.flat);
     box(2, 238.6, 420.0, 310.1, 437.8, M.zip); box(2, 399.4, 420.0, 552.5, 437.8, M.city);
-    if (RKDP_CONTACT.phone) box(2, 238.6, 482.4, 552.5, 500.2, RKDP_CONTACT.phone, { keep: true });
   }
+  const C = contactOf(p);
+  if (C.phone) box(2, 238.6, 482.4, 552.5, 500.2, C.phone, { keep: true });
   // zakres
   if (d.scope_all) check(2, 42.7, 557.8);
   if (d.scope_pit) check(2, 42.7, 637.0);

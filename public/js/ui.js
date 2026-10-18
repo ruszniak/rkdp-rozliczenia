@@ -96,6 +96,7 @@ export function initTooltips() {
     const text = target.getAttribute('data-tip');
     if (!text) return;
     tipEl.textContent = text;
+    tipEl.classList.toggle('wide', target.hasAttribute('data-tip-wide'));
     tipEl.hidden = false;
     const r = target.getBoundingClientRect();
     const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
@@ -111,6 +112,12 @@ export function initTooltips() {
   });
   document.addEventListener('focusin', (e) => { const t = e.target.closest?.('[data-tip]'); if (t) show(t); });
   ['scroll', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { tipEl.hidden = true; }, true));
+}
+
+// Ikonka „i” z instrukcją: podpowiedź po najechaniu, pełna treść w okienku po kliknięciu (też na telefonie)
+export function infoTip(text, title = 'Jak to działa') {
+  return h('button', { type: 'button', class: 'info-i', 'aria-label': title, 'data-tip': text, 'data-tip-wide': '',
+    onclick: (e) => { e.preventDefault(); e.stopPropagation(); modal(title, h('div', { class: 'info-body' }, text), close => [h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Rozumiem')]); } }, 'i');
 }
 
 // Okno dialogowe (wspólne): actions(close) zwraca listę przycisków
