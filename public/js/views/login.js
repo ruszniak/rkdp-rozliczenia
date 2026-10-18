@@ -2,7 +2,14 @@ import { h } from '../ui.js';
 import { sb } from '../store.js';
 import { deviceToken, saveDeviceToken, deviceLabel, markActive } from '../session.js';
 
-const MIN_PASSWORD = 12;
+const MIN_PASSWORD = 10;
+const PW_RULES = [
+  [`co najmniej ${MIN_PASSWORD} znaków`, pw => pw.length >= MIN_PASSWORD],
+  ['litera', pw => /[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(pw)],
+  ['cyfra', pw => /\d/.test(pw)],
+  ['znak specjalny (np. ! ? # @ - _ .)', pw => /[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s]/.test(pw)],
+];
+const PW_TEXT = `co najmniej ${MIN_PASSWORD} znaków, litery, cyfry i znak specjalny`;
 
 function plError(err) {
   const m = (err?.message || '').toLowerCase();
@@ -15,7 +22,7 @@ function plError(err) {
     return 'Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.';
   if (m.includes('najpierw podaj hasło')) return 'Minęło za dużo czasu od podania hasła. Zaloguj się jeszcze raz.';
   if (m.includes('same_password') || m.includes('different from the old')) return 'Nowe hasło musi się różnić od poprzedniego.';
-  if (m.includes('weak') || m.includes('at least')) return `Hasło jest za słabe – użyj co najmniej ${MIN_PASSWORD} znaków, liter i cyfr.`;
+  if (m.includes('weak') || m.includes('at least')) return `Hasło jest za słabe – wymagane: ${PW_TEXT}.`;
   if (m.includes('expired') || m.includes('invalid') || m.includes('token'))
     return 'Kod jest nieprawidłowy albo wygasł. Wyślij nowy kod.';
   return 'Nie udało się: ' + (err?.message || 'spróbuj ponownie');
@@ -133,10 +140,19 @@ export async function renderLogin(app, initialError = '') {
     const p1 = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', required: true, placeholder: `Nowe hasło (min. ${MIN_PASSWORD} znaków)`, 'aria-label': 'Nowe hasło' });
     const p2 = h('input', { class: 'input', type: 'password', autocomplete: 'new-password', required: true, placeholder: 'Powtórz hasło', 'aria-label': 'Powtórz hasło' });
     const btn = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Ustaw hasło i zaloguj');
+    const items = PW_RULES.map(([label]) => h('li', {}, label));
+    const same = h('li', {}, 'oba hasła takie same');
+    const rules = h('ul', { class: 'pw-rules', 'aria-live': 'polite' }, ...items, same);
+    const check = () => {
+      PW_RULES.forEach(([, ok], i) => items[i].classList.toggle('ok', ok(p1.value)));
+      same.classList.toggle('ok', !!p1.value && p1.value === p2.value);
+      errBox.textContent = '';
+    };
+    p1.addEventListener('input', check); p2.addEventListener('input', check);
     const form = h('form', { class: 'login-box', style: { gap: '14px' }, onsubmit: async (e) => {
       e.preventDefault();
       const pw = p1.value;
-      if (pw.length < MIN_PASSWORD || !/[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(pw) || !/\d/.test(pw)) { errBox.textContent = `Hasło musi mieć co najmniej ${MIN_PASSWORD} znaków, w tym litery i cyfry.`; return; }
+      if (!PW_RULES.every(([, ok]) => ok(pw))) { errBox.textContent = `Hasło musi mieć ${PW_TEXT}.`; return; }
       if (pw.toLowerCase().includes(email.split('@')[0].split('.')[0])) { errBox.textContent = 'Hasło nie może zawierać Twojego imienia z adresu e-mail.'; return; }
       if (pw !== p2.value) { errBox.textContent = 'Hasła nie są takie same.'; return; }
       busy(btn, true, 'Zapisywanie…'); errBox.textContent = '';
@@ -146,9 +162,9 @@ export async function renderLogin(app, initialError = '') {
       if (e2) { await sb.auth.signOut({ scope: 'local' }); errBox.textContent = 'Hasło ustawione. Zaloguj się nim.'; stepPassword(); return; }
       if (data?.device_token) saveDeviceToken(email, data.device_token);
       go();
-    } }, p1, p2, btn);
+    } }, p1, p2, rules, btn);
     box.replaceChildren(...head('Krok 3 z 3', 'Nowe hasło',
-      `Co najmniej ${MIN_PASSWORD} znaków, litery i cyfry. Najlepiej kilka słów lub hasło z menedżera haseł. Nie używaj hasła z innych serwisów.`),
+      'Wymyśl własne hasło – nikt inny go nie zna, także administrator. Nie używaj hasła z innych serwisów.'),
       form, errBox);
     p1.focus();
   }
