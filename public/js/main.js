@@ -5,6 +5,7 @@ import { renderRozliczenia } from './views/rozliczenia.js';
 import { renderKlienci } from './views/klienci.js';
 import { renderSprawozdania } from './views/sprawozdania.js';
 import { renderProfil } from './views/profil.js';
+import { renderObecnosc } from './views/obecnosc.js';
 import { renderZgloszenia } from './views/zgloszenia.js';
 import { renderPulpit } from './views/pulpit.js';
 import { renderOferty } from './views/oferty.js';
@@ -88,6 +89,7 @@ function layout(active) {
         ...M.tabs.map(link),
         me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
       h('div', { class: 'nav-user' },
+        (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
         h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
         h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, initials(me.full_name)),
         h('button', { class: 'btn btn-ghost btn-sm logout', onclick: logout, 'aria-label': 'Wyloguj' }, (() => { const i = h('span', { class: 'logout-ico', 'aria-hidden': 'true' }); i.innerHTML = TAB_ICONS.logout; return i; })(), h('span', { class: 'logout-txt' }, 'Wyloguj')))));
@@ -127,7 +129,8 @@ async function route() {
   const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'pulpit' : 'doradztwo');
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');
   try {
-    if (view === 'profil') cleanup = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
+    if (view === 'obecnosc') cleanup = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
+    else if (view === 'profil') cleanup = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
     else if (view === 'doradztwo' && hasModule('doradztwo')) cleanup = await renderM2(layout(m2key), parts, params);
     else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
