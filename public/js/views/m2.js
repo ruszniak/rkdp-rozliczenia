@@ -11,6 +11,8 @@ import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
+import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
+import { modal as uiModal } from '../ui.js';
 
 const BASE = '#/doradztwo';
 const members = () => state.members.filter(m => m.active && (m.modules || []).includes('doradztwo'));
@@ -474,7 +476,7 @@ async function viewMatter(main, id, params) {
     [statusPill(m.status), reportBtn, poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
-  h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, timeCard, ordersCard)));
+  h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, clientTicketsBox(client || { id: m.client_id }, { module: 'm2', matter: m }), timeCard, ordersCard)));
 }
 
 // ================= KLIENCI =================
@@ -583,7 +585,7 @@ async function viewClient(main, id) {
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · ')),
-    h('div', { class: 'two' }, form, h('div', {}, mattersCard, contactsCard, ordersCard)));
+    h('div', { class: 'two' }, form, h('div', {}, mattersCard, clientTicketsBox(c, { module: 'm2' }), contactsCard, ordersCard)));
 }
 
 // ================= KALENDARZ =================
@@ -642,18 +644,69 @@ async function viewCalendar(main, params) {
   let gsrc = settings.m2_google_calendar_src || '';
   const gid = /^https?:/.test(gsrc) ? (new URL(gsrc).searchParams.get('src') || '') : gsrc;
   const gOpen = gid ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(gid)}` : null;
-  const google = gInfo ? h('section', { class: 'card section', style: { marginTop: '18px' } },
-    h('div', { class: 'section-head' }, h('h2', {}, 'Kalendarz Google M2 TAX'), gOpen ? h('a', { class: 'btn btn-ghost btn-sm', href: gOpen, target: '_blank', rel: 'noopener' }, 'Otwórz w Google') : null),
-    h('p', { class: 'hint' }, gInfo.off ? `Kalendarz Google nie jest jeszcze podłączony: ${gInfo.reason || ''} ${isAdmin() ? 'Instrukcja: Zespół i ustawienia → M2 TAX → Kalendarz Google.' : ''}` : `Nie udało się pobrać wydarzeń z Google: ${gInfo.error}`)) : null;
-  main.replaceChildren(...header('kalendarz', 'Kalendarz terminów', 'Kliknij dwukrotnie dzień, aby dodać termin.',
+  const zoho = settings.m2_zoho_bookings_url || '';
+
+  // ---- agenda: najbliższe 14 dni (terminy z aplikacji + Kalendarz Google) ----
+  const agTo = addDaysIso(13);
+  const [agDl, agG] = await Promise.all([
+    fetchAll(() => sb.from('m2_deadlines').select('*').gte('due_date', today).lte('due_date', agTo).order('due_date')),
+    gInfo ? Promise.resolve([]) : sb.functions.invoke('gcal', { body: { action: 'list', from: today, to: agTo } }).then(r => r.data?.events || [], () => []),
+  ]);
+  const lateDl = await fetchAll(() => sb.from('m2_deadlines').select('*').eq('done', false).lt('due_date', today).order('due_date'));
+  const agenda = new Map();
+  const put = (day, item) => { if (!agenda.has(day)) agenda.set(day, []); agenda.get(day).push(item); };
+  agDl.forEach(d => put(d.due_date, { t: d.due_time ? d.due_time.slice(0, 5) : '', dl: d }));
+  agG.forEach(e => { const day = e.allDay ? e.start : iso(new Date(e.start)); if (day >= today && day <= agTo) put(day, { t: e.allDay ? '' : gTime(e).trim(), g: e }); });
+  const dayName = k => { const d = new Date(k + 'T00:00:00'); const n = Math.round((d - new Date(today + 'T00:00:00')) / 86400000);
+    return (n === 0 ? 'Dziś' : n === 1 ? 'Jutro' : d.toLocaleDateString('pl-PL', { weekday: 'long' })) + ', ' + d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' }); };
+  const agItem = it => {
+    if (it.g) return h('a', { class: 'ag-item g', href: it.g.link || null, target: '_blank', rel: 'noopener' },
+      h('span', { class: 'ag-time' }, it.t || 'cały dzień'), h('span', { class: 'ag-dot', style: { background: '#4285F4' } }),
+      h('span', { class: 'ag-main' }, h('b', {}, it.g.title), h('span', { class: 'small muted' }, ['Kalendarz Google', it.g.location].filter(Boolean).join(' · '))),
+      it.g.meet ? h('span', { class: 'badge' }, 'Meet') : null);
+    const d = it.dl, k = DEADLINE_KIND[d.kind] || DEADLINE_KIND.wewnetrzny, m = d.matter_id ? mmAll.get(d.matter_id) : null;
+    return h(m ? 'a' : 'div', { class: 'ag-item' + (d.done ? ' done' : ''), href: m ? `${BASE}/sprawa/${m.id}` : null },
+      h('span', { class: 'ag-time' }, it.t || '—'), h('span', { class: 'ag-dot', style: { background: k.color } }),
+      h('span', { class: 'ag-main' }, h('b', {}, d.title), h('span', { class: 'small muted' }, [k.label, m ? `${m.number} · ${m.title}` : null, d.assignee_id ? who(d.assignee_id) : null].filter(Boolean).join(' · '))),
+      d.done ? h('span', { class: 'badge ok' }, 'wykonany') : null);
+  };
+  const mmAll = new Map(matters.map(m => [m.id, m]));
+  const agendaCard = h('section', { class: 'card section' },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Najbliższe 14 dni'), h('span', { class: 'small muted' }, 'terminy i spotkania')),
+    lateDl.length ? h('div', { class: 'ag-day late' }, h('div', { class: 'ag-date' }, `Zaległe terminy (${lateDl.length})`),
+      ...lateDl.slice(0, 8).map(d => agItem({ t: fmtDate(d.due_date).slice(0, 5), dl: d }))) : null,
+    ...([...agenda.keys()].sort().map(k => h('div', { class: 'ag-day' + (k === today ? ' today' : '') }, h('div', { class: 'ag-date' }, dayName(k)),
+      ...agenda.get(k).sort((a, b) => (a.t || '00:00').localeCompare(b.t || '00:00')).map(agItem)))),
+    !agenda.size && !lateDl.length ? h('p', { class: 'hint' }, 'Brak terminów i spotkań w najbliższych dwóch tygodniach.') : null);
+
+  // ---- spotkania (Zoho Bookings) ----
+  const bookDialog = () => uiModal('Umów spotkanie – Zoho Bookings', h('div', {},
+    h('iframe', { class: 'zoho', src: zoho, title: 'Zoho Bookings M2 TAX', loading: 'lazy' }),
+    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Rezerwacja trafi do kalendarza doradcy w Google (gdy Zoho jest połączone z Kalendarzem Google) i pokaże się tutaj na niebiesko.')),
+  close => [h('a', { class: 'btn btn-ghost btn-sm', href: zoho, target: '_blank', rel: 'noopener' }, 'Otwórz w nowej karcie'), h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij')], { wide: true });
+  const meetCard = h('section', { class: 'card section meet-card' },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Spotkania z klientami')),
+    h('p', { class: 'small', style: { marginBottom: '12px' } }, 'Klienci umawiają się sami przez Zoho Bookings (link na stronie m2tax.pl). Spotkanie umówione telefonicznie wpisz tutaj w imieniu klienta.'),
+    zoho ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+      h('button', { class: 'btn btn-primary btn-sm', onclick: bookDialog }, icon('plus'), 'Umów spotkanie'),
+      h('button', { class: 'btn btn-outline btn-sm', onclick: () => { navigator.clipboard?.writeText(zoho).then(() => toast('Skopiowano link do rezerwacji')); } }, 'Kopiuj link dla klienta'))
+      : h('p', { class: 'hint' }, 'Brak adresu Zoho Bookings – ustaw go w Zespół i ustawienia.'),
+    h('div', { class: 'meet-sep' }),
+    h('p', { class: 'small', style: { marginBottom: '8px' } }, h('b', {}, 'Kalendarz Google M2 TAX')),
+    gInfo ? h('p', { class: 'hint' }, gInfo.off ? `Niepodłączony: ${gInfo.reason || ''} ${isAdmin() ? 'Instrukcja: Zespół i ustawienia → Kalendarz Google.' : ''}` : `Nie udało się pobrać wydarzeń: ${gInfo.error}`)
+      : h('p', { class: 'hint' }, 'Połączony – spotkania i wydarzenia z Google widać na niebiesko, a terminy z aplikacji trafiają do Google automatycznie.'),
+    gOpen ? h('a', { class: 'btn btn-ghost btn-sm', href: gOpen, target: '_blank', rel: 'noopener', style: { marginTop: '6px', paddingLeft: 0 } }, 'Otwórz Kalendarz Google →') : null);
+
+  main.replaceChildren(...header('kalendarz', 'Kalendarz i spotkania', 'Terminy spraw, spotkania z klientami i Kalendarz Google w jednym miejscu. Kliknij dwukrotnie dzień, aby dodać termin.',
     [h('a', { class: 'icon-btn', href: `${BASE}/kalendarz?m=${shift(-1)}`, 'aria-label': 'Poprzedni miesiąc' }, icon('left')),
       h('span', { class: 'month' }, h('span', { class: 'label' }, MONTHS[mo - 1][0].toUpperCase() + MONTHS[mo - 1].slice(1) + ' ' + y)),
       h('a', { class: 'icon-btn', href: `${BASE}/kalendarz?m=${shift(1)}`, 'aria-label': 'Następny miesiąc' }, icon('right')),
-      h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewCalendar(main, params) }) }, icon('plus'), 'Termin')]),
+      zoho ? h('button', { class: 'btn btn-outline btn-sm', onclick: bookDialog }, 'Umów spotkanie') : null,
+      h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewCalendar(main, params) }) }, icon('plus'), 'Termin')].filter(Boolean)),
   h('div', { class: 'legend' }, ...Object.values(DEADLINE_KIND).map(k => h('span', {}, h('span', { class: 'dot', style: { background: k.color } }), k.label)),
-    gInfo ? null : h('span', {}, h('span', { class: 'dot', style: { background: '#4285F4' } }), 'Kalendarz Google'),
-    gInfo || !gOpen ? null : h('a', { href: gOpen, target: '_blank', rel: 'noopener', class: 'small' }, 'Otwórz w Google →')),
-  h('div', { class: 'cal-wrap' }, grid), ...(google ? [google] : []));
+    gInfo ? null : h('span', {}, h('span', { class: 'dot', style: { background: '#4285F4' } }), 'Kalendarz Google (spotkania, Zoho)')),
+  h('div', { class: 'cal-layout' }, h('div', { class: 'cal-wrap' }, grid), h('div', { class: 'cal-side' }, meetCard)),
+  agendaCard);
 }
 
 // ================= ZLECENIA I UMOWY =================
@@ -1133,17 +1186,6 @@ async function viewOrder(main, id, params) {
   h('div', { class: 'order-layout' }, h('div', {}, h('section', { class: 'card section' }, formBox), mattersCard || ''), h('div', { class: 'paper-wrap' }, preview)));
 }
 
-// ================= SPOTKANIA (Zoho) =================
-async function viewMeetings(main) {
-  const s = await loadSettings();
-  const zoho = s.m2_zoho_bookings_url;
-  main.replaceChildren(...header('spotkania', 'Spotkania', 'Rezerwacje klientów przez Zoho Bookings.',
-    zoho ? h('a', { class: 'btn btn-outline btn-sm', href: zoho, target: '_blank', rel: 'noopener' }, 'Otwórz Zoho Bookings') : null),
-  zoho ? h('section', { class: 'card section' }, h('iframe', { class: 'zoho', src: zoho, title: 'Zoho Bookings M2 TAX', loading: 'lazy' }),
-    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Tu możesz umówić spotkanie w imieniu klienta (np. przez telefon). Zarezerwowane spotkania zobaczysz w kalendarzu Google M2 TAX w zakładce Kalendarz.'))
-    : h('div', { class: 'card empty' }, 'Brak adresu Zoho Bookings – ustaw go w Zespół i ustawienia.'));
-}
-
 // ================= ROUTER =================
 export async function renderM2(main, parts, params) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
@@ -1155,6 +1197,7 @@ export async function renderM2(main, parts, params) {
   if (sub === 'kalendarz') return viewCalendar(main, params);
   if (sub === 'zlecenia') return viewOrders(main, params);
   if (sub === 'zlecenie') return viewOrder(main, parts[2], params);
-  if (sub === 'spotkania') return viewMeetings(main);
+  if (sub === 'spotkania') { history.replaceState(null, '', `${BASE}/kalendarz`); return viewCalendar(main, params); }
+  if (sub === 'zgloszenia') return renderZgloszenia(main, parts[2], params, 'm2');
   return viewDashboard(main);
 }

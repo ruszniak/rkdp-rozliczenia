@@ -27,9 +27,9 @@ const MODULES = {
     tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/sprawozdania', 'Sprawozdania', 'sprawozdania']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
-      ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia'], ['#/doradztwo/spotkania', 'Spotkania', 'm2:spotkania']] },
+      ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/zgloszenia', 'Zgłoszenia', 'm2:zgloszenia'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']] },
 };
-const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', zlecenie: 'zlecenia' };
+const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', zlecenie: 'zlecenia', spotkania: 'kalendarz' };
 const remembered = () => { try { return localStorage.getItem('rkdp_module'); } catch { return null; } };
 const remember = m => { try { localStorage.setItem('rkdp_module', m); } catch { /* */ } };
 
@@ -46,11 +46,12 @@ const TAB_ICONS = {
   'm2:klienci': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.9-5 5.5-5s4.9 2 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.3.2 4 1.9 4.5 4.8"/></svg>',
   'm2:kalendarz': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   'm2:zlecenia': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="m10 15 2 2 4-4"/></svg>',
+  'm2:zgloszenia': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13h4l1.5 3h5L16 13h4"/><path d="M5.5 5h13L21 13v6H3v-6z"/></svg>',
   'm2:spotkania': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   'logout': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/></svg>',
   'default': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg>',
 };
-const TAB_SHORT = { rozliczenia: 'Rozliczenia', sprawozdania: 'Sprawozd.', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:spotkania': 'Spotkania' };
+const TAB_SHORT = { rozliczenia: 'Rozliczenia', sprawozdania: 'Sprawozd.', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:spotkania': 'Spotkania' };
 
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
 function layout(active) {

@@ -30,7 +30,7 @@ const HELP_ADMIN = `Pulpit doradcy – podsumowanie całego biura:
 async function loadData(period) {
   const pdate = period + '-01';
   const [tickets, clients, entries] = await Promise.all([
-    fetchAll(() => sb.from('rkdp_tickets').select('id,no,title,client_id,category,priority,status,due_date,assignee_id,created_by,done_at,done_by,updated_at').order('due_date')).catch(() => []),
+    fetchAll(() => sb.from('rkdp_tickets').select('id,no,title,client_id,category,priority,status,due_date,assignee_id,created_by,done_at,done_by,updated_at').eq('module', 'rkdp').order('due_date')).catch(() => []),
     fetchAll(() => sb.from('clients').select('id,name,status,legal_form,bookkeeping,accountant_id,hr_id').order('name')),
     fetchAll(() => sb.from('checklist_entries').select('client_id,task_code,status').eq('period', pdate)),
   ]);
