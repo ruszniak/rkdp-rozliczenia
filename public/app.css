@@ -42,7 +42,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .icon-btn:hover{border-color:var(--bronze);color:var(--bronze)}
 
 /* nagłówek */
-.site-header{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--line);contain:layout paint}
+.site-header{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid var(--line)}
 .nav{display:flex;align-items:center;justify-content:space-between;height:72px;gap:20px}
 .nav-brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:var(--ink)}
 .nav-brand img{height:40px;width:auto}
