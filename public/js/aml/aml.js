@@ -49,7 +49,22 @@ export async function ensureCase(module, clientId) {
   if (error) throw error;
   return data;
 }
+// listy sankcyjne odświeżane raz na dobę – każda osobnym wywołaniem (limit czasu funkcji)
+let listsReady = null;
+export function ensureLists() {
+  if (listsReady) return listsReady;
+  listsReady = (async () => {
+    const { data } = await sb.functions.invoke('aml', { body: { action: 'lists' } });
+    const have = Object.fromEntries((data?.lists || []).map(l => [l.source, l]));
+    for (const s of ['eu', 'un', 'pl']) {
+      const l = have[s];
+      if (!l || !l.entries || Date.now() - new Date(l.fetched_at) > 24 * 3600e3) await sb.functions.invoke('aml', { body: { action: 'refresh_lists', source: s } }).catch(() => {});
+    }
+  })().catch(() => { listsReady = null; });
+  return listsReady;
+}
 export async function runAuto(caseId, only) {
+  await ensureLists();
   const { data, error } = await sb.functions.invoke('aml', { body: { action: 'run', case_id: caseId, only } });
   if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch { /* */ } throw new Error(m); }
   if (data?.error) throw new Error(data.error);

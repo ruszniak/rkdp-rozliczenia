@@ -115,7 +115,7 @@ async function fetchList(src: string): Promise<string[]> {
     const lines = t.split(/\r?\n/); const sep = (lines[0].match(/;/g) || []).length > (lines[0].match(/,/g) || []).length ? ';' : ',';
     const head = splitCsv(lines[0], sep).map(h => h.toLowerCase());
     const cols = head.map((h, i) => /wholename/.test(h) ? i : -1).filter(i => i >= 0);
-    for (let i = 1; i < lines.length; i++) { const c = splitCsv(lines[i], sep); cols.forEach(ix => { const v = (c[ix] || '').trim(); if (v) names.add(v); }); }
+    for (let i = 1; i < lines.length; i++) { const l = lines[i]; if (!l) continue; const c = l.indexOf('"') >= 0 ? splitCsv(l, sep) : l.split(sep); cols.forEach(ix => { const v = (c[ix] || '').trim(); if (v) names.add(v); }); }
   } else if (src === 'un') {
     const d = xml.parse(t)?.CONSOLIDATED_LIST || {};
     for (const p of arr(d?.INDIVIDUALS?.INDIVIDUAL)) {
@@ -132,27 +132,29 @@ async function fetchList(src: string): Promise<string[]> {
   }
   return [...names].filter(n => n && n.length > 2);
 }
-async function ensureLists(admin: any) {
-  const { data } = await admin.from('sanctions_lists').select('source, fetched_at, entries, error');
-  const have = Object.fromEntries((data || []).map((x: any) => [x.source, x]));
-  const stale = (s: string) => !have[s] || !have[s].entries || Date.now() - new Date(have[s].fetched_at).getTime() > 24 * 3600 * 1000;
-  for (const s of Object.keys(SOURCES).filter(stale)) {
-    try {
-      const names = await fetchList(s);
-      if (names.length < 20) throw new Error('Pobrano zbyt mało pozycji – źródło mogło zmienić format.');
-      await admin.from('sanctions_lists').upsert({ source: s, fetched_at: new Date().toISOString(), entries: names.length, names, error: null });
-    } catch (e) {
-      await admin.from('sanctions_lists').upsert({ source: s, fetched_at: have[s]?.fetched_at || new Date(0).toISOString(), entries: have[s]?.entries || 0, ...(have[s] ? {} : { names: [] }), error: String(e) });
-    }
+// odświeżenie jednej listy (osobne wywołanie – limit czasu procesora funkcji); nazwy zapisujemy jako „wyświetlana\tznormalizowana”
+async function refreshList(admin: any, s: string) {
+  const { data: prev } = await admin.from('sanctions_lists').select('source, fetched_at, entries').eq('source', s).maybeSingle();
+  try {
+    const names = (await fetchList(s)).map(n => { const t = toks(n); return t.length ? `${n}\t${t.join(' ')}` : null; }).filter(Boolean);
+    if (names.length < 20) throw new Error('Pobrano zbyt mało pozycji – źródło mogło zmienić format.');
+    await admin.from('sanctions_lists').upsert({ source: s, fetched_at: new Date().toISOString(), entries: names.length, names, error: null });
+    return { source: s, entries: names.length };
+  } catch (e) {
+    await admin.from('sanctions_lists').upsert({ source: s, fetched_at: prev?.fetched_at || new Date(0).toISOString(), entries: prev?.entries || 0, ...(prev ? {} : { names: [] }), error: String(e) });
+    return { source: s, error: String(e) };
   }
-  const { data: all } = await admin.from('sanctions_lists').select('*');
-  return all || [];
+}
+async function loadLists(admin: any) {
+  const { data } = await admin.from('sanctions_lists').select('*');
+  return data || [];
 }
 function screen(lists: any[], candidates: string[]) {
   const C = candidates.filter(Boolean).map(c => ({ c, t: toks(c), n: toks(c).join(' ') })).filter(x => x.t.length);
   const hits: any[] = [];
-  for (const L of lists) for (const name of (L.names || [])) {
-    const et = toks(name); if (!et.length) continue; const en = et.join(' ');
+  for (const L of lists) for (const row of (L.names || [])) {
+    const tab = row.indexOf('\t'); const name = tab >= 0 ? row.slice(0, tab) : row; const en = tab >= 0 ? row.slice(tab + 1) : toks(row).join(' ');
+    if (!en) continue; const et = en.split(' ');
     for (const x of C) {
       const set = new Set(x.t);
       const match = en === x.n || (et.length >= 2 && et.every(w => set.has(w))) || (x.t.length >= 2 && et.length >= 2 && x.t.every(w => et.includes(w)));
@@ -181,6 +183,11 @@ Deno.serve(async (req: Request) => {
     if (body.action === 'lists') {
       const { data } = await admin.from('sanctions_lists').select('source, fetched_at, entries, error');
       return json({ lists: (data || []).map((x: any) => ({ ...x, label: SOURCES[x.source]?.label })) });
+    }
+    if (body.action === 'refresh_lists') {
+      const s = String(body.source || '');
+      if (!SOURCES[s]) return json({ error: 'Nieznana lista.' }, 400);
+      return json(await refreshList(admin, s));
     }
     if (body.action !== 'run') return json({ error: 'Nieznana operacja.' }, 400);
 
@@ -253,7 +260,7 @@ Deno.serve(async (req: Request) => {
     }
     if (want.has('sankcje')) {
       try {
-        const lists = await ensureLists(admin);
+        const lists = await loadLists(admin);
         const cands = [client.name, ...people,
           ...(crbrData?.companies || []).flatMap((c: any) => [...c.beneficiaries, ...c.reporters].map(fullName)),
           ...(krsData?.found ? [...krsData.board, ...krsData.shareholders, ...(krsData.partners || []), ...(krsData.proxies || [])].map(fullName) : [])]
@@ -261,8 +268,9 @@ Deno.serve(async (req: Request) => {
         const hits = screen(lists, cands);
         const srcInfo = lists.map((l: any) => ({ source: l.source, label: SOURCES[l.source]?.label, fetched_at: l.fetched_at, entries: l.entries, error: l.error }));
         const broken = srcInfo.filter(s => !s.entries);
-        add({ kind: 'sankcje', result: hits.length ? 'uwaga' : broken.length ? 'blad' : 'ok',
-          summary: hits.length ? `MOŻLIWE TRAFIENIE na liście sankcyjnej (${hits.length}) – wymaga ręcznej oceny.` : `Brak trafień. Sprawdzono ${cands.length} nazw na ${srcInfo.filter(s => s.entries).length} listach${broken.length ? ` (niedostępne: ${broken.map(b => b.label).join(', ')})` : ''}.`,
+        const stale = srcInfo.filter(s => s.entries && Date.now() - new Date(s.fetched_at).getTime() > 72 * 3600 * 1000);
+        add({ kind: 'sankcje', result: hits.length ? 'uwaga' : (broken.length || !srcInfo.length) ? 'blad' : 'ok',
+          summary: hits.length ? `MOŻLIWE TRAFIENIE na liście sankcyjnej (${hits.length}) – wymaga ręcznej oceny.` : `Brak trafień. Sprawdzono ${cands.length} nazw na ${srcInfo.filter(s => s.entries).length} listach${broken.length ? ` (niedostępne: ${broken.map(b => b.label).join(', ')})` : ''}${stale.length ? ` (nieaktualne ponad 3 dni: ${stale.map(b => b.label).join(', ')})` : ''}.`,
           data: { candidates: cands, hits, lists: srcInfo } });
       } catch (e) { add({ kind: 'sankcje', result: 'blad', summary: String(e) }); }
     }
