@@ -7,7 +7,7 @@ import { orderHtml, printableHtml, buildOrderDocx, ORDER_CSS } from '../m2/order
 
 const HELP = `Wzory pism procesowych M2 TAX na papierze firmowym:
 • Wybierz rodzaj pisma, pełnomocnika (Marcin, Michał albo obaj) i – opcjonalnie – sprawę lub klienta. Dane strony, organ i sygnatura wpiszą się same.
-• Nazwisko i numer wpisu wybranego pełnomocnika pojawiają się w nagłówku papieru firmowego, w danych pełnomocnika i w podpisie.
+• Wybrany pełnomocnik pojawia się pod danymi strony („reprezentowana przez Doradcę Podatkowego …”) i w podpisie. Nagłówek to papier firmowy M2 TAX.
 • Miejsca do uzupełnienia są oznaczone [w nawiasach] – w Wordzie mają żółte wyróżnienie, więc łatwo je znaleźć i dopisać treść.
 • „Pobierz Word” – dalsza praca nad pismem poza aplikacją. „PDF” – szybki wydruk.
 • Organ podaj tak, jak ma się znaleźć w adresie (np. „Naczelnik Pierwszego Urzędu Skarbowego we Wrocławiu”), a organ, który wydał akt – w dopełniaczu (np. „Naczelnika Pierwszego Urzędu Skarbowego we Wrocławiu”).`;

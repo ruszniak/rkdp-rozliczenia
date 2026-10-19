@@ -305,7 +305,7 @@ export function pismoBlocks(type, d, signers) {
   const fem = /\b(sp\.|spółka|s\.a\.|fundacja|spółdzielnia)/i.test(c.name || '') || c.kind === 'firma';
   // pisma do sądu: oznaczenie roli strony (Skarżący); do urzędu – same dane strony
   B.push({ t: 'party', label: T.court ? T.party : null, lines: [c.name || '[imię i nazwisko / nazwa]', c.address || '[adres]', idLine] });
-  B.push({ t: 'party', lead: `${fem ? 'reprezentowana' : 'reprezentowany'} przez`, bold: sg.map((_, i) => i + 1), lines: [
+  B.push({ t: 'party', lead: `${fem ? 'reprezentowana' : 'reprezentowany'} przez`, bold: [0, ...sg.map((_, i) => i + 1)], lines: [
     many ? 'Doradców Podatkowych' : 'Doradcę Podatkowego',
     ...sg.map(s => s.name_acc || accName(s.full_name)),
     FIRM.address,
@@ -327,10 +327,7 @@ export function pismoBlocks(type, d, signers) {
   return B;
 }
 
-// papier firmowy z nazwiskiem wybranego pełnomocnika w nagłówku
-export function pismoBrand(signers) {
-  const sg = signers.filter(Boolean);
-  const top = sg.length === 1 ? `${sg[0].full_name} · doradca podatkowy nr ${sg[0].license_no || '[……]'}`
-    : sg.length > 1 ? `${sg.map(s => `${s.full_name} (nr ${s.license_no || '…'})`).join(' · ')} – doradcy podatkowi` : null;
-  return { ...M2_BRAND, lines: [top, ...M2_BRAND.lines].filter(Boolean) };
+// papier firmowy M2 TAX (bez nazwisk pełnomocników w nagłówku)
+export function pismoBrand() {
+  return M2_BRAND;
 }
