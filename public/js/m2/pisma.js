@@ -307,7 +307,7 @@ export function pismoBlocks(type, d, signers) {
   B.push({ t: 'party', label: T.court ? T.party : null, lines: [c.name || '[imię i nazwisko / nazwa]', c.address || '[adres]', idLine] });
   B.push({ t: 'party', lead: `${fem ? 'reprezentowana' : 'reprezentowany'} przez`, bold: sg.map((_, i) => i + 1), lines: [
     many ? 'Doradców Podatkowych' : 'Doradcę Podatkowego',
-    ...sg.map(s => `${s.name_acc || accName(s.full_name)} (nr wpisu ${s.license_no || '[……]'})`),
+    ...sg.map(s => s.name_acc || accName(s.full_name)),
     FIRM.address,
     !many && sg[0].ae_address ? `adres do doręczeń elektronicznych: ${sg[0].ae_address}` : null,
   ].filter(Boolean) });
