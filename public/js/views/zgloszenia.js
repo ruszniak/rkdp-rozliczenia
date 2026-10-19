@@ -88,7 +88,12 @@ function fieldsGrid(t, ctx, onChange = () => {}) {
     mk('source', 'Skąd zgłoszenie', sel(TK_SOURCE)));
 }
 
-const loadClients = () => fetchAll(() => sb.from(cur.clientTable).select('id, name').order('name'));
+const clientCache = new Map();
+const loadClients = () => {
+  const k = cur.clientTable, hit = clientCache.get(k);
+  if (hit && Date.now() - hit.t < 120000) return Promise.resolve(hit.rows);
+  return fetchAll(() => sb.from(k).select('id, name').order('name')).then(rows => { clientCache.set(k, { t: Date.now(), rows }); return rows; });
+};
 const loadCtx = async () => {
   const [clients, matters] = await Promise.all([loadClients(), cur.key === 'm2' ? fetchAll(() => sb.from('m2_matters').select('id, number, title, client_id').order('opened_at', { ascending: false })) : Promise.resolve([])]);
   return { clients, matters };
@@ -121,7 +126,13 @@ export async function newTicketDialog({ client = null, matter = null, module = '
 }
 
 // ---------- lista ----------
-export const generateRecurring = () => sb.rpc('rkdp_generate_recurring').then(r => r.data || 0, () => 0);
+// zadania cykliczne sprawdzamy najwyżej co 10 minut (nie przy każdym przełączeniu zakładki)
+let lastGen = 0;
+export const generateRecurring = () => {
+  if (Date.now() - lastGen < 10 * 60000) return Promise.resolve(0);
+  lastGen = Date.now();
+  return sb.rpc('rkdp_generate_recurring').then(r => r.data || 0, () => 0);
+};
 
 export async function renderZgloszenia(main, id, params, module = 'rkdp') {
   setMod(module);
@@ -130,11 +141,11 @@ export async function renderZgloszenia(main, id, params, module = 'rkdp') {
   const created = await generateRecurring();
   if (created) toast(`Utworzono zgłoszenia cykliczne: ${created}`);
   const [tickets, clients] = await Promise.all([
-    fetchAll(() => sb.from('rkdp_tickets').select('*').eq('module', cur.key).order('created_at', { ascending: false })),
+    fetchAll(() => sb.from('rkdp_tickets').select('*, rkdp_ticket_files(count)').eq('module', cur.key).order('created_at', { ascending: false })),
     loadClients(),
   ]);
   const cname = Object.fromEntries(clients.map(c => [c.id, c.name]));
-  const fileCount = await countFiles(tickets.map(t => t.id));
+  const fileCount = Object.fromEntries(tickets.map(t => [t.id, t.rkdp_ticket_files?.[0]?.count || 0]));
   const me = state.me.id;
   const F = {
     otwarte: ['Otwarte', t => TK_OPEN.includes(t.status)],

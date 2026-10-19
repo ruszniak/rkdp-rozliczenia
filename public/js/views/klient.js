@@ -1,5 +1,5 @@
 import { h, toast, fail, fmtDateTime, periodLabel, shiftPeriod, defaultPeriod } from '../ui.js';
-import { sb, state, memberById, canEditClients, isAdmin, activeTasks } from '../store.js';
+import { sb, state, memberById, canEditClients, isAdmin, activeTasks, hasModule } from '../store.js';
 import { LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, CIT_ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS, CLIENT_STATUS,
   STATUS, FIELD_LABELS, isCompany, isPartnership } from '../dict.js';
 import { completeness } from './klienci.js';
@@ -104,7 +104,8 @@ export async function renderKlient(main, id) {
   if (error) throw error;
   if (!c) { main.replaceChildren(h('div', { class: 'card empty' }, 'Nie znaleziono klienta albo nie masz do niego dostępu.')); return; }
 
-  const editable = canEditClients();
+  // pełny dostęp – wszystko; pracownik z ograniczonym dostępem – dane swoich klientów (bez przypisań, pilnuje tego baza)
+  const editable = canEditClients() || hasModule('rozliczenia');
   const draft = { ...c };
   let partnerList = (partners || []).map(p => ({ ...p }));
   const removedPartners = [];
@@ -168,7 +169,7 @@ export async function renderKlient(main, id) {
   // ---------- przypisania ----------
   const assigned = new Set((assigns || []).map(a => a.member_id));
   const roleSelect = (field, label) => {
-    const sel = h('select', { class: 'select', disabled: !editable },
+    const sel = h('select', { class: 'select', disabled: !canEditClients() },
       h('option', { value: '' }, '— nie przypisano —'),
       state.members.filter(m => m.active).map(m => h('option', { value: m.id }, m.full_name)));
     sel.value = c[field] || '';
@@ -247,11 +248,13 @@ export async function renderKlient(main, id) {
     if (!draft.name?.trim()) { toast('Nazwa jest wymagana', true); return; }
     saveBtn.disabled = true; saveInfo.textContent = 'Zapisywanie…';
     const patch = {};
-    for (const k of Object.keys(draft)) if (!['id', 'created_at', 'updated_at'].includes(k) && draft[k] !== c[k]) patch[k] = draft[k];
+    const locked = canEditClients() ? [] : ['accountant_id', 'hr_id'];
+    for (const k of Object.keys(draft)) if (!['id', 'created_at', 'updated_at', ...locked].includes(k) && draft[k] !== c[k]) patch[k] = draft[k];
     try {
       if (Object.keys(patch).length) {
-        const { error: e } = await sb.from('clients').update(patch).eq('id', id);
+        const { data: upd, error: e } = await sb.from('clients').update(patch).eq('id', id).select('id');
         if (e) throw e;
+        if (!upd?.length) throw new Error('Brak uprawnień do zmiany danych tego klienta.');
         Object.assign(c, patch);
       }
       for (const pid of removedPartners.splice(0)) {

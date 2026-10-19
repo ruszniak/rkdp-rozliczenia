@@ -153,6 +153,10 @@ export function initMobileTables() {
       });
     });
   };
+  // tylko na telefonie – na komputerze obserwator niepotrzebnie spowalniałby przełączanie zakładek
+  const mq = window.matchMedia('(max-width: 820px)');
   tableObs = new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(label); } });
-  tableObs.observe(document.body, { childList: true, subtree: true });
+  const sync = () => { if (mq.matches) { tableObs.observe(document.body, { childList: true, subtree: true }); label(); } else tableObs.disconnect(); };
+  mq.addEventListener?.('change', sync);
+  sync();
 }
