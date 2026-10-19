@@ -13,6 +13,7 @@ import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
+import { historyCard } from '../m2/history.js';
 import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
 
@@ -478,7 +479,7 @@ async function viewMatter(main, id, params) {
     [statusPill(m.status), reportBtn, poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
-  h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, clientTicketsBox(client || { id: m.client_id }, { module: 'm2', matter: m }), timeCard, ordersCard)));
+  h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, clientTicketsBox(client || { id: m.client_id }, { module: 'm2', matter: m }), timeCard, ordersCard, historyCard({ matter: m.id }))));
 }
 
 // ================= KLIENCI =================
@@ -587,7 +588,7 @@ async function viewClient(main, id) {
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · ')),
-    h('div', { class: 'two' }, form, h('div', {}, mattersCard, clientTicketsBox(c, { module: 'm2' }), contactsCard, ordersCard)));
+    h('div', { class: 'two' }, form, h('div', {}, mattersCard, clientTicketsBox(c, { module: 'm2' }), contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
 // ================= KALENDARZ =================
