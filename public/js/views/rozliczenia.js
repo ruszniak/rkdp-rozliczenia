@@ -1,4 +1,4 @@
-import { h, icon, toast, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials } from '../ui.js';
+import { h, icon, toast, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials, printHtml } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
 import { downloadXlsx } from '../xlsx.js';
@@ -626,12 +626,7 @@ tr.ok td{background:#EAF2E5}
 ${tables || '<p>Brak danych.</p>'}
 <p class="legend"><span class="m m-done">✓</span> zrobione &nbsp; <span class="m m-na">–</span> nie dotyczy &nbsp; <span class="m m-missing_docs">!</span> brak dokumentów &nbsp; <span class="m"></span> do zrobienia</p>
 </body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) return toast('Przeglądarka zablokowała nowe okno – zezwól na wyskakujące okna dla tej strony.', true);
-    w.document.open(); w.document.write(html); w.document.close();
-    const go = () => { w.focus(); w.print(); };
-    const img = w.document.querySelector('img');
-    if (img && !img.complete) { img.onload = go; img.onerror = go; } else setTimeout(go, 200);
+    printHtml(html);
   }
 
   function exportCsv() {

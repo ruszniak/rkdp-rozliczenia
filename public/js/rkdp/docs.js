@@ -1,5 +1,5 @@
 // RKDP – dokumenty dla klientów: umowy (wg wzorów biura), UPL-1, PEL (ZUS), PPS-1, pełnomocnictwo procesowe.
-import { h, toast, fail, icon, modal } from '../ui.js';
+import { h, toast, fail, icon, modal, printHtml } from '../ui.js';
 import { sb, state, canEditClients } from '../store.js';
 import { fillDocx, docxToHtml, downloadBytes } from '../docx.js';
 import { upl1Defaults, upl1Items, pelDefaults, pelItems, printOverlay, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
@@ -241,9 +241,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
         const c = v.contract, T = TEMPLATES[c.tpl];
         const { bytes, documentXml } = await fillDocx(T.url, contractReplacements(c));
         if (format === 'docx') return downloadBytes(bytes, fname('Umowa_RKDP', 'docx'));
-        const w = window.open('', '_blank'); if (!w) return toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
-        w.document.open(); w.document.write(contractPrintHtml(documentXml, fname('Umowa_RKDP', 'pdf'))); w.document.close();
-        setTimeout(() => { w.focus(); w.print(); }, 700);
+        printHtml(contractPrintHtml(documentXml, fname('Umowa_RKDP', 'pdf')));
         return;
       }
       if (format === 'docx' && t !== 'procesowe') return toast('Formularz urzędowy pobierasz jako PDF', true);
@@ -263,9 +261,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
         const party = isJdg(cl) ? { ...cl, kind: 'osoba', name: `${n.first} ${n.last}`.trim() } : { ...cl, kind: 'firma' };
         const blocks = poaBlocks(o, party, [advisor], { standalone: true, brand: RKDP_BRAND });
         if (format === 'docx') return downloadBytes(await buildOrderDocx(blocks, RKDP_BRAND), fname('Pelnomocnictwo_procesowe', 'docx'));
-        const w = window.open('', '_blank'); if (!w) return toast('Zezwól na wyskakujące okna', true);
-        w.document.open(); w.document.write(printableHtml(blocks, fname('Pelnomocnictwo_procesowe', 'pdf'), location.origin + RKDP_BRAND.logo, RKDP_BRAND)); w.document.close();
-        setTimeout(() => { w.focus(); w.print(); }, 600);
+        printHtml(printableHtml(blocks, fname('Pelnomocnictwo_procesowe', 'pdf'), location.origin + RKDP_BRAND.logo, RKDP_BRAND));
       }
     } catch (e) { fail(e, 'Nie udało się wygenerować dokumentu'); }
   }

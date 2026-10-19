@@ -1,6 +1,6 @@
 // Lista obecności / ewidencja czasu pracy – każdy pracownik prowadzi swoją,
 // administrator widzi wszystkich, osoba z attendance_scope (np. Marcin – m2tax.pl) widzi listy pracowników z tej domeny.
-import { h, toast, fail, icon, infoTip, modal, MONTHS } from '../ui.js';
+import { h, toast, fail, icon, infoTip, modal, MONTHS, printHtml } from '../ui.js';
 import { sb, state, memberById, isAdmin } from '../store.js';
 import { downloadXlsx } from '../xlsx.js';
 
@@ -196,10 +196,7 @@ export function exportPdf(m, people) {
     table.sum{width:55%;margin-top:10px}table.sum td{border:none;border-bottom:1px solid #eee5d8;padding:3px 5px}
     .sign{display:flex;justify-content:space-between;margin-top:34px}.sign div{width:42%;border-top:1px solid #777;text-align:center;font-size:8pt;color:#666;padding-top:3px}
     .foot{margin-top:14px;font-size:7.5pt;color:#9a8f80}</style></head><body>${pages}</body></html>`;
-  const w = window.open('', '_blank');
-  if (!w) return toast('Przeglądarka zablokowała nowe okno – zezwól na wyskakujące okna.', true);
-  w.document.open(); w.document.write(html); w.document.close();
-  setTimeout(() => { w.focus(); w.print(); }, 400);
+  printHtml(html);
 }
 export function exportXlsx(m, people) {
   const sheets = [];

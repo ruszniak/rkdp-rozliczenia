@@ -1,5 +1,5 @@
 // Oferty na usługi – lista i edytor (RKDP: zakładka Klienci → Oferty, M2 TAX: Zlecenia → Oferty).
-import { h, toast, fail, icon, infoTip } from '../ui.js';
+import { h, toast, fail, icon, infoTip, printHtml } from '../ui.js';
 import { sb, state, isAdmin } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { lookupNip, validNip } from '../nip.js';
@@ -178,11 +178,7 @@ async function renderEditor(main, id, brand) {
   }
   async function pdf() {
     if (dirty || !row) { if (!(await save())) return; }
-    const w = window.open('', '_blank');
-    if (!w) return toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
-    w.document.open(); w.document.write(offerHtml(o, brand, { number: row.number })); w.document.close();
-    const imgs = [...w.document.images];
-    Promise.all(imgs.map(i => i.complete ? 1 : new Promise(r => { i.onload = i.onerror = r; }))).then(() => setTimeout(() => { w.focus(); w.print(); }, 700));
+    printHtml(offerHtml(o, brand, { number: row.number }));
   }
   const statusSel = h('select', { class: 'select' }, ...Object.entries(STATUS).map(([k, v]) => h('option', { value: k }, v)));
   statusSel.value = status;

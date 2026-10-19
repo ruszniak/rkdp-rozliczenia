@@ -160,3 +160,30 @@ export function initMobileTables() {
   mq.addEventListener?.('change', sync);
   sync();
 }
+
+// Drukowanie / zapis do PDF w ukrytej ramce na tej samej stronie (bez nowego okna).
+// Nowe okno about:blank dzieli wątek z aplikacją – gdy podgląd wydruku zostawał otwarty
+// w innej karcie, aplikacja przestawała reagować. Ramka znika po wydruku, a strona działa dalej.
+let printFrame = null;
+export function printHtml(html, title) {
+  printFrame?.remove();
+  const f = document.createElement('iframe');
+  f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
+  Object.assign(f.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0', opacity: '0', pointerEvents: 'none' });
+  printFrame = f;
+  const docTitle = title || (html.match(/<title>([^<]*)<\/title>/i) || [])[1] || document.title;
+  f.onload = async () => {
+    const w = f.contentWindow, d = f.contentDocument;
+    if (!w || !d) return;
+    await Promise.all([...d.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; setTimeout(r, 4000); })));
+    try { await Promise.race([d.fonts?.ready, new Promise(r => setTimeout(r, 1500))]); } catch { /* */ }
+    const prev = document.title;
+    document.title = docTitle; // Chrome bierze tytuł z dokumentu jako nazwę pliku PDF
+    const restore = () => { document.title = prev; };
+    w.addEventListener('afterprint', restore, { once: true });
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) { console.error(e); } setTimeout(restore, 1000); }, 150);
+  };
+  f.srcdoc = html;
+  document.body.append(f);
+  return true;
+}

@@ -1,5 +1,6 @@
 // Dokumenty M2 TAX na papierze firmowym: ZLECENIE (krótkie, 1 strona) i UMOWA (wg wzoru kancelarii).
 // Jedna treść (lista bloków) → podgląd, PDF (druk) i Word (.docx).
+import { printHtml } from '../ui.js';
 import { FIRM, MATTER_TYPE } from './dict.js';
 import { zip } from '../xlsx.js';
 
@@ -621,15 +622,7 @@ ${ORDER_CSS}
 }
 
 export function printOrder(blocks, title) {
-  const w = window.open('', '_blank');
-  if (!w) return false;
-  w.document.open();
-  w.document.write(printableHtml(blocks, title, location.origin + '/m2tax-logo.png'));
-  w.document.close();
-  const go = () => { w.focus(); w.print(); };
-  const img = w.document.querySelector('img');
-  setTimeout(() => (img && !img.complete) ? (img.onload = img.onerror = go) : go(), 500);
-  return true;
+  return printHtml(printableHtml(blocks, title, location.origin + '/m2tax-logo.png'));
 }
 
 // ===================== Word (.docx) =====================

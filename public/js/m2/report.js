@@ -1,4 +1,5 @@
 // M2 TAX – raporty sprawy do PDF: pełne podsumowanie, samo zestawienie godzin, sam dziennik.
+import { printHtml } from '../ui.js';
 import { printableHtml, M2_BRAND, dateLong } from './order.js';
 import { MATTER_TYPE, MATTER_STATUS, FEE_TYPE, DEADLINE_KIND, JOURNAL_KIND, fmtDate, money, hours, todayIso } from './dict.js';
 import { state, memberById } from '../store.js';
@@ -85,13 +86,5 @@ export function matterReportBlocks(kind, { m, client, ord, deadlines = [], journ
 export function printMatterReport(kind, data) {
   const blocks = matterReportBlocks(kind, data);
   const name = { pelny: 'Raport', godziny: 'Godziny', dziennik: 'Dziennik' }[kind];
-  const w = window.open('', '_blank');
-  if (!w) return false;
-  w.document.open();
-  w.document.write(printableHtml(blocks, `${name}_${(data.m.number || 'sprawa').replace(/\//g, '-')}`, location.origin + M2_BRAND.logo, M2_BRAND));
-  w.document.close();
-  const go = () => { w.focus(); w.print(); };
-  const img = w.document.querySelector('img');
-  setTimeout(() => (img && !img.complete) ? (img.onload = img.onerror = go) : go(), 500);
-  return true;
+  return printHtml(printableHtml(blocks, `${name}_${(data.m.number || 'sprawa').replace(/\//g, '-')}`, location.origin + M2_BRAND.logo, M2_BRAND));
 }

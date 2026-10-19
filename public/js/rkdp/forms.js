@@ -1,5 +1,6 @@
 // Formularze urzędowe RKDP wypełniane na oryginalnych wzorach: UPL-1 (US) i PEL (ZUS).
 // Współrzędne w punktach PDF (A4, początek w lewym górnym rogu).
+import { printHtml } from '../ui.js';
 import { parseAddress, splitName, parseReps } from '../m2/pps1.js';
 
 // W bazie RKDP osoby (JDG) zapisane są jako „Nazwisko Imię”
@@ -193,12 +194,7 @@ export function overlayHtml(pages, items, title, origin = location.origin) {
 }
 
 export function printOverlay(pages, items, title) {
-  const w = window.open('', '_blank');
-  if (!w) return false;
-  w.document.open(); w.document.write(overlayHtml(pages, items, title)); w.document.close();
-  Promise.all(pages.map(u => { const im = new Image(); im.src = location.origin + u; return im.decode().catch(() => {}); }))
-    .then(() => setTimeout(() => { w.focus(); w.print(); }, 300));
-  return true;
+  return printHtml(overlayHtml(pages, items, title));
 }
 
 export const UPL1_PAGES = ['/rkdp/upl1-1.png', '/rkdp/upl1-2.png'];

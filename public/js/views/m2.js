@@ -1,6 +1,6 @@
 // Moduł Doradztwo podatkowe (M2 TAX)
 import { todayWidget as obTodayWidget, teamTodayCard, canSeeTeam } from './obecnosc.js';
-import { h, toast, fail, icon, initials, MONTHS } from '../ui.js';
+import { h, toast, fail, icon, initials, MONTHS, printHtml } from '../ui.js';
 import { sb, state, memberById, isAdmin } from '../store.js';
 import {
   MATTER_TYPE, MATTER_STATUS, OPEN_STATUSES, AUTHORITIES, TAX_KINDS, FEE_TYPE, BILLING_TYPE, SUBSCRIPTIONS, AML_RISK,
@@ -903,9 +903,7 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
     h('button', { class: 'btn btn-primary btn-sm', onclick: () => {
       if (!ready()) return;
       if (d.kind === 'pps1') { if (!printPps1(d, signers.find(x => x.id === d.who))) toast('Zezwól na wyskakujące okna, aby zapisać PDF', true); return; }
-      const w = window.open('', '_blank'); if (!w) return toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
-      w.document.open(); w.document.write(printableHtml(firmDoc(), fileBase(), location.origin + '/m2tax-logo.png')); w.document.close();
-      setTimeout(() => { w.focus(); w.print(); }, 600);
+      printHtml(printableHtml(firmDoc(), fileBase(), location.origin + '/m2tax-logo.png'));
     } }, icon('download'), 'PDF'),
   ]);
 }

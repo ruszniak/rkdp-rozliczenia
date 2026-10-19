@@ -1,5 +1,6 @@
 // PPS-1(3) – pełnomocnictwo szczególne. Dane nanoszone na oryginalny formularz MF (tło: /m2/pps1-N.png),
 // współrzędne w punktach PDF (A4 595,44 × 841,68 pt, początek w lewym górnym rogu).
+import { printHtml } from '../ui.js';
 import { FIRM, MATTER_TYPE } from './dict.js';
 
 // adres M2 TAX do doręczeń w kraju (C.2)
@@ -158,10 +159,5 @@ export function pps1Html(d, signer, origin = location.origin, opts = {}) {
 }
 
 export function printPps1(d, signer, opts = {}) {
-  const w = window.open('', '_blank');
-  if (!w) return false;
-  w.document.open(); w.document.write(pps1Html(d, signer, location.origin, opts)); w.document.close();
-  const imgs = [1, 2, 3].map(n => { const im = new Image(); im.src = `${location.origin}/m2/pps1-${n}.png`; return im.decode().catch(() => {}); });
-  Promise.all(imgs).then(() => setTimeout(() => { w.focus(); w.print(); }, 300));
-  return true;
+  return printHtml(pps1Html(d, signer, location.origin, opts));
 }

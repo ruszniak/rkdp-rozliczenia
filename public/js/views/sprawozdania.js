@@ -1,5 +1,5 @@
 // RKDP – zatwierdzanie sprawozdań finansowych: dane z KRS + protokół ZZW z uchwałami (Word / PDF).
-import { h, toast, fail, icon, infoTip } from '../ui.js';
+import { h, toast, fail, icon, infoTip, printHtml } from '../ui.js';
 
 const HELP = {
   all: `Co wpisujesz:
@@ -260,9 +260,7 @@ async function renderEditor(main, id) {
     if (dirty || !row) await save();
     const blocks = zzwBlocks(p), brand = companyBrand(p);
     if (kind === 'docx') return downloadBytes(await buildOrderDocx(blocks, brand), fname('docx'));
-    const w = window.open('', '_blank'); if (!w) return toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
-    w.document.open(); w.document.write(printableHtml(blocks, fname('pdf'), '', brand)); w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 600);
+    printHtml(printableHtml(blocks, fname('pdf'), '', brand));
   }
 
   if (!row) fillFromClient(clients.find(c => c.id === clientId));
