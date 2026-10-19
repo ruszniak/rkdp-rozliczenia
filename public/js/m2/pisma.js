@@ -117,6 +117,51 @@ export const PISMA = {
     ],
     atts: ['korekta deklaracji (zeznania) [symbol formularza]', 'wyjaśnienie przyczyn złożenia korekty'],
   },
+  ulga: {
+    group: 'Postępowanie podatkowe', label: 'Wniosek o ulgę w spłacie (raty, odroczenie, umorzenie)', desc: 'Art. 67a § 1 o.p. – ważny interes podatnika lub interes publiczny.',
+    party: 'Wnioskodawca', addr: ADDR.us, fields: ['subject', 'value'], subjectLabel: 'Zaległość / podatek (np. VAT za lipiec 2026 r.)', valueLabel: 'Kwota (zł)',
+    build: (d, X) => [
+      { t: 'title', text: 'WNIOSEK O UDZIELENIE ULGI W SPŁACIE ZOBOWIĄZANIA PODATKOWEGO' },
+      { t: 'subtitle', text: `${F('rozłożenie na raty / odroczenie terminu płatności / umorzenie zaległości')} – ${d.subject || F('podatek i okres')}` },
+      { t: 'p', text: `Działając w imieniu i na rzecz Wnioskodawcy, na podstawie pełnomocnictwa ${X.poaTxt}, na podstawie art. 67a § 1 pkt ${F('1 / 2 / 3')} ${OP}, ${X.v('wnoszę', 'wnosimy')} o ${F('rozłożenie na raty zapłaty / odroczenie terminu płatności / umorzenie w całości lub w części')} ${d.subject ? `zobowiązania (zaległości) w ${d.subject}` : F('wskazanie zobowiązania')} w kwocie ${d.value ? `${d.value} zł` : F('kwota zł')}${F(' wraz z odsetkami za zwłokę / opłatą prolongacyjną')}.` },
+      { t: 'p', text: `${X.v('Proponuję', 'Proponujemy')} następujący harmonogram spłaty: ${F('liczba rat, wysokość i terminy')}.` },
+      { t: 'subtitle', text: 'UZASADNIENIE' },
+      { t: 'h', text: 'I. Ważny interes podatnika' },
+      { t: 'p', text: F('Sytuacja majątkowa, rodzinna i zdrowotna Wnioskodawcy, przyczyny powstania zaległości, zdarzenia losowe.') },
+      { t: 'h', text: 'II. Interes publiczny' },
+      { t: 'p', text: F('Np. zachowanie miejsc pracy, możliwość dalszego regulowania zobowiązań publicznoprawnych.') },
+      { t: 'h', text: 'III. Sytuacja finansowa' },
+      { t: 'p', text: F('Przychody, koszty, zadłużenie, posiadany majątek – w nawiązaniu do załączonych dokumentów.') },
+      { t: 'p', text: `Mając powyższe na uwadze, ${X.v('wnoszę', 'wnosimy')} jak na wstępie.` },
+    ],
+    atts: ['oświadczenie o stanie majątkowym i sytuacji finansowej', '[dokumenty potwierdzające sytuację finansową]', '[formularz informacji o pomocy publicznej – jeśli dotyczy]'],
+  },
+  zawieszenie: {
+    group: 'Postępowanie podatkowe', label: 'Wniosek o zawieszenie postępowania', desc: 'Art. 201 § 1 / art. 205 § 1 o.p. – np. zagadnienie wstępne.',
+    party: 'Strona', addr: ADDR.us, fields: ['ref', 'subject'], subjectLabel: 'Postępowanie (np. w sprawie VAT za 2024 r.)',
+    build: (d, X) => [
+      { t: 'title', text: 'WNIOSEK O ZAWIESZENIE POSTĘPOWANIA' },
+      { t: 'p', text: `Działając w imieniu i na rzecz Strony, na podstawie pełnomocnictwa ${X.poaTxt}, na podstawie art. ${F('201 § 1 pkt 2 / 205 § 1')} ${OP}, ${X.v('wnoszę', 'wnosimy')} o zawieszenie postępowania ${d.subject || F('oznaczenie postępowania')} do czasu ${F('rozstrzygnięcia zagadnienia wstępnego przez … / ustania przyczyny')}.` },
+      { t: 'subtitle', text: 'UZASADNIENIE' },
+      { t: 'p', text: F('Wskazanie zagadnienia wstępnego (organ / sąd, sygnatura) i jego wpływu na rozstrzygnięcie sprawy.') },
+      { t: 'p', text: `Mając powyższe na uwadze, ${X.v('wnoszę', 'wnosimy')} jak na wstępie.` },
+    ],
+  },
+  wstrzymanie: {
+    group: 'Środki zaskarżenia', label: 'Wniosek o wstrzymanie wykonania decyzji (WSA)', desc: 'Art. 61 § 3 p.p.s.a. – znaczna szkoda lub trudne do odwrócenia skutki.',
+    party: 'Skarżący', organParty: true, court: true, addr: ADDR.wsa, fields: ['ref', 'actOrg', 'actDate', 'actNo', 'subject'], actLabel: 'decyzji', refLabel: 'Sygn. akt',
+    actOrgDefault: 'Dyrektora Izby Administracji Skarbowej we Wrocławiu', subjectLabel: 'Przedmiot decyzji',
+    build: (d, X) => [
+      { t: 'title', text: 'WNIOSEK O WSTRZYMANIE WYKONANIA ZASKARŻONEJ DECYZJI' },
+      { t: 'p', text: `Działając w imieniu Skarżącego, na podstawie pełnomocnictwa ${X.poaTxt}, na podstawie art. 61 § 3 ${PPSA}, ${X.v('wnoszę', 'wnosimy')} o wstrzymanie wykonania w całości decyzji ${d.actOrg || F('organ w dopełniaczu')} z dnia ${X.date(d.actDate)}${d.actNo ? `, nr ${d.actNo}` : ''}, w przedmiocie ${d.subject || F('przedmiot decyzji')}.` },
+      { t: 'subtitle', text: 'UZASADNIENIE' },
+      { t: 'p', text: 'Zgodnie z art. 61 § 3 p.p.s.a. po przekazaniu sądowi skargi sąd może na wniosek skarżącego wydać postanowienie o wstrzymaniu wykonania aktu w całości lub w części, jeżeli zachodzi niebezpieczeństwo wyrządzenia znacznej szkody lub spowodowania trudnych do odwrócenia skutków.' },
+      { t: 'p', text: `W niniejszej sprawie wykonanie decyzji ${F('spowoduje / grozi …: opis konkretnych skutków finansowych, utraty płynności, zajęcia rachunków, upadłości')}.` },
+      { t: 'p', text: F('Wykazanie sytuacji majątkowej Skarżącego – dokumenty finansowe w załączeniu.') },
+      { t: 'p', text: `Mając powyższe na uwadze, ${X.v('wnoszę', 'wnosimy')} jak na wstępie.` },
+    ],
+    atts: ['[dokumenty finansowe uprawdopodobniające szkodę]'],
+  },
   odwolanie: {
     group: 'Środki zaskarżenia', label: 'Odwołanie od decyzji', desc: 'Art. 220–223 o.p. – 14 dni, do DIAS za pośrednictwem organu I instancji.',
     party: 'Strona', addr: ADDR.dias, via: ADDR.us, fields: ['ref', 'actOrg', 'actDate', 'actNo', 'served', 'subject'], actLabel: 'decyzji',
@@ -257,7 +302,6 @@ export function pismoBlocks(type, d, signers) {
   const idLine = c.nip ? `NIP: ${c.nip}` : (c.kind === 'osoba' ? 'PESEL: [……]' : 'NIP: [……]');
   const B = [{ t: 'opts', highlight: true }];
   B.push({ t: 'place', text: `${d.place || 'Wrocław'}, dnia ${d.date ? dateLong(d.date) : '[data]'}` });
-  B.push({ t: 'addr', lines: lines(d.addr || T.addr), via: T.via && d.via !== '' ? lines(d.via ?? T.via) : null });
   B.push({ t: 'party', label: T.party, lines: [c.name || '[imię i nazwisko / nazwa]', c.address || '[adres]', idLine] });
   B.push({ t: 'party', label: many ? 'Pełnomocnicy' : 'Pełnomocnik', lines: [
     ...sg.map(s => `${s.full_name} – doradca podatkowy, nr wpisu ${s.license_no || '[……]'}`),
@@ -266,6 +310,7 @@ export function pismoBlocks(type, d, signers) {
     `e-mail: ${FIRM.email} · tel. ${FIRM.phones}`,
   ].filter(Boolean) });
   if (T.organParty) B.push({ t: 'party', label: 'Organ', lines: [d.actOrgNom || (type === 'nsa' ? 'Dyrektor Izby Administracji Skarbowej we Wrocławiu' : (d.actOrg ? d.actOrg.replace(/^Dyrektora/, 'Dyrektor').replace(/^Naczelnika/, 'Naczelnik') : '[organ]'))] });
+  B.push({ t: 'addr', lines: lines(d.addr || T.addr), via: T.via && d.via !== '' ? lines(d.via ?? T.via) : null });
   if (T.fields.includes('ref')) B.push({ t: 'ref', label: (T.refLabel || 'Znak sprawy') + ':', text: d.ref || '[……]' });
   B.push({ t: 'gap' });
   B.push(...T.build(d, X));
