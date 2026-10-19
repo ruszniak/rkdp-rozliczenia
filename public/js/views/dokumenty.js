@@ -51,6 +51,7 @@ export async function renderDokumenty(main) {
       tile('Lista obecności', 'Ewidencja czasu pracy za miesiąc – Twoja albo zespołu.', '#/obecnosc', ['PDF', 'Excel']),
       tile('Lista klientów', 'Eksport kartoteki klientów – w zakładce Klienci przycisk eksportu.', '#/klienci', ['Excel'])),
     hasModule('doradztwo') ? group('M2 TAX',
+      tile('Wzory pism procesowych', 'Pisma do US, odwołania, zażalenia, skargi do WSA i NSA, wnioski o interpretację – na papierze M2 TAX z wybranym pełnomocnikiem.', '#/doradztwo/dokumenty', ['Word', 'PDF']),
       tile('Zlecenie / umowa M2 TAX', 'Zlecenie, umowa o doradztwo, pełnomocnictwa i PPS-1 dla klientów M2 TAX.', '#/doradztwo/zlecenia', ['PDF', 'Word']),
       tile('Oferta M2 TAX', 'Oferta doradztwa podatkowego na papierze M2 TAX.', '#/doradztwo/oferty', ['PDF']),
       tile('Raport sprawy', 'Podsumowanie sprawy, same godziny albo sam dziennik – otwórz sprawę i kliknij „Raport PDF”.', '#/doradztwo/sprawy', ['PDF'])) : null);

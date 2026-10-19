@@ -562,6 +562,13 @@ export const ORDER_CSS = `
 .doc .sign2 .firmname{font-weight:600;margin-top:4px}
 .doc .sign2 .person{margin-top:34px;font-size:9.5pt}
 .doc .sign2 .person::before{content:"";display:block;border-top:1px dotted #1c1d21;margin-bottom:4px;width:85%}
+.doc .place{text-align:right;margin:0 0 14px}
+.doc .party{margin:0 0 10px;font-size:10pt;line-height:1.4}
+.doc .addr{margin:10px 0 16px 50%;font-size:10.5pt;line-height:1.4}
+.doc .addr .via{margin-top:6px;font-weight:400}.doc .addr .via span{font-size:9pt;color:#5d6068}
+.doc .ref{margin:0 0 4px;font-size:9.5pt}.doc .ref span{color:#5d6068}
+.doc .signR{margin:36px 0 14px 50%;text-align:center;font-size:9.5pt;break-inside:avoid}.doc .signR .dots{border-top:1px dotted #1c1d21;margin:0 10% 5px}.doc .signR span{color:#5d6068}
+.doc mark{background:#fff3a3;padding:0 1px}
 .doc .pb{border-top:1px dashed #cfc9bf;margin:22px 0;position:relative}
 .doc .pb::after{content:"nowa strona";position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:#fffdf9;padding:0 8px;font-size:7pt;color:#a29d93;letter-spacing:.1em;text-transform:uppercase}
 @media print{.doc .pb{border:0;margin:0;break-before:page}.doc .pb::after{display:none}}
@@ -594,9 +601,15 @@ function bodyHtml(blocks) {
     else if (b.t === 'table') html += `<table class="rt"><thead><tr>${b.head.map((x, i) => `<th class="${(b.cls || [])[i] || ''}">${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr class="${r.cls || ''}">${(r.cells || r).map((c, i) => `<td class="${(b.cls || [])[i] || ''}">${c && typeof c === 'object' ? `${c.cls ? `<span class="${c.cls}">` : ''}${esc(c.text)}${c.cls ? '</span>' : ''}${c.sub ? `<span class="sub">${esc(c.sub)}</span>` : ''}` : esc(c ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     else if (b.t === 'kv') html += `<table class="kv"><thead><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     else if (b.t === 'sign') html += `<div class="sign">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div><div class="line">${x.lines.map(esc).join('<br>')}</div></div>`).join('')}</div>`;
+    else if (b.t === 'place') html += `<p class="place">${esc(b.text)}</p>`;
+    else if (b.t === 'party') html += `<div class="party"><div class="lbl">${esc(b.label)}</div>${b.lines.map((l, i) => i ? esc(l) : `<b>${esc(l)}</b>`).join('<br>')}</div>`;
+    else if (b.t === 'addr') html += `<div class="addr"><b>${esc(b.lines[0])}</b>${b.lines.slice(1).map(l => '<br>' + esc(l)).join('')}${b.via ? `<div class="via"><span>za pośrednictwem:</span><br><b>${esc(b.via[0])}</b>${b.via.slice(1).map(l => '<br>' + esc(l)).join('')}</div>` : ''}</div>`;
+    else if (b.t === 'ref') html += `<p class="ref"><span>${esc(b.label)}</span> <b>${esc(b.text)}</b></p>`;
+    else if (b.t === 'subtitle') html += `<p class="center"><b>${esc(b.text)}</b></p>`;
+    else if (b.t === 'signR') html += `<div class="signR"><div class="dots"></div>${b.lines.map((l, i) => i ? `<span>${esc(l)}</span>` : `<b>${esc(l)}</b>`).join('<br>')}</div>`;
     else if (b.t === 'sign2') html += `<div class="sign2">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div>${x.firm ? `<div class="firmname">${esc(x.firm)}</div>` : ''}${x.people.map(pp => `<div class="person">${esc(pp)}</div>`).join('')}</div>`).join('')}</div>`;
   }
-  return html;
+  return blocks.some(b => b.t === 'opts' && b.highlight) ? html.replace(/\[[^\]<]*\]/g, m => `<mark>${m}</mark>`) : html;
 }
 
 const isCompact = blocks => blocks[0]?.text === 'ZLECENIE';
@@ -627,7 +640,11 @@ export function printOrder(blocks, title) {
 
 // ===================== Word (.docx) =====================
 const x = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
-const run = (text, o = {}) => `<w:r><w:rPr>${o.font ? `<w:rFonts w:ascii="${o.font}" w:hAnsi="${o.font}" w:cs="${o.font}"/>` : ''}${o.b ? '<w:b/>' : ''}${o.color ? `<w:color w:val="${o.color}"/>` : ''}${o.sz ? `<w:sz w:val="${o.sz}"/><w:szCs w:val="${o.sz}"/>` : ''}${o.spacing ? `<w:spacing w:val="${o.spacing}"/>` : ''}${o.caps ? '<w:caps/>' : ''}</w:rPr><w:t xml:space="preserve">${x(text)}</w:t></w:r>`;
+let HL = false; // wyróżnianie pól do uzupełnienia […] w Wordzie (pisma)
+const run = (text, o = {}) => HL && /\[[^\]]*\]/.test(String(text ?? ''))
+  ? String(text).split(/(\[[^\]]*\])/).filter(Boolean).map(t => run0(t, /^\[[^\]]*\]$/.test(t) ? { ...o, hl: true } : o)).join('')
+  : run0(text, o);
+const run0 = (text, o = {}) => `<w:r><w:rPr>${o.font ? `<w:rFonts w:ascii="${o.font}" w:hAnsi="${o.font}" w:cs="${o.font}"/>` : ''}${o.b ? '<w:b/>' : ''}${o.color ? `<w:color w:val="${o.color}"/>` : ''}${o.sz ? `<w:sz w:val="${o.sz}"/><w:szCs w:val="${o.sz}"/>` : ''}${o.spacing ? `<w:spacing w:val="${o.spacing}"/>` : ''}${o.caps ? '<w:caps/>' : ''}${o.hl ? '<w:highlight w:val="yellow"/>' : ''}</w:rPr><w:t xml:space="preserve">${x(text)}</w:t></w:r>`;
 const tab = () => '<w:r><w:tab/></w:r>';
 function para(runs, o = {}) {
   const ind = o.ind ? `<w:ind w:left="${o.ind[0]}" w:hanging="${o.ind[1]}"/>` : '';
@@ -653,6 +670,7 @@ function kvTable(b) {
 }
 
 function docxBody(blocks) {
+  HL = blocks.some(b => b.t === 'opts' && b.highlight);
   const compact = isCompact(blocks);
   const sz = compact ? 20 : 21;
   let body = '', pendingPB = false;
@@ -675,6 +693,15 @@ function docxBody(blocks) {
     else if (b.t === 'pb') pendingPB = true;
     else if (b.t === 'kv') add(kvTable(b) + para('', { after: 60 }));
     else if (b.t === 'sign') add(para('', { after: 360 }) + twoColTable([b.left, b.right].map(c => label(c.label) + para('', { after: 520 }) + para(run('……………………………………', { sz: 19 }), { after: 20 }) + para(lines(c.lines, { sz: 18 }), { after: 0 }))));
+    else if (b.t === 'place') add(para(run(b.text, { sz }), { jc: 'right', after: 240 }));
+    else if (b.t === 'party') add(para(run(b.label, { b: true, color: '7A5A37', sz: 15, spacing: 30, caps: true, font: 'Montserrat' }), { after: 20, keep: true })
+      + para(b.lines.map((l, i) => run(l, { sz: 20, b: i === 0 }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { after: 160 }));
+    else if (b.t === 'addr') add(para(b.lines.map((l, i) => run(l, { sz: 21, b: i === 0 }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { ind: [4820, 0], after: b.via ? 60 : 240, before: 120 })
+      + (b.via ? para(run('za pośrednictwem:', { sz: 18, color: '5D6068' }) + '<w:r><w:br/></w:r>' + b.via.map((l, i) => run(l, { sz: 20, b: i === 0 }) + (i < b.via.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { ind: [4820, 0], after: 240 }) : ''));
+    else if (b.t === 'ref') add(para(run(b.label + ' ', { sz: 19, color: '5D6068' }) + run(b.text, { sz: 19, b: true }), { after: 40 }));
+    else if (b.t === 'subtitle') add(para(run(b.text, { sz, b: true }), { jc: 'center', before: 160, after: 200, keep: true }));
+    else if (b.t === 'signR') add(para('', { after: 480, keep: true }) + para(run('……………………………………………', { sz: 19 }), { ind: [5103, 0], jc: 'center', after: 20, keep: true })
+      + para(b.lines.map((l, i) => run(l, { sz: 18, b: i === 0, color: i ? '5D6068' : undefined }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { ind: [5103, 0], jc: 'center', after: 200 }));
     else if (b.t === 'sign2') add(para('', { after: 300 }) + twoColTable([b.left, b.right].map(c => label(c.label)
       + (c.firm ? para(run(c.firm, { b: true, sz: 19 }), { after: 0 }) : '')
       + c.people.map(pp => para('', { after: 420 }) + para(run('……………………………………', { sz: 19 }), { after: 10 }) + para(run(pp, { sz: 18 }), { after: 0 })).join(''))));

@@ -14,6 +14,7 @@ import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
 import { historyCard } from '../m2/history.js';
+import { renderM2Dokumenty } from './m2pisma.js';
 import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
 
@@ -476,10 +477,10 @@ async function viewMatter(main, id, params) {
     ]);
   } }, icon('download'), 'Raport PDF');
   main.replaceChildren(...header('sprawy', `${m.number} · ${m.title}`, null,
-    [statusPill(m.status), reportBtn, poaBtn, delMatter].filter(Boolean)),
+    [statusPill(m.status), h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/dokumenty?sprawa=${m.id}` }, 'Pismo'), reportBtn, poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
-  h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, clientTicketsBox(client || { id: m.client_id }, { module: 'm2', matter: m }), timeCard, ordersCard, historyCard({ matter: m.id }))));
+  h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, timeCard, ordersCard, historyCard({ matter: m.id }))));
 }
 
 // ================= KLIENCI =================
@@ -588,7 +589,7 @@ async function viewClient(main, id) {
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · ')),
-    h('div', { class: 'two' }, form, h('div', {}, mattersCard, clientTicketsBox(c, { module: 'm2' }), contactsCard, ordersCard, historyCard({ client: c.id }))));
+    h('div', { class: 'two' }, form, h('div', {}, mattersCard, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
 // ================= KALENDARZ =================
@@ -916,7 +917,7 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
 
 let orderCssInjected = false;
 async function viewOrder(main, id, params) {
-  if (!orderCssInjected) { document.head.append(h('style', {}, ORDER_CSS)); orderCssInjected = true; }
+  if (!orderCssInjected && !document.getElementById('order-css')) { document.head.append(h('style', { id: 'order-css' }, ORDER_CSS)); orderCssInjected = true; }
   const isNew = id === 'nowe';
   const [clients, signers] = await Promise.all([
     fetchAll(() => sb.from('m2_clients').select('*').order('name')),
@@ -1205,6 +1206,7 @@ export async function renderM2(main, parts, params) {
   if (sub === 'zlecenia') return viewOrders(main, params);
   if (sub === 'zlecenie') return viewOrder(main, parts[2], params);
   if (sub === 'spotkania') { history.replaceState(null, '', `${BASE}/kalendarz`); return viewCalendar(main, params); }
+  if (sub === 'dokumenty') return renderM2Dokumenty(main, params);
   if (sub === 'zgloszenia') return renderZgloszenia(main, parts[2], params, 'm2');
   if (sub === 'oferty') return renderOferty(main, parts[2], 'm2');
   return viewDashboard(main);
