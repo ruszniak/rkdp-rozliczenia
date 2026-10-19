@@ -4,6 +4,7 @@ import { renderLogin } from './views/login.js';
 import { renderRozliczenia } from './views/rozliczenia.js';
 import { renderKlienci } from './views/klienci.js';
 import { renderSprawozdania } from './views/sprawozdania.js';
+import { renderDokumenty } from './views/dokumenty.js';
 import { renderProfil } from './views/profil.js';
 import { renderObecnosc } from './views/obecnosc.js';
 import { renderZgloszenia } from './views/zgloszenia.js';
@@ -26,7 +27,7 @@ function parseHash() {
 
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
-    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/sprawozdania', 'Sprawozdania', 'sprawozdania']] },
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/dokumenty', 'Dokumenty', 'sprawozdania']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/zgloszenia', 'Zgłoszenia', 'm2:zgloszenia'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']] },
@@ -53,7 +54,7 @@ const TAB_ICONS = {
   'logout': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/></svg>',
   'default': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg>',
 };
-const TAB_SHORT = { rozliczenia: 'Rozliczenia', sprawozdania: 'Sprawozd.', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:spotkania': 'Spotkania' };
+const TAB_SHORT = { rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:spotkania': 'Spotkania' };
 
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
 function layout(active) {
@@ -138,6 +139,7 @@ async function route() {
     else if (view === 'oferty') cleanup = await renderOferty(layout('klienci'), parts[1], 'rkdp');
     else if (view === 'pulpit') cleanup = await renderPulpit(layout('pulpit'));
     else if (view === 'zgloszenia') cleanup = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
+    else if (view === 'dokumenty') cleanup = await renderDokumenty(layout('sprawozdania'));
     else if (view === 'sprawozdania') cleanup = await renderSprawozdania(layout('sprawozdania'), parts[1]);
     else if (view === 'zespol' && state.me.role === 'admin') cleanup = await renderZespol(layout('zespol'));
     else cleanup = await renderRozliczenia(layout('rozliczenia'), params);
