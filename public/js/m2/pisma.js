@@ -302,8 +302,10 @@ export function pismoBlocks(type, d, signers) {
   const idLine = c.nip ? `NIP: ${c.nip}` : (c.kind === 'osoba' ? 'PESEL: [……]' : 'NIP: [……]');
   const B = [{ t: 'opts', highlight: true }];
   B.push({ t: 'place', text: `${d.place || 'Wrocław'}, dnia ${d.date ? dateLong(d.date) : '[data]'}` });
-  B.push({ t: 'party', label: T.party, lines: [c.name || '[imię i nazwisko / nazwa]', c.address || '[adres]', idLine] });
-  B.push({ t: 'party', label: many ? 'Pełnomocnicy' : 'Pełnomocnik', lines: [
+  const fem = /\b(sp\.|spółka|s\.a\.|fundacja|spółdzielnia)/i.test(c.name || '') || c.kind === 'firma';
+  // pisma do sądu: oznaczenie roli strony (Skarżący); do urzędu – same dane strony
+  B.push({ t: 'party', label: T.court ? T.party : null, lines: [c.name || '[imię i nazwisko / nazwa]', c.address || '[adres]', idLine] });
+  B.push({ t: 'party', lead: `${fem ? 'reprezentowana' : 'reprezentowany'} przez:`, lines: [
     ...sg.map(s => `${s.full_name} – doradca podatkowy, nr wpisu ${s.license_no || '[……]'}`),
     FIRM.address,
     !many && sg[0].ae_address ? `adres do doręczeń elektronicznych: ${sg[0].ae_address}` : null,

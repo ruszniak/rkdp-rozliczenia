@@ -563,7 +563,7 @@ export const ORDER_CSS = `
 .doc .sign2 .person{margin-top:34px;font-size:9.5pt}
 .doc .sign2 .person::before{content:"";display:block;border-top:1px dotted #1c1d21;margin-bottom:4px;width:85%}
 .doc .place{text-align:right;margin:0 0 14px}
-.doc .party{margin:0 0 10px;font-size:10pt;line-height:1.4}
+.doc .party{margin:0 0 10px;font-size:10pt;line-height:1.4}.doc .party .lead{color:#5d6068;font-size:9.5pt;margin-bottom:1px}
 .doc .addr{margin:10px 0 16px 50%;font-size:10.5pt;line-height:1.4}
 .doc .addr .via{margin-top:6px;font-weight:400}.doc .addr .via span{font-size:9pt;color:#5d6068}
 .doc .ref{margin:0 0 4px;font-size:9.5pt}.doc .ref span{color:#5d6068}
@@ -602,7 +602,7 @@ function bodyHtml(blocks) {
     else if (b.t === 'kv') html += `<table class="kv"><thead><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     else if (b.t === 'sign') html += `<div class="sign">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div><div class="line">${x.lines.map(esc).join('<br>')}</div></div>`).join('')}</div>`;
     else if (b.t === 'place') html += `<p class="place">${esc(b.text)}</p>`;
-    else if (b.t === 'party') html += `<div class="party"><div class="lbl">${esc(b.label)}</div>${b.lines.map((l, i) => i ? esc(l) : `<b>${esc(l)}</b>`).join('<br>')}</div>`;
+    else if (b.t === 'party') html += `<div class="party">${b.label ? `<div class="lbl">${esc(b.label)}</div>` : ''}${b.lead ? `<div class="lead">${esc(b.lead)}</div>` : ''}${b.lines.map((l, i) => i ? esc(l) : `<b>${esc(l)}</b>`).join('<br>')}</div>`;
     else if (b.t === 'addr') html += `<div class="addr"><b>${esc(b.lines[0])}</b>${b.lines.slice(1).map(l => '<br>' + esc(l)).join('')}${b.via ? `<div class="via"><span>za pośrednictwem:</span><br><b>${esc(b.via[0])}</b>${b.via.slice(1).map(l => '<br>' + esc(l)).join('')}</div>` : ''}</div>`;
     else if (b.t === 'ref') html += `<p class="ref"><span>${esc(b.label)}</span> <b>${esc(b.text)}</b></p>`;
     else if (b.t === 'subtitle') html += `<p class="center"><b>${esc(b.text)}</b></p>`;
@@ -694,7 +694,8 @@ function docxBody(blocks) {
     else if (b.t === 'kv') add(kvTable(b) + para('', { after: 60 }));
     else if (b.t === 'sign') add(para('', { after: 360 }) + twoColTable([b.left, b.right].map(c => label(c.label) + para('', { after: 520 }) + para(run('……………………………………', { sz: 19 }), { after: 20 }) + para(lines(c.lines, { sz: 18 }), { after: 0 }))));
     else if (b.t === 'place') add(para(run(b.text, { sz }), { jc: 'right', after: 240 }));
-    else if (b.t === 'party') add(para(run(b.label, { b: true, color: '7A5A37', sz: 15, spacing: 30, caps: true, font: 'Montserrat' }), { after: 20, keep: true })
+    else if (b.t === 'party') add((b.label ? para(run(b.label, { b: true, color: '7A5A37', sz: 15, spacing: 30, caps: true, font: 'Montserrat' }), { after: 20, keep: true }) : '')
+      + (b.lead ? para(run(b.lead, { sz: 19, color: '5D6068' }), { after: 20, keep: true }) : '')
       + para(b.lines.map((l, i) => run(l, { sz: 20, b: i === 0 }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { after: 160 }));
     else if (b.t === 'addr') add(para(b.lines.map((l, i) => run(l, { sz: 21, b: i === 0 }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { ind: [4820, 0], after: b.via ? 60 : 240, before: 120 })
       + (b.via ? para(run('za pośrednictwem:', { sz: 18, color: '5D6068' }) + '<w:r><w:br/></w:r>' + b.via.map((l, i) => run(l, { sz: 20, b: i === 0 }) + (i < b.via.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { ind: [4820, 0], after: 240 }) : ''));
