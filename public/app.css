@@ -478,3 +478,4 @@ a,button,select,input,label{-webkit-tap-highlight-color:rgba(122,90,55,.12)}
 @media (max-width:820px) and (display-mode:standalone){
   .site-header{background:rgba(248,245,240,.98)}
 }
+.cal-chip.g{border-left-color:#4285F4;background:#EAF1FD}

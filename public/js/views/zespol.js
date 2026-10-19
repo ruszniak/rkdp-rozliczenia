@@ -1,4 +1,4 @@
-import { h, toast, fail } from '../ui.js';
+import { h, toast, fail, infoTip } from '../ui.js';
 import { sb, state } from '../store.js';
 import { ROLE, RULE } from '../dict.js';
 import { fetchAll } from './rozliczenia.js';
@@ -236,6 +236,52 @@ export async function renderZespol(main) {
     h('div', { class: 'form-grid' },
       setInput('m2_google_calendar_src', 'Kalendarz Google M2 TAX – identyfikator kalendarza albo kod/link do osadzenia', 'np. kancelaria@m2tax.pl albo https://calendar.google.com/calendar/embed?src=…'),
       setInput('m2_zoho_bookings_url', 'Zoho Bookings – adres strony rezerwacji', 'https://…zohobookings.eu/…')),
+    gcalBox(),
     h('p', { class: 'eyebrow', style: { margin: '18px 0 8px' } }, 'Podpisujący zlecenia i pełnomocnicy (PPS-1)'),
     h('div', { class: 'list-wrap' }, h('table', { class: 'list' }, h('thead', {}, h('tr', {}, ...['Imię i nazwisko', 'Tytuł', 'Nr wpisu', 'Funkcja', 'NIP (PPS-1)', 'Adres do doręczeń elektronicznych'].map(t => h('th', {}, t)))), sgBody))));
+}
+
+// ---------- Kalendarz Google M2 TAX: stan połączenia i wysłanie terminów ----------
+const GCAL_HELP = `Jak podłączyć Kalendarz Google M2 TAX (jednorazowo, ok. 10 minut):
+
+1. console.cloud.google.com → utwórz projekt (np. „M2 TAX aplikacja”) → „Interfejsy API i usługi” → włącz „Google Calendar API”.
+2. „Dane logowania” → „Utwórz dane logowania” → „Konto usługi” (nazwa np. m2tax-kalendarz) → Gotowe.
+3. Otwórz konto usługi → „Klucze” → „Dodaj klucz” → JSON. Pobierze się plik .json – nie wysyłaj go nikomu.
+4. Supabase → projekt rkdp-rozliczenia → Edge Functions → Secrets → „Add new secret”: nazwa GOOGLE_SERVICE_ACCOUNT, wartość = cała zawartość pliku .json → Save.
+5. Kalendarz Google → ustawienia kalendarza M2 TAX → „Udostępnij określonym osobom” → dodaj adres konta usługi (…@….iam.gserviceaccount.com) z uprawnieniem „Wprowadzanie zmian w wydarzeniach”.
+6. W tym samym miejscu skopiuj „Identyfikator kalendarza” i wklej go wyżej w polu „Kalendarz Google M2 TAX”.
+7. Kliknij „Sprawdź połączenie”, a potem „Wyślij terminy do Google”.
+
+Powiadomienia: każdy z Was ustawia je u siebie w Google – ustawienia kalendarza M2 TAX → „Powiadomienia o wydarzeniach” / „Powiadomienia o wydarzeniach całodniowych” (np. dzień wcześniej o 9:00). Działają wtedy też na telefonie w aplikacji Kalendarz Google.
+
+Jeśli kalendarz jest w Google Workspace, administrator domeny musi zezwalać na udostępnianie kalendarzy na zewnątrz (konto usługi ma adres spoza domeny).`;
+
+function gcalBox() {
+  const st = h('p', { class: 'small' }, 'Sprawdzam połączenie…');
+  const check = async () => {
+    st.textContent = 'Sprawdzam połączenie…';
+    try {
+      const { data, error } = await sb.functions.invoke('gcal', { body: { action: 'status' } });
+      if (error) throw error;
+      if (!data.configured) st.replaceChildren(h('b', {}, 'Niepodłączony. '), data.reason || '', data.serviceAccount ? ` Konto usługi: ${data.serviceAccount}` : '');
+      else if (!data.ok) st.replaceChildren(h('b', { style: { color: 'var(--warn)' } }, 'Błąd: '), data.error, h('br'), `Konto usługi do udostępnienia: ${data.serviceAccount}`);
+      else st.replaceChildren(h('b', { style: { color: 'var(--ok)' } }, '✓ Połączono '), `z kalendarzem „${data.name}”. Konto usługi: ${data.serviceAccount}`);
+    } catch (e) { st.textContent = 'Nie udało się sprawdzić połączenia: ' + (e.message || e); }
+  };
+  const syncBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+    syncBtn.disabled = true; syncBtn.textContent = 'Wysyłam…';
+    try {
+      const { data, error } = await sb.functions.invoke('gcal', { body: { action: 'sync_all' } });
+      if (error) throw error;
+      if (data.configured === false) toast(data.reason, true);
+      else toast(`Wysłano do Google: ${data.synced}${data.errors?.length ? ` · błędy: ${data.errors.length}` : ''}`, !!data.errors?.length);
+    } catch (e) { fail(e); }
+    syncBtn.disabled = false; syncBtn.textContent = 'Wyślij terminy do Google';
+  } }, 'Wyślij terminy do Google');
+  check();
+  return h('div', { class: 'panel', style: { padding: '14px 16px', marginTop: '14px' } },
+    h('p', { class: 'eyebrow', style: { marginBottom: '8px', display: 'flex', alignItems: 'center' } }, 'Kalendarz Google – synchronizacja', infoTip(GCAL_HELP, 'Kalendarz Google – podłączenie')),
+    st,
+    h('p', { class: 'hint', style: { margin: '6px 0 10px' } }, 'Nowe terminy i oznaczenie „wykonane” trafiają do Google od razu. „Wyślij terminy do Google” przesyła wszystkie terminy od 60 dni wstecz (np. po pierwszym podłączeniu).'),
+    h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, h('button', { class: 'btn btn-outline btn-sm', onclick: check }, 'Sprawdź połączenie'), syncBtn));
 }

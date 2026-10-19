@@ -80,6 +80,18 @@ async function loadSettings() {
   return Object.fromEntries((data || []).map(r => [r.key, r.value]));
 }
 
+// ---------- Kalendarz Google: terminy z aplikacji trafiają do kalendarza M2 TAX ----------
+export function gcalSync(ids) {
+  if (!ids?.length) return;
+  sb.functions.invoke('gcal', { body: { action: 'sync', ids } }).then(({ data }) => {
+    if (data?.errors?.length) toast('Kalendarz Google: ' + data.errors[0], true);
+  }).catch(() => { /* kalendarz niepodłączony – bez komunikatu */ });
+}
+export function gcalDelete(ids) {
+  if (!ids?.length) return Promise.resolve();
+  return sb.functions.invoke('gcal', { body: { action: 'delete', ids } }).catch(() => {});
+}
+
 // ---------- dodawanie terminu (z kalkulatorem) ----------
 export function deadlineDialog({ matter = null, clientId = null, date = null, onSaved }) {
   const d = { kind: 'procesowy', title: '', due_date: date || '', assignee_id: matter?.lead_id || state.me.id, notes: '', basis: null, served_at: null };
@@ -130,8 +142,9 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
       if (!d.title || !d.due_date) return toast('Podaj czego dotyczy termin i datę', true);
       const row = { title: d.title, due_date: d.due_date, due_time: d.due_time || null, kind: d.kind || 'wewnetrzny', assignee_id: d.assignee_id || null,
         notes: d.notes || null, basis: d.basis, served_at: d.served_at, matter_id: matter?.id || null, client_id: matter?.client_id || clientId || null };
-      const { error } = await sb.from('m2_deadlines').insert(row);
+      const { data: ins, error } = await sb.from('m2_deadlines').insert(row).select('id').single();
       if (error) return fail(error);
+      gcalSync([ins.id]);
       toast('Dodano termin'); close(); onSaved?.();
     } }, 'Zapisz termin')]);
 }
@@ -144,7 +157,7 @@ function deadlineRow(dl, matters, onChange) {
   cb.addEventListener('change', async () => {
     const { error } = await sb.from('m2_deadlines').update({ done: cb.checked, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', dl.id);
     if (error) { cb.checked = !cb.checked; return fail(error); }
-    dl.done = cb.checked; onChange?.();
+    dl.done = cb.checked; gcalSync([dl.id]); onChange?.();
   });
   const m = dl.matter_id ? matters?.get(dl.matter_id) : null;
   const k = DEADLINE_KIND[dl.kind] || DEADLINE_KIND.wewnetrzny;
@@ -419,6 +432,7 @@ async function viewMatter(main, id, params) {
 
   const delMatter = isAdmin() ? h('button', { class: 'btn btn-danger btn-sm', onclick: async () => {
     if (!confirm(`Usunąć sprawę ${m.number} razem z terminami, dziennikiem i czasem pracy? Tego nie da się cofnąć.`)) return;
+    await gcalDelete(deadlines.map(d => d.id));
     const { error } = await sb.from('m2_matters').delete().eq('id', id); if (error) return fail(error);
     toast('Usunięto sprawę'); location.hash = `${BASE}/sprawy`;
   } }, 'Usuń sprawę') : null;
@@ -588,6 +602,24 @@ async function viewCalendar(main, params) {
   ]);
   const mm = new Map(matters.map(m => [m.id, m]));
   const byDay = new Map(); deadlines.forEach(d => { if (!byDay.has(d.due_date)) byDay.set(d.due_date, []); byDay.get(d.due_date).push(d); });
+  // wydarzenia z Kalendarza Google M2 TAX (spotkania, Zoho itd.) – bez terminów, które aplikacja sama tam wysłała
+  const gByDay = new Map();
+  let gInfo = null;
+  try {
+    const { data: gl, error: ge } = await sb.functions.invoke('gcal', { body: { action: 'list', from: iso(start), to: iso(end) } });
+    if (ge) throw ge;
+    if (gl?.configured === false) gInfo = { off: true, reason: gl.reason };
+    else if (gl?.error) gInfo = { error: gl.error };
+    else (gl?.events || []).forEach(e => {
+      const s0 = new Date(e.allDay ? e.start + 'T00:00:00' : e.start), e0 = new Date(e.allDay ? e.end + 'T00:00:00' : e.end);
+      if (e.allDay) e0.setDate(e0.getDate() - 1);
+      for (let d = new Date(s0.getFullYear(), s0.getMonth(), s0.getDate()); d <= e0; d.setDate(d.getDate() + 1)) {
+        const k = iso(d); if (!gByDay.has(k)) gByDay.set(k, []); gByDay.get(k).push(e);
+        if (!e.allDay) break;
+      }
+    });
+  } catch (e) { gInfo = { error: e.message || String(e) }; }
+  const gTime = e => e.allDay ? '' : new Date(e.start).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) + ' ';
   const shift = (n) => { const d = new Date(y, mo - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
   const today = todayIso();
   const grid = h('div', { class: 'cal' }, ...['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'].map(d => h('div', { class: 'cal-h' }, d)));
@@ -603,22 +635,25 @@ async function viewCalendar(main, params) {
       return h(m ? 'a' : 'span', { class: 'cal-chip' + (it.done ? ' done' : ''), href: m ? `${BASE}/sprawa/${m.id}` : null,
         style: { borderLeftColor: k.color }, 'data-tip': `${k.label}: ${it.title}${m ? `\n${m.number} · ${m.title}` : ''}${it.assignee_id ? `\nOdpowiada: ${who(it.assignee_id)}` : ''}` },
       (it.due_time ? it.due_time.slice(0, 5) + ' ' : '') + it.title);
-    })));
+    }),
+    ...(gByDay.get(key) || []).map(e => h('a', { class: 'cal-chip g', href: e.link || null, target: '_blank', rel: 'noopener',
+      'data-tip': `Kalendarz Google: ${gTime(e)}${e.title}${e.location ? `\n${e.location}` : ''}` }, gTime(e) + e.title))));
   }
   let gsrc = settings.m2_google_calendar_src || '';
-  if (gsrc && !/^https?:/.test(gsrc)) gsrc = `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(gsrc)}&ctz=Europe%2FWarsaw&mode=WEEK`;
-  const google = h('section', { class: 'card section', style: { marginTop: '18px' } },
-    h('div', { class: 'section-head' }, h('h2', {}, 'Kalendarz Google M2 TAX'), gsrc ? h('a', { class: 'btn btn-ghost btn-sm', href: gsrc.replace('/embed', '/r'), target: '_blank', rel: 'noopener' }, 'Otwórz w Google') : null),
-    gsrc ? h('iframe', { class: 'gcal', src: gsrc, title: 'Kalendarz Google M2 TAX', loading: 'lazy' })
-      : h('p', { class: 'hint' }, isAdmin() ? 'Wklej link do osadzenia kalendarza (Google Kalendarz → Ustawienia kalendarza → Integracja kalendarza → „Kod do umieszczenia” lub „Identyfikator kalendarza”) w Zespół i ustawienia → M2 TAX.' : 'Administrator nie podpiął jeszcze kalendarza Google.'),
-    gsrc ? h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Wydarzenia prywatnego kalendarza widać, gdy jesteś zalogowany w przeglądarce na konto Google z dostępem do kalendarza M2 TAX.') : null);
+  const gid = /^https?:/.test(gsrc) ? (new URL(gsrc).searchParams.get('src') || '') : gsrc;
+  const gOpen = gid ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(gid)}` : null;
+  const google = gInfo ? h('section', { class: 'card section', style: { marginTop: '18px' } },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Kalendarz Google M2 TAX'), gOpen ? h('a', { class: 'btn btn-ghost btn-sm', href: gOpen, target: '_blank', rel: 'noopener' }, 'Otwórz w Google') : null),
+    h('p', { class: 'hint' }, gInfo.off ? `Kalendarz Google nie jest jeszcze podłączony: ${gInfo.reason || ''} ${isAdmin() ? 'Instrukcja: Zespół i ustawienia → M2 TAX → Kalendarz Google.' : ''}` : `Nie udało się pobrać wydarzeń z Google: ${gInfo.error}`)) : null;
   main.replaceChildren(...header('kalendarz', 'Kalendarz terminów', 'Kliknij dwukrotnie dzień, aby dodać termin.',
     [h('a', { class: 'icon-btn', href: `${BASE}/kalendarz?m=${shift(-1)}`, 'aria-label': 'Poprzedni miesiąc' }, icon('left')),
       h('span', { class: 'month' }, h('span', { class: 'label' }, MONTHS[mo - 1][0].toUpperCase() + MONTHS[mo - 1].slice(1) + ' ' + y)),
       h('a', { class: 'icon-btn', href: `${BASE}/kalendarz?m=${shift(1)}`, 'aria-label': 'Następny miesiąc' }, icon('right')),
       h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewCalendar(main, params) }) }, icon('plus'), 'Termin')]),
-  h('div', { class: 'legend' }, ...Object.values(DEADLINE_KIND).map(k => h('span', {}, h('span', { class: 'dot', style: { background: k.color } }), k.label))),
-  h('div', { class: 'cal-wrap' }, grid), google);
+  h('div', { class: 'legend' }, ...Object.values(DEADLINE_KIND).map(k => h('span', {}, h('span', { class: 'dot', style: { background: k.color } }), k.label)),
+    gInfo ? null : h('span', {}, h('span', { class: 'dot', style: { background: '#4285F4' } }), 'Kalendarz Google'),
+    gInfo || !gOpen ? null : h('a', { href: gOpen, target: '_blank', rel: 'noopener', class: 'small' }, 'Otwórz w Google →')),
+  h('div', { class: 'cal-wrap' }, grid), ...(google ? [google] : []));
 }
 
 // ================= ZLECENIA I UMOWY =================
