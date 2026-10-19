@@ -130,36 +130,49 @@ export async function renderKlienci(main) {
     wlBtn.disabled = false; wlBtn.replaceChildren(icon('download'), 'Biała lista VAT');
     if (error || data?.error) return fail(data?.error || error, 'Biała lista');
     const res = data.results || {};
+    const norm = v => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const LBL = { name: 'Nazwa', address: 'Adres', regon: 'REGON', krs: 'KRS' };
     const changes = withNip.map(c => {
       const r = res[cleanNip(c.nip)];
       if (!r?.found) return { c, notFound: true, set: {} };
       const set = {};
-      for (const k of ['address', 'regon', 'krs']) if (r[k] && (c[k] || '').trim() !== r[k]) set[k] = r[k];
+      // nazwa: dla spółek z rejestru; przy JDG rejestr podaje „IMIĘ NAZWISKO + firma”, więc nie nadpisuję imienia i nazwiska
+      if (r.name && c.legal_form !== 'jdg' && norm(c.name) !== norm(r.name)) set.name = r.name;
+      for (const k of ['address', 'regon', 'krs']) if (r[k] && norm(c[k]) !== norm(r[k])) set[k] = r[k];
       return { c, r, set };
     });
     const rows = changes.filter(x => Object.keys(x.set).length || x.notFound);
+    const nChanges = rows.reduce((a, x) => a + Object.keys(x.set).length, 0);
     const tbody = h('tbody', {}, ...(rows.length ? rows.map(x => {
-      const cb = h('input', { type: 'checkbox', checked: !x.notFound, disabled: x.notFound });
-      x.cb = cb;
-      const diff = Object.entries(x.set).map(([k, v]) => h('div', { class: 'small' }, h('b', {}, { address: 'Adres', regon: 'REGON', krs: 'KRS' }[k] + ': '),
-        x.c[k] ? h('span', { class: 'muted', style: { textDecoration: 'line-through' } }, x.c[k] + ' ') : '', v));
-      return h('tr', {}, h('td', {}, cb), h('td', {}, h('b', {}, x.c.name), h('div', { class: 'small muted' }, 'NIP ' + x.c.nip),
-          x.r && x.r.name ? h('div', { class: 'small muted' }, 'w rejestrze: ' + x.r.name) : null),
+      x.cbs = {};
+      const diff = Object.entries(x.set).map(([k, v]) => {
+        const cb = h('input', { type: 'checkbox', checked: true }); x.cbs[k] = cb;
+        return h('label', { class: 'small wl-ch' }, cb, h('b', {}, LBL[k] + ': '),
+          x.c[k] ? h('span', { class: 'muted', style: { textDecoration: 'line-through' } }, x.c[k] + ' ') : '', v);
+      });
+      return h('tr', {}, h('td', {}, h('b', {}, x.c.name), h('div', { class: 'small muted' }, 'NIP ' + x.c.nip),
+          x.r && x.r.name && !x.set.name ? h('div', { class: 'small muted' }, 'w rejestrze: ' + x.r.name) : null),
         h('td', {}, x.notFound ? h('span', { class: 'badge warn' }, 'brak w wykazie VAT') : diff),
         h('td', { class: 'small' }, x.r?.statusVat || ''));
-    }) : [h('tr', {}, h('td', { colspan: 4, class: 'empty' }, 'Wszystkie dane są aktualne.'))]));
+    }) : [h('tr', {}, h('td', { colspan: 3, class: 'empty' }, 'Wszystkie dane są aktualne.'))]));
     modal(`Biała lista VAT – ${data.checkedAt}`, h('div', {},
-      h('p', { class: 'hint', style: { marginBottom: '10px' } }, `Sprawdzono ${withNip.length} klientów. Zaznaczone zmiany zostaną zapisane (adres, REGON, KRS). Nazwy klientów nie zmieniam. „Brak w wykazie VAT” oznacza podmiot niezarejestrowany jako podatnik VAT albo wykreślony.`),
+      h('p', { class: 'hint', style: { marginBottom: '10px' } }, `Sprawdzono ${withNip.length} klientów, znaleziono ${nChanges} różnic. Zaznaczone pola zostaną zapisane (nazwa, adres, REGON, KRS). Nazw JDG nie zmieniam – rejestr podaje je w innym układzie (imię, nazwisko i nazwa firmy). „Brak w wykazie VAT” oznacza podmiot niezarejestrowany jako podatnik VAT albo wykreślony.`),
       h('div', { class: 'list-wrap', style: { maxHeight: '60vh', overflow: 'auto' } }, h('table', { class: 'list' },
-        h('thead', {}, h('tr', {}, ['', 'Klient', 'Zmiana', 'Status VAT'].map(t => h('th', {}, t)))), tbody))),
+        h('thead', {}, h('tr', {}, ['Klient', 'Zmiana (odznacz, czego nie zapisywać)', 'Status VAT'].map(t => h('th', {}, t)))), tbody))),
     (close) => [
       h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
-      rows.some(x => !x.notFound) ? h('button', { class: 'btn btn-primary btn-sm', onclick: async (e) => {
-        const todo = rows.filter(x => x.cb?.checked && Object.keys(x.set).length);
+      nChanges ? h('button', { class: 'btn btn-primary btn-sm', onclick: async (e) => {
         e.currentTarget.disabled = true;
-        let ok = 0;
-        for (const x of todo) { const { error: e2 } = await sb.from('clients').update(x.set).eq('id', x.c.id); if (e2) { fail(e2); break; } Object.assign(x.c, x.set); ok++; }
-        toast(`Zaktualizowano ${ok} klientów`); close(); render();
+        let ok = 0, denied = 0;
+        for (const x of rows) {
+          const set = Object.fromEntries(Object.entries(x.set).filter(([k]) => x.cbs?.[k]?.checked));
+          if (!Object.keys(set).length) continue;
+          const { data: upd, error: e2 } = await sb.from('clients').update(set).eq('id', x.c.id).select('id');
+          if (e2) { fail(e2); break; }
+          if (!upd?.length) { denied++; continue; }
+          Object.assign(x.c, set); ok++;
+        }
+        toast(denied ? `Zaktualizowano ${ok} klientów, ${denied} bez uprawnień do zmiany` : `Zaktualizowano ${ok} klientów`, !!denied); close(); render();
       } }, 'Zapisz zaznaczone') : null,
     ], { wide: true });
   } }, icon('download'), 'Biała lista VAT') : null;
