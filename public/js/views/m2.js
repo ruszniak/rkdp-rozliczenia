@@ -13,6 +13,7 @@ import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
 import { modal as uiModal } from '../ui.js';
+import { renderOferty } from './oferty.js';
 
 const BASE = '#/doradztwo';
 const members = () => state.members.filter(m => m.active && (m.modules || []).includes('doradztwo'));
@@ -751,6 +752,7 @@ async function viewOrders(main, params) {
     'Zlecenie – krótkie, na jedną stronę, do mniejszych tematów. Umowa – pełny wzór M2 TAX. Oba na papierze firmowym, do pobrania jako PDF lub Word.',
     [h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=zlecenie` }, icon('plus'), 'Nowe zlecenie'),
       h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa` }, icon('plus'), 'Nowa umowa'),
+      h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/oferty` }, 'Oferty'),
       h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ kind: 'pps1' }) }, 'Pełnomocnictwo PPS-1'),
       h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ kind: 'procesowe' }) }, 'Pełnomocnictwo procesowe')]),
   h('div', { class: 'toolbar' }, search, ty, st),
@@ -1199,5 +1201,6 @@ export async function renderM2(main, parts, params) {
   if (sub === 'zlecenie') return viewOrder(main, parts[2], params);
   if (sub === 'spotkania') { history.replaceState(null, '', `${BASE}/kalendarz`); return viewCalendar(main, params); }
   if (sub === 'zgloszenia') return renderZgloszenia(main, parts[2], params, 'm2');
+  if (sub === 'oferty') return renderOferty(main, parts[2], 'm2');
   return viewDashboard(main);
 }
