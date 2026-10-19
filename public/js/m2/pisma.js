@@ -305,9 +305,8 @@ export function pismoBlocks(type, d, signers) {
   B.push({ t: 'party', label: T.party, lines: [c.name || '[imię i nazwisko / nazwa]', c.address || '[adres]', idLine] });
   B.push({ t: 'party', label: many ? 'Pełnomocnicy' : 'Pełnomocnik', lines: [
     ...sg.map(s => `${s.full_name} – doradca podatkowy, nr wpisu ${s.license_no || '[……]'}`),
-    `${FIRM.name}`, `${FIRM.address} (adres do doręczeń)`,
+    FIRM.address,
     !many && sg[0].ae_address ? `adres do doręczeń elektronicznych: ${sg[0].ae_address}` : null,
-    `e-mail: ${FIRM.email} · tel. ${FIRM.phones}`,
   ].filter(Boolean) });
   if (T.organParty) B.push({ t: 'party', label: 'Organ', lines: [d.actOrgNom || (type === 'nsa' ? 'Dyrektor Izby Administracji Skarbowej we Wrocławiu' : (d.actOrg ? d.actOrg.replace(/^Dyrektora/, 'Dyrektor').replace(/^Naczelnika/, 'Naczelnik') : '[organ]'))] });
   B.push({ t: 'addr', lines: lines(d.addr || T.addr), via: T.via && d.via !== '' ? lines(d.via ?? T.via) : null });
