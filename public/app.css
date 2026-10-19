@@ -581,3 +581,11 @@ a.ag-item:hover{background:#FAF4EA}
   .ob-time,.ob-brk{width:100%}
   .ob-month b{min-width:0}
 }
+
+/* Załączniki w uwagach (Rozliczenia) */
+.note-btn .clip{position:absolute;bottom:1px;right:0;min-width:15px;height:15px;padding:0 3px;border-radius:99px;background:var(--bronze);color:#fff;font-size:9.5px;font-weight:700;line-height:15px;text-align:center}
+.pop-notes{width:min(440px,calc(100vw - 32px))}
+.pop .pop-notes .tk-drop{padding:10px 12px;margin:2px 0 8px;font-size:12.5px}
+.pf-files{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));max-height:260px;overflow:auto;margin-bottom:6px}
+.pop.busy{opacity:.7;pointer-events:none}
+.pop:has(.pop-notes){max-width:none}

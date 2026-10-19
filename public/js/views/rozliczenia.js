@@ -2,6 +2,7 @@ import { h, icon, toast, fail, periodLabel, shiftPeriod, defaultPeriod, download
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
 import { downloadXlsx } from '../xlsx.js';
+import { fileTile, dropZone, pastedFiles, named, safeName } from './zgloszenia.js';
 
 const PREF_KEY = 'rkdp-rozliczenia-v2';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch { return {}; } };
@@ -55,6 +56,12 @@ export async function renderRozliczenia(main, params) {
     fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at').eq('period', pdate)),
     fetchAll(() => sb.from('period_notes').select('client_id,notes,questions').eq('period', pdate)),
   ]);
+  // załączniki do uwag (tabela może jeszcze nie istnieć – wtedy po prostu brak plików)
+  const fileCount = new Map();
+  sb.from('period_files').select('client_id').eq('period', pdate).then(({ data }) => {
+    (data || []).forEach(r => fileCount.set(r.client_id, (fileCount.get(r.client_id) || 0) + 1));
+    fileCount.forEach((_, id) => { try { refreshRow(id); } catch { /* tabela jeszcze się rysuje */ } });
+  });
 
   const tasksAll = state.taskTypes.filter(t => t.active);
   const byClient = new Map();
@@ -346,9 +353,10 @@ export async function renderRozliczenia(main, params) {
   function noteCell(c) {
     const n = noteMap.get(c.id) || {};
     const has = !!(n.notes?.trim()), q = !!(n.questions?.trim());
-    const tip = (has ? `Uwagi: ${n.notes}` : '') + (has && q ? '\n' : '') + (q ? `Pytania: ${n.questions}` : '') || 'Dodaj uwagę lub pytanie';
-    return h('button', { class: 'note-btn' + (has || q ? ' has' : '') + (q ? ' q' : ''), 'data-tip': tip, 'aria-label': 'Uwagi',
-      html: ICON_NOTE + (q ? '<span class="dot"></span>' : ''), onclick: (ev) => notesMenu(ev.currentTarget, c) });
+    const fc = fileCount.get(c.id) || 0;
+    const tip = ((has ? `Uwagi: ${n.notes}` : '') + (has && q ? '\n' : '') + (q ? `Pytania: ${n.questions}` : '') + (fc ? `${has || q ? '\n' : ''}Załączniki: ${fc}` : '')) || 'Dodaj uwagę, pytanie lub zrzut ekranu';
+    return h('button', { class: 'note-btn' + (has || q || fc ? ' has' : '') + (q ? ' q' : ''), 'data-tip': tip, 'aria-label': 'Uwagi',
+      html: ICON_NOTE + (q ? '<span class="dot"></span>' : '') + (fc ? `<span class="clip">${fc}</span>` : ''), onclick: (ev) => notesMenu(ev.currentTarget, c) });
   }
 
   function rowFor(c, area, cols) {
@@ -456,7 +464,8 @@ export async function renderRozliczenia(main, params) {
     pop.style.top = (r.bottom + ph + 8 > innerHeight ? Math.max(8, r.top - ph - 6) : r.bottom + 6) + 'px';
     const close = (e) => {
       if (e.type === 'keydown' && e.key !== 'Escape') return;
-      if (e.type === 'mousedown' && pop.contains(e.target)) return;
+      if (e.type === 'mousedown' && (pop.contains(e.target) || e.target.closest?.('.modal-back'))) return;
+      if (e.type === 'keydown' && document.querySelector('.modal-back')) return;
       closePop();
     };
     pop._cleanup = () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
@@ -500,11 +509,48 @@ export async function renderRozliczenia(main, params) {
       if (error) return fail(error);
       noteMap.set(c.id, payload); closePop(); refreshRow(c.id); toast('Zapisano');
     };
-    openPop(anchor, h('div', { class: 'pop-body' },
+    const files = h('div', { class: 'tk-files pf-files' });
+    const pop = openPop(anchor, h('div', { class: 'pop-body pop-notes' },
       h('label', {}, `Uwagi – ${c.name}`), ta1,
       h('label', {}, 'Pytania / problemy'), ta2,
+      h('label', {}, 'Załączniki – zrzuty ekranu, PDF, inne pliki'),
+      dropZone(fs => addFiles(fs), 'albo wklej zrzut Ctrl+V / ⌘V'), files,
       h('div', { class: 'row' }, h('button', { class: 'btn btn-ghost btn-sm', onclick: closePop }, 'Anuluj'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: save }, 'Zapisz'))));
+    const ar = anchor.getBoundingClientRect();
+    const place = () => { const r = ar, ph = pop.offsetHeight; pop.style.top = Math.max(8, Math.min(r.bottom + 6, innerHeight - ph - 8)) + 'px'; };
+    async function loadFiles() {
+      const { data, error } = await sb.from('period_files').select('*').eq('client_id', c.id).eq('period', pdate).order('created_at');
+      if (error) { files.replaceChildren(h('p', { class: 'hint' }, 'Załączniki będą dostępne po aktualizacji bazy danych.')); return; }
+      fileCount.set(c.id, data.length); refreshRow(c.id);
+      files.replaceChildren(...data.map(f => fileTile({ ...f, bucket: 'rozliczenia' }, { onDelete: (f.uploaded_by === state.me.id || state.me.role === 'admin') ? async () => {
+        if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
+        const { error: e1 } = await sb.from('period_files').delete().eq('id', f.id);
+        if (e1) return fail(e1);
+        await sb.storage.from('rozliczenia').remove([f.path]);
+        loadFiles();
+      } : null })));
+      place();
+    }
+    async function addFiles(fs) {
+      pop.classList.add('busy');
+      let ok = 0;
+      for (const raw of fs) {
+        const f = named(raw);
+        if (f.size > 25 * 1048576) { toast(`„${f.name}” jest większy niż 25 MB`, true); continue; }
+        const path = `${c.id}/${period}/${crypto.randomUUID().slice(0, 8)}-${safeName(f.name)}`;
+        const { error } = await sb.storage.from('rozliczenia').upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+        if (error) { fail(error, `Nie udało się wysłać „${f.name}”`); continue; }
+        const { error: e2 } = await sb.from('period_files').insert({ client_id: c.id, period: pdate, path, name: f.name, mime: f.type || null, size: f.size, uploaded_by: state.me.id });
+        if (e2) { await sb.storage.from('rozliczenia').remove([path]); fail(e2); continue; }
+        ok++;
+      }
+      pop.classList.remove('busy');
+      if (ok) toast(ok === 1 ? 'Dodano załącznik' : `Dodano załączniki: ${ok}`);
+      loadFiles();
+    }
+    pop.addEventListener('paste', e => { const fs = pastedFiles(e); if (fs.length) { e.preventDefault(); addFiles(fs); } });
+    loadFiles();
   }
 
   // ---------- menu układu ----------

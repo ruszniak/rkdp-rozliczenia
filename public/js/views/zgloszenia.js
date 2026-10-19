@@ -462,11 +462,11 @@ const BUCKET = 'zgloszenia';
 const MAX_MB = 25;
 const isImg = f => /^image\//.test(f.mime || f.type || '') || /\.(png|jpe?g|gif|webp|heic)$/i.test(f.name || '');
 const isPdf = f => /pdf/.test(f.mime || f.type || '') || /\.pdf$/i.test(f.name || '');
-const fmtSize = n => n > 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+export const fmtSize = n => n > 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
-const safeName = n => (n || 'plik').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^\w.\-]+/g, '_').slice(-80);
+export const safeName = n => (n || 'plik').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^\w.\-]+/g, '_').slice(-80);
 // wklejony obraz ze schowka ma nazwę „image.png” – nadaj czytelną
-const named = f => (/^image\.(png|jpe?g|gif|webp)$/i.test(f.name || '') || !f.name) && isImg(f)
+export const named = f => (/^image\.(png|jpe?g|gif|webp)$/i.test(f.name || '') || !f.name) && isImg(f)
   ? new File([f], `zrzut_ekranu_${stamp()}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`, { type: f.type }) : f;
 
 export async function countFiles(ids) {
@@ -493,9 +493,9 @@ export async function uploadFiles(ticketId, files) {
 }
 
 const blobCache = new Map();
-async function fileUrl(path) {
+async function fileUrl(path, bucket = BUCKET) {
   if (blobCache.has(path)) return blobCache.get(path);
-  const { data, error } = await sb.storage.from(BUCKET).download(path);
+  const { data, error } = await sb.storage.from(bucket).download(path);
   if (error) throw error;
   const url = URL.createObjectURL(data);
   blobCache.set(path, url);
@@ -505,7 +505,7 @@ function saveAs(url, name) { const a = document.createElement('a'); a.href = url
 
 async function openFile(f) {
   try {
-    const url = await fileUrl(f.path);
+    const url = await fileUrl(f.path, f.bucket);
     if (isImg(f)) {
       modal(f.name, h('div', { class: 'tk-lightbox' }, h('img', { src: url, alt: f.name })), close => [
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => saveAs(url, f.name) }, icon('download'), 'Pobierz'),
@@ -519,9 +519,9 @@ async function openFile(f) {
 
 const fileIcon = f => isPdf(f) ? 'PDF' : /sheet|excel|\.xlsx?$|\.csv$/i.test(`${f.mime} ${f.name}`) ? 'XLS' : /word|\.docx?$/i.test(`${f.mime} ${f.name}`) ? 'DOC' : /zip|\.zip$/i.test(`${f.mime} ${f.name}`) ? 'ZIP' : (f.name.split('.').pop() || 'PLIK').slice(0, 4).toUpperCase();
 
-function fileTile(f, { onDelete } = {}) {
+export function fileTile(f, { onDelete } = {}) {
   const thumb = h('div', { class: 'tk-thumb' + (isImg(f) ? ' img' : '') }, isImg(f) ? '' : h('span', { class: 'tk-ext' }, fileIcon(f)));
-  if (isImg(f)) fileUrl(f.path).then(u => { thumb.style.backgroundImage = `url("${u}")`; }).catch(() => { thumb.textContent = 'IMG'; });
+  if (isImg(f)) fileUrl(f.path, f.bucket).then(u => { thumb.style.backgroundImage = `url("${u}")`; }).catch(() => { thumb.textContent = 'IMG'; });
   return h('div', { class: 'tk-file' },
     h('button', { type: 'button', class: 'tk-file-open', onclick: () => openFile(f), title: f.name }, thumb,
       h('span', { class: 'tk-file-name' }, f.name),
@@ -529,7 +529,7 @@ function fileTile(f, { onDelete } = {}) {
     onDelete ? h('button', { type: 'button', class: 'tk-file-del', 'aria-label': 'Usuń załącznik', onclick: onDelete }, '✕') : null);
 }
 
-function dropZone(onFiles, hint) {
+export function dropZone(onFiles, hint) {
   const input = h('input', { type: 'file', multiple: true, hidden: true, onchange: () => { if (input.files.length) onFiles([...input.files]); input.value = ''; } });
   const zone = h('div', { class: 'tk-drop' },
     h('div', {}, h('b', {}, 'Przeciągnij pliki tutaj'), h('span', { class: 'muted' }, ` · ${hint}`)),
@@ -539,7 +539,7 @@ function dropZone(onFiles, hint) {
   zone.addEventListener('drop', e => { const fs = [...(e.dataTransfer?.files || [])]; if (fs.length) onFiles(fs); });
   return zone;
 }
-const pastedFiles = e => [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
+export const pastedFiles = e => [...(e.clipboardData?.items || [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean);
 
 // pliki dodawane w oknie „Nowe zgłoszenie” – wysyłane po zapisaniu zgłoszenia
 function pendingFilesBox(pending) {
