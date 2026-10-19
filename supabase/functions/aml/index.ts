@@ -78,12 +78,19 @@ async function krs(nr: string) {
 
 // ---------------- Biała lista VAT ----------------
 async function vat(nip: string) {
-  const r = await get(`https://wl-api.mf.gov.pl/api/search/nip/${nip}?date=${today()}`, { headers: { Accept: 'application/json' } });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j?.message || `Biała lista odpowiedziała błędem (${r.status}).`);
+  let date = today();
+  let r = await get(`https://wl-api.mf.gov.pl/api/search/nip/${nip}?date=${date}`, { headers: { Accept: 'application/json' } });
+  let j = await r.json().catch(() => ({}));
+  if (!r.ok && (r.status >= 500 || /aktualizacj/i.test(j?.message || ''))) {
+    // baza MF w trakcie aktualizacji – stan na dzień poprzedni
+    const x = new Date(date + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - 1); date = x.toISOString().slice(0, 10);
+    r = await get(`https://wl-api.mf.gov.pl/api/search/nip/${nip}?date=${date}`, { headers: { Accept: 'application/json' } });
+    j = await r.json().catch(() => ({}));
+  }
+  if (!r.ok) throw new Error(/aktualizacj/i.test(j?.message || '') ? 'Biała lista MF chwilowo aktualizuje bazę – spróbuj ponownie za kilkanaście minut.' : (j?.message || `Biała lista odpowiedziała błędem (${r.status}).`));
   const s = j?.result?.subject;
   if (!s) return { found: false, requestId: j?.result?.requestId || null };
-  return { found: true, requestId: j?.result?.requestId || null, name: s.name, statusVat: s.statusVat, krs: s.krs || null, regon: s.regon || null,
+  return { found: true, asOf: date, requestId: j?.result?.requestId || null, name: s.name, statusVat: s.statusVat, krs: s.krs || null, regon: s.regon || null,
     address: s.workingAddress || s.residenceAddress || null, accounts: s.accountNumbers || [], registered: s.registrationLegalDate || null,
     removed: s.removalDate || null, removalBasis: s.removalBasis || null, representatives: arr(s.representatives).map((x: any) => [x.firstName, x.lastName, x.companyName].filter(Boolean).join(' ')) };
 }

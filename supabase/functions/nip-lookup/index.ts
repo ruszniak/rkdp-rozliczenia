@@ -18,6 +18,25 @@ function validNip(nip: string) {
   return sum % 11 === Number(nip[9]);
 }
 
+
+// Biała lista MF w czasie aktualizacji bazy odrzuca zapytania na bieżący dzień („Trwa aktualizacja bazy danych”).
+// Wtedy ponawiamy zapytanie ze stanem na dzień poprzedni, a gdy i to nie działa – zwracamy czytelny komunikat.
+const yesterday = (d: string) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - 1); return x.toISOString().slice(0, 10); };
+async function wl(path: string, date: string): Promise<{ ok: boolean; j: any; date: string; status: number }> {
+  let used = date;
+  for (let i = 0; i < 2; i++) {
+    const r = await fetch(`https://wl-api.mf.gov.pl/api/search/${path}?date=${used}`, { headers: { Accept: 'application/json' } }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (r?.ok) return { ok: true, j, date: used, status: r.status };
+    if (i === 1 || (r && r.status === 400 && !/aktualizacj/i.test(j?.message || ''))) return { ok: false, j, date: used, status: r?.status || 0 };
+    used = yesterday(date);
+  }
+  return { ok: false, j: {}, date: used, status: 0 };
+}
+const wlErr = (w: { j: any; status: number }) => /aktualizacj/i.test(w.j?.message || '')
+  ? 'Biała lista VAT (Ministerstwo Finansów) chwilowo aktualizuje bazę i nie odpowiada. Spróbuj ponownie za kilka–kilkanaście minut albo uzupełnij dane ręcznie.'
+  : (w.j?.message || `Biała lista VAT odpowiedziała błędem (${w.status || 'brak połączenia'}).`);
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   try {
@@ -71,9 +90,9 @@ Deno.serve(async (req: Request) => {
       const results: Record<string, unknown> = {};
       for (let i = 0; i < list.length; i += 30) {
         const chunk = list.slice(i, i + 30);
-        const r = await fetch(`https://wl-api.mf.gov.pl/api/search/nips/${chunk.join(',')}?date=${date}`, { headers: { Accept: 'application/json' } });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) return json({ error: j?.message || `Biała lista VAT odpowiedziała błędem (${r.status}).`, partial: results }, 502);
+        const w = await wl(`nips/${chunk.join(',')}`, date);
+        if (!w.ok) return json({ error: wlErr(w), partial: results }, 502);
+        const j = w.j;
         for (const e of (j?.result?.entries || [])) {
           const s = (e.subjects || [])[0];
           results[e.identifier] = s ? {
@@ -89,16 +108,16 @@ Deno.serve(async (req: Request) => {
     const clean = String(nip || '').replace(/\D/g, '');
     if (!validNip(clean)) return json({ error: 'Nieprawidłowy numer NIP (błędna suma kontrolna).' }, 400);
 
-    const r = await fetch(`https://wl-api.mf.gov.pl/api/search/nip/${clean}?date=${date}`, { headers: { Accept: 'application/json' } });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) return json({ error: j?.message || `Biała lista VAT odpowiedziała błędem (${r.status}).` }, 502);
+    const w = await wl(`nip/${clean}`, date);
+    if (!w.ok) return json({ error: wlErr(w) }, 502);
+    const j = w.j;
     const s = j?.result?.subject;
     if (!s) return json({ found: false, nip: clean, checkedAt: date, requestId: j?.result?.requestId || null });
 
     return json({
       found: true,
-      source: 'Biała lista VAT (Ministerstwo Finansów)',
-      checkedAt: date,
+      source: 'Biała lista VAT (Ministerstwo Finansów)' + (w.date !== date ? ` – stan na ${w.date} (baza MF w trakcie aktualizacji)` : ''),
+      checkedAt: w.date,
       requestId: j?.result?.requestId || null,
       name: s.name || null,
       nip: s.nip || clean,
