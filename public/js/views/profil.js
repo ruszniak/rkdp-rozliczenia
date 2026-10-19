@@ -21,7 +21,7 @@ export async function renderProfil(main) {
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
-  const d = { delivery: 'biuro', email: me.email, ...(prof || {}), pesel: priv?.pesel || '', id_doc: priv?.id_doc || '' };
+  const d = { delivery: 'biuro', ...(prof || {}), pesel: priv?.pesel || '', id_doc: priv?.id_doc || '' };
   let dirty = false;
   const info = h('span', { class: 'small muted' }, prof?.updated_at ? `Zapisano ${new Date(prof.updated_at).toLocaleDateString('pl-PL')}` : 'Profil jeszcze niezapisany');
   const mark = () => { dirty = true; info.textContent = 'Niezapisane zmiany'; };
@@ -88,7 +88,7 @@ export function memberPoa(member, prof, priv) {
   return {
     mode: 'pracownik', full_name: member.full_name,
     nip: p.nip || '', pesel: priv?.pesel || '', ae_address: p.ae_address || '',
-    phone: p.phone || '', email: p.email || member.email || '',
+    phone: p.phone || '', email: p.email || '',
     delivery: own ? { country: 'POLSKA', voiv: p.voiv || '', county: p.county || '', commune: p.commune || '', street: p.street || '', house: p.house || '', flat: p.flat || '', city: p.city || '', zip: p.zip || '', post: p.post || p.city || '' } : 'biuro',
     filled: !!prof,
   };
