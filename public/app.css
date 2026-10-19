@@ -624,3 +624,24 @@ a.dk-tile:hover,button.dk-tile:hover{border-color:var(--bronze);transform:transl
 .pz-form textarea{min-height:68px}
 @media (max-width:1400px){.pz-layout{grid-template-columns:240px minmax(0,1fr)}.pz-paper{grid-column:1/-1}}
 @media (max-width:820px){.pz-layout{grid-template-columns:1fr}.pz-side{position:static;max-height:260px}}
+
+/* AML */
+.aml-st{display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:99px;font-size:11.5px;font-weight:700;background:var(--panel);color:var(--bronze-dark);white-space:nowrap}
+.aml-st.ok{background:var(--ok-bg);color:var(--ok)}.aml-st.bad{background:var(--warn-bg);color:var(--warn)}.aml-st.warn{background:#FBF1DD;color:#8a6a1f}.aml-st.dark{background:var(--dark);color:var(--gold)}
+.aml-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;margin:4px 0 12px}
+.aml-row{display:flex;flex-direction:column;gap:1px;min-width:0}.aml-row b{font-size:13px;overflow-wrap:anywhere}
+.aml-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.aml-checks{border-top:1px solid var(--line)}
+.aml-chk{border-bottom:1px solid var(--line);padding:6px 0}
+.aml-chk summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;flex-wrap:wrap}
+.aml-chk summary::-webkit-details-marker{display:none}
+.aml-chk p{margin:6px 0 0 30px}.aml-chk ul{margin:6px 0 0 30px}
+.aml-k{font-weight:600;font-size:13px;flex:1;min-width:160px}
+.aml-res{width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:#EFE9E0;color:#8F8579;flex:none}
+.aml-res.ok{background:var(--ok-bg);color:var(--ok)}.aml-res.bad{background:var(--warn-bg);color:var(--warn)}.aml-res.warn{background:#FBF1DD;color:#8a6a1f}
+.aml-q{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.aml-q .check{align-items:flex-start;gap:8px;font-size:13.5px}
+.aml-score{background:var(--panel);border-radius:10px;padding:8px 12px;font-size:13.5px}
+.aml-warn{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13.5px}
+.aml-late{color:var(--warn);font-weight:700}
+@media (max-width:820px){.aml-grid{grid-template-columns:1fr}}

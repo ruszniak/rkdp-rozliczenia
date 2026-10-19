@@ -182,6 +182,7 @@ export async function renderKlienci(main) {
       h('div', {}, h('p', { class: 'eyebrow' }, 'Baza klientów'), h('h1', { style: { marginTop: '6px' } }, 'Klienci'),
         h('p', { class: 'sub' }, 'Dane kontaktowe i profil rozliczeń: PIT, CIT, VAT, ZUS, wspólnicy.')),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+        h('a', { class: 'btn btn-outline', href: '#/aml' }, 'AML'),
         h('a', { class: 'btn btn-outline', href: '#/oferty' }, 'Oferty'),
         h('button', { class: 'btn btn-outline', onclick: () => dokumentyDialog().catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'), addBtn)),
     h('div', { class: 'toolbar' }, search, statusSel, groupSel, counter, exportBtn, wlBtn),

@@ -15,6 +15,7 @@ import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
 import { historyCard } from '../m2/history.js';
 import { renderM2Dokumenty } from './m2pisma.js';
+import { amlCard, renderAml, amlDashCard } from '../aml/aml.js';
 import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
 
@@ -227,7 +228,7 @@ async function viewDashboard(main) {
     tile(orders.filter(o => o.status === 'projekt' || o.status === 'wyslane').length, 'Zlecenia i umowy niepodpisane', `${BASE}/zlecenia`)),
   h('div', { class: 'two' },
     h('div', {}, h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list),
-    h('div', {}, obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, h('div', { class: 'table-title' }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
+    h('div', {}, obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'), h('div', { class: 'table-title' }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
       h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
         h('div', {}, h('b', {}, m.number), ' ', m.title, h('div', { class: 'small muted' }, m.m2_clients?.name || '')), statusPill(m.status)))
         : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')])))));
@@ -506,7 +507,7 @@ async function viewClients(main) {
   };
   let st2; search.addEventListener('input', () => { clearTimeout(st2); st2 = setTimeout(render, 180); }); st.addEventListener('change', render);
   main.replaceChildren(...header('klienci', 'Klienci M2 TAX', 'Osobna baza klientów doradztwa – dane, kontakty, stawki i weryfikacja AML.',
-    h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/klient/nowy` }, icon('plus'), 'Nowy klient')),
+    [h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/aml` }, 'Weryfikacja AML'), h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/klient/nowy` }, icon('plus'), 'Nowy klient')]),
   h('div', { class: 'toolbar' }, search, st),
   h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
     h('thead', {}, h('tr', {}, ...['Klient', 'Kontakt', 'Rozliczenie', 'AML', 'Otwarte sprawy'].map(t => h('th', {}, t)))), tbody)));
@@ -589,7 +590,7 @@ async function viewClient(main, id) {
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · ')),
-    h('div', { class: 'two' }, form, h('div', {}, mattersCard, contactsCard, ordersCard, historyCard({ client: c.id }))));
+    h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
 // ================= KALENDARZ =================
@@ -1207,6 +1208,7 @@ export async function renderM2(main, parts, params) {
   if (sub === 'zlecenie') return viewOrder(main, parts[2], params);
   if (sub === 'spotkania') { history.replaceState(null, '', `${BASE}/kalendarz`); return viewCalendar(main, params); }
   if (sub === 'dokumenty') return renderM2Dokumenty(main, params);
+  if (sub === 'aml') return renderAml(main, 'm2');
   if (sub === 'zgloszenia') return renderZgloszenia(main, parts[2], params, 'm2');
   if (sub === 'oferty') return renderOferty(main, parts[2], 'm2');
   return viewDashboard(main);

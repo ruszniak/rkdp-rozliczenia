@@ -7,6 +7,7 @@ import { renderSprawozdania } from './views/sprawozdania.js';
 import { renderDokumenty } from './views/dokumenty.js';
 import { renderProfil } from './views/profil.js';
 import { renderObecnosc } from './views/obecnosc.js';
+import { renderAml } from './aml/aml.js';
 import { renderZgloszenia } from './views/zgloszenia.js';
 import { renderPulpit } from './views/pulpit.js';
 import { renderOferty } from './views/oferty.js';
@@ -32,7 +33,7 @@ const MODULES = {
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']] },
 };
-const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', zlecenie: 'zlecenia', spotkania: 'kalendarz', oferty: 'zlecenia' };
+const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', aml: 'klienci', dokumenty: 'dokumenty', zlecenie: 'zlecenia', spotkania: 'kalendarz', oferty: 'zlecenia' };
 const remembered = () => { try { return localStorage.getItem('rkdp_module'); } catch { return null; } };
 const remember = m => { try { localStorage.setItem('rkdp_module', m); } catch { /* */ } };
 
@@ -137,6 +138,7 @@ async function route() {
     else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
     else if (view === 'klient') cleanup = await renderKlient(layout('klienci'), parts[1]);
+    else if (view === 'aml') cleanup = await renderAml(layout('klienci'), 'rkdp');
     else if (view === 'oferty') cleanup = await renderOferty(layout('klienci'), parts[1], 'rkdp');
     else if (view === 'pulpit') cleanup = await renderPulpit(layout('pulpit'));
     else if (view === 'zgloszenia') cleanup = await renderZgloszenia(layout('zgloszenia'), parts[1], params);

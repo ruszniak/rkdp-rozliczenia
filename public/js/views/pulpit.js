@@ -4,6 +4,7 @@ import { sb, state, memberById } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { sectionOf, deadlinesFor } from '../dict.js';
 import { todayWidget, teamTodayCard, canSeeTeam } from './obecnosc.js';
+import { amlDashCard } from '../aml/aml.js';
 import { TK_OPEN, TK_CAT, statusTag, dueTag, newTicketDialog, generateRecurring } from './zgloszenia.js';
 
 const PREF = 'rkdp-pulpit-widok';
@@ -168,6 +169,7 @@ function adminDashboard(D, period) {
           ...missing.slice(0, 15).map(x => h('a', { class: 'tk-mini', href: `#/klient/${x.c.id}` }, h('span', {}, x.c.name), h('span', { class: 'small muted' }, `${x.area} · ${x.person ? who(x.person) : 'nieprzypisany'}`)))) : null),
       h('div', {},
         canSeeTeam() ? teamTodayCard() : null,
+        amlDashCard('rkdp'),
         deadlinesCard(period),
         card(`Ostatnio zamknięte (${doneWeek.length})`, null, ...(doneWeek.length ? doneWeek.slice(0, 10).map(t => h('a', { class: 'tk-mini', href: `#/zgloszenia/${t.id}` },
           h('div', { style: { minWidth: 0 } }, h('b', {}, t.title), h('div', { class: 'small muted' }, [D.cname[t.client_id], who(t.done_by || t.assignee_id)].filter(Boolean).join(' · '))),
