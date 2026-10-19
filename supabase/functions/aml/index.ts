@@ -220,7 +220,8 @@ Deno.serve(async (req: Request) => {
     const nip = String(client.nip || '').replace(/\D/g, '');
     const want = new Set<string>(Array.isArray(body.only) && body.only.length ? body.only : ['vat', 'crbr', 'krs', 'sankcje']);
     const checks: any[] = [];
-    const add = (c: any) => checks.push({ case_id: caseId, checked_by: memberId, ...c });
+    // wszystkie wiersze z kompletem kolumn – przy zapisie zbiorczym brakujące pola trafiłyby jako NULL (nie domyślne)
+    const add = (c: any) => checks.push({ case_id: caseId, checked_by: memberId, data: {}, raw: null, sha256: null, request_id: null, ...c, ...(c.data == null ? { data: {} } : {}) });
     let krsNo = String(client.krs || '').replace(/\D/g, '');
 
     if (want.has('vat')) {
