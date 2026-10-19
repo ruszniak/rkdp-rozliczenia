@@ -1,7 +1,7 @@
 // Wzory pism procesowych M2 TAX – na papierze firmowym, z wybranym pełnomocnikiem.
 // Pola do uzupełnienia oznaczone są [w nawiasach kwadratowych] – w Wordzie mają żółte wyróżnienie.
 import { FIRM } from './dict.js';
-import { M2_BRAND, dateLong } from './order.js';
+import { M2_BRAND, dateLong, accName } from './order.js';
 
 const F = t => `[${t}]`;
 const OP = 'ustawy z dnia 29 sierpnia 1997 r. – Ordynacja podatkowa (t.j. Dz.U. z [rok] r. poz. [……] ze zm.; dalej: „Ordynacja podatkowa” lub „o.p.”)';
@@ -305,8 +305,9 @@ export function pismoBlocks(type, d, signers) {
   const fem = /\b(sp\.|spółka|s\.a\.|fundacja|spółdzielnia)/i.test(c.name || '') || c.kind === 'firma';
   // pisma do sądu: oznaczenie roli strony (Skarżący); do urzędu – same dane strony
   B.push({ t: 'party', label: T.court ? T.party : null, lines: [c.name || '[imię i nazwisko / nazwa]', c.address || '[adres]', idLine] });
-  B.push({ t: 'party', lead: `${fem ? 'reprezentowana' : 'reprezentowany'} przez:`, lines: [
-    ...sg.map(s => `${s.full_name} – doradca podatkowy, nr wpisu ${s.license_no || '[……]'}`),
+  B.push({ t: 'party', lead: `${fem ? 'reprezentowana' : 'reprezentowany'} przez`, bold: sg.map((_, i) => i + 1), lines: [
+    many ? 'Doradców Podatkowych' : 'Doradcę Podatkowego',
+    ...sg.map(s => `${s.name_acc || accName(s.full_name)} (nr wpisu ${s.license_no || '[……]'})`),
     FIRM.address,
     !many && sg[0].ae_address ? `adres do doręczeń elektronicznych: ${sg[0].ae_address}` : null,
   ].filter(Boolean) });

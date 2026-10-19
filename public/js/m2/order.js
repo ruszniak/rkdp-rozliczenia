@@ -66,7 +66,7 @@ export function slownie(v) {
 const kwota = v => zl(v) ? `${zl(v)} netto (słownie: ${slownie(v)})` : `${P} zł netto (słownie: ${P})`;
 
 // odmiana „Michał Ruszniak” → „Michała Ruszniaka” (gdy brak gotowej formy w bazie)
-function accName(full) {
+export function accName(full) {
   return (full || '').split(/\s+/).map(w => /ska$/i.test(w) ? w.slice(0, -1) + 'ą' : /cka$/i.test(w) ? w.slice(0, -1) + 'ą'
     : /a$/i.test(w) ? w.slice(0, -1) + 'ę' : /ek$/i.test(w) ? w.slice(0, -2) + 'ka' : /[bcćdfghjklłmnńprsśtwzźż]$/i.test(w) ? w + 'a' : w).join(' ');
 }
@@ -602,7 +602,7 @@ function bodyHtml(blocks) {
     else if (b.t === 'kv') html += `<table class="kv"><thead><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     else if (b.t === 'sign') html += `<div class="sign">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div><div class="line">${x.lines.map(esc).join('<br>')}</div></div>`).join('')}</div>`;
     else if (b.t === 'place') html += `<p class="place">${esc(b.text)}</p>`;
-    else if (b.t === 'party') html += `<div class="party">${b.label ? `<div class="lbl">${esc(b.label)}</div>` : ''}${b.lead ? `<div class="lead">${esc(b.lead)}</div>` : ''}${b.lines.map((l, i) => i ? esc(l) : `<b>${esc(l)}</b>`).join('<br>')}</div>`;
+    else if (b.t === 'party') html += `<div class="party">${b.label ? `<div class="lbl">${esc(b.label)}</div>` : ''}${b.lead ? `<div class="lead">${esc(b.lead)}</div>` : ''}${b.lines.map((l, i) => (b.bold || [0]).includes(i) ? `<b>${esc(l)}</b>` : esc(l)).join('<br>')}</div>`;
     else if (b.t === 'addr') html += `<div class="addr"><b>${esc(b.lines[0])}</b>${b.lines.slice(1).map(l => '<br>' + esc(l)).join('')}${b.via ? `<div class="via"><span>za pośrednictwem:</span><br><b>${esc(b.via[0])}</b>${b.via.slice(1).map(l => '<br>' + esc(l)).join('')}</div>` : ''}</div>`;
     else if (b.t === 'ref') html += `<p class="ref"><span>${esc(b.label)}</span> <b>${esc(b.text)}</b></p>`;
     else if (b.t === 'subtitle') html += `<p class="center"><b>${esc(b.text)}</b></p>`;
@@ -696,7 +696,7 @@ function docxBody(blocks) {
     else if (b.t === 'place') add(para(run(b.text, { sz }), { jc: 'right', after: 240 }));
     else if (b.t === 'party') add((b.label ? para(run(b.label, { b: true, color: '7A5A37', sz: 15, spacing: 30, caps: true, font: 'Montserrat' }), { after: 20, keep: true }) : '')
       + (b.lead ? para(run(b.lead, { sz: 19, color: '5D6068' }), { after: 20, keep: true }) : '')
-      + para(b.lines.map((l, i) => run(l, { sz: 20, b: i === 0 }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { after: 160 }));
+      + para(b.lines.map((l, i) => run(l, { sz: 20, b: (b.bold || [0]).includes(i) }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { after: 160 }));
     else if (b.t === 'addr') add(para(b.lines.map((l, i) => run(l, { sz: 21, b: i === 0 }) + (i < b.lines.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { ind: [4820, 0], after: b.via ? 60 : 240, before: 120 })
       + (b.via ? para(run('za pośrednictwem:', { sz: 18, color: '5D6068' }) + '<w:r><w:br/></w:r>' + b.via.map((l, i) => run(l, { sz: 20, b: i === 0 }) + (i < b.via.length - 1 ? '<w:r><w:br/></w:r>' : '')).join(''), { ind: [4820, 0], after: 240 }) : ''));
     else if (b.t === 'ref') add(para(run(b.label + ' ', { sz: 19, color: '5D6068' }) + run(b.text, { sz: 19, b: true }), { after: 40 }));
