@@ -220,6 +220,8 @@ export async function renderZespol(main) {
     inp.addEventListener('change', async () => {
       let v = inp.value.trim() || null;
       const m = v && v.match(/src="([^"]+)"/); if (m) v = m[1].replace(/&amp;/g, '&'); // wklejony cały kod <iframe>
+      if (key === 'm2_google_calendar_src' && v && /gserviceaccount\.com/i.test(v))
+        return toast('To adres konta usługi, nie kalendarza. Wklej „Identyfikator kalendarza” z ustawień Twojego kalendarza Google (np. Twój e-mail).', true);
       const { error } = await sb.from('app_settings').upsert({ key, value: v }); if (error) return fail(error);
       inp.value = v || ''; toast('Zapisano');
     });
