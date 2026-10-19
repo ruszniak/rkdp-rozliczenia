@@ -90,7 +90,7 @@ async function vat(nip: string) {
 
 // ---------------- listy sankcyjne ----------------
 const STOP = new Set(['sp', 'z', 'o', 'oo', 'spolka', 'ograniczona', 'odpowiedzialnoscia', 'akcyjna', 'komandytowa', 'jawna', 'cywilna', 's', 'a', 'sa', 'ltd', 'llc', 'gmbh', 'ooo', 'zao', 'pao', 'oao', 'jsc', 'limited', 'company', 'co', 'inc', 'the', 'and', 'i', 'of', 'ag', 'bv', 'kg']);
-const norm = (t: string) => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase().replace(/[^a-z0-9а-яё]+/g, ' ').trim();
+const norm = (t: string) => (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase().replace(/[^a-z0-9а-яё]+/g, ' ').trim();
 const toks = (t: string) => norm(t).split(' ').filter(w => w.length > 1 && !STOP.has(w));
 const SOURCES: Record<string, { label: string; url: string }> = {
   eu: { label: 'Skonsolidowana lista sankcji finansowych UE', url: 'https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw' },
