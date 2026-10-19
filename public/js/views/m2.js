@@ -600,22 +600,32 @@ async function viewCalendar(main, params) {
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const start = new Date(first); start.setDate(first.getDate() - ((first.getDay() + 6) % 7));
   const end = new Date(last); end.setDate(last.getDate() + (6 - ((last.getDay() + 6) % 7)));
-  const [deadlines, matters, settings] = await Promise.all([
+  const today0 = todayIso(), agTo = addDaysIso(13);
+  const gFrom = iso(start) < today0 ? iso(start) : today0, gTo = iso(end) > agTo ? iso(end) : agTo;
+  // wszystko równolegle; Kalendarz Google z limitem czasu, żeby nie blokował widoku
+  const gReq = Promise.race([
+    sb.functions.invoke('gcal', { body: { action: 'list', from: gFrom, to: gTo } }),
+    new Promise(r => setTimeout(() => r({ error: new Error('Kalendarz Google nie odpowiada – spróbuj odświeżyć za chwilę.') }), 8000)),
+  ]).catch(e => ({ error: e }));
+  const [deadlines, matters, settings, agDl, lateDl, gRes] = await Promise.all([
     fetchAll(() => sb.from('m2_deadlines').select('*').gte('due_date', iso(start)).lte('due_date', iso(end)).order('due_date')),
     fetchAll(() => sb.from('m2_matters').select('id,number,title')),
     loadSettings(),
+    fetchAll(() => sb.from('m2_deadlines').select('*').gte('due_date', today0).lte('due_date', agTo).order('due_date')),
+    fetchAll(() => sb.from('m2_deadlines').select('*').eq('done', false).lt('due_date', today0).order('due_date')),
+    gReq,
   ]);
   const mm = new Map(matters.map(m => [m.id, m]));
   const byDay = new Map(); deadlines.forEach(d => { if (!byDay.has(d.due_date)) byDay.set(d.due_date, []); byDay.get(d.due_date).push(d); });
   // wydarzenia z Kalendarza Google M2 TAX (spotkania, Zoho itd.) – bez terminów, które aplikacja sama tam wysłała
   const gByDay = new Map();
-  let gInfo = null;
+  let gInfo = null, gEvents = [];
   try {
-    const { data: gl, error: ge } = await sb.functions.invoke('gcal', { body: { action: 'list', from: iso(start), to: iso(end) } });
+    const { data: gl, error: ge } = gRes || {};
     if (ge) throw ge;
     if (gl?.configured === false) gInfo = { off: true, reason: gl.reason };
     else if (gl?.error) gInfo = { error: gl.error };
-    else (gl?.events || []).forEach(e => {
+    else (gEvents = gl?.events || []).forEach(e => {
       const s0 = new Date(e.allDay ? e.start + 'T00:00:00' : e.start), e0 = new Date(e.allDay ? e.end + 'T00:00:00' : e.end);
       if (e.allDay) e0.setDate(e0.getDate() - 1);
       for (let d = new Date(s0.getFullYear(), s0.getMonth(), s0.getDate()); d <= e0; d.setDate(d.getDate() + 1)) {
@@ -650,12 +660,7 @@ async function viewCalendar(main, params) {
   const zoho = settings.m2_zoho_bookings_url || '';
 
   // ---- agenda: najbliższe 14 dni (terminy z aplikacji + Kalendarz Google) ----
-  const agTo = addDaysIso(13);
-  const [agDl, agG] = await Promise.all([
-    fetchAll(() => sb.from('m2_deadlines').select('*').gte('due_date', today).lte('due_date', agTo).order('due_date')),
-    gInfo ? Promise.resolve([]) : sb.functions.invoke('gcal', { body: { action: 'list', from: today, to: agTo } }).then(r => r.data?.events || [], () => []),
-  ]);
-  const lateDl = await fetchAll(() => sb.from('m2_deadlines').select('*').eq('done', false).lt('due_date', today).order('due_date'));
+  const agG = gInfo ? [] : gEvents;
   const agenda = new Map();
   const put = (day, item) => { if (!agenda.has(day)) agenda.set(day, []); agenda.get(day).push(item); };
   agDl.forEach(d => put(d.due_date, { t: d.due_time ? d.due_time.slice(0, 5) : '', dl: d }));
