@@ -7,3 +7,4 @@ public/config.js
 *.xlsx
 import_*.sql
 dane/
+public/assets/

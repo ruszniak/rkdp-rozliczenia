@@ -10,5 +10,10 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4"
   },
-  "engines": { "node": "22.x" }
+  "engines": {
+    "node": "22.x"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
 }

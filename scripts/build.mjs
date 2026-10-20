@@ -1,5 +1,6 @@
 // Krok budowania na Vercelu: kopiuje bibliotekę Supabase i zapisuje konfigurację.
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
@@ -27,3 +28,35 @@ if (/service_role|sb_secret_/.test(key) || /"role"\s*:\s*"service_role"/.test(Bu
 writeFileSync('public/config.js',
   `window.RKDP_CONFIG = ${JSON.stringify({ supabaseUrl: url, supabaseAnonKey: key })};\n`);
 console.log('OK: vendor/supabase.js i config.js gotowe');
+
+// ---- Optymalizacja: jeden zminifikowany pakiet JS (z podziałem na części ładowane na żądanie) i CSS z odciskiem w nazwie.
+// Pliki w /assets mają w nazwie skrót treści, więc przeglądarka trzyma je w pamięci na stałe (Cache-Control: immutable),
+// a po każdej zmianie kodu nazwa się zmienia. Jeśli esbuild nie jest dostępny, aplikacja działa ze źródeł jak dotąd.
+const hash = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, 10);
+try {
+  const esbuild = await import('esbuild');
+  rmSync('public/assets', { recursive: true, force: true });
+  const res = await esbuild.build({
+    entryPoints: ['public/js/main.js'], bundle: true, splitting: true, format: 'esm', minify: true, target: ['es2020'],
+    outdir: 'public/assets', entryNames: 'app-[hash]', chunkNames: 'c-[hash]', metafile: true, legalComments: 'none', logLevel: 'warning',
+  });
+  const entry = Object.entries(res.metafile.outputs).find(([, o]) => o.entryPoint === 'public/js/main.js')[0].replace(/^public/, '');
+  const css = await esbuild.transform(readFileSync('public/app.css', 'utf8'), { loader: 'css', minify: true });
+  const cssName = `app-${hash(css.code)}.css`;
+  writeFileSync(`public/assets/${cssName}`, css.code);
+  const sbJs = readFileSync('public/vendor/supabase.js');
+  const sbName = `supabase-${hash(sbJs)}.js`;
+  writeFileSync(`public/assets/${sbName}`, sbJs);
+  let html = readFileSync('public/index.html', 'utf8');
+  html = html
+    .replace('<link rel="stylesheet" href="/app.css">', `<link rel="stylesheet" href="/assets/${cssName}">\n  <link rel="modulepreload" href="${entry}">`)
+    .replace('<script src="/vendor/supabase.js"></script>', `<script src="/assets/${sbName}"></script>`)
+    .replace('<script type="module" src="/js/main.js"></script>', `<script type="module" src="${entry}"></script>`);
+  if (!html.includes(entry) || !html.includes(cssName)) throw new Error('nie udało się podmienić odwołań w index.html');
+  writeFileSync('public/index.html', html);
+  const files = readdirSync('public/assets');
+  const kb = files.reduce((s, f) => s + readFileSync('public/assets/' + f).length, 0) / 1024;
+  console.log(`OK: pakiet ${entry} + ${files.length - 1} plików, razem ${kb.toFixed(0)} kB`);
+} catch (e) {
+  console.warn('Pominięto pakietowanie (aplikacja działa ze źródeł):', e.message);
+}

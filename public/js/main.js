@@ -1,19 +1,32 @@
 import { h, initials, toast, initTooltips, initMobileTables } from './ui.js';
 import { sb, state, hasModule } from './store.js';
 import { renderLogin } from './views/login.js';
-import { renderRozliczenia } from './views/rozliczenia.js';
-import { renderKlienci } from './views/klienci.js';
-import { renderSprawozdania } from './views/sprawozdania.js';
-import { renderDokumenty } from './views/dokumenty.js';
-import { renderProfil } from './views/profil.js';
-import { renderObecnosc } from './views/obecnosc.js';
-import { renderAml } from './aml/aml.js';
-import { renderZgloszenia } from './views/zgloszenia.js';
-import { renderPulpit } from './views/pulpit.js';
-import { renderOferty } from './views/oferty.js';
-import { renderKlient } from './views/klient.js';
-import { renderZespol } from './views/zespol.js';
-import { renderM2 } from './views/m2.js';
+// widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
+const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
+const renderRozliczenia = lazy(() => import('./views/rozliczenia.js'), 'renderRozliczenia');
+const renderKlienci = lazy(() => import('./views/klienci.js'), 'renderKlienci');
+const renderSprawozdania = lazy(() => import('./views/sprawozdania.js'), 'renderSprawozdania');
+const renderDokumenty = lazy(() => import('./views/dokumenty.js'), 'renderDokumenty');
+const renderProfil = lazy(() => import('./views/profil.js'), 'renderProfil');
+const renderObecnosc = lazy(() => import('./views/obecnosc.js'), 'renderObecnosc');
+const renderAml = lazy(() => import('./aml/aml.js'), 'renderAml');
+const renderZgloszenia = lazy(() => import('./views/zgloszenia.js'), 'renderZgloszenia');
+const renderPulpit = lazy(() => import('./views/pulpit.js'), 'renderPulpit');
+const renderOferty = lazy(() => import('./views/oferty.js'), 'renderOferty');
+const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
+const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
+const renderM2 = lazy(() => import('./views/m2.js'), 'renderM2');
+// po wyświetleniu pierwszego ekranu pobieramy w tle pozostałe widoki, żeby przełączanie zakładek było natychmiastowe
+const prefetchViews = () => {
+  const go = () => {
+    const list = [];
+    if (hasModule('rozliczenia')) list.push(() => import('./views/pulpit.js'), () => import('./views/rozliczenia.js'), () => import('./views/klienci.js'), () => import('./views/klient.js'), () => import('./views/zgloszenia.js'), () => import('./views/dokumenty.js'));
+    if (hasModule('doradztwo')) list.push(() => import('./views/m2.js'));
+    list.push(() => import('./views/obecnosc.js'), () => import('./views/profil.js'));
+    list.reduce((p, f) => p.then(() => f().catch(() => null)), Promise.resolve());
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 3000 }); else setTimeout(go, 1500);
+};
 import { logout as endSession, startIdleWatch, takeLogoutReason } from './session.js';
 
 const app = document.getElementById('app');
@@ -159,31 +172,36 @@ async function start() {
   if (!session) { renderLogin(app, reason); return; }
   // nowe logowanie (hasło + kod): baza musi potwierdzić, że sesja przeszła oba kroki i nie wygasła
   let idleMinutes = null;
-  const { data: mode } = await sb.rpc('login_mode');
+  state.session = session;
+  // tryb logowania, stan sesji i dane zespołu pobieramy równolegle (zamiast po kolei)
+  const [{ data: mode }, stRes, ctx] = await Promise.all([
+    sb.rpc('login_mode'),
+    sb.rpc('auth_state'),
+    loadContext().then(() => null, err => err),
+  ]);
   if (mode === 'haslo_kod') {
-    const { data: st, error } = await sb.rpc('auth_state');
+    const { data: st, error } = stRes;
     if (error || !st?.verified) {
+      state.session = null;
       await sb.auth.signOut({ scope: 'local' });
       renderLogin(app, reason || (st?.member ? 'Sesja wygasła albo wymaga ponownego logowania hasłem i kodem.' : ''));
       return;
     }
     idleMinutes = st.idle_minutes;
   }
-  state.session = session;
-  try {
-    await loadContext();
-  } catch (err) {
-    app.replaceChildren(h('div', { class: 'empty' }, 'Błąd połączenia z bazą: ' + err.message));
+  if (ctx) {
+    app.replaceChildren(h('div', { class: 'empty' }, 'Błąd połączenia z bazą: ' + ctx.message));
     return;
   }
   if (!state.me) {
+    state.session = null;
     await sb.auth.signOut({ scope: 'local' });
     renderLogin(app, 'Ten adres nie ma dostępu do aplikacji.');
     return;
   }
-  if (idleMinutes) { await sb.rpc('auth_touch'); startIdleWatch(idleMinutes); }
+  if (idleMinutes) { sb.rpc('auth_touch'); startIdleWatch(idleMinutes); }
   window.addEventListener('hashchange', route);
-  route();
+  route().then(prefetchViews);
 }
 
 sb.auth.onAuthStateChange((event) => {

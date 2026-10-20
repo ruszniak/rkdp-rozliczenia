@@ -310,7 +310,11 @@ function quickClientDialog(onCreated) {
 
 async function viewMatter(main, id, params) {
   const isNew = id === 'nowa';
-  const orders = await fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,fee_type,fee_amount,m2_clients(name)').order('order_date', { ascending: false }));
+  // zlecenia i sprawa pobierane równolegle
+  const [orders, mRes] = await Promise.all([
+    fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,fee_type,fee_amount,m2_clients(name)').order('order_date', { ascending: false })),
+    isNew ? Promise.resolve(null) : sb.from('m2_matters').select('*').eq('id', id).maybeSingle(),
+  ]);
   let m;
   if (isNew) {
     const ord = orders.find(o => o.id === params.get('zlecenie'));
@@ -322,7 +326,7 @@ async function viewMatter(main, id, params) {
     }
     m = { order_id: ord.id, client_id: ord.client_id, title: '', matter_type: 'konsultacja', status: 'nowa', lead_id: state.me.id, opened_at: todayIso(), fee_type: ord.fee_type, fee_amount: ord.fee_amount };
   } else {
-    const { data, error } = await sb.from('m2_matters').select('*').eq('id', id).maybeSingle();
+    const { data, error } = mRes;
     if (error) throw error;
     if (!data) { main.replaceChildren(h('div', { class: 'card empty' }, 'Nie znaleziono sprawy.')); return; }
     m = data;

@@ -183,8 +183,9 @@ export async function renderPulpit(main) {
   const admin = state.me.role === 'admin';
   let view = admin ? (() => { try { return localStorage.getItem(PREF) || 'doradca'; } catch { return 'doradca'; } })() : 'moj';
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie pulpitu…'));
-  await generateRecurring();
-  const D = await loadData(period);
+  // zadania cykliczne i dane pulpitu równolegle; gdy powstały nowe zgłoszenia – odświeżamy dane
+  let [created, D] = await Promise.all([generateRecurring(), loadData(period)]);
+  if (created > 0) D = await loadData(period);
   const body = h('div');
   const switcher = admin ? h('div', { class: 'tabs', style: { margin: 0 } }) : null;
   const draw = () => {
