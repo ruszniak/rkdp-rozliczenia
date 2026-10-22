@@ -720,3 +720,6 @@ table.jpk-table{width:100%;border-collapse:collapse;font-size:12.5px;font-varian
 .jpk-issue-acc li{margin:2px 0}
 .linklike{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--bronze-dark);cursor:pointer;text-decoration:underline}
 .jpk-clear{color:var(--warn);border-color:#E3B7A8}.jpk-clear:hover{background:var(--warn-bg)}
+.jpk-wz{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.fin-table tr.fin-wt td{font-style:italic;font-weight:400 !important;background:none !important;color:var(--text)}
+.fin-table tr.fin-wt td.fin-key{color:transparent}

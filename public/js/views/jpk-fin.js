@@ -147,7 +147,7 @@ export function buildBilans(m) {
   if (Math.abs(rEnd) >= 0.005 || Math.abs(rStart) >= 0.005) add(P, 'A.VI', { S_1: '—', S_2: 'Wynik na kontach wynikowych (niezamkniętych na wynik finansowy)' }, rStart, rEnd, 'z RZiS');
   const total = (map, keys) => keys.reduce((s, k) => ({ start: s.start + (map.get(k)?.start || 0), end: s.end + (map.get(k)?.end || 0) }), { start: 0, end: 0 });
   const tA = total(A, ['A', 'B', 'C', 'D']), tP = total(P, ['A', 'B']);
-  return { aktywa: rowsFrom(A, AKTYWA, ['A', 'B', 'C', 'D']), pasywa: rowsFrom(P, PASYWA, ['A', 'B']), tA, tP, warnings, unclosed: r2(rEnd) };
+  return { aktywa: rowsFrom(A, AKTYWA, ['A', 'B', 'C', 'D']), pasywa: rowsFrom(P, PASYWA, ['A', 'B']), tA, tP, warnings, unclosed: r2(rEnd), mapA: A, mapP: P };
 }
 
 // kolejność wierszy: najpierw wzór (zawsze pozycje główne i rzymskie), potem dodatkowe pozycje z danych
@@ -222,7 +222,7 @@ export function buildRzis(m, variant = 'RP') {
     }
     return 0;
   });
-  return { variant: T.name, rows, net: r2(vals[T.result]), closingEntries: closing.size, fromPostings: usePostings };
+  return { variant: T.name, rows, net: r2(vals[T.result]), closingEntries: closing.size, fromPostings: usePostings, acc, vals };
 }
 
 // ---------- KONTROLA PLIKU: błędy (error) i ostrzeżenia (warn) ----------
@@ -314,4 +314,136 @@ export function validateKr(m, A, B) {
   if (negRzis.length) add('warn', `Ujemne kwoty w RZiS – możliwy zły znacznik (${negRzis.length})`, 'Konto przypisane do pozycji kosztowej ma przewagę obrotów Ma (albo do przychodowej – Wn). Sprawdź, czy znacznik nie wskazuje przychodu zamiast kosztu (lub odwrotnie).', negRzis, 'rzis');
   if (rp && B.unclosed && Math.abs(B.unclosed - rp.net) >= 0.01) add('warn', 'Wynik z RZiS różni się od salda kont wynikowych', `RZiS: ${fmt(rp.net)}, saldo niezamkniętych kont wynikowych: ${fmt(B.unclosed)}. Część kont wynikowych może nie mieć znacznika RZiS wariantu porównawczego.`, [], 'rzis');
   return issues.sort((a, b) => (a.level === b.level ? 0 : a.level === 'error' ? -1 : 1));
+}
+
+
+// ---------- WZORY UPROSZCZONE: jednostki małe (załącznik nr 5) i mikro (załącznik nr 4) ----------
+// Znaczniki JPK_KR_PD wskazują pozycje pełnego wzoru (załącznik nr 1), dlatego pozycje wzorów uproszczonych
+// wyliczamy jako sumy pozycji pełnego wzoru. Wiersz: [klucz, nazwa, źródła (ścieżki pełnego wzoru) | funkcja, poziom, „w tym”]
+export const WZORY = { pelny: 'Jednostka pozostała (zał. nr 1)', mala: 'Jednostka mała (zał. nr 5)', mikro: 'Jednostka mikro (zał. nr 4)' };
+
+const BIL_MALA = {
+  aktywa: [
+    ['A', 'Aktywa trwałe', ['A'], 1], ['A.I', 'Wartości niematerialne i prawne', ['A.I'], 2], ['A.II', 'Rzeczowe aktywa trwałe', ['A.II'], 2],
+    ['A.II.w1', 'środki trwałe', ['A.II.1'], 3, 1], ['A.II.w2', 'środki trwałe w budowie', ['A.II.2'], 3, 1],
+    ['A.III', 'Należności długoterminowe', ['A.III'], 2], ['A.IV', 'Inwestycje długoterminowe', ['A.IV'], 2],
+    ['A.IV.w1', 'nieruchomości', ['A.IV.1'], 3, 1], ['A.IV.w2', 'długoterminowe aktywa finansowe', ['A.IV.3'], 3, 1],
+    ['A.V', 'Długoterminowe rozliczenia międzyokresowe', ['A.V'], 2],
+    ['B', 'Aktywa obrotowe', ['B'], 1], ['B.I', 'Zapasy', ['B.I'], 2], ['B.II', 'Należności krótkoterminowe', ['B.II'], 2],
+    ['B.II.w1', 'z tytułu dostaw i usług (bez podziału na okresy wymagalności)', ['B.II.1.a', 'B.II.2.a', 'B.II.3.a'], 3, 1],
+    ['B.III', 'Inwestycje krótkoterminowe', ['B.III'], 2], ['B.III.w1', 'krótkoterminowe aktywa finansowe', ['B.III.1'], 3, 1],
+    ['B.III.w2', 'środki pieniężne w kasie i na rachunkach', ['B.III.1.c.1|B.III.1.c'], 4, 1],
+    ['B.IV', 'Krótkoterminowe rozliczenia międzyokresowe', ['B.IV'], 2],
+    ['C', 'Należne wpłaty na kapitał (fundusz) podstawowy', ['C'], 1], ['D', 'Udziały (akcje) własne', ['D'], 1],
+  ],
+  pasywa: [
+    ['A', 'Kapitał (fundusz) własny', ['A'], 1], ['A.I', 'Kapitał (fundusz) podstawowy', ['A.I'], 2], ['A.II', 'Kapitał (fundusz) zapasowy', ['A.II'], 2],
+    ['A.III', 'Kapitał (fundusz) z aktualizacji wyceny', ['A.III'], 2], ['A.IV', 'Pozostałe kapitały (fundusze) rezerwowe', ['A.IV'], 2],
+    ['A.V', 'Zysk (strata) z lat ubiegłych', ['A.V'], 2], ['A.VI', 'Zysk (strata) netto', ['A.VI'], 2], ['A.VII', 'Odpisy z zysku netto w ciągu roku obrotowego (wielkość ujemna)', ['A.VII'], 2],
+    ['B', 'Zobowiązania i rezerwy na zobowiązania', ['B'], 1], ['B.I', 'Rezerwy na zobowiązania', ['B.I'], 2], ['B.I.w1', 'rezerwa na świadczenia emerytalne i podobne', ['B.I.2'], 3, 1],
+    ['B.II', 'Zobowiązania długoterminowe', ['B.II'], 2], ['B.II.w1', 'z tytułu kredytów i pożyczek', ['B.II.3.a'], 3, 1],
+    ['B.III', 'Zobowiązania krótkoterminowe', ['B.III'], 2], ['B.III.w1', 'z tytułu kredytów i pożyczek', ['B.III.3.a'], 3, 1],
+    ['B.III.w2', 'z tytułu dostaw i usług (bez podziału na okresy wymagalności)', ['B.III.1.a', 'B.III.2.a', 'B.III.3.d'], 3, 1], ['B.III.w3', 'fundusze specjalne', ['B.III.4'], 3, 1],
+    ['B.IV', 'Rozliczenia międzyokresowe', ['B.IV'], 2],
+  ],
+};
+const BIL_MIKRO = {
+  aktywa: [
+    ['A', 'Aktywa trwałe', ['A'], 1], ['A.w1', 'środki trwałe', ['A.II.1'], 2, 1],
+    ['B', 'Aktywa obrotowe', ['B'], 1], ['B.w1', 'zapasy', ['B.I'], 2, 1], ['B.w2', 'należności krótkoterminowe', ['B.II'], 2, 1],
+    ['C', 'Należne wpłaty na kapitał (fundusz) podstawowy', ['C'], 1], ['D', 'Udziały (akcje) własne', ['D'], 1],
+  ],
+  pasywa: [
+    ['A', 'Kapitał (fundusz) własny', ['A'], 1], ['A.w1', 'kapitał (fundusz) podstawowy', ['A.I'], 2, 1],
+    ['B', 'Zobowiązania i rezerwy na zobowiązania', ['B'], 1], ['B.w1', 'rezerwy na zobowiązania', ['B.I'], 2, 1],
+    ['B.w2', 'zobowiązania z tytułu kredytów i pożyczek', ['B.II.3.a', 'B.III.3.a'], 2, 1],
+  ],
+};
+// RZiS: źródła z wariantu porównawczego (RP) albo kalkulacyjnego (RK) pełnego wzoru
+const RZIS_MALA_RP = [
+  ['A', 'Przychody netto ze sprzedaży i zrównane z nimi', ['A'], 1], ['A.I', 'Przychody netto ze sprzedaży', ['A.I', 'A.IV'], 2],
+  ['A.II', 'Zmiana stanu produktów (zwiększenie – wartość dodatnia, zmniejszenie – wartość ujemna)', ['A.II'], 2], ['A.III', 'Koszt wytworzenia produktów na własne potrzeby jednostki', ['A.III'], 2],
+  ['B', 'Koszty działalności operacyjnej', ['B'], 1], ['B.I', 'Amortyzacja', ['B.I'], 2], ['B.II', 'Zużycie materiałów i energii', ['B.II'], 2], ['B.III', 'Usługi obce', ['B.III'], 2],
+  ['B.IV', 'Wynagrodzenia', ['B.V'], 2], ['B.V', 'Ubezpieczenia społeczne i inne świadczenia, w tym emerytalne', ['B.VI'], 2],
+  ['B.VI', 'Pozostałe koszty (w tym podatki i opłaty)', ['B.IV', 'B.VII', 'B.VIII'], 2], ['B.VI.w1', 'wartość sprzedanych towarów i materiałów', ['B.VIII'], 3, 1],
+  ['C', 'Zysk (strata) ze sprzedaży (A − B)', v => v.A - v.B, 1, 0, 1],
+  ['D', 'Pozostałe przychody operacyjne', ['D'], 1], ['D.w1', 'aktualizacja wartości aktywów niefinansowych', ['D.III'], 2, 1],
+  ['E', 'Pozostałe koszty operacyjne', ['E'], 1], ['E.w1', 'aktualizacja wartości aktywów niefinansowych', ['E.II'], 2, 1],
+  ['F', 'Przychody finansowe', ['G'], 1], ['F.I', 'Dywidendy i udziały w zyskach', ['G.I'], 2], ['F.II', 'Odsetki', ['G.II'], 2],
+  ['F.III', 'Zysk z tytułu rozchodu aktywów finansowych', ['G.III'], 2], ['F.IV', 'Aktualizacja wartości aktywów finansowych', ['G.IV'], 2],
+  ['F.x', 'inne przychody finansowe (np. różnice kursowe) – ujęte w sumie F', ['G.V'], 2, 1],
+  ['G', 'Koszty finansowe', ['H'], 1], ['G.I', 'Odsetki', ['H.I'], 2], ['G.II', 'Strata z tytułu rozchodu aktywów finansowych', ['H.II'], 2], ['G.III', 'Aktualizacja wartości aktywów finansowych', ['H.III'], 2],
+  ['G.x', 'inne koszty finansowe (np. różnice kursowe) – ujęte w sumie G', ['H.IV'], 2, 1],
+  ['H', 'Zysk (strata) brutto (C + D − E + F − G)', v => v.C + v.D - v.E + v.F - v.G, 1, 0, 1],
+  ['I', 'Podatek dochodowy', ['J', 'K'], 1],
+  ['J', 'Zysk (strata) netto (H − I)', v => v.H - v.I, 1, 0, 1],
+];
+const RZIS_MALA_RK = [
+  ['A', 'Przychody netto ze sprzedaży produktów, towarów i materiałów', ['A'], 1], ['B', 'Koszty sprzedanych produktów, towarów i materiałów', ['B'], 1],
+  ['C', 'Koszty sprzedaży', ['D'], 1], ['D', 'Koszty ogólnego zarządu', ['E'], 1],
+  ['E', 'Zysk (strata) ze sprzedaży (A − B − C − D)', v => v.A - v.B - v.C - v.D, 1, 0, 1],
+  ['F', 'Pozostałe przychody operacyjne', ['G'], 1], ['F.w1', 'aktualizacja wartości aktywów niefinansowych', ['G.III'], 2, 1],
+  ['G', 'Pozostałe koszty operacyjne', ['H'], 1], ['G.w1', 'aktualizacja wartości aktywów niefinansowych', ['H.II'], 2, 1],
+  ['H', 'Przychody finansowe', ['J'], 1], ['H.I', 'Dywidendy i udziały w zyskach', ['J.I'], 2], ['H.II', 'Odsetki', ['J.II'], 2],
+  ['H.III', 'Zysk z tytułu rozchodu aktywów finansowych', ['J.III'], 2], ['H.IV', 'Aktualizacja wartości aktywów finansowych', ['J.IV'], 2],
+  ['H.x', 'inne przychody finansowe – ujęte w sumie H', ['J.V'], 2, 1],
+  ['I', 'Koszty finansowe', ['K'], 1], ['I.I', 'Odsetki', ['K.I'], 2], ['I.II', 'Strata z tytułu rozchodu aktywów finansowych', ['K.II'], 2], ['I.III', 'Aktualizacja wartości aktywów finansowych', ['K.III'], 2],
+  ['I.x', 'inne koszty finansowe – ujęte w sumie I', ['K.IV'], 2, 1],
+  ['J', 'Zysk (strata) brutto (E + F − G + H − I)', v => v.E + v.F - v.G + v.H - v.I, 1, 0, 1],
+  ['K', 'Podatek dochodowy', ['M', 'N'], 1],
+  ['L', 'Zysk (strata) netto (J − K)', v => v.J - v.K, 1, 0, 1],
+];
+const RZIS_MIKRO_RP = [
+  ['A', 'Przychody podstawowej działalności operacyjnej i zrównane z nimi', ['A'], 1], ['A.w1', 'zmiana stanu produktów (zwiększenie – wartość dodatnia, zmniejszenie – wartość ujemna)', ['A.II'], 2, 1],
+  ['B', 'Koszty podstawowej działalności operacyjnej', ['B'], 1], ['B.I', 'Amortyzacja', ['B.I'], 2], ['B.II', 'Zużycie materiałów i energii', ['B.II'], 2],
+  ['B.III', 'Wynagrodzenia, ubezpieczenia społeczne i inne świadczenia', ['B.V', 'B.VI'], 2], ['B.IV', 'Pozostałe koszty', ['B.III', 'B.IV', 'B.VII', 'B.VIII'], 2],
+  ['C', 'Pozostałe przychody i zyski', ['D', 'G'], 1], ['C.w1', 'aktualizacja wartości aktywów', ['D.III', 'G.IV'], 2, 1],
+  ['D', 'Pozostałe koszty i straty', ['E', 'H'], 1], ['D.w1', 'aktualizacja wartości aktywów', ['E.II', 'H.III'], 2, 1],
+  ['E', 'Podatek dochodowy', ['J', 'K'], 1],
+  ['F', 'Zysk (strata) netto (A − B + C − D − E)', v => v.A - v.B + v.C - v.D - v.E, 1, 0, 1],
+];
+// mikro przy samych znacznikach kalkulacyjnych – bez podziału kosztów według rodzajów
+const RZIS_MIKRO_RK = [
+  ['A', 'Przychody podstawowej działalności operacyjnej i zrównane z nimi', ['A'], 1],
+  ['B', 'Koszty podstawowej działalności operacyjnej (bez podziału na rodzaje – znaczniki kalkulacyjne)', ['B', 'D', 'E'], 1],
+  ['C', 'Pozostałe przychody i zyski', ['G', 'J'], 1], ['C.w1', 'aktualizacja wartości aktywów', ['G.III', 'J.IV'], 2, 1],
+  ['D', 'Pozostałe koszty i straty', ['H', 'K'], 1], ['D.w1', 'aktualizacja wartości aktywów', ['H.II', 'K.III'], 2, 1],
+  ['E', 'Podatek dochodowy', ['M', 'N'], 1],
+  ['F', 'Zysk (strata) netto (A − B + C − D − E)', v => v.A - v.B + v.C - v.D - v.E, 1, 0, 1],
+];
+
+// konta, które składają się na pozycje źródłowe (z pozycją pełnego wzoru i jej potomkami)
+const collect = (map, srcs, pick) => {
+  const out = [];
+  for (const [k, n] of map) if (srcs.some(s => k === s)) for (const [kk, nn] of map) if ((kk === k || kk.startsWith(k + '.')) && nn.accounts.length) out.push(...nn.accounts.map(a => pick(a, kk)));
+  const seen = new Set(); return out.filter(a => { const id = a.S_1 + '|' + a._p + '|' + (a.how || ''); if (seen.has(id)) return false; seen.add(id); return true; });
+};
+
+export function bilansSimple(B, wz) {
+  const T = wz === 'mikro' ? BIL_MIKRO : BIL_MALA;
+  const side = (rows, map) => rows.map(([key, name, srcs0, depth, wt]) => {
+    // „X|Y” – pierwsza pozycja, która występuje w danych (np. środki pieniężne bez dalszego podziału)
+    const srcs = srcs0.map(x => x.split('|').find(y => map.has(y)) || x.split('|')[0]);
+    const start = srcs.reduce((s, p) => s + (map.get(p)?.start || 0), 0), end = srcs.reduce((s, p) => s + (map.get(p)?.end || 0), 0);
+    return { key: wt ? '' : key, depth, name: wt ? `w tym: ${name}` : name, wt: !!wt, start: r2(start), end: r2(end),
+      accounts: collect(map, srcs, (a, p) => ({ ...a, _p: p, how: [a.how, `poz. ${p}`].filter(Boolean).join(' · ') })) };
+  });
+  return { aktywa: side(T.aktywa, B.mapA), pasywa: side(T.pasywa, B.mapP), tA: B.tA, tP: B.tP };
+}
+
+export function rzisSimple(R, wz, variant) {
+  const T = wz === 'mikro' ? (variant === 'RK' ? RZIS_MIKRO_RK : RZIS_MIKRO_RP) : (variant === 'RK' ? RZIS_MALA_RK : RZIS_MALA_RP);
+  const v = {};
+  const rows = T.map(([key, name, src, depth, wt, calc]) => {
+    let val, accounts = [];
+    if (typeof src === 'function') val = src(v);
+    else {
+      val = src.reduce((s, p) => s + (R.acc.get(p)?.v || 0), 0);
+      accounts = collect(R.acc, src, (a, p) => ({ ...a, _p: p, how: `poz. ${p}` }));
+    }
+    if (!wt && !key.includes('.')) v[key] = val;
+    return { key: wt ? '' : key.replace(/\.x$/, ''), depth, name: wt ? (key.endsWith('.x') ? name : `w tym: ${name}`) : name, wt: !!wt, calc: !!calc, v: r2(val), accounts };
+  });
+  const last = rows[rows.length - 1];
+  return { variant: R.variant, rows, net: last.v, fromPostings: R.fromPostings, closingEntries: R.closingEntries };
 }

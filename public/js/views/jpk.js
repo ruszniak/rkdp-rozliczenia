@@ -2,7 +2,7 @@
 // Plik jest czytany wyłącznie w przeglądarce – nic nie jest wysyłane na serwer ani zapisywane w bazie.
 import { h, toast, infoTip, printHtml, modal, icon } from '../ui.js';
 import { downloadXlsx } from '../xlsx.js';
-import { buildBilans, buildRzis, hasVariant, validateKr } from './jpk-fin.js';
+import { buildBilans, buildRzis, hasVariant, validateKr, WZORY, bilansSimple, rzisSimple } from './jpk-fin.js';
 
 const HELP = `Podgląd plików JPK (JPK_CIT):
 • Przeciągnij plik XML albo kliknij „Wybierz plik”. Obsługiwane: JPK_KR_PD (księgi rachunkowe), JPK_ST_KR (środki trwałe), a także inne pliki JPK – jako tabele.
@@ -372,7 +372,7 @@ function viewKr(m) {
         dataTable({ cols: [{ key: 'marker', label: 'Znacznik', w: 160 }, { key: 'n', label: 'Kont', num: true, dec: 0 }, ...['S_4', 'S_5', 'S_6', 'S_7', 'S_10', 'S_11'].map(k => ({ key: k, label: lbl(k), num: true })), { key: 'saldo', label: 'Saldo (Wn − Ma)', num: true }],
           rows: groups, pageSize: 500, onRow: g => { tab = 'acc'; render(); setTimeout(() => { const s = body.querySelector('.jpk-search'); if (s && g.marker !== '(brak znacznika)') { s.value = g.marker; s.dispatchEvent(new Event('input')); } }, 0); } }).el);
     }
-    if (tab === 'bil') body.replaceChildren(...bilansView(m).filter(Boolean));
+    if (tab === 'bil') body.replaceChildren(...bilansView(m, () => render()).filter(Boolean));
     if (tab === 'rzis') body.replaceChildren(...rzisView(m, () => render()).filter(Boolean));
     if (tab === 'kt') body.replaceChildren(dataTable({ cols: ['T_1', 'T_2', 'T_3'].map(k => ({ key: k, label: lbl(k) })), rows: m.contractors }).el);
     if (tab === 'rpd') body.replaceChildren(rpdCard(m.rpd));
@@ -410,13 +410,20 @@ function summaryKr(m, A) {
 }
 
 // ----- Bilans i RZiS (zestawienia pomocnicze) -----
+const WZ_KEY = 'rkdp_jpk_wzor';
+// warianty RZiS do eksportu: mikro – jeden (porównawczy, a przy samych znacznikach kalkulacyjnych – kalkulacyjny)
+const rzisVariants = (m, wz) => { const rp = hasVariant(m, 'RP'), rk = hasVariant(m, 'RK', ['B', 'D', 'E']); return wz === 'mikro' ? (rp ? ['RP'] : hasVariant(m, 'RK') ? ['RK'] : []) : [rp ? 'RP' : null, rk ? 'RK' : null].filter(Boolean); };
+const getWz = m => m._wz || (() => { try { return localStorage.getItem(WZ_KEY); } catch { return null; } })() || 'pelny';
+const wzPicker = (m, rerender) => h('div', { class: 'jpk-wz' }, h('span', { class: 'small muted' }, 'Wzór sprawozdania:'),
+  h('div', { class: 'tabs', style: { margin: 0 } }, ...Object.entries(WZORY).map(([k, l]) => h('button', { class: getWz(m) === k ? 'on' : '', type: 'button',
+    onclick: () => { m._wz = k; try { localStorage.setItem(WZ_KEY, k); } catch { /* */ } rerender(); } }, l))));
 const FIN_NOTE = 'Zestawienie pomocnicze wygenerowane przez aplikację na podstawie znaczników kont (S_12_1, S_12_2) i sald z pliku JPK_KR_PD. Nie jest częścią pliku JPK ani sprawozdaniem finansowym – służy do kontroli i analizy.';
 const finNote = (extra) => h('div', { class: 'jpk-note' }, h('b', {}, 'Informacyjnie. '), FIN_NOTE, extra ? h('div', { style: { marginTop: '4px' } }, extra) : null);
 function finTable(rows, cols, opts = {}) {
   const tb = h('tbody');
   const draw = () => tb.replaceChildren(...rows.flatMap(r => {
     const open = r._open;
-    const tr = h('tr', { class: `fin-d${Math.min(r.depth, 5)}${r.calc ? ' fin-calc' : ''}${r.accounts?.length ? ' click' : ''}`, onclick: r.accounts?.length ? () => { r._open = !r._open; draw(); } : null },
+    const tr = h('tr', { class: `fin-d${Math.min(r.depth, 5)}${r.wt ? ' fin-wt' : ''}${r.calc ? ' fin-calc' : ''}${r.accounts?.length ? ' click' : ''}`, onclick: r.accounts?.length ? () => { r._open = !r._open; draw(); } : null },
       h('td', { class: 'fin-key' }, r.key), h('td', { class: 'fin-name' }, r.accounts?.length ? h('span', { class: 'fin-tw' }, open ? '▾ ' : '▸ ') : null, r.name || h('span', { class: 'muted' }, 'pozycja ze znacznika')),
       ...cols.map(c => h('td', { class: 'n' + (r[c.key] < 0 ? ' neg' : '') }, fmtN(r[c.key]))));
     if (!open) return [tr];
@@ -428,8 +435,9 @@ function finTable(rows, cols, opts = {}) {
     h('thead', {}, h('tr', {}, h('th', {}, 'Poz.'), h('th', {}, 'Wyszczególnienie'), ...cols.map(c => h('th', { class: 'n' }, c.label)))), tb,
     opts.foot ? h('tfoot', {}, opts.foot) : null));
 }
-function bilansView(m) {
+function bilansView(m, rerender) {
   const B = m._bil || (m._bil = buildBilans(m));
+  const wz = getWz(m), S = wz === 'pelny' ? B : bilansSimple(B, wz);
   const H = m.header;
   const cols = [{ key: 'start', label: `Stan na początek${H.RokDataOd ? ' ' + H.RokDataOd : ''}` }, { key: 'end', label: `Stan na koniec${H.DataDo ? ' ' + H.DataDo : ''}` }];
   const foot = (label, t) => h('tr', { class: 'tot' }, h('td'), h('td', {}, label), h('td', { class: 'n' }, fmtN(t.start)), h('td', { class: 'n' }, fmtN(t.end)));
@@ -438,29 +446,33 @@ function bilansView(m) {
   const out = [finNote(B.unclosed ? `Konta wynikowe nie są zamknięte na wynik finansowy – ich saldo (${fmtN(B.unclosed)}) pokazano w pasywach w pozycji A.VI „Zysk (strata) netto”.` : null),
     h('div', { class: 'jpk-tiles' },
       ...[['Suma aktywów', B.tA.end], ['Suma pasywów', B.tP.end], ['Różnica (koniec)', dE], ['Różnica (początek)', dS]].map(([l, n]) => h('div', { class: 'card tile' + (/Różnica/.test(l) && Math.abs(n) >= 0.005 ? ' jpk-bad' : '') }, h('span', { class: 'num', style: { fontSize: '22px' } }, fmtN(n)), h('span', { class: 'lbl' }, l)))),
-    h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Aktywa'), h('span', { class: 'small muted' }, 'kliknij pozycję, aby zobaczyć konta')), finTable(B.aktywa, cols, { foot: foot('Aktywa razem', B.tA) })),
-    h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Pasywa')), finTable(B.pasywa, cols, { foot: foot('Pasywa razem', B.tP) }))];
+    h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, `Aktywa – ${WZORY[wz].toLowerCase()}`), h('span', { class: 'small muted' }, 'kliknij pozycję, aby zobaczyć konta')), finTable(S.aktywa, cols, { foot: foot('Aktywa razem', B.tA) })),
+    h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, `Pasywa – ${WZORY[wz].toLowerCase()}`)), finTable(S.pasywa, cols, { foot: foot('Pasywa razem', B.tP) }))];
   const warn = [];
   if (Math.abs(dE) >= 0.005 || Math.abs(dS) >= 0.005) warn.push(h('p', { class: 'jpk-warn' }, `Suma aktywów różni się od sumy pasywów (koniec: ${fmtN(dE)}, początek: ${fmtN(dS)}). Najczęstsze przyczyny: konta z saldem bez znacznika bilansowego albo konta z saldem przeciwnym do znacznika.`));
   if (W.unmarked.length) warn.push(h('p', { class: 'jpk-warn' }, `Konta z saldem bez znacznika bilansu ani RZiS (${W.unmarked.length}): ${W.unmarked.slice(0, 12).map(a => `${a.S_1} (${fmtN(a.saldo)})`).join(', ')}${W.unmarked.length > 12 ? '…' : ''}.`));
   if (W.opposite.length) warn.push(h('p', { class: 'small muted' }, `Konta z saldem przeciwnym do strony znacznika – wykazane jako pomniejszenie pozycji (np. umorzenie, odpisy aktualizujące) (${W.opposite.length}): ${W.opposite.slice(0, 12).map(a => `${a.S_1} (${a.side}: ${fmtN(a.saldo)})`).join(', ')}${W.opposite.length > 12 ? '…' : ''}. Jeśli to rozrachunek, który może mieć saldo po obu stronach, powinien mieć drugi znacznik (aktywa i pasywa).`));
   if (W.dual) warn.push(h('p', { class: 'small muted' }, `Konta z dwoma znacznikami (aktywa i pasywa): ${W.dual} – saldo Wn wykazano w aktywach, saldo Ma w pasywach.`));
   if (!B.aktywa.some(r => r.accounts.length) && !B.pasywa.some(r => r.accounts.length)) warn.unshift(h('p', { class: 'jpk-warn' }, 'W pliku nie ma znaczników bilansowych (BA…/BP…) w polach S_12_1 i S_12_2 – bilansu nie da się wygenerować.'));
-  return [...out.slice(0, 2), ...warn, ...out.slice(2)];
+  if (wz !== 'pelny') warn.push(h('p', { class: 'small muted' }, 'Pozycje wzoru uproszczonego wyliczono jako sumy pozycji pełnego wzoru, na które wskazują znaczniki kont. Podział należności i zobowiązań z tytułu dostaw i usług na okresy wymagalności (do / powyżej 12 miesięcy) nie wynika z pliku JPK.'));
+  return [wzPicker(m, rerender), ...out.slice(0, 2), ...warn, ...out.slice(2)];
 }
 function rzisView(m, rerender) {
   // wariant kalkulacyjny pokazujemy tylko, gdy są znaczniki kosztów RK (B, D, E) – inaczej byłby niepełny
   const hasRP = hasVariant(m, 'RP'), hasRK = hasVariant(m, 'RK', ['B', 'D', 'E']);
   if (!hasRP && !hasRK) return [finNote(), h('p', { class: 'jpk-warn' }, 'W pliku nie ma znaczników RZiS (RP…/RK…) w polach S_12_1 i S_12_2 – rachunku zysków i strat nie da się wygenerować.')];
-  const v = m._rzv && ((m._rzv === 'RK' && hasRK) || (m._rzv === 'RP' && hasRP)) ? m._rzv : hasRP ? 'RP' : 'RK';
+  const wz = getWz(m);
+  const v = wz === 'mikro' ? (hasRP ? 'RP' : 'RK') : m._rzv && ((m._rzv === 'RK' && hasRK) || (m._rzv === 'RP' && hasRP)) ? m._rzv : hasRP ? 'RP' : 'RK';
   m._rz = m._rz || {};
-  const R = m._rz[v] || (m._rz[v] = buildRzis(m, v));
-  const pick = hasRP && hasRK ? h('div', { class: 'tabs', style: { marginBottom: '10px' } }, ...[['RP', 'Wariant porównawczy'], ['RK', 'Wariant kalkulacyjny']].map(([k, l]) => h('button', { class: v === k ? 'on' : '', onclick: () => { m._rzv = k; rerender(); } }, l))) : null;
+  const RF = m._rz[v] || (m._rz[v] = buildRzis(m, v));
+  const R = wz === 'pelny' ? RF : { ...rzisSimple(RF, wz, v), variant: wz === 'mikro' ? 'jednostki mikro' : RF.variant };
+  const pick = hasRP && hasRK && wz !== 'mikro' ? h('div', { class: 'tabs', style: { marginBottom: '10px' } }, ...[['RP', 'Wariant porównawczy'], ['RK', 'Wariant kalkulacyjny']].map(([k, l]) => h('button', { class: v === k ? 'on' : '', onclick: () => { m._rzv = k; rerender(); } }, l))) : null;
   const B = m._bil || (m._bil = buildBilans(m));
-  return [finNote(R.fromPostings ? `Kwoty to obroty z dziennika za okres pliku${R.closingEntries ? ` z pominięciem ${R.closingEntries} zapisów przeksięgowania na wynik finansowy` : ''}: przychody = Ma − Wn, koszty = Wn − Ma.` : 'Kwoty to obroty narastająco z zestawienia obrotów i sald.'),
+  return [wzPicker(m, rerender), finNote(R.fromPostings ? `Kwoty to obroty z dziennika za okres pliku${R.closingEntries ? ` z pominięciem ${R.closingEntries} zapisów przeksięgowania na wynik finansowy` : ''}: przychody = Ma − Wn, koszty = Wn − Ma.` : 'Kwoty to obroty narastająco z zestawienia obrotów i sald.'),
     pick,
     h('div', { class: 'jpk-tiles' }, ...[['Zysk (strata) netto', R.net], [`Wariant`, null]].map(([l, n]) => n === null ? h('div', { class: 'card tile' }, h('span', { class: 'num', style: { fontSize: '22px' } }, R.variant), h('span', { class: 'lbl' }, 'Wariant RZiS')) : h('div', { class: 'card tile' + (n < 0 ? ' jpk-bad' : '') }, h('span', { class: 'num', style: { fontSize: '22px' } }, fmtN(n)), h('span', { class: 'lbl' }, l)))),
-    h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, `Rachunek zysków i strat – wariant ${R.variant}`), h('span', { class: 'small muted' }, 'kliknij pozycję, aby zobaczyć konta')),
+    wz === 'mikro' && v === 'RK' ? h('p', { class: 'jpk-warn' }, 'Plik ma tylko znaczniki wariantu kalkulacyjnego – koszty w RZiS jednostki mikro pokazano bez podziału na rodzaje (amortyzacja, materiały, wynagrodzenia, pozostałe).') : null,
+    h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, `Rachunek zysków i strat – ${wz === 'mikro' ? WZORY.mikro.toLowerCase() : `wariant ${R.variant}${wz === 'mala' ? ' (jednostka mała)' : ''}`}`), h('span', { class: 'small muted' }, 'kliknij pozycję, aby zobaczyć konta')),
       finTable(R.rows, [{ key: 'v', label: `Kwota za okres${m.header.DataOd ? ` ${m.header.DataOd} – ${m.header.DataDo}` : ''}` }], { accInfo: a => `Wn ${fmtN(a.wn)} / Ma ${fmtN(a.ma)}` })),
     B.unclosed && Math.abs(B.unclosed - R.net) >= 0.01 ? h('p', { class: 'small muted' }, `Saldo niezamkniętych kont wynikowych w bilansie: ${fmtN(B.unclosed)} – różnica względem RZiS może wynikać z kont wynikowych bez znacznika RZiS lub ze znacznikiem tylko jednego wariantu.`) : null];
 }
@@ -541,13 +553,14 @@ function exportExcel(m) {
       ...(iss.length ? iss.flatMap(i => [[{ v: i.level === 'error' ? 'BŁĄD' : 'uwaga', s: i.level === 'error' ? 'missing' : 'normal' }, { v: i.title, s: 'wrap' }, '', '', { v: i.text || '', s: 'wrap' }],
         ...i.accounts.map(a => ['', '', a.S_1, a.S_2 || '', a.info || ''])]) : [['', 'Nie wykryto problemów']])] });
     const B = m._bil || (m._bil = buildBilans(m));
-    const finRows = (rows, cols) => rows.map(r => [r.key, { v: '   '.repeat(r.depth - 1) + (r.name || ''), s: r.depth === 1 || r.calc ? 'header' : 'normal' }, ...cols.map(c => ({ v: r[c], s: 'money' }))]);
-    sheets.push({ name: 'Bilans (pomocniczo)', widths: [12, 70, 20, 20], rows: [[{ v: 'Bilans – zestawienie pomocnicze ze znaczników kont (nie jest częścią JPK)', s: 'title' }], [],
-      ['Poz.', 'AKTYWA', 'Stan na początek', 'Stan na koniec'].map(v => ({ v, s: 'header' })), ...finRows(B.aktywa, ['start', 'end']), ['', { v: 'Aktywa razem', s: 'header' }, { v: r2(B.tA.start), s: 'money' }, { v: r2(B.tA.end), s: 'money' }], [],
-      ['Poz.', 'PASYWA', 'Stan na początek', 'Stan na koniec'].map(v => ({ v, s: 'header' })), ...finRows(B.pasywa, ['start', 'end']), ['', { v: 'Pasywa razem', s: 'header' }, { v: r2(B.tP.start), s: 'money' }, { v: r2(B.tP.end), s: 'money' }]] });
-    for (const v of ['RP', 'RK']) if (v === 'RP' ? hasVariant(m, 'RP') : hasVariant(m, 'RK', ['B', 'D', 'E'])) {
-      const R = buildRzis(m, v);
-      sheets.push({ name: `RZiS ${R.variant} (pomocniczo)`, widths: [12, 70, 20], rows: [[{ v: `Rachunek zysków i strat – wariant ${R.variant} – zestawienie pomocnicze (nie jest częścią JPK)`, s: 'title' }], [],
+    const wz = getWz(m), SB = wz === 'pelny' ? B : bilansSimple(B, wz);
+    const finRows = (rows, cols) => rows.map(r => [r.key, { v: '   '.repeat(r.depth - 1) + (r.name || ''), s: (r.depth === 1 || r.calc) && !r.wt ? 'header' : 'normal' }, ...cols.map(c => ({ v: r[c], s: 'money' }))]);
+    sheets.push({ name: 'Bilans (pomocniczo)', widths: [12, 70, 20, 20], rows: [[{ v: `Bilans – ${WZORY[wz]} – zestawienie pomocnicze ze znaczników kont (nie jest częścią JPK)`, s: 'title' }], [],
+      ['Poz.', 'AKTYWA', 'Stan na początek', 'Stan na koniec'].map(v => ({ v, s: 'header' })), ...finRows(SB.aktywa, ['start', 'end']), ['', { v: 'Aktywa razem', s: 'header' }, { v: r2(B.tA.start), s: 'money' }, { v: r2(B.tA.end), s: 'money' }], [],
+      ['Poz.', 'PASYWA', 'Stan na początek', 'Stan na koniec'].map(v => ({ v, s: 'header' })), ...finRows(SB.pasywa, ['start', 'end']), ['', { v: 'Pasywa razem', s: 'header' }, { v: r2(B.tP.start), s: 'money' }, { v: r2(B.tP.end), s: 'money' }]] });
+    for (const v of rzisVariants(m, wz)) {
+      const R = wz === 'pelny' ? buildRzis(m, v) : { ...rzisSimple(buildRzis(m, v), wz, v), variant: wz === 'mikro' ? 'mikro' : buildRzis(m, v).variant };
+      sheets.push({ name: `RZiS ${R.variant} (pomocniczo)`, widths: [12, 70, 20], rows: [[{ v: `Rachunek zysków i strat – ${WZORY[wz]} – ${wz === 'mikro' ? '' : 'wariant ' + R.variant + ' – '}zestawienie pomocnicze (nie jest częścią JPK)`, s: 'title' }], [],
         ['Poz.', 'Wyszczególnienie', 'Kwota'].map(x => ({ v: x, s: 'header' })), ...finRows(R.rows, ['v'])] });
     }
     if (m.contractors.length) sheets.push(sheetFrom('Kontrahenci', C(['T_1', 'T_2', 'T_3']), m.contractors));
@@ -566,7 +579,7 @@ function exportPdfDialog(m) {
   const cb = (label, checked) => { const i = h('input', { type: 'checkbox', checked }); return [i, h('label', { class: 'check', style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '6px 0' } }, i, label)]; };
   const [zo, zoL] = cb('Zestawienie obrotów i sald (konta)', true);
   const [mk, mkL] = cb('Sumy według znaczników kont', true);
-  const [fin, finL] = cb('Bilans i RZiS (zestawienia pomocnicze)', true);
+  const [fin, finL] = cb(`Bilans i RZiS – ${WZORY[getWz(m)].toLowerCase()} (zestawienia pomocnicze)`, true);
   const [jr, jrL] = cb(`Dziennik z dekretacją (${fmtInt(m.journal.length)} zapisów)`, m.journal.length <= 300);
   modal('Raport PDF', h('div', {}, h('p', { class: 'small muted' }, 'Raport zawsze zawiera dane podmiotu, sumy kontrolne i kontrolę bilansu.'), finL, zoL, mkL, jrL,
     m.journal.length > 2000 ? h('p', { class: 'small muted' }, 'Dziennik jest duży – wydruk może mieć kilkaset stron. Do analizy lepiej użyć Excela.') : null),
@@ -585,12 +598,13 @@ function printReport(m, o) {
     parts.push('<h2>Kontrola bilansu</h2>' + tbl(['', 'Winien', 'Ma', 'Różnica'], A.balance.map(b => [b.name, fmtN(b.wn), fmtN(b.ma), fmtN(b.diff)]), [1, 2, 3]));
     if (m.rpd) parts.push('<h2>Rozliczenie podatku dochodowego (RPD)</h2>' + tbl(['Pole', 'Opis', 'Kwota'], Object.keys(m.rpd).map(k => [k, lbl(k), fmtN(num(m.rpd[k]))]), [2]));
     if (o.fin) {
-      const B = m._bil || (m._bil = buildBilans(m));
-      const fr = (rows, cols) => rows.map(r => { const x = [r.key, '\u00a0'.repeat((r.depth - 1) * 3) + (r.name || r.key), ...cols.map(c => fmtN(r[c]))]; x._cls = r.depth === 1 || r.calc ? 'tot' : ''; return x; });
+      const B0 = m._bil || (m._bil = buildBilans(m));
+      const wz = getWz(m), B = wz === 'pelny' ? B0 : { ...bilansSimple(B0, wz), tA: B0.tA, tP: B0.tP };
+      const fr = (rows, cols) => rows.map(r => { const x = [r.key, '\u00a0'.repeat((r.depth - 1) * 3) + (r.name || r.key), ...cols.map(c => fmtN(r[c]))]; x._cls = (r.depth === 1 || r.calc) && !r.wt ? 'tot' : ''; return x; });
       const note = '<p class="note">Zestawienie pomocnicze wygenerowane przez aplikację na podstawie znaczników kont i sald z pliku JPK_KR_PD – nie jest częścią pliku JPK ani sprawozdaniem finansowym.</p>';
       const tA = ['', 'Aktywa razem', fmtN(B.tA.start), fmtN(B.tA.end)]; tA._cls = 'tot'; const tP = ['', 'Pasywa razem', fmtN(B.tP.start), fmtN(B.tP.end)]; tP._cls = 'tot';
-      parts.push('<h2 class="pb">Bilans (zestawienie pomocnicze)</h2>' + note + tbl(['Poz.', 'Aktywa', 'Stan na początek', 'Stan na koniec'], [...fr(B.aktywa, ['start', 'end']), tA], [2, 3]) + tbl(['Poz.', 'Pasywa', 'Stan na początek', 'Stan na koniec'], [...fr(B.pasywa, ['start', 'end']), tP], [2, 3]));
-      for (const v of ['RP', 'RK']) if (v === 'RP' ? hasVariant(m, 'RP') : hasVariant(m, 'RK', ['B', 'D', 'E'])) { const R = buildRzis(m, v); parts.push(`<h2 class="pb">Rachunek zysków i strat – wariant ${R.variant} (zestawienie pomocnicze)</h2>` + note + tbl(['Poz.', 'Wyszczególnienie', 'Kwota'], fr(R.rows, ['v']), [2])); }
+      parts.push(`<h2 class="pb">Bilans – ${esc(WZORY[wz])} (zestawienie pomocnicze)</h2>` + note + tbl(['Poz.', 'Aktywa', 'Stan na początek', 'Stan na koniec'], [...fr(B.aktywa, ['start', 'end']), tA], [2, 3]) + tbl(['Poz.', 'Pasywa', 'Stan na początek', 'Stan na koniec'], [...fr(B.pasywa, ['start', 'end']), tP], [2, 3]));
+      for (const v of rzisVariants(m, wz)) { const RF = buildRzis(m, v), R = wz === 'pelny' ? RF : rzisSimple(RF, wz, v); parts.push(`<h2 class="pb">Rachunek zysków i strat – ${esc(WZORY[wz])}${wz === 'mikro' ? '' : ' – wariant ' + RF.variant} (zestawienie pomocnicze)</h2>` + note + tbl(['Poz.', 'Wyszczególnienie', 'Kwota'], fr(R.rows, ['v']), [2])); }
     }
     if (o.markers) for (const k of ['S_12_1', 'S_12_2', 'S_12_3']) if (m.accounts.some(a => a[k]))
       parts.push(`<h2>Sumy według znacznika: ${esc(lbl(k))} (${k})</h2>` + tbl(['Znacznik', 'Kont', 'BO Wn', 'BO Ma', 'Obroty Wn', 'Obroty Ma', 'Saldo Wn', 'Saldo Ma'], markerGroups(m.accounts, k).map(g => [g.marker, g.n, fmtN(g.S_4), fmtN(g.S_5), fmtN(g.S_6), fmtN(g.S_7), fmtN(g.S_10), fmtN(g.S_11)]), [1, 2, 3, 4, 5, 6, 7]));
