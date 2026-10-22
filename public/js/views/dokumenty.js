@@ -46,6 +46,8 @@ export async function renderDokumenty(main) {
     group('Spółki',
       tile('Protokół zgromadzenia wspólników (ZZW)', 'Zatwierdzenie sprawozdania finansowego, podział zysku / pokrycie straty, absolutoria. Dane z KRS.', '#/sprawozdania/nowy', ['PDF', 'Word']),
       h('div', { class: 'card dk-tile dk-list' }, h('b', {}, 'Ostatnie protokoły'), recent)),
+    group('JPK',
+      tile('Podgląd JPK_CIT', 'Otwórz plik JPK_KR_PD (księgi rachunkowe) lub JPK_ST_KR (środki trwałe): konta, dziennik, znaczniki, sumy kontrolne. Plik zostaje na Twoim komputerze.', '#/jpk', ['Excel', 'PDF'])),
     group('Raporty i zestawienia',
       tile('Raport rozliczeń', 'Stan rozliczeń klientów za miesiąc – w zakładce Rozliczenia przycisk „Pobierz”.', '#/rozliczenia', ['PDF', 'Excel', 'CSV']),
       tile('Lista obecności', 'Ewidencja czasu pracy za miesiąc – Twoja albo zespołu.', '#/obecnosc', ['PDF', 'Excel']),
