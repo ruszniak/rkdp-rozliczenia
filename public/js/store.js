@@ -6,8 +6,12 @@ if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
   throw new Error('Brak konfiguracji');
 }
 
+import { cachedFetch } from './cache.js';
+export { setStaleHandler, invalidateCache, cacheableRoute, autoRefreshRoute } from './cache.js';
+
 export const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+  global: { fetch: cachedFetch },
 });
 
 export const state = {

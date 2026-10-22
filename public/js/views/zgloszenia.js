@@ -138,12 +138,10 @@ export async function renderZgloszenia(main, id, params, module = 'rkdp') {
   setMod(module);
   if (id === 'cykliczne') return renderTemplates(main);
   if (id) return renderTicket(main, id);
-  const created = await generateRecurring();
-  if (created) toast(`Utworzono zgłoszenia cykliczne: ${created}`);
-  const [tickets, clients] = await Promise.all([
-    fetchAll(() => sb.from('rkdp_tickets').select('*, rkdp_ticket_files(count)').eq('module', cur.key).order('created_at', { ascending: false })),
-    loadClients(),
-  ]);
+  const loadT = () => fetchAll(() => sb.from('rkdp_tickets').select('*, rkdp_ticket_files(count)').eq('module', cur.key).order('created_at', { ascending: false }));
+  // zgłoszenia cykliczne generują się równolegle z wczytywaniem listy; gdy coś powstało – lista wczytuje się ponownie
+  let [created, tickets, clients] = await Promise.all([generateRecurring(), loadT(), loadClients()]);
+  if (created) { toast(`Utworzono zgłoszenia cykliczne: ${created}`); tickets = await loadT(); }
   const cname = Object.fromEntries(clients.map(c => [c.id, c.name]));
   const fileCount = Object.fromEntries(tickets.map(t => [t.id, t.rkdp_ticket_files?.[0]?.count || 0]));
   const me = state.me.id;

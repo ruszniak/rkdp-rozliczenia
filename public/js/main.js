@@ -1,5 +1,5 @@
 import { h, initials, toast, initTooltips, initMobileTables } from './ui.js';
-import { sb, state, hasModule, isJpkOnly } from './store.js';
+import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
 import { renderLogin } from './views/login.js';
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
@@ -125,11 +125,13 @@ function layout(active) {
     ' · aplikacja wewnętrzna · wykonanie: ',
     h('a', { href: 'https://ruszniak.io', target: '_blank', rel: 'noopener' }, 'druslak'),
     h('div', { class: 'owner' }, `© ${new Date().getFullYear()} Właściciel oprogramowania: Michał Ruszniak. Wszelkie prawa zastrzeżone.`));
-  app.replaceChildren(header, main, foot);
+  pending = [header, main, foot];
+  if (!routing) commit();
   return main;
 }
 
 async function logout() {
+  invalidateCache();
   location.hash = '';
   await endSession();
 }
@@ -146,44 +148,75 @@ async function loadContext() {
   state.me = members.find(m => m.email === email && m.active) || null;
 }
 
-async function route() {
-  if (cleanup) { try { cleanup(); } catch { /* */ } cleanup = null; }
+// ---------- przełączanie widoków bez „pustej strony” ----------
+// Nowy widok rysuje się poza ekranem; stary zostaje widoczny (z paskiem postępu) do chwili, gdy nowy jest gotowy.
+let pending = null, routing = false, routeSeq = 0, keepScrollY = null;
+const prog = h('div', { id: 'nprog', 'aria-hidden': 'true' });
+document.body.append(prog);
+let progTimer = null;
+const showProgress = () => { clearTimeout(progTimer); progTimer = setTimeout(() => prog.classList.add('on'), 120); };
+const hideProgress = () => { clearTimeout(progTimer); prog.classList.remove('on'); };
+function commit() {
+  if (!pending) return;
+  app.replaceChildren(...pending); pending = null; hideProgress();
+  if (keepScrollY !== null) { const y = keepScrollY; requestAnimationFrame(() => window.scrollTo(0, y)); } else window.scrollTo(0, 0);
+}
+// od razu podświetl klikniętą zakładkę – nie czekając na dane
+function markActiveTab() {
+  const cur = location.hash.split('?')[0] || '#/';
+  const links = [...document.querySelectorAll('.nav-links a')];
+  const fit = links.filter(a => { const hr = a.getAttribute('href'); return cur === hr || cur.startsWith(hr + '/'); }).sort((x, y) => y.getAttribute('href').length - x.getAttribute('href').length)[0];
+  if (fit) links.forEach(a => a.classList.toggle('active', a === fit));
+}
+
+async function route(opts = {}) {
+  const seq = ++routeSeq;
+  routing = true; keepScrollY = opts.keepScroll ? window.scrollY : null;
+  if (!opts.silent) { markActiveTab(); showProgress(); }
+  const early = setTimeout(() => { if (seq === routeSeq) commit(); }, opts.silent ? 4000 : 700);
+  let c = null;
+  const done = () => {
+    clearTimeout(early);
+    if (seq !== routeSeq) { try { c?.(); } catch { /* */ } return; }
+    if (cleanup) { try { cleanup(); } catch { /* */ } }
+    cleanup = c; routing = false; commit(); hideProgress();
+  };
   document.querySelector('.pop')?.remove();
   const { parts, params } = parseHash();
   if (isJpkOnly()) {
     if (parts[0] !== 'jpk') history.replaceState(null, '', '#/jpk');
-    try { cleanup = await renderJpk(layout('jpk'), { mod: 'rkdp' }); } catch (err) { console.error(err); toast('Nie udało się wczytać: ' + (err.message || err), true); }
-    return;
+    try { c = await renderJpk(layout('jpk'), { mod: 'rkdp' }); } catch (err) { console.error(err); toast('Nie udało się wczytać: ' + (err.message || err), true); }
+    return done();
   }
   const startMod = remembered() === 'm2' && hasModule('doradztwo') ? 'doradztwo' : null;
   const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'pulpit' : 'doradztwo');
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');
   try {
-    if (view === 'obecnosc') cleanup = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
-    else if (view === 'profil') cleanup = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
-    else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) cleanup = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
-    else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) cleanup = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
-    else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) cleanup = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });
-    else if (view === 'doradztwo' && hasModule('doradztwo')) cleanup = await renderM2(layout(m2key), parts, params);
-    else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
-    else if (view === 'jpk') cleanup = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
-    else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
-    else if (view === 'klient') cleanup = await renderKlient(layout('klienci'), parts[1]);
-    else if (view === 'aml') cleanup = await renderAml(layout('klienci'), 'rkdp');
-    else if (view === 'oferty') cleanup = await renderOferty(layout('klienci'), parts[1], 'rkdp');
-    else if (view === 'pulpit') cleanup = await renderPulpit(layout('pulpit'));
-    else if (view === 'zgloszenia') cleanup = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
-    else if (view === 'dokumenty') cleanup = await renderDokumenty(layout('sprawozdania'));
-    else if (view === 'kalkulator') cleanup = await renderKalkulator(layout('sprawozdania'), { mod: 'rkdp' });
-    else if (view === 'wzory') cleanup = await renderWzory(layout('sprawozdania'), { mod: 'rkdp', params });
-    else if (view === 'sprawozdania') cleanup = await renderSprawozdania(layout('sprawozdania'), parts[1]);
-    else if (view === 'zespol' && state.me.role === 'admin') cleanup = await renderZespol(layout('zespol'));
-    else cleanup = await renderRozliczenia(layout('rozliczenia'), params);
+    if (view === 'obecnosc') c = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
+    else if (view === 'profil') c = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
+    else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) c = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
+    else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) c = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
+    else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) c = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });
+    else if (view === 'doradztwo' && hasModule('doradztwo')) c = await renderM2(layout(m2key), parts, params);
+    else if (!hasModule('rozliczenia') && view !== 'zespol') c = await renderM2(layout('m2:'), ['doradztwo'], params);
+    else if (view === 'jpk') c = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
+    else if (view === 'klienci') c = await renderKlienci(layout('klienci'), params);
+    else if (view === 'klient') c = await renderKlient(layout('klienci'), parts[1]);
+    else if (view === 'aml') c = await renderAml(layout('klienci'), 'rkdp');
+    else if (view === 'oferty') c = await renderOferty(layout('klienci'), parts[1], 'rkdp');
+    else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'));
+    else if (view === 'zgloszenia') c = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
+    else if (view === 'dokumenty') c = await renderDokumenty(layout('sprawozdania'));
+    else if (view === 'kalkulator') c = await renderKalkulator(layout('sprawozdania'), { mod: 'rkdp' });
+    else if (view === 'wzory') c = await renderWzory(layout('sprawozdania'), { mod: 'rkdp', params });
+    else if (view === 'sprawozdania') c = await renderSprawozdania(layout('sprawozdania'), parts[1]);
+    else if (view === 'zespol' && state.me.role === 'admin') c = await renderZespol(layout('zespol'));
+    else c = await renderRozliczenia(layout('rozliczenia'), params);
   } catch (err) {
     console.error(err);
     toast('Nie udało się wczytać danych: ' + (err.message || err), true);
   }
-  window.scrollTo(0, 0);
+  done();
 }
 
 async function start() {
@@ -220,7 +253,17 @@ async function start() {
     return;
   }
   if (idleMinutes) { sb.rpc('auth_touch'); startIdleWatch(idleMinutes); }
-  window.addEventListener('hashchange', route);
+  window.addEventListener('hashchange', () => route());
+  // dane w bazie zmieniły się od ostatniej wizyty – przerysuj widok po cichu, o ile użytkownik nic teraz nie wpisuje
+  let lastAuto = 0;
+  setStaleHandler(() => {
+    if (routing || !autoRefreshRoute() || Date.now() - lastAuto < 5000) return;
+    const ae = document.activeElement;
+    if (document.querySelector('.modal-back, .pop') || document.body.classList.contains('focus-mode')) return;
+    if (ae && ae.closest('main') && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+    lastAuto = Date.now();
+    route({ silent: true, keepScroll: true });
+  });
   route().then(prefetchViews);
 }
 
