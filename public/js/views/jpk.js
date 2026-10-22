@@ -2,7 +2,7 @@
 // Plik jest czytany wyłącznie w przeglądarce – nic nie jest wysyłane na serwer ani zapisywane w bazie.
 import { h, toast, infoTip, printHtml, modal, icon } from '../ui.js';
 import { downloadXlsx } from '../xlsx.js';
-import { buildBilans, buildRzis, hasVariant } from './jpk-fin.js';
+import { buildBilans, buildRzis, hasVariant, validateKr } from './jpk-fin.js';
 
 const HELP = `Podgląd plików JPK (JPK_CIT):
 • Przeciągnij plik XML albo kliknij „Wybierz plik”. Obsługiwane: JPK_KR_PD (księgi rachunkowe), JPK_ST_KR (środki trwałe), a także inne pliki JPK – jako tabele.
@@ -222,6 +222,7 @@ function dataTable({ cols, rows, onRow, pageSize = 100, filters = [], empty = 'B
 
 // ---------- widok ----------
 let current = null; // ostatnio otwarty plik – tylko w pamięci karty przeglądarki
+let onClear = () => {};
 
 export async function renderJpk(main, params) {
   const area = h('div');
@@ -235,6 +236,11 @@ export async function renderJpk(main, params) {
       current = parseJpk(await readText(file), file.name);
       current.size = file.size; current.ms = Math.round(performance.now() - t0);
       draw();
+      if (current.kind === 'kr_pd') {
+        const iss = issuesOf(current), e = iss.filter(i => i.level === 'error').length;
+        if (e) toast(`Kontrola pliku: wykryto ${e} ${e === 1 ? 'błąd' : e < 5 ? 'błędy' : 'błędów'} – szczegóły nad zakładkami.`, true);
+        else if (iss.length) toast(`Kontrola pliku: ${iss.length} ${iss.length === 1 ? 'ostrzeżenie' : 'ostrzeżenia'} – sprawdź znaczniki.`);
+      }
     } catch (e) { console.error(e); current = null; area.replaceChildren(h('div', { class: 'card empty' }, 'Nie udało się odczytać pliku: ' + e.message)); }
   };
   const input = h('input', { type: 'file', accept: '.xml,text/xml,application/xml', hidden: true, onchange: () => { loadFile(input.files[0]); input.value = ''; } });
@@ -245,8 +251,16 @@ export async function renderJpk(main, params) {
   ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('over'); }));
   zone.addEventListener('drop', e => loadFile(e.dataTransfer?.files?.[0]));
 
+  // „Wyczyść dane”: usuwa wczytany plik z pamięci aplikacji (w tym ukrytą ramkę wydruku PDF z danymi)
+  onClear = () => {
+    if (!current) return;
+    if (!confirm(`Usunąć z aplikacji dane pliku ${current.fileName}? Plik na Twoim dysku pozostaje bez zmian.`)) return;
+    current = null; input.value = '';
+    document.querySelectorAll('iframe[aria-hidden="true"]').forEach(f => f.remove());
+    draw(); toast('Dane pliku usunięto z aplikacji.');
+  };
   const draw = () => {
-    if (!current) { area.replaceChildren(h('div', { class: 'card empty' }, 'Otwórz plik, aby zobaczyć jego zawartość.')); return; }
+    if (!current) { area.replaceChildren(h('div', { class: 'card empty' }, 'Otwórz plik, aby zobaczyć jego zawartość. Dane z pliku są tylko w tej karcie przeglądarki – „Wyczyść dane” usuwa je od razu, a zamknięcie karty lub wylogowanie także.')); return; }
     area.replaceChildren(current.kind === 'kr_pd' ? viewKr(current) : current.kind === 'st_kr' ? viewSt(current) : viewGeneric(current));
   };
 
@@ -281,7 +295,33 @@ const ok = v => v === null ? h('span', { class: 'muted' }, '—') : h('span', { 
 function exportBar(m, extra = []) {
   return h('div', { class: 'jpk-actions' }, ...extra,
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportExcel(m) }, icon('download'), 'Pobierz Excel'),
-    h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportPdfDialog(m) }, icon('download'), 'PDF'));
+    h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportPdfDialog(m) }, icon('download'), 'PDF'),
+    h('button', { class: 'btn btn-outline btn-sm jpk-clear', onclick: () => onClear(), 'data-tip': 'Usuwa wczytany plik z aplikacji (podgląd, bilans, RZiS, kontrola). Plik na dysku pozostaje.' }, '✕ Wyczyść dane'));
+}
+
+// ----- kontrola pliku -----
+const issuesOf = m => m._iss || (m._iss = validateKr(m, m._a || (m._a = analyzeKr(m)), m._bil || (m._bil = buildBilans(m))));
+function issuesPanel(m, goTo) {
+  const list = issuesOf(m);
+  const err = list.filter(i => i.level === 'error').length, warn = list.length - err;
+  if (!list.length) return h('div', { class: 'jpk-check ok' }, h('b', {}, '✓ Kontrola pliku: nie wykryto problemów'), h('span', { class: 'small' }, ' – sumy kontrolne, bilans Wn = Ma, salda kont, znaczniki oraz bilans i RZiS są spójne.'));
+  let open = err > 0;
+  const body = h('div', { class: 'jpk-check-list' });
+  const draw = () => {
+    body.hidden = !open;
+    body.replaceChildren(...list.map(i => h('div', { class: 'jpk-issue ' + i.level },
+      h('div', { class: 'jpk-issue-head' }, h('span', { class: 'jpk-lvl' }, i.level === 'error' ? 'Błąd' : 'Uwaga'), h('b', {}, i.title),
+        i.go ? h('button', { class: 'btn btn-ghost btn-sm', onclick: () => goTo(i.go, i.query) }, 'Pokaż →') : null),
+      i.text ? h('p', { class: 'small' }, i.text) : null,
+      i.accounts.length ? h('ul', { class: 'jpk-issue-acc' }, ...i.accounts.slice(0, 12).map(a => h('li', {},
+        h('button', { class: 'linklike', onclick: () => goTo('acc', a.S_1) }, a.S_1), ` ${a.S_2 || ''}`, a.info ? h('span', { class: 'muted' }, ` – ${a.info}`) : null)),
+        i.accounts.length > 12 ? h('li', { class: 'muted' }, `… i ${i.accounts.length - 12} więcej (pełna lista w Excelu, arkusz „Kontrola”)`) : null) : null)));
+  };
+  const head = h('button', { class: 'jpk-check-head', onclick: () => { open = !open; draw(); arrow.textContent = open ? '▾' : '▸'; } });
+  const arrow = h('span', {}, open ? '▾' : '▸');
+  head.append(arrow, h('b', {}, ` ${err ? '⚠' : 'ℹ'} Kontrola pliku: `), [err ? `${err} ${err === 1 ? 'błąd' : err < 5 ? 'błędy' : 'błędów'}` : '', warn ? `${warn} ${warn === 1 ? 'ostrzeżenie' : warn < 5 ? 'ostrzeżenia' : 'ostrzeżeń'}` : ''].filter(Boolean).join(' i '), h('span', { class: 'small muted' }, open ? '' : ' – kliknij, aby zobaczyć'));
+  draw();
+  return h('div', { class: 'jpk-check ' + (err ? 'err' : 'warn') }, head, body);
 }
 
 // ----- JPK_KR_PD -----
@@ -338,7 +378,13 @@ function viewKr(m) {
     if (tab === 'rpd') body.replaceChildren(rpdCard(m.rpd));
   };
   let tabs = h('div');
-  const el = h('div', {}, metaCard(m), h('div', { class: 'jpk-bar' }, tabs, exportBar(m)), body);
+  const goTo = (t, q) => {
+    tab = t === 'acc' && q ? 'acc' : t; if (t === 'zp') accFilter = '';
+    render();
+    if (q) setTimeout(() => { const sEl = body.querySelector('.jpk-search'); if (sEl) { sEl.value = q; sEl.dispatchEvent(new Event('input')); } }, 0);
+    el.querySelector('.jpk-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const el = h('div', {}, metaCard(m), issuesPanel(m, goTo), h('div', { class: 'jpk-bar' }, tabs, exportBar(m)), body);
   render();
   return el;
 }
@@ -489,6 +535,11 @@ function exportExcel(m) {
       (() => { const n = new Map(m.accounts.map(a => [a.S_1, a.S_2])); return m.postings.map(p => ({ ...p, _n: n.get(p.Z_3) || '' })); })()));
     for (const k of ['S_12_1', 'S_12_2', 'S_12_3']) if (m.accounts.some(a => a[k]))
       sheets.push(sheetFrom(`Znaczniki ${k}`, [{ key: 'marker', label: lbl(k) }, { key: 'n', label: 'Liczba kont' }, ...['S_4', 'S_5', 'S_6', 'S_7', 'S_8', 'S_9', 'S_10', 'S_11'].map(f => ({ key: f, label: lbl(f), num: true })), { key: 'saldo', label: 'Saldo (Wn − Ma)', num: true }], markerGroups(m.accounts, k)));
+    const iss = issuesOf(m);
+    sheets.splice(1, 0, { name: 'Kontrola', widths: [10, 60, 14, 40, 60], rows: [[{ v: 'Kontrola pliku', s: 'title' }], [],
+      ['Poziom', 'Problem', 'Konto', 'Nazwa konta', 'Szczegóły'].map(v => ({ v, s: 'header' })),
+      ...(iss.length ? iss.flatMap(i => [[{ v: i.level === 'error' ? 'BŁĄD' : 'uwaga', s: i.level === 'error' ? 'missing' : 'normal' }, { v: i.title, s: 'wrap' }, '', '', { v: i.text || '', s: 'wrap' }],
+        ...i.accounts.map(a => ['', '', a.S_1, a.S_2 || '', a.info || ''])]) : [['', 'Nie wykryto problemów']])] });
     const B = m._bil || (m._bil = buildBilans(m));
     const finRows = (rows, cols) => rows.map(r => [r.key, { v: '   '.repeat(r.depth - 1) + (r.name || ''), s: r.depth === 1 || r.calc ? 'header' : 'normal' }, ...cols.map(c => ({ v: r[c], s: 'money' }))]);
     sheets.push({ name: 'Bilans (pomocniczo)', widths: [12, 70, 20, 20], rows: [[{ v: 'Bilans – zestawienie pomocnicze ze znaczników kont (nie jest częścią JPK)', s: 'title' }], [],
@@ -528,6 +579,8 @@ function printReport(m, o) {
     `<div class="kv">${infoRows(m).map(([k, v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div>`];
   if (m.kind === 'kr_pd') {
     const A = m._a || (m._a = analyzeKr(m));
+    const iss = issuesOf(m);
+    parts.push('<h2>Kontrola pliku</h2>' + (iss.length ? iss.map(i => `<div class="iss ${i.level}"><b>${i.level === 'error' ? 'Błąd' : 'Uwaga'}: ${esc(i.title)}</b><div>${esc(i.text || '')}</div>${i.accounts.length ? `<div class="acc">${i.accounts.slice(0, 30).map(a => `${esc(a.S_1)} ${esc(a.S_2 || '')}${a.info ? ' – ' + esc(a.info) : ''}`).join('<br>')}${i.accounts.length > 30 ? `<br>… i ${i.accounts.length - 30} więcej` : ''}</div>` : ''}</div>`).join('') : '<p>✓ Nie wykryto problemów.</p>'));
     parts.push('<h2>Sumy kontrolne</h2>' + tbl(['Pole', 'Opis', 'W pliku', 'Wyliczone', 'Wynik'], A.ctrlRows.map(r => [r.k, lbl(r.k), r.file === undefined ? '—' : fmtN(num(r.file), ['C_1', 'C_3'].includes(r.k) ? 0 : 2), fmtN(r.calc, ['C_1', 'C_3'].includes(r.k) ? 0 : 2), r.ok === null ? '—' : r.ok ? '✓ zgodne' : '✗ różnica']), [2, 3]));
     parts.push('<h2>Kontrola bilansu</h2>' + tbl(['', 'Winien', 'Ma', 'Różnica'], A.balance.map(b => [b.name, fmtN(b.wn), fmtN(b.ma), fmtN(b.diff)]), [1, 2, 3]));
     if (m.rpd) parts.push('<h2>Rozliczenie podatku dochodowego (RPD)</h2>' + tbl(['Pole', 'Opis', 'Kwota'], Object.keys(m.rpd).map(k => [k, lbl(k), fmtN(num(m.rpd[k]))]), [2]));
@@ -570,7 +623,7 @@ h2{font-size:11pt;margin:14px 0 6px;color:#1D1A16;break-after:avoid}.pb{break-be
 table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1D1A16;color:#efe7da;text-align:left;padding:4px 5px;font-weight:600;font-size:7.8pt}
 td{padding:3px 5px;border-bottom:.4pt solid #e3d9ca;vertical-align:top}th.n,td.n{text-align:right;white-space:nowrap}tr{break-inside:avoid}tr.tot td{font-weight:700;border-top:1pt solid #1D1A16}
 .jr{break-inside:avoid;margin-bottom:6px}.jh{background:#F3EEE6;padding:3px 6px;display:flex;gap:4px}.jh span{margin-left:auto;font-weight:700}
-.foot{margin-top:10px;font-size:7pt;color:#8a8178}.note{font-size:7.6pt;color:#7d7368;margin:0 0 6px}
+.foot{margin-top:10px;font-size:7pt;color:#8a8178}.note{font-size:7.6pt;color:#7d7368;margin:0 0 6px}.iss{padding:4px 8px;margin:0 0 4px;border-left:3px solid #B08D57;background:#F7F3EC}.iss.error{border-color:#A4462F;background:#FBEDE7}.iss .acc{font-size:7.6pt;color:#4a433b;margin-top:2px}
 </style></head><body>${parts.join('')}<div class="foot">Raport z pliku ${esc(m.fileName)} · wygenerowano ${esc(now)} w aplikacji RKDP / M2 TAX</div></body></html>`;
   printHtml(html, baseName(m));
 }

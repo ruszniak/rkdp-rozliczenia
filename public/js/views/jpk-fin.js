@@ -224,3 +224,94 @@ export function buildRzis(m, variant = 'RP') {
   });
   return { variant: T.name, rows, net: r2(vals[T.result]), closingEntries: closing.size, fromPostings: usePostings };
 }
+
+// ---------- KONTROLA PLIKU: błędy (error) i ostrzeżenia (warn) ----------
+// Każdy problem: { level, title, text, accounts: [{ S_1, S_2, info }], go: zakładka do otwarcia, query: tekst do wyszukania }
+const accClass = a => (String(a.S_1 || '').match(/\d/) || [''])[0];
+const isResultNo = a => /^(4|5|7)/.test(String(a.S_1 || '').replace(/\D/g, '')) || /^87/.test(String(a.S_1 || '').replace(/\D/g, ''));
+const isBalanceNo = a => /^[0-3]|^6|^8[0-6]/.test(String(a.S_1 || '').replace(/\D/g, ''));
+const RZIS_KEYS = { RP: new Set(RZIS_P.rows.map(r => r[0])), RK: new Set(RZIS_K.rows.map(r => r[0])) };
+const SIGN = { RP: Object.fromEntries(RZIS_P.rows.filter(r => r[2]).map(r => [r[0], r[2]])), RK: Object.fromEntries(RZIS_K.rows.filter(r => r[2]).map(r => [r[0], r[2]])) };
+const inTemplate = (kind, path) => {
+  const has = kind === 'BA' ? k => !!AKTYWA[k] : kind === 'BP' ? k => !!PASYWA[k] : k => RZIS_KEYS[kind].has(k);
+  if (has(path)) return true;
+  const par = parents(path).at(-2); // dodatkowe podpozycje (np. myślniki) pod istniejącą pozycją wzoru
+  return !!par && has(par) && path.split('.').length >= 4;
+};
+const fmt = n => Number(Math.abs(n) < 0.005 ? 0 : n).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export function validateKr(m, A, B) {
+  const issues = [];
+  const add = (level, title, text, accounts = [], go = null, query = null) => issues.push({ level, title, text, accounts, go, query });
+  const accLine = (a, info) => ({ S_1: a.S_1, S_2: a.S_2 || '', info });
+
+  // 1. sumy kontrolne
+  const badCtrl = A.ctrlRows.filter(r => r.ok === false);
+  if (badCtrl.length) add('error', 'Sumy kontrolne (Ctrl) nie zgadzają się z danymi', badCtrl.map(r => `${r.k}: w pliku ${fmt(num(r.file))}, z danych ${fmt(r.calc)}`).join('; ') + '. Plik może być niekompletny albo uszkodzony.', [], 'sum');
+  // 2. bilans obrotów i sald (Wn = Ma)
+  for (const b of A.balance) if (Math.abs(b.diff) >= 0.005) add('error', `${b.name}: Wn ≠ Ma`, `Różnica ${fmt(b.diff)} (Wn ${fmt(b.wn)}, Ma ${fmt(b.ma)}).`, [], 'sum');
+  // 3. niezbilansowane zapisy
+  if (A.unbalanced.length) add('error', `Zapisy w dzienniku, w których Wn ≠ Ma (${A.unbalanced.length})`, `Np. ${A.unbalanced.slice(0, 8).map(j => j.D_1).join(', ')}.`, [], 'jr', A.unbalanced[0]?.D_1);
+  // 4. konta z zapisów, których brak w ZOiS
+  if (A.unknownAccounts.length) add('error', `Konta użyte w zapisach, których nie ma w zestawieniu obrotów i sald (${A.unknownAccounts.length})`, A.unknownAccounts.slice(0, 15).join(', '), [], 'zp');
+
+  // 5. spójność kont w ZOiS: saldo = BO + obroty narastająco; obroty okresu = zapisy w dzienniku
+  const turn = new Map();
+  for (const p of m.postings) { const t = turn.get(p.Z_3) || { wn: 0, ma: 0 }; t.wn += num(p.Z_4); t.ma += num(p.Z_7); turn.set(p.Z_3, t); }
+  const badSaldo = [], badTurn = [];
+  for (const a of m.accounts) {
+    const saldo = num(a.S_10) - num(a.S_11), bo = num(a.S_4) - num(a.S_5), nar = num(a.S_8) - num(a.S_9);
+    if (Math.abs(saldo - bo - nar) >= 0.01 && Math.abs(saldo - nar) >= 0.01) badSaldo.push(accLine(a, `saldo ${fmt(saldo)}, BO + obroty ${fmt(bo + nar)}`));
+    if (m.postings.length) {
+      const t = turn.get(a.S_1) || { wn: 0, ma: 0 };
+      if (Math.abs(t.wn - num(a.S_6)) >= 0.01 || Math.abs(t.ma - num(a.S_7)) >= 0.01) badTurn.push(accLine(a, `ZOiS Wn ${fmt(num(a.S_6))} / Ma ${fmt(num(a.S_7))}, dziennik Wn ${fmt(t.wn)} / Ma ${fmt(t.ma)}`));
+    }
+  }
+  if (badSaldo.length) add('error', `Saldo konta nie wynika z bilansu otwarcia i obrotów (${badSaldo.length})`, 'Saldo końcowe powinno być równe BO + obroty narastająco.', badSaldo, 'acc');
+  if (badTurn.length) add('error', `Obroty kont w ZOiS różnią się od zapisów w dzienniku (${badTurn.length})`, 'Obroty za okres (S_6 / S_7) powinny być sumą pozycji z dziennika na tym koncie.', badTurn, 'acc');
+
+  // 6. znaczniki
+  const noMarker = [], unknown = [], outside = [], wrongType = [], singleOpp = [], negRzis = [];
+  for (const a of m.accounts) {
+    const active = [a.S_4, a.S_5, a.S_6, a.S_7, a.S_10, a.S_11].some(v => Math.abs(num(v)) >= 0.005);
+    if (!active) continue;
+    if (!String(a.S_12_1 || '').trim()) { noMarker.push(accLine(a, `saldo ${fmt(num(a.S_10) - num(a.S_11))}`)); continue; }
+    for (const raw of [a.S_12_1, a.S_12_2].filter(x => String(x || '').trim())) {
+      const parsed = parseMarker(raw);
+      if (!parsed.length && !/^INNE$/i.test(String(raw).trim())) unknown.push(accLine(a, `„${raw}”`));
+      for (const p of parsed) if (!inTemplate(p.kind, p.path)) outside.push(accLine(a, `${raw} → ${p.kind === 'BA' ? 'aktywa' : p.kind === 'BP' ? 'pasywa' : 'RZiS'} ${p.path}`));
+    }
+    const mk = accMarkers(a);
+    const hasB = mk.some(x => x.kind === 'BA' || x.kind === 'BP'), hasR = mk.some(x => x.kind === 'RP' || x.kind === 'RK');
+    if (isResultNo(a) && hasB && !hasR) wrongType.push(accLine(a, `konto wynikowe ze znacznikiem bilansu (${a.S_12_1})`));
+    if (/^[0-3]/.test(String(a.S_1 || '').replace(/\D/g, '')) && hasR && !hasB) wrongType.push(accLine(a, `konto bilansowe ze znacznikiem RZiS (${a.S_12_1})`));
+    const ba = mk.find(x => x.kind === 'BA'), bp = mk.find(x => x.kind === 'BP');
+    const saldo = num(a.S_10) - num(a.S_11);
+    if (accClass(a) === '2' && ((ba && !bp && saldo < -0.005) || (bp && !ba && saldo > 0.005)))
+      singleOpp.push(accLine(a, `${ba ? 'znacznik aktywów' : 'znacznik pasywów'}, a saldo ${saldo > 0 ? 'Wn' : 'Ma'} ${fmt(Math.abs(saldo))}`));
+  }
+  if (noMarker.length) add('error', `Konta bez znacznika S_12_1 (${noMarker.length})`, 'Znacznik S_12_1 jest obowiązkowy dla każdego konta, które miało saldo lub obroty. Konta bez znacznika nie trafią do bilansu ani RZiS.', noMarker, 'acc');
+  if (unknown.length) add('warn', `Nierozpoznane znaczniki (${unknown.length})`, 'Znacznik nie ma formatu BA…/BP…/RP…/RK… – aplikacja nie przypisze konta do bilansu ani RZiS (może to też być znacznik innego wzoru sprawozdania).', unknown, 'acc');
+  if (outside.length) add('warn', `Znaczniki wskazujące pozycję spoza wzoru bilansu / RZiS (${outside.length})`, 'Pozycja nie występuje we wzorze z załącznika nr 1 do ustawy o rachunkowości – sprawdź znacznik (literówka?) albo to wzór dla jednostek małych / mikro.', outside, 'acc');
+  if (wrongType.length) add('warn', `Możliwy zły znacznik – typ konta nie pasuje do sprawozdania (${wrongType.length})`, 'Konta zespołów 4, 5, 7 i 87 zwykle mają znaczniki RZiS, a konta zespołów 0–3 – znaczniki bilansu.', wrongType, 'acc');
+  if (singleOpp.length) add('warn', `Rozrachunki z saldem po stronie przeciwnej do znacznika (${singleOpp.length})`, 'Konto ma tylko jeden znacznik, a saldo jest po drugiej stronie – prawdopodobnie brakuje drugiego znacznika (aktywa i pasywa). Teraz saldo pomniejsza pozycję zamiast trafić na drugą stronę bilansu.', singleOpp, 'bil');
+
+  // 7. bilans: aktywa = pasywa
+  const dE = r2(B.tA.end - B.tP.end), dS = r2(B.tA.start - B.tP.start);
+  if (Math.abs(dE) >= 0.005 || Math.abs(dS) >= 0.005) {
+    // podpowiedź: konta, których saldo równa się różnicy
+    const d = Math.abs(dE || dS);
+    const hint = d < 0.01 ? [] : m.accounts.filter(a => { const v = Math.abs(num(a.S_10) - num(a.S_11)); return v >= 0.01 && (Math.abs(v - d) < 0.01 || Math.abs(2 * v - d) < 0.01); })
+      .slice(0, 10).map(a => accLine(a, `saldo ${fmt(num(a.S_10) - num(a.S_11))} – kwota pasuje do różnicy${Math.abs(2 * Math.abs(num(a.S_10) - num(a.S_11)) - d) < 0.01 ? ' (×2 – konto po złej stronie bilansu?)' : ''}`));
+    add('error', 'Bilans się nie bilansuje (aktywa ≠ pasywa)', `Różnica na koniec ${fmt(dE)}, na początek ${fmt(dS)}. Najczęstsze przyczyny: konto bez znacznika, zły znacznik (np. pasywa zamiast aktywów – wtedy różnica to dwukrotność salda) albo rozrachunek z jednym znacznikiem.${hint.length ? ' Konta, których saldo odpowiada różnicy:' : ''}`, hint, 'bil');
+  }
+  // 8. RZiS: konta wynikowe bez znacznika RZiS, ujemne przychody / koszty
+  const rp = hasVariant(m, 'RP') ? buildRzis(m, 'RP') : null;
+  if (rp) for (const row of rp.rows) for (const ac of row.accounts) {
+    const sec = row.key.split('.')[0]; if (row.key === 'A.II') continue; // zmiana stanu produktów może być ujemna
+    if (ac.v < -0.005) negRzis.push({ S_1: ac.S_1, S_2: ac.S_2, info: `${SIGN.RP[sec] > 0 ? 'przychód' : 'koszt'} ujemny ${fmt(ac.v)} w poz. ${row.key}` });
+  }
+  if (negRzis.length) add('warn', `Ujemne kwoty w RZiS – możliwy zły znacznik (${negRzis.length})`, 'Konto przypisane do pozycji kosztowej ma przewagę obrotów Ma (albo do przychodowej – Wn). Sprawdź, czy znacznik nie wskazuje przychodu zamiast kosztu (lub odwrotnie).', negRzis, 'rzis');
+  if (rp && B.unclosed && Math.abs(B.unclosed - rp.net) >= 0.01) add('warn', 'Wynik z RZiS różni się od salda kont wynikowych', `RZiS: ${fmt(rp.net)}, saldo niezamkniętych kont wynikowych: ${fmt(B.unclosed)}. Część kont wynikowych może nie mieć znacznika RZiS wariantu porównawczego.`, [], 'rzis');
+  return issues.sort((a, b) => (a.level === b.level ? 0 : a.level === 'error' ? -1 : 1));
+}

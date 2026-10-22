@@ -701,3 +701,22 @@ table.jpk-table{width:100%;border-collapse:collapse;font-size:12.5px;font-varian
 .fin-table tr.fin-acc td:nth-child(2){padding-left:64px;white-space:normal}
 .fin-accno{font-weight:600;color:var(--bronze-dark)}
 .fin-tw{color:var(--bronze);font-size:11px}
+/* Kontrola pliku JPK */
+.jpk-check{border-radius:var(--r);margin-bottom:16px;border:1px solid var(--line);background:var(--card)}
+.jpk-check.ok{padding:12px 16px;border-color:#BFD3BC;background:var(--ok-bg);color:var(--ok)}
+.jpk-check.err{border-color:#E3B7A8;background:#FDF4F0}
+.jpk-check.warn{border-color:#E8D3A8;background:#FDF9F0}
+.jpk-check-head{display:flex;align-items:center;gap:4px;width:100%;text-align:left;border:0;background:none;padding:12px 16px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink)}
+.jpk-check.err .jpk-check-head b{color:var(--warn)}
+.jpk-check-list{padding:0 16px 12px;display:grid;gap:8px}
+.jpk-issue{background:var(--card);border:1px solid var(--line);border-left:4px solid #C9A25E;border-radius:10px;padding:10px 12px}
+.jpk-issue.error{border-left-color:var(--warn)}
+.jpk-issue-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.jpk-issue-head .btn{margin-left:auto}
+.jpk-lvl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:99px;background:#F5E7CF;color:#7A5A37}
+.jpk-issue.error .jpk-lvl{background:var(--warn-bg);color:var(--warn)}
+.jpk-issue p{margin:6px 0 0}
+.jpk-issue-acc{margin:6px 0 0;padding-left:18px;font-size:12.5px}
+.jpk-issue-acc li{margin:2px 0}
+.linklike{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--bronze-dark);cursor:pointer;text-decoration:underline}
+.jpk-clear{color:var(--warn);border-color:#E3B7A8}.jpk-clear:hover{background:var(--warn-bg)}
