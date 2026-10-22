@@ -17,6 +17,8 @@ const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
 const renderM2 = lazy(() => import('./views/m2.js'), 'renderM2');
 const renderJpk = lazy(() => import('./views/jpk.js'), 'renderJpk');
+const renderKalkulator = lazy(() => import('./views/kalkulator.js'), 'renderKalkulator');
+const renderWzory = lazy(() => import('./views/wzory.js'), 'renderWzory');
 // po wyświetleniu pierwszego ekranu pobieramy w tle pozostałe widoki, żeby przełączanie zakładek było natychmiastowe
 const prefetchViews = () => {
   const go = () => {
@@ -160,6 +162,8 @@ async function route() {
     if (view === 'obecnosc') cleanup = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
     else if (view === 'profil') cleanup = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
     else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) cleanup = await renderJpk(layout('m2:jpk'), { mod: 'm2' });
+    else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) cleanup = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
+    else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) cleanup = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });
     else if (view === 'doradztwo' && hasModule('doradztwo')) cleanup = await renderM2(layout(m2key), parts, params);
     else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'jpk') cleanup = await renderJpk(layout('jpk'), { mod: 'rkdp' });
@@ -170,6 +174,8 @@ async function route() {
     else if (view === 'pulpit') cleanup = await renderPulpit(layout('pulpit'));
     else if (view === 'zgloszenia') cleanup = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
     else if (view === 'dokumenty') cleanup = await renderDokumenty(layout('sprawozdania'));
+    else if (view === 'kalkulator') cleanup = await renderKalkulator(layout('sprawozdania'), { mod: 'rkdp' });
+    else if (view === 'wzory') cleanup = await renderWzory(layout('sprawozdania'), { mod: 'rkdp', params });
     else if (view === 'sprawozdania') cleanup = await renderSprawozdania(layout('sprawozdania'), parts[1]);
     else if (view === 'zespol' && state.me.role === 'admin') cleanup = await renderZespol(layout('zespol'));
     else cleanup = await renderRozliczenia(layout('rozliczenia'), params);

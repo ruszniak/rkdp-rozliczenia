@@ -2,6 +2,7 @@
 import { h, fail, infoTip } from '../ui.js';
 import { sb, hasModule } from '../store.js';
 import { dokumentyDialog } from '../rkdp/docs.js';
+import { WZORY } from '../tools/wzory.js';
 
 const HELP = `Tu wygenerujesz każdy dokument z aplikacji:
 • Kliknij kafelek, wybierz klienta i uzupełnij dane – większość pól wypełnia się sama z karty klienta, KRS lub Twojego profilu.
@@ -46,6 +47,10 @@ export async function renderDokumenty(main) {
     group('Spółki',
       tile('Protokół zgromadzenia wspólników (ZZW)', 'Zatwierdzenie sprawozdania finansowego, podział zysku / pokrycie straty, absolutoria. Dane z KRS.', '#/sprawozdania/nowy', ['PDF', 'Word']),
       h('div', { class: 'card dk-tile dk-list' }, h('b', {}, 'Ostatnie protokoły'), recent)),
+    group('Wzory umów i uchwał dla klientów',
+      ...Object.entries(WZORY).map(([k, w]) => tile(w.label, w.desc, `#/wzory?wzor=${k}`, ['Word', 'PDF']))),
+    group('Narzędzia',
+      tile('Kalkulator: JDG czy spółka z o.o.?', 'Porównanie obciążeń: JDG na skali, liniowym i ryczałcie, spółka na CIT i CIT estońskim. Wynik w PDF dla klienta.', '#/kalkulator', ['PDF'])),
     group('JPK',
       tile('Podgląd JPK_CIT', 'Otwórz plik JPK_KR_PD (księgi rachunkowe) lub JPK_ST_KR (środki trwałe): konta, dziennik, znaczniki, sumy kontrolne. Plik zostaje na Twoim komputerze.', '#/jpk', ['Excel', 'PDF'])),
     group('Raporty i zestawienia',

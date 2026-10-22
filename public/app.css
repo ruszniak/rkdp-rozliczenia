@@ -723,3 +723,31 @@ table.jpk-table{width:100%;border-collapse:collapse;font-size:12.5px;font-varian
 .jpk-wz{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .fin-table tr.fin-wt td{font-style:italic;font-weight:400 !important;background:none !important;color:var(--text)}
 .fin-table tr.fin-wt td.fin-key{color:transparent}
+
+/* Kalkulator formy opodatkowania */
+.fk-layout{display:grid;grid-template-columns:330px minmax(0,1fr);gap:16px;align-items:start}
+.fk-form{position:sticky;top:90px;margin:0}
+.fk-fields{display:flex;flex-direction:column;gap:12px}
+.fk-hr{border:0;border-top:1px solid var(--line);margin:4px 0;width:100%}
+.fk-res{display:flex;flex-direction:column;gap:14px;min-width:0}
+.fk-info{background:var(--panel);border-radius:10px;padding:10px 14px;color:var(--text)}
+.fk-warn{background:#FBF1DD;color:#6b5218;border-radius:10px;padding:8px 12px;margin-bottom:6px}
+.fk-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.fk-card{display:flex;flex-direction:column;gap:3px;padding:16px}
+.fk-card.best{border:2px solid var(--bronze);background:#FFFBF4}
+.fk-top{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.fk-badge{background:var(--bronze);color:#fff}
+.fk-lbl{font-size:11.5px;color:var(--label);margin-top:8px}
+.fk-val{font-weight:700;font-variant-numeric:tabular-nums}
+.fk-val.big{font-family:var(--serif);font-size:22px;color:var(--bronze-dark)}
+.fk-bar{height:6px;background:var(--panel);border-radius:99px;margin:8px 0 4px;overflow:hidden}
+.fk-bar>div{height:100%;background:var(--bronze);border-radius:99px}
+table.fk-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.fk-table th,.fk-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.fk-table th{font-size:11.5px;color:var(--label);font-weight:700}
+.fk-table .num{text-align:right}
+.fk-table tr.fk-sum td{font-weight:700;background:var(--panel)}
+@media (max-width:980px){.fk-layout{grid-template-columns:1fr}.fk-form{position:static}}
+.fk-scroll{overflow-x:auto}
+.wz-hints{margin-top:14px;background:#FBF1DD;border-radius:10px;padding:12px 14px;font-size:13px;color:#4f3d14}
+.wz-hints ul{margin:6px 0 0;padding-left:18px}.wz-hints li{margin:3px 0}

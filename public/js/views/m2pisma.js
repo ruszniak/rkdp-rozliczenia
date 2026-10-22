@@ -122,6 +122,8 @@ export async function renderM2Dokumenty(main, params) {
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Dokumenty – wzory pism', infoTip(HELP, 'Wzory pism – instrukcja')),
         h('p', { class: 'sub' }, 'Pisma procesowe na papierze firmowym M2 TAX – do pobrania w Wordzie i dalszej edycji.')),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+        h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/wzory' }, 'Wzory umów i uchwał'),
+        h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/kalkulator' }, 'Kalkulator JDG / spółka'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: pdf }, icon('download'), 'PDF'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: word }, icon('download'), 'Pobierz Word'))),
     h('div', { class: 'pz-layout' },
