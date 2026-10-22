@@ -265,7 +265,8 @@ export async function renderJpk(main, params) {
   };
 
   main.replaceChildren(
-    h('div', { class: 'page-head' },
+    params?.back ? h('a', { href: params.back, class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Dokumenty') : '',
+    h('div', { class: 'page-head', style: params?.back ? { marginTop: '10px' } : null },
       h('div', {}, h('p', { class: 'eyebrow' }, params?.mod === 'm2' ? 'Doradztwo podatkowe · M2 TAX' : 'RKDP'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Podgląd JPK', infoTip(HELP, 'Podgląd JPK – instrukcja')),
         h('p', { class: 'sub' }, 'JPK_CIT: księgi rachunkowe (JPK_KR_PD) i środki trwałe (JPK_ST_KR) – podgląd, kontrola, Excel i PDF.'))),

@@ -45,10 +45,10 @@ function parseHash() {
 
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
-    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/dokumenty', 'Dokumenty', 'sprawozdania'], ['#/jpk', 'JPK', 'jpk']] },
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/dokumenty', 'Dokumenty', 'sprawozdania']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
-      ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia'], ['#/doradztwo/jpk', 'JPK', 'm2:jpk']] },
+      ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'RKDP · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -161,12 +161,12 @@ async function route() {
   try {
     if (view === 'obecnosc') cleanup = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
     else if (view === 'profil') cleanup = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
-    else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) cleanup = await renderJpk(layout('m2:jpk'), { mod: 'm2' });
+    else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) cleanup = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
     else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) cleanup = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
     else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) cleanup = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });
     else if (view === 'doradztwo' && hasModule('doradztwo')) cleanup = await renderM2(layout(m2key), parts, params);
     else if (!hasModule('rozliczenia') && view !== 'zespol') cleanup = await renderM2(layout('m2:'), ['doradztwo'], params);
-    else if (view === 'jpk') cleanup = await renderJpk(layout('jpk'), { mod: 'rkdp' });
+    else if (view === 'jpk') cleanup = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
     else if (view === 'klienci') cleanup = await renderKlienci(layout('klienci'), params);
     else if (view === 'klient') cleanup = await renderKlient(layout('klienci'), parts[1]);
     else if (view === 'aml') cleanup = await renderAml(layout('klienci'), 'rkdp');

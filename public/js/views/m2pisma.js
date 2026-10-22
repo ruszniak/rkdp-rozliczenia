@@ -124,6 +124,7 @@ export async function renderM2Dokumenty(main, params) {
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
         h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/wzory' }, 'Wzory umów i uchwał'),
         h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/kalkulator' }, 'Kalkulator JDG / spółka'),
+        h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/jpk' }, 'Podgląd JPK'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: pdf }, icon('download'), 'PDF'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: word }, icon('download'), 'Pobierz Word'))),
     h('div', { class: 'pz-layout' },
