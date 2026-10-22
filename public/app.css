@@ -168,6 +168,10 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px
 .note-btn:hover{background:var(--panel);color:var(--bronze)}
 .note-btn.has{color:var(--bronze)}
 .note-btn.q{color:var(--warn)}
+/* jest uwaga: pełny, wyraźny dymek */
+.note-btn.has svg{width:20px;height:20px}
+.note-btn.has svg path{fill:currentColor}
+.note-btn.has .dot{top:3px;right:3px;box-shadow:0 0 0 2px var(--card,#fff)}
 .note-btn .dot{position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:99px;background:var(--warn)}
 
 /* podpowiedź */
