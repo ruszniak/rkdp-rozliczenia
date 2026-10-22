@@ -545,7 +545,7 @@ export const ORDER_CSS = `
 .doc table.kv{width:100%;border-collapse:collapse;margin:0 0 6px;font-size:9.5pt}
 .doc table.kv th,.doc table.kv td{border:1px solid #cfc9bf;padding:5px 8px;text-align:left;vertical-align:top}
 .doc table.kv th{background:#f3eee6;font-family:Montserrat,Arial,sans-serif;font-size:8pt;letter-spacing:.06em;text-transform:uppercase;color:#5d4a33}
-.doc table.kv td:first-child{width:42%;color:#3b3d42}
+.doc table.kv td:first-child{width:42%;color:#3b3d42}.doc table.kv.multi td:first-child{width:auto}
 .doc table.rt{width:100%;border-collapse:collapse;margin:2px 0 8px;font-size:9pt;page-break-inside:auto}
 .doc table.rt tr{page-break-inside:avoid}
 .doc table.rt th,.doc table.rt td{border-bottom:1px solid #ddd6ca;padding:5px 6px;text-align:left;vertical-align:top}
@@ -599,7 +599,7 @@ function bodyHtml(blocks) {
     else if (b.t === 'small') html += `<p class="small">${esc(b.text)}</p>`;
     else if (b.t === 'pb') html += '<div class="pb"></div>';
     else if (b.t === 'table') html += `<table class="rt"><thead><tr>${b.head.map((x, i) => `<th class="${(b.cls || [])[i] || ''}">${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr class="${r.cls || ''}">${(r.cells || r).map((c, i) => `<td class="${(b.cls || [])[i] || ''}">${c && typeof c === 'object' ? `${c.cls ? `<span class="${c.cls}">` : ''}${esc(c.text)}${c.cls ? '</span>' : ''}${c.sub ? `<span class="sub">${esc(c.sub)}</span>` : ''}` : esc(c ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    else if (b.t === 'kv') html += `<table class="kv"><thead><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    else if (b.t === 'kv') html += `<table class="kv${b.head.length > 2 ? ' multi' : ''}">${b.widths ? `<colgroup>${b.widths.map(w => `<col style="width:${Math.round(w * 100)}%">`).join('')}</colgroup>` : ''}<thead><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     else if (b.t === 'sign') html += `<div class="sign">${[b.left, b.right].map(x => `<div><div class="lbl">${esc(x.label)}</div><div class="line">${x.lines.map(esc).join('<br>')}</div></div>`).join('')}</div>`;
     else if (b.t === 'place') html += `<p class="place">${esc(b.text)}</p>`;
     else if (b.t === 'party') html += `<div class="party">${b.label ? `<div class="lbl">${esc(b.label)}</div>` : ''}${b.lead ? `<div class="lead">${esc(b.lead)}</div>` : ''}${b.lines.map((l, i) => (b.bold || [0]).includes(i) ? `<b>${esc(l)}</b>` : esc(l)).join('<br>')}</div>`;
@@ -661,12 +661,14 @@ function twoColTable(cells) {
 const label = t => para(run(t, { b: true, color: '7A5A37', sz: 15, spacing: 30, caps: true, font: 'Montserrat' }), { after: 30, keep: true });
 
 function kvTable(b) {
-  const c1 = Math.round(W * 0.42), c2 = W - c1;
+  const k = b.head.length;
+  const fr = b.widths || (k === 2 ? [0.42, 0.58] : Array(k).fill(1 / k));
+  const ws = fr.map(f => Math.round(W * f)); ws[k - 1] = W - ws.slice(0, -1).reduce((a, x) => a + x, 0);
   const bd = '<w:tblBorders>' + ['top', 'left', 'bottom', 'right', 'insideH', 'insideV'].map(s => `<w:${s} w:val="single" w:sz="4" w:color="CFC9BF"/>`).join('') + '</w:tblBorders>';
   const cell = (t, w, head) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${head ? '<w:shd w:val="clear" w:color="auto" w:fill="F3EEE6"/>' : ''}<w:tcMar><w:top w:w="60" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/></w:tcMar></w:tcPr>${para(run(t, head ? { b: true, sz: 16, color: '5D4A33', font: 'Montserrat' } : { sz: 19 }), { after: 0 })}</w:tc>`;
-  return `<w:tbl><w:tblPr><w:tblW w:w="${W}" w:type="dxa"/>${bd}<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="110" w:type="dxa"/><w:right w:w="110" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="${c1}"/><w:gridCol w:w="${c2}"/></w:tblGrid>`
-    + `<w:tr><w:trPr><w:tblHeader/></w:trPr>${cell(b.head[0], c1, true)}${cell(b.head[1], c2, true)}</w:tr>`
-    + b.rows.map(r => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cell(r[0], c1)}${cell(r[1], c2)}</w:tr>`).join('') + '</w:tbl>';
+  return `<w:tbl><w:tblPr><w:tblW w:w="${W}" w:type="dxa"/>${bd}<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="110" w:type="dxa"/><w:right w:w="110" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${ws.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`
+    + `<w:tr><w:trPr><w:tblHeader/></w:trPr>${b.head.map((t, i) => cell(t, ws[i], true)).join('')}</w:tr>`
+    + b.rows.map(r => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${ws.map((w, i) => cell(r[i] ?? '', w)).join('')}</w:tr>`).join('') + '</w:tbl>';
 }
 
 function docxBody(blocks) {

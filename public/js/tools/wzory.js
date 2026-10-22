@@ -249,9 +249,161 @@ export const WZORY = {
         { t: 'sign', left: { label: 'Przewodniczący Zgromadzenia', lines: [v(d.przew, 'imię i nazwisko')] }, right: { label: 'Protokolant', lines: [v(d.prot, 'imię i nazwisko')] } },
         { t: 'pb' },
         { t: 'att', text: 'Lista obecności' },
-        { t: 'kv', head: ['Wspólnik', 'Liczba udziałów i głosów', 'Podpis'], rows: list.map(x => [x.name, x.cnt === null ? F('…') : String(x.cnt), '']) },
+        { t: 'kv', head: ['Wspólnik', 'Liczba udziałów i głosów', 'Podpis'], widths: [0.4, 0.25, 0.35], rows: list.map(x => [x.name, x.cnt === null ? F('…') : String(x.cnt), '']) },
       );
       return B;
+    },
+  },
+
+  // ======================================================================
+  kontrakt: {
+    group: 'Wspólnik i zarząd', label: 'Umowa z członkiem zarządu powołanym – z wynagrodzeniem',
+    desc: 'Umowa o pełnienie funkcji członka zarządu na podstawie powołania: wynagrodzenie, obowiązki, zakaz konkurencji, poufność. Spółkę reprezentuje pełnomocnik z art. 210 KSH.',
+    fields: [
+      ['miejsce', 'Miejsce zawarcia'], ['data', 'Data zawarcia', 'date'],
+      ['spolka', 'Spółka', 'wide'], ['spolkaAdres', 'Adres siedziby', 'area'], ['spolkaId', 'KRS / NIP'],
+      ['repr', 'Spółkę reprezentuje', 'select', [['pelnomocnik', 'pełnomocnik powołany uchwałą wspólników'], ['rn', 'rada nadzorcza']]],
+      ['reprOsoba', 'Imię i nazwisko pełnomocnika / członka RN', 'wide'], ['uchwalaData', 'Data uchwały o pełnomocniku / powołaniu', 'date'],
+      ['osoba', 'Członek zarządu', 'wide'], ['osobaAdres', 'Adres członka zarządu', 'area'], ['funkcja', 'Funkcja'],
+      ['od', 'Wynagrodzenie od dnia', 'date'], ['kwota', 'Wynagrodzenie brutto miesięcznie (zł)', 'money'],
+    ],
+    defaults: { repr: 'pelnomocnik', funkcja: 'Prezesa Zarządu' },
+    hints: [
+      'Wynagrodzenie z tytułu powołania to przychód z działalności wykonywanej osobiście (art. 13 pkt 7 ustawy o PIT) – spółka pobiera zaliczki na PIT i składkę zdrowotną 9%; składek społecznych nie ma, jeśli brak innego tytułu.',
+      'Umowę w imieniu spółki podpisuje rada nadzorcza albo pełnomocnik powołany uchwałą wspólników (art. 210 § 1 KSH) – użyj wzoru „Protokół – pełnomocnik z art. 210 KSH”.',
+      'Jedyny wspólnik będący jedynym członkiem zarządu – umowa w formie aktu notarialnego (art. 210 § 2 KSH).',
+      'Najpierw uchwała o powołaniu do zarządu i ustaleniu wynagrodzenia (wzór „Uchwała o wynagrodzeniu członka zarządu”), potem ta umowa jako jej uszczegółowienie.',
+    ],
+    build: d => {
+      const reprTxt = d.repr === 'rn'
+        ? `reprezentowaną przez Radę Nadzorczą, w imieniu której działa ${v(d.reprOsoba, 'imię i nazwisko')} na podstawie uchwały Rady Nadzorczej z dnia ${dt(d.uchwalaData, 'data uchwały')}`
+        : `reprezentowaną przez ${v(d.reprOsoba, 'imię i nazwisko')} – pełnomocnika powołanego uchwałą Zgromadzenia Wspólników z dnia ${dt(d.uchwalaData, 'data uchwały')} na podstawie art. 210 § 1 Kodeksu spółek handlowych`;
+      return [HL,
+        { t: 'title', text: 'UMOWA O PEŁNIENIE FUNKCJI CZŁONKA ZARZĄDU' },
+        { t: 'meta', text: `zawarta w dniu ${dt(d.data)} w ${v(d.miejsce, 'miejscowość')} pomiędzy:` },
+        party(null, d.spolka, d.spolkaAdres, d.spolkaId || `KRS ${F('……')}, NIP ${F('……')}`),
+        zwana(`${reprTxt}, zwaną dalej „Spółką”,`),
+        { t: 'center', text: 'a' },
+        party(null, d.osoba, d.osobaAdres, `PESEL ${F('……')}`),
+        zwana('zwanym dalej „Członkiem Zarządu”.'),
+        { t: 'h', text: '§ 1. Przedmiot umowy' },
+        { t: 'ust', n: '1.', text: `Członek Zarządu został powołany do pełnienia funkcji ${v(d.funkcja, 'funkcja')} Spółki uchwałą Zgromadzenia Wspólników z dnia ${F('data uchwały o powołaniu')}.` },
+        { t: 'ust', n: '2.', text: 'Umowa określa zasady pełnienia funkcji i wynagrodzenia Członka Zarządu z tytułu powołania. Umowa nie jest umową o pracę ani umową o świadczenie usług, a jej podstawą jest stosunek organizacyjny wynikający z powołania.' },
+        { t: 'h', text: '§ 2. Obowiązki Członka Zarządu' },
+        { t: 'ust', n: '1.', text: 'Członek Zarządu prowadzi sprawy Spółki i reprezentuje ją zgodnie z Kodeksem spółek handlowych, umową Spółki, regulaminem zarządu i uchwałami wspólników, z dochowaniem staranności wynikającej z zawodowego charakteru działalności (art. 293 § 2 KSH).' },
+        { t: 'ust', n: '2.', text: `Członek Zarządu wykonuje obowiązki osobiście, w miejscu i czasie odpowiednim do potrzeb Spółki, w szczególności w zakresie: ${F('np. finanse, sprzedaż, nadzór nad księgowością')}.` },
+        { t: 'ust', n: '3.', text: 'Spółka zapewnia Członkowi Zarządu narzędzia i środki niezbędne do pełnienia funkcji oraz zwraca udokumentowane wydatki poniesione w związku z jej pełnieniem, w tym koszty podróży służbowych.' },
+        { t: 'h', text: '§ 3. Wynagrodzenie' },
+        { t: 'ust', n: '1.', text: `Z tytułu pełnienia funkcji Członkowi Zarządu przysługuje wynagrodzenie w kwocie ${kw(d.kwota)} brutto miesięcznie, począwszy od dnia ${dt(d.od, 'data')}.` },
+        { t: 'ust', n: '2.', text: `Wynagrodzenie jest płatne z dołu, do ${F('10.')} dnia miesiąca następującego po miesiącu, za który przysługuje, na rachunek bankowy nr ${F('numer rachunku')}. Za niepełny miesiąc wynagrodzenie przysługuje proporcjonalnie.` },
+        { t: 'ust', n: '3.', text: 'Spółka jako płatnik pobiera od wynagrodzenia zaliczki na podatek dochodowy (art. 13 pkt 7 ustawy o podatku dochodowym od osób fizycznych) oraz składkę na ubezpieczenie zdrowotne.' },
+        { t: 'ust', n: '4.', text: `Zgromadzenie Wspólników może przyznać Członkowi Zarządu premię ${F('roczną / uznaniową – zasady')}.` },
+        { t: 'h', text: '§ 4. Zakaz konkurencji i poufność' },
+        { t: 'ust', n: '1.', text: 'Członek Zarządu nie może bez zgody Spółki zajmować się interesami konkurencyjnymi ani uczestniczyć w spółce konkurencyjnej jako wspólnik lub członek organu (art. 211 KSH).' },
+        { t: 'ust', n: '2.', text: 'Członek Zarządu zachowa w tajemnicy informacje stanowiące tajemnicę przedsiębiorstwa Spółki, w czasie trwania umowy i przez 3 lata po jej zakończeniu.' },
+        { t: 'h', text: '§ 5. Czas trwania umowy' },
+        { t: 'ust', n: '1.', text: 'Umowa obowiązuje przez okres pełnienia funkcji i rozwiązuje się z mocy prawa z dniem wygaśnięcia mandatu Członka Zarządu, w tym wskutek odwołania, rezygnacji lub upływu kadencji, bez okresu wypowiedzenia i bez prawa do odszkodowania.' },
+        { t: 'ust', n: '2.', text: 'Najpóźniej w dniu zakończenia umowy Członek Zarządu przekaże Spółce dokumenty, nośniki danych i mienie Spółki, którymi dysponuje.' },
+        { t: 'h', text: '§ 6. Postanowienia końcowe' },
+        { t: 'ust', n: '1.', text: 'Zmiany umowy wymagają formy pisemnej pod rygorem nieważności i zachowania zasad reprezentacji z art. 210 KSH.' },
+        { t: 'ust', n: '2.', text: 'W sprawach nieuregulowanych stosuje się przepisy Kodeksu spółek handlowych i Kodeksu cywilnego.' },
+        { t: 'ust', n: '3.', text: 'Umowę sporządzono w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej ze stron.' },
+        { t: 'sign', left: { label: 'Spółka', lines: [v(d.reprOsoba, 'pełnomocnik / rada nadzorcza')] }, right: { label: 'Członek Zarządu', lines: [v(d.osoba, 'imię i nazwisko')] } },
+      ];
+    },
+  },
+
+  // ======================================================================
+  art176: {
+    group: 'Wspólnik i zarząd', label: 'Uchwała – świadczenia wspólnika z art. 176 KSH',
+    desc: 'Powtarzające się świadczenia niepieniężne wspólnika na rzecz spółki: zakres, wynagrodzenie, rozliczanie protokołem.',
+    fields: [
+      ['nr', 'Numer uchwały'], ['data', 'Data zgromadzenia', 'date'],
+      ['spolka', 'Spółka', 'wide'], ['siedziba', 'Siedziba (miejscowość)'], ['par', 'Paragraf umowy spółki o świadczeniach'],
+      ['wspolnik', 'Wspólnik', 'wide'], ['zakres', 'Rodzaj i zakres świadczeń', 'area'],
+      ['model', 'Wynagrodzenie', 'select', [['ryczalt', 'ryczałt miesięczny'], ['godz', 'stawka za godzinę']]],
+      ['kwota', 'Kwota ryczałtu / stawka godzinowa (zł brutto)', 'money'], ['limit', 'Maksymalna liczba godzin w miesiącu (stawka godzinowa)'],
+      ['od', 'Od dnia', 'date'],
+    ],
+    defaults: { model: 'ryczalt', par: '§ …' },
+    hints: [
+      'Obowiązek powtarzających się świadczeń niepieniężnych oraz ich rodzaj i zakres muszą być określone w umowie spółki (art. 176 § 1 KSH) – jeśli umowa spółki tego nie przewiduje, najpierw zmiana umowy spółki w formie aktu notarialnego (art. 255 § 3 KSH) i wpis do KRS.',
+      'Wynagrodzenie może być płatne nawet wtedy, gdy spółka nie ma zysku, ale nie może przewyższać cen lub stawek przyjętych powszechnie w obrocie – warto mieć porównanie rynkowe.',
+      'Świadczenia muszą być rzeczywiście wykonywane i udokumentowane – co miesiąc protokół wykonanych czynności (wzór obok). Brak dokumentacji to główne ryzyko zakwestionowania kosztu w CIT.',
+      'Kwalifikacja w PIT i brak oskładkowania ZUS bywają sporne – przy nowym wdrożeniu rozważ interpretację indywidualną. Wspólnik nie głosuje w sprawie, która dotyczy sporu między nim a spółką (art. 244 KSH).',
+    ],
+    build: d => {
+      const godz = d.model === 'godz';
+      return [HL,
+        { t: 'title', text: `UCHWAŁA NR ${v(d.nr, 'nr')}` },
+        { t: 'subtitle', text: `Nadzwyczajnego Zgromadzenia Wspólników spółki ${v(d.spolka, 'nazwa spółki')} z siedzibą w ${v(d.siedziba, 'miejscowość')} z dnia ${dt(d.data)} w sprawie określenia świadczeń niepieniężnych wspólnika i wynagrodzenia za te świadczenia` },
+        { t: 'p', text: `Działając na podstawie art. 176 § 1 Kodeksu spółek handlowych oraz ${v(d.par, '§ …')} umowy Spółki, Nadzwyczajne Zgromadzenie Wspólników postanawia, co następuje:` },
+        { t: 'h', text: '§ 1' },
+        { t: 'ust', n: '1.', text: `Wspólnik ${v(d.wspolnik, 'imię i nazwisko wspólnika')} (dalej „Wspólnik”) jest zobowiązany do powtarzających się świadczeń niepieniężnych na rzecz Spółki, polegających na: ${v(d.zakres, 'rodzaj i zakres świadczeń – np. prowadzenie spraw handlowych, obsługa klientów, nadzór nad realizacją zleceń')}.` },
+        { t: 'ust', n: '2.', text: 'Wspólnik wykonuje świadczenia osobiście, z należytą starannością, w terminach i miejscach odpowiadających potrzebom Spółki.' },
+        { t: 'h', text: '§ 2' },
+        { t: 'ust', n: '1.', text: godz
+          ? `Za świadczenia, o których mowa w § 1, Wspólnikowi przysługuje wynagrodzenie w wysokości ${kw(d.kwota)} brutto za każdą godzinę wykonywania świadczeń, nie więcej niż za ${v(d.limit, '…')} godzin w miesiącu, począwszy od dnia ${dt(d.od, 'data')}.`
+          : `Za świadczenia, o których mowa w § 1, Wspólnikowi przysługuje wynagrodzenie ryczałtowe w kwocie ${kw(d.kwota)} brutto miesięcznie, począwszy od dnia ${dt(d.od, 'data')}.` },
+        { t: 'ust', n: '2.', text: 'Wynagrodzenie jest płatne nawet wtedy, gdy sprawozdanie finansowe Spółki nie wykazuje zysku (art. 176 § 1 zd. 2 KSH). Zgromadzenie Wspólników stwierdza, że wynagrodzenie nie przewyższa cen ani stawek przyjętych powszechnie w obrocie za świadczenia tego rodzaju.' },
+        { t: 'ust', n: '3.', text: `Podstawą wypłaty wynagrodzenia jest protokół wykonanych czynności za dany miesiąc, sporządzony przez Wspólnika i zatwierdzony przez Zarząd. Wynagrodzenie jest płatne do ${F('10.')} dnia miesiąca następującego po miesiącu wykonania świadczeń.` },
+        { t: 'ust', n: '4.', text: 'Spółka jako płatnik wykona obowiązki wynikające z przepisów podatkowych.' },
+        { t: 'h', text: '§ 3' },
+        { t: 'p', text: 'W razie niewykonania lub nienależytego wykonania świadczeń wynagrodzenie za dany miesiąc ulega proporcjonalnemu obniżeniu, bez uszczerbku dla rygorów przewidzianych w umowie Spółki (art. 176 § 2 KSH).' },
+        { t: 'h', text: '§ 4' },
+        { t: 'p', text: 'Uchwała wchodzi w życie z dniem podjęcia.' },
+        { t: 'gap' },
+        { t: 'p', text: `Uchwała została podjęta w głosowaniu jawnym. Oddano ${F('…')} głosów „za”, ${F('…')} głosów „przeciw”, ${F('…')} głosów „wstrzymujących się”.` },
+        { t: 'sign', left: { label: 'Przewodniczący Zgromadzenia', lines: [F('imię i nazwisko')] }, right: { label: 'Protokolant', lines: [F('imię i nazwisko')] } },
+        { t: 'pb' },
+        { t: 'att', text: 'Propozycja postanowienia umowy spółki (do aktu notarialnego, jeśli umowa go nie zawiera)' },
+        { t: 'ust', n: '1.', text: 'Wspólnicy mogą zostać zobowiązani do powtarzających się świadczeń niepieniężnych na rzecz Spółki, polegających na świadczeniu usług w zakresie zarządzania, administracji, obsługi klientów, sprzedaży, marketingu, nadzoru nad realizacją usług oraz innych czynności związanych z przedmiotem działalności Spółki.' },
+        { t: 'ust', n: '2.', text: 'Szczegółowy zakres świadczeń, osoby zobowiązane, okres ich wykonywania oraz wysokość wynagrodzenia określa uchwała Zgromadzenia Wspólników. Wynagrodzenie może być płatne nawet wtedy, gdy sprawozdanie finansowe nie wykazuje zysku, i nie może przewyższać cen lub stawek przyjętych powszechnie w obrocie.' },
+        { t: 'ust', n: '3.', text: 'W razie niewykonania lub nienależytego wykonania świadczeń wspólnik traci prawo do wynagrodzenia za okres, w którym świadczeń nie wykonywał, w części odpowiadającej niewykonanym świadczeniom.' },
+      ];
+    },
+  },
+
+  // ======================================================================
+  art176prot: {
+    group: 'Wspólnik i zarząd', label: 'Protokół wykonanych czynności (art. 176 KSH)',
+    desc: 'Miesięczne zestawienie świadczeń wspólnika z czasem pracy i wynagrodzeniem – zatwierdzane przez zarząd, podstawa wypłaty.',
+    fields: [
+      ['spolka', 'Spółka', 'wide'], ['wspolnik', 'Wspólnik', 'wide'],
+      ['okres', 'Miesiąc (np. październik 2026)'], ['uchwala', 'Uchwała – nr i data (np. nr 3/2026 z 2.01.2026)', 'wide'],
+      ['czynnosci', 'Czynności – w każdej linii: data; opis; liczba godzin', 'area'],
+      ['model', 'Wynagrodzenie', 'select', [['ryczalt', 'ryczałt miesięczny'], ['godz', 'stawka za godzinę']]],
+      ['kwota', 'Ryczałt / stawka godzinowa (zł brutto)', 'money'],
+      ['zarzad', 'Zatwierdza – członek zarządu'], ['data', 'Data sporządzenia', 'date'],
+    ],
+    defaults: { model: 'ryczalt' },
+    hints: [
+      'Opisuj konkretnie: co, dla kogo, z jakim efektem (np. „negocjacje z klientem X – umowa na dostawy”). Ogólniki typu „sprawy bieżące” osłabiają dowód w kontroli.',
+      'Dołączaj ślady pracy: e-maile, notatki ze spotkań, zestawienia – i przechowuj je razem z protokołem.',
+      'Zatwierdzić protokół powinien członek zarządu inny niż wspólnik wykonujący świadczenia; gdy to ta sama osoba – podpisuje dodatkowo drugi wspólnik albo prokurent.',
+    ],
+    build: d => {
+      const rows = lines(d.czynnosci).map(l => { const [a, b, c] = l.split(';').map(x => (x || '').trim()); return [a || F('data'), b || F('opis czynności'), c || '']; });
+      const list = rows.length ? rows : [[F('data'), F('opis czynności'), F('h')], [F('data'), F('opis czynności'), F('h')], [F('data'), F('opis czynności'), F('h')]];
+      const hrs = list.map(r => n(r[2])).filter(x => x !== null);
+      const sum = hrs.length ? hrs.reduce((a, x) => a + x, 0) : null;
+      const rate = n(d.kwota);
+      const wyn = d.model === 'godz' ? (rate !== null && sum !== null ? rate * sum : null) : rate;
+      const sumTxt = sum === null ? F('…') : String(Math.round(sum * 100) / 100).replace('.', ',');
+      return [HL,
+        { t: 'title', text: 'PROTOKÓŁ WYKONANYCH CZYNNOŚCI' },
+        { t: 'subtitle', text: `świadczenia niepieniężne wspólnika na rzecz spółki ${v(d.spolka, 'nazwa spółki')} (art. 176 KSH) za ${v(d.okres, 'miesiąc i rok')}` },
+        { t: 'kv', head: ['Dane', ''], rows: [['Wspólnik', v(d.wspolnik, 'imię i nazwisko')], ['Podstawa', `uchwała Zgromadzenia Wspólników ${v(d.uchwala, 'nr i data uchwały')}`], ['Okres', v(d.okres, 'miesiąc i rok')]] },
+        { t: 'h', text: 'Wykonane czynności' },
+        { t: 'kv', head: ['Data', 'Opis czynności i efekt', 'Godziny'], widths: [0.18, 0.67, 0.15], rows: [...list, ['', 'Razem', sumTxt]] },
+        { t: 'h', text: 'Rozliczenie' },
+        { t: 'kv', head: ['Pozycja', 'Kwota'], rows: d.model === 'godz'
+          ? [['Stawka za godzinę (brutto)', rate === null ? F('kwota') : zl(rate)], ['Liczba godzin', sumTxt], ['Wynagrodzenie za okres (brutto)', wyn === null ? F('kwota') : zl(wyn)]]
+          : [['Wynagrodzenie ryczałtowe za okres (brutto)', wyn === null ? F('kwota') : zl(wyn)], ['Liczba godzin (informacyjnie)', sumTxt]] },
+        { t: 'p', text: 'Wspólnik oświadcza, że czynności wymienione w protokole wykonał osobiście w podanym okresie. Zarząd Spółki potwierdza ich wykonanie i przyjęcie bez zastrzeżeń oraz zatwierdza wypłatę wynagrodzenia w kwocie wskazanej powyżej.' },
+        { t: 'place', text: `${F('miejscowość')}, ${dt(d.data)}` },
+        { t: 'sign', left: { label: 'Wspólnik', lines: [v(d.wspolnik, 'imię i nazwisko')] }, right: { label: 'Zatwierdzam – Zarząd', lines: [v(d.zarzad, 'imię i nazwisko, funkcja')] } },
+      ];
     },
   },
 
@@ -331,6 +483,69 @@ export const WZORY = {
         { t: 'sign', left: { label: 'Wynajmujący', lines: [v(d.wynajmujacy, 'wynajmujący')] }, right: { label: 'Najemca', lines: [v(d.najemca, 'najemca')] } },
       ];
       return B;
+    },
+  },
+
+  // ======================================================================
+  najemsiedziba: {
+    group: 'Umowy cywilnoprawne', label: 'Najem części mieszkania na siedzibę spółki',
+    desc: 'Najem części lokalu mieszkalnego dla sp. z o.o. – adres siedziby w KRS, korespondencja, czynsz z mediami, podatek od nieruchomości.',
+    fields: [
+      ['miejsce', 'Miejsce zawarcia'], ['data', 'Data zawarcia', 'date'],
+      ['wynajmujacy', 'Wynajmujący (właściciel mieszkania)', 'wide'], ['wynAdres', 'Adres wynajmującego', 'area'],
+      ['spolka', 'Spółka (najemca)', 'wide'], ['spolkaId', 'KRS / NIP spółki'],
+      ['repr', 'Spółkę reprezentuje', 'select', [['zarzad', 'zarząd (wynajmujący nie jest w zarządzie)'], ['pelnomocnik', 'pełnomocnik z art. 210 KSH (wynajmujący jest członkiem zarządu)']]],
+      ['reprOsoba', 'Imię i nazwisko reprezentanta', 'wide'],
+      ['lokal', 'Adres lokalu', 'wide'], ['kw', 'Księga wieczysta nr'], ['powCala', 'Powierzchnia mieszkania (m²)'], ['pow', 'Wynajmowana część (m²)'], ['opis', 'Opis wynajmowanej części (np. pokój nr 2)'],
+      ['od', 'Najem od', 'date'], ['czynsz', 'Czynsz miesięcznie (zł, z mediami)', 'money'], ['wypow', 'Okres wypowiedzenia (miesiące)'],
+    ],
+    defaults: { repr: 'zarzad', wypow: '3', opis: 'pokój o powierzchni … m² wraz z prawem współkorzystania z przedpokoju i łazienki' },
+    hints: [
+      'Wynajmowana część służy działalności spółki – w podatku od nieruchomości ta powierzchnia może być opodatkowana stawką dla działalności gospodarczej. Zgłoś zmianę w gminie; najem samego adresu bez faktycznego zajęcia powierzchni zmniejsza to ryzyko, ale musi odpowiadać rzeczywistości.',
+      'Wynajmujący – osoba prywatna – rozlicza najem ryczałtem 8,5% (12,5% od nadwyżki ponad 100 000 zł). Najem na cele biurowe nie korzysta ze zwolnienia z VAT dla najmu mieszkaniowego – wynajmujący poniżej limitu 200 000 zł korzysta ze zwolnienia podmiotowego.',
+      'Gdy wynajmującym jest członek zarządu spółki, spółkę reprezentuje pełnomocnik powołany uchwałą wspólników (art. 210 § 1 KSH); jedyny wspólnik i jedyny członek zarządu – akt notarialny (art. 210 § 2 KSH).',
+      'Sprawdź regulamin wspólnoty / spółdzielni i warunki kredytu hipotecznego – czasem wymagają zgody na działalność w lokalu. Umowa i zgoda na siedzibę są potrzebne przy rejestracji spółki i zmianie adresu w KRS oraz przy weryfikacji VAT.',
+    ],
+    build: d => {
+      const reprTxt = d.repr === 'pelnomocnik'
+        ? `reprezentowaną przez ${v(d.reprOsoba, 'imię i nazwisko')} – pełnomocnika powołanego uchwałą Zgromadzenia Wspólników z dnia ${F('data uchwały')} na podstawie art. 210 § 1 KSH`
+        : `reprezentowaną przez ${v(d.reprOsoba, 'imię, nazwisko i funkcja')}`;
+      return [HL,
+        { t: 'title', text: 'UMOWA NAJMU CZĘŚCI LOKALU MIESZKALNEGO' },
+        { t: 'subtitle', text: 'na potrzeby siedziby spółki' },
+        { t: 'meta', text: `zawarta w dniu ${dt(d.data)} w ${v(d.miejsce, 'miejscowość')} pomiędzy:` },
+        party(null, d.wynajmujacy, d.wynAdres, `PESEL ${F('……')}`),
+        zwana('zwanym dalej „Wynajmującym”,'),
+        { t: 'center', text: 'a' },
+        party(null, d.spolka, [d.lokal || F('adres siedziby')].join('\n'), d.spolkaId || `KRS ${F('……')}, NIP ${F('……')}`),
+        zwana(`${reprTxt}, zwaną dalej „Najemcą”.`),
+        { t: 'h', text: '§ 1. Przedmiot najmu' },
+        { t: 'ust', n: '1.', text: `Wynajmujący oświadcza, że jest ${F('właścicielem / współwłaścicielem')} lokalu mieszkalnego położonego w ${v(d.lokal, 'adres lokalu')}, o powierzchni ${v(d.powCala, '…')} m², dla którego Sąd Rejonowy ${F('…')} prowadzi księgę wieczystą nr ${v(d.kw, '…')} (dalej „Lokal”).` },
+        { t: 'ust', n: '2.', text: `Wynajmujący oddaje Najemcy w najem część Lokalu o powierzchni ${v(d.pow, '…')} m², obejmującą ${v(d.opis, 'opis części lokalu')} (dalej „Przedmiot najmu”), z przeznaczeniem na siedzibę Najemcy oraz prowadzenie czynności administracyjnych i biurowych zarządu.` },
+        { t: 'ust', n: '3.', text: 'Pozostała część Lokalu jest wykorzystywana przez Wynajmującego na cele mieszkaniowe i nie jest objęta umową.' },
+        { t: 'h', text: '§ 2. Siedziba i korespondencja' },
+        { t: 'ust', n: '1.', text: 'Wynajmujący wyraża zgodę na ustanowienie w Lokalu siedziby i adresu Najemcy, ujawnienie tego adresu w Krajowym Rejestrze Sądowym, rejestrach podatkowych i innych rejestrach publicznych oraz na wskazywanie go jako adresu do doręczeń.' },
+        { t: 'ust', n: '2.', text: 'Wynajmujący wyraża zgodę na umieszczenie oznaczenia Najemcy na skrzynce pocztowej i drzwiach Lokalu oraz zobowiązuje się nie utrudniać odbioru korespondencji kierowanej do Najemcy.' },
+        { t: 'ust', n: '3.', text: 'Najemca zobowiązuje się nie przyjmować w Lokalu klientów w zakresie wykraczającym poza zwykłe potrzeby administracyjne oraz nie prowadzić w nim działalności uciążliwej dla mieszkańców budynku.' },
+        { t: 'h', text: '§ 3. Okres najmu' },
+        { t: 'p', text: `Umowa zostaje zawarta na czas nieokreślony od dnia ${dt(d.od, 'data')}. Każda ze stron może ją wypowiedzieć z zachowaniem ${v(d.wypow, '3')}-miesięcznego okresu wypowiedzenia ze skutkiem na koniec miesiąca kalendarzowego.` },
+        { t: 'h', text: '§ 4. Czynsz' },
+        { t: 'ust', n: '1.', text: `Najemca będzie płacił Wynajmującemu czynsz w kwocie ${kw(d.czynsz)} miesięcznie, płatny z góry do ${F('10.')} dnia każdego miesiąca na rachunek bankowy Wynajmującego nr ${F('numer rachunku')}.` },
+        { t: 'ust', n: '2.', text: 'Czynsz obejmuje opłaty za media i koszty eksploatacji przypadające na Przedmiot najmu. Strony nie rozliczają tych kosztów odrębnie.' },
+        { t: 'ust', n: '3.', text: `Wynajmujący oświadcza, że ${F('nie jest czynnym podatnikiem VAT i korzysta ze zwolnienia podmiotowego / jest czynnym podatnikiem VAT')}, a przychody z najmu rozlicza ryczałtem od przychodów ewidencjonowanych.` },
+        { t: 'ust', n: '4.', text: 'Wynajmujący zgłosi właściwemu organowi zmianę sposobu wykorzystania części Lokalu na potrzeby podatku od nieruchomości. Różnicę podatku od nieruchomości przypadającą na Przedmiot najmu Najemca zwraca Wynajmującemu w terminie 14 dni od otrzymania wezwania z kopią decyzji.' },
+        { t: 'h', text: '§ 5. Obowiązki stron' },
+        { t: 'ust', n: '1.', text: 'Najemca będzie używał Przedmiotu najmu zgodnie z umową, utrzymywał go w należytym stanie i nie odda go w podnajem ani do używania osobom trzecim bez pisemnej zgody Wynajmującego.' },
+        { t: 'ust', n: '2.', text: 'Wynajmujący oświadcza, że prowadzenie siedziby spółki w Lokalu nie narusza regulaminu wspólnoty / spółdzielni ani umów, którymi jest związany, w tym umowy kredytu zabezpieczonego hipoteką na Lokalu.' },
+        { t: 'h', text: '§ 6. Zakończenie najmu' },
+        { t: 'ust', n: '1.', text: 'W terminie 30 dni od zakończenia najmu Najemca złoży wniosek o zmianę adresu siedziby w Krajowym Rejestrze Sądowym i zaktualizuje zgłoszenia w innych rejestrach.' },
+        { t: 'ust', n: '2.', text: 'Do czasu wykreślenia adresu Wynajmujący będzie przekazywał Najemcy korespondencję kierowaną na adres Lokalu.' },
+        { t: 'h', text: '§ 7. Postanowienia końcowe' },
+        { t: 'ust', n: '1.', text: 'Zmiany umowy wymagają formy pisemnej pod rygorem nieważności.' },
+        { t: 'ust', n: '2.', text: 'W sprawach nieuregulowanych stosuje się przepisy Kodeksu cywilnego.' },
+        { t: 'ust', n: '3.', text: 'Umowę sporządzono w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej ze stron.' },
+        { t: 'sign', left: { label: 'Wynajmujący', lines: [v(d.wynajmujacy, 'imię i nazwisko')] }, right: { label: 'Najemca', lines: [v(d.spolka, 'spółka')] } },
+      ];
     },
   },
 
