@@ -4,7 +4,7 @@ import { compute, PARAMS } from '../tools/forma.js';
 import { printableHtml, M2_BRAND, RKDP_BRAND, dateLong } from '../m2/order.js';
 
 const HELP = `Kalkulator porównuje roczne obciążenia przy tym samym wyniku firmy:
-• JDG na skali, liniowym i – opcjonalnie – na ryczałcie (wybierz stawkę).
+• JDG na skali, liniowym i ryczałcie (wybierz stawkę właściwą dla działalności; składka zdrowotna na ryczałcie wg progów przychodu, połowa odliczana od przychodu).
 • Sp. z o.o. na zwykłym CIT (9% mały podatnik / 19%) z podatkiem 19% od dywidendy oraz na CIT estońskim (ryczałt 10% / 20% przy wypłacie zysku, PIT od dywidendy pomniejszony o 90% / 70% ryczałtu).
 • Przy jednym wspólniku doliczamy jego ZUS (pełne składki społeczne i składkę zdrowotną wspólnika). Przy kilku wspólnikach – bez składek (o ile nie mają innego tytułu).
 • „Zostaje w spółce” to zysk niewypłacony. W CIT estońskim jest on opodatkowany dopiero przy wypłacie.
@@ -14,11 +14,11 @@ const HELP = `Kalkulator porównuje roczne obciążenia przy tym samym wyniku fi
 const num = v => { const n = Number(String(v ?? '').replace(/[\s ]/g, '').replace(',', '.')); return isNaN(n) ? 0 : n; };
 const zl = v => (Math.round(v) || 0).toLocaleString('pl-PL') + ' zł';
 const pct = v => v === null ? '—' : (v * 100).toFixed(1).replace('.', ',') + '%';
-const RYCZ = [['0', 'nie porównuj'], ['0.03', '3%'], ['0.055', '5,5%'], ['0.085', '8,5%'], ['0.12', '12% (m.in. usługi IT)'], ['0.14', '14%'], ['0.15', '15%'], ['0.17', '17%']];
+const RYCZ = [['0.02', '2% – sprzedaż produktów rolnych'], ['0.03', '3% – handel, gastronomia'], ['0.055', '5,5% – produkcja, budowlanka'], ['0.085', '8,5% – usługi, najem'], ['0.1', '10% – obrót nieruchomościami'], ['0.12', '12% – usługi IT'], ['0.14', '14% – opieka zdrowotna, architektura, inżynieria'], ['0.15', '15% – usługi wymienione w ustawie'], ['0.17', '17% – wolne zawody']];
 
 export async function renderKalkulator(main, { mod = 'rkdp' } = {}) {
   const brand = mod === 'm2' ? M2_BRAND : RKDP_BRAND;
-  const d = { rok: 2026, przychod: 900000, koszty: 600000, zus: 'pelny', chor: true, wspolnicy: 2, wyplata: 1, maly: true, kosztySpolki: 0, ryczalt: 0, dla: '' };
+  const d = { rok: 2026, przychod: 900000, koszty: 600000, zus: 'pelny', chor: true, wspolnicy: 2, wyplata: 1, maly: true, kosztySpolki: 0, ryczalt: 0.085, dla: '' };
   let res = compute(d);
 
   const field = (label, el, hint) => h('label', { class: 'field' }, h('span', {}, label), el, hint ? h('span', { class: 'small muted' }, hint) : null);
@@ -48,7 +48,7 @@ export async function renderKalkulator(main, { mod = 'rkdp' } = {}) {
       field('Koszty roczne (zł)', money('koszty'), 'Bez wynagrodzenia właściciela i bez ZUS przedsiębiorcy.'),
       field('ZUS przedsiębiorcy (JDG)', select('zus', [['pelny', 'pełny ZUS'], ['pref', 'preferencyjny (24 mies.)'], ['start', 'ulga na start (6 mies.) + preferencyjny'], ['brak', 'brak – np. zbieg z etatem']])),
       check('chor', 'Dobrowolne ubezpieczenie chorobowe'),
-      field('Porównaj też ryczałt', select('ryczalt', RYCZ, Number)),
+      field('Stawka ryczałtu (JDG)', select('ryczalt', RYCZ, Number), 'Ryczałt liczy się od przychodu – koszty nie obniżają podatku.'),
       h('hr', { class: 'fk-hr' }),
       field('Wspólnicy spółki', select('wspolnicy', [['2', '2 lub więcej (bez ZUS wspólników)'], ['1', '1 – jedyny wspólnik płaci ZUS']], Number)),
       field('Jaką część zysku spółka wypłaca', select('wyplata', [['1', '100% – cały zysk co roku'], ['0.75', '75%'], ['0.5', '50%'], ['0.25', '25%'], ['0', '0% – reinwestuje']], Number)),
@@ -107,6 +107,7 @@ export async function renderKalkulator(main, { mod = 'rkdp' } = {}) {
       { t: 'h', text: 'Założenia' },
       { t: 'kv', head: ['Parametr', 'Wartość'], rows: [
         ['Przychód roczny', zl(d.przychod)], ['Koszty roczne', zl(d.koszty)], ['Dochód', zl(res.D)],
+        ['Stawka ryczałtu (JDG)', `${String(Math.round(d.ryczalt * 1000) / 10).replace('.', ',')}%`],
         ['ZUS przedsiębiorcy (JDG)', { pelny: 'pełny', pref: 'preferencyjny', start: 'ulga na start (6 mies.) + preferencyjny', brak: 'brak' }[d.zus] + (d.chor && d.zus !== 'brak' ? ', z chorobowym' : '')],
         ['Wspólnicy spółki', res.sole ? '1 (jedyny wspólnik płaci ZUS)' : '2 lub więcej'],
         ['Wypłata zysku ze spółki', `${Math.round(d.wyplata * 100)}%`],

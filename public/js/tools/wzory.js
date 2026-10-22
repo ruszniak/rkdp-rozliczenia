@@ -183,6 +183,79 @@ export const WZORY = {
   },
 
   // ======================================================================
+  art210: {
+    group: 'Wspólnik i zarząd', label: 'Protokół – pełnomocnik z art. 210 KSH',
+    desc: 'Protokół zgromadzenia wspólników z uchwałą o powołaniu pełnomocnika do umowy spółki z członkiem zarządu (pożyczka, najem, umowa o pracę, zlecenie).',
+    fields: [
+      ['tryb', 'Kto podejmuje uchwałę', 'select', [['zgromadzenie', 'zgromadzenie wspólników (kilku wspólników)'], ['jedyny', 'jedyny wspólnik (art. 156 KSH)']]],
+      ['spolka', 'Spółka', 'wide'], ['siedziba', 'Siedziba (miejscowość)'], ['krs', 'KRS'],
+      ['data', 'Data zgromadzenia', 'date'], ['godz', 'Godzina'], ['miejsce', 'Miejsce (adres)', 'wide'],
+      ['wspolnicy', 'Wspólnicy – w każdej linii: imię i nazwisko; liczba udziałów', 'area'],
+      ['przew', 'Przewodniczący zgromadzenia'], ['prot', 'Protokolant'],
+      ['czlonek', 'Członek zarządu (druga strona umowy)'], ['funkcja', 'Jego funkcja w zarządzie'],
+      ['pelnomocnik', 'Pełnomocnik spółki (imię i nazwisko)'], ['pelnId', 'PESEL / dokument pełnomocnika'],
+      ['umowa', 'Rodzaj umowy', 'select', [['pozyczki', 'umowa pożyczki'], ['najmu', 'umowa najmu'], ['o pracę', 'umowa o pracę'], ['zlecenia', 'umowa zlecenia / o świadczenie usług'], ['sprzedaży', 'umowa sprzedaży'], ['inna', 'inna umowa']]],
+      ['warunki', 'Istotne warunki umowy (kwota, przedmiot, okres)', 'area'],
+    ],
+    defaults: { tryb: 'zgromadzenie', umowa: 'pozyczki', funkcja: 'Prezesa Zarządu' },
+    hints: [
+      'W umowie między spółką a członkiem zarządu spółkę reprezentuje rada nadzorcza albo pełnomocnik powołany uchwałą zgromadzenia wspólników (art. 210 § 1 KSH). Umowa podpisana przez samego członka zarządu „po obu stronach” jest nieważna.',
+      'Gdy jedyny wspólnik jest zarazem jedynym członkiem zarządu, pełnomocnika się nie powołuje – umowę zawiera się w formie aktu notarialnego (art. 210 § 2 KSH), a notariusz zawiadamia sąd rejestrowy.',
+      'Pełnomocnikiem nie powinien być inny członek zarządu działający w imieniu zarządu – najczęściej jest to wspólnik niebędący w zarządzie albo osoba trzecia (np. prokurent, pracownik, doradca).',
+      'Uchwały wpisuje się do księgi protokołów (art. 248 KSH). Zgromadzenie bez formalnego zwołania jest ważne, gdy reprezentowany jest cały kapitał i nikt nie zgłosił sprzeciwu (art. 240 KSH).',
+    ],
+    build: d => {
+      const sole = d.tryb === 'jedyny';
+      const sh = lines(d.wspolnicy).map(l => { const [name, cnt] = l.split(/[;–\t]/).map(x => x.trim()); return { name: name || F('wspólnik'), cnt: n(cnt) }; });
+      const list = sh.length ? sh : (sole ? [{ name: F('imię i nazwisko'), cnt: null }] : [{ name: F('wspólnik 1'), cnt: null }, { name: F('wspólnik 2'), cnt: null }]);
+      const total = list.every(x => x.cnt !== null) ? list.reduce((a, x) => a + x.cnt, 0) : null;
+      const totalTxt = total === null ? F('…') : String(total);
+      const um = d.umowa === 'inna' ? F('rodzaj umowy') : `umowy ${d.umowa}`;
+      const czl = v(d.czlonek, 'imię i nazwisko członka zarządu');
+      const war = String(d.warunki || '').trim() || F('istotne warunki umowy – przedmiot, kwota, termin');
+      const uchwPeln = nr => [
+        { t: 'subtitle', text: `Uchwała nr ${nr}${sole ? ' Jedynego Wspólnika' : ' Nadzwyczajnego Zgromadzenia Wspólników'} w sprawie powołania pełnomocnika do zawarcia umowy z członkiem zarządu` },
+        { t: 'ust', n: '§ 1.', text: `Na podstawie art. 210 § 1 Kodeksu spółek handlowych ${sole ? 'Jedyny Wspólnik, wykonujący uprawnienia zgromadzenia wspólników,' : 'Nadzwyczajne Zgromadzenie Wspólników'} powołuje ${v(d.pelnomocnik, 'imię i nazwisko pełnomocnika')}${d.pelnId ? `, ${d.pelnId}` : `, ${F('PESEL / seria i nr dowodu')}`}, na pełnomocnika Spółki do reprezentowania Spółki przy zawarciu ${um} z ${czl}, pełniącym funkcję ${v(d.funkcja, 'funkcja')}, na następujących warunkach: ${war}.` },
+        { t: 'ust', n: '§ 2.', text: 'Pełnomocnik jest umocowany również do dokonywania w imieniu Spółki wszelkich czynności związanych z tą umową, w tym do jej zmiany, rozwiązania i odbioru oświadczeń, a także do reprezentowania Spółki w ewentualnym sporze z członkiem zarządu na tle tej umowy.' },
+        { t: 'ust', n: '§ 3.', text: 'Uchwała wchodzi w życie z dniem podjęcia.' },
+      ];
+      const B = [HL,
+        { t: 'title', text: 'PROTOKÓŁ' },
+        { t: 'subtitle', text: sole
+          ? `z decyzji Jedynego Wspólnika spółki ${v(d.spolka, 'nazwa spółki')} z siedzibą w ${v(d.siedziba, 'miejscowość')} (KRS ${v(d.krs, '…')}) wykonującego uprawnienia zgromadzenia wspólników, z dnia ${dt(d.data)}`
+          : `z Nadzwyczajnego Zgromadzenia Wspólników spółki ${v(d.spolka, 'nazwa spółki')} z siedzibą w ${v(d.siedziba, 'miejscowość')} (KRS ${v(d.krs, '…')}), które odbyło się w dniu ${dt(d.data)} o godz. ${v(d.godz, '…')} w ${v(d.miejsce, 'miejsce')}` },
+      ];
+      if (sole) {
+        const w = list[0];
+        B.push({ t: 'p', text: `${w.name}, posiadający ${w.cnt ?? F('…')} udziałów stanowiących 100% kapitału zakładowego Spółki, działając na podstawie art. 156 Kodeksu spółek handlowych jako Jedyny Wspólnik wykonujący wszystkie uprawnienia zgromadzenia wspólników, podejmuje następującą uchwałę:` },
+          ...uchwPeln('1'),
+          { t: 'small', text: 'Jedyny Wspólnik oświadcza, że nie jest jedynym członkiem zarządu Spółki (w takim przypadku umowę zawiera się w formie aktu notarialnego – art. 210 § 2 KSH).' },
+          { t: 'signR', lines: ['Jedyny Wspólnik', w.name] });
+        return B;
+      }
+      B.push(
+        { t: 'ust', n: '1.', text: `Zgromadzenie otworzył ${v(d.przew, 'imię i nazwisko')}, który stwierdził, że na Zgromadzeniu reprezentowany jest cały kapitał zakładowy Spółki, tj. ${totalTxt} udziałów, a obecni wspólnicy nie zgłosili sprzeciwu co do odbycia Zgromadzenia ani wniesienia poszczególnych spraw do porządku obrad. Zgromadzenie odbywa się bez formalnego zwołania na podstawie art. 240 Kodeksu spółek handlowych i jest zdolne do podejmowania wiążących uchwał.` },
+        { t: 'ust', n: '2.', text: `Na Przewodniczącego Zgromadzenia wybrano ${v(d.przew, 'imię i nazwisko')}, a na Protokolanta ${v(d.prot, 'imię i nazwisko')}. Uchwałę podjęto w głosowaniu tajnym jednogłośnie.` },
+        { t: 'ust', n: '3.', text: 'Zgromadzenie przyjęło jednogłośnie porządek obrad:' },
+        { t: 'pkt', n: '1)', text: 'otwarcie Zgromadzenia i wybór Przewodniczącego,' },
+        { t: 'pkt', n: '2)', text: 'stwierdzenie ważności Zgromadzenia i zdolności do podejmowania uchwał,' },
+        { t: 'pkt', n: '3)', text: 'przyjęcie porządku obrad,' },
+        { t: 'pkt', n: '4)', text: `podjęcie uchwały w sprawie powołania pełnomocnika do zawarcia ${um} z członkiem zarządu,` },
+        { t: 'pkt', n: '5)', text: 'zamknięcie Zgromadzenia.' },
+        { t: 'ust', n: '4.', text: 'Do punktu 4 porządku obrad Zgromadzenie podjęło uchwałę o następującej treści:' },
+        ...uchwPeln('1'),
+        { t: 'p', text: `Uchwałę podjęto w głosowaniu tajnym. Oddano ${totalTxt} ważnych głosów z ${totalTxt} udziałów, co stanowi 100% kapitału zakładowego; „za” – ${totalTxt}, „przeciw” – 0, „wstrzymujących się” – 0.` },
+        { t: 'ust', n: '5.', text: 'Wobec wyczerpania porządku obrad Przewodniczący zamknął Zgromadzenie.' },
+        { t: 'sign', left: { label: 'Przewodniczący Zgromadzenia', lines: [v(d.przew, 'imię i nazwisko')] }, right: { label: 'Protokolant', lines: [v(d.prot, 'imię i nazwisko')] } },
+        { t: 'pb' },
+        { t: 'att', text: 'Lista obecności' },
+        { t: 'kv', head: ['Wspólnik', 'Liczba udziałów i głosów', 'Podpis'], rows: list.map(x => [x.name, x.cnt === null ? F('…') : String(x.cnt), '']) },
+      );
+      return B;
+    },
+  },
+
+  // ======================================================================
   najem: {
     group: 'Umowy cywilnoprawne', label: 'Umowa najmu lokalu użytkowego',
     desc: 'Czynsz z VAT, waloryzacja, media (refaktura albo ryczałt), kaucja, wypowiedzenie i zwrot lokalu.',
