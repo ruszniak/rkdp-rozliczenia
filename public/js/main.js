@@ -1,5 +1,5 @@
 import { h, initials, toast, initTooltips, initMobileTables } from './ui.js';
-import { sb, state, hasModule } from './store.js';
+import { sb, state, hasModule, isJpkOnly } from './store.js';
 import { renderLogin } from './views/login.js';
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
@@ -21,6 +21,7 @@ const renderJpk = lazy(() => import('./views/jpk.js'), 'renderJpk');
 const prefetchViews = () => {
   const go = () => {
     const list = [];
+    if (isJpkOnly()) return;
     if (hasModule('rozliczenia')) list.push(() => import('./views/pulpit.js'), () => import('./views/rozliczenia.js'), () => import('./views/klienci.js'), () => import('./views/klient.js'), () => import('./views/zgloszenia.js'), () => import('./views/dokumenty.js'));
     if (hasModule('doradztwo')) list.push(() => import('./views/m2.js'));
     list.push(() => import('./views/obecnosc.js'), () => import('./views/profil.js'), () => import('./views/jpk.js'));
@@ -47,6 +48,8 @@ const MODULES = {
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/kalendarz', 'Kalendarz', 'm2:kalendarz'], ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia'], ['#/doradztwo/jpk', 'JPK', 'm2:jpk']] },
 };
+// konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
+MODULES.jpk = { label: 'RKDP', full: 'RKDP · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
 const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', aml: 'klienci', dokumenty: 'dokumenty', zlecenie: 'zlecenia', spotkania: 'kalendarz', oferty: 'zlecenia' };
 const remembered = () => { try { return localStorage.getItem('rkdp_module'); } catch { return null; } };
 const remember = m => { try { localStorage.setItem('rkdp_module', m); } catch { /* */ } };
@@ -67,18 +70,21 @@ const TAB_ICONS = {
   'm2:zgloszenia': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13h4l1.5 3h5L16 13h4"/><path d="M5.5 5h13L21 13v6H3v-6z"/></svg>',
   'm2:spotkania': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   'm2:dokumenty': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h6"/></svg>',
+  'jpk': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="m10.5 13-2 2 2 2M14.5 13l2 2-2 2"/></svg>',
   'logout': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/></svg>',
   'default': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg>',
 };
-const TAB_SHORT = { rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
+TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
+const TAB_SHORT = { 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
 
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
 function layout(active) {
   const me = state.me;
-  const mine = Object.keys(MODULES).filter(k => hasModule(MODULES[k].need));
-  let mod = active.startsWith('m2:') ? 'm2' : active === 'zespol' ? (remembered() || mine[0]) : 'rkdp';
+  const jpkOnly = isJpkOnly();
+  const mine = jpkOnly ? ['jpk'] : Object.keys(MODULES).filter(k => k !== 'jpk' && hasModule(MODULES[k].need));
+  let mod = jpkOnly ? 'jpk' : active.startsWith('m2:') ? 'm2' : active === 'zespol' ? (remembered() || mine[0]) : 'rkdp';
   if (!mine.includes(mod)) mod = mine[0] || 'rkdp';
-  if (active !== 'zespol') remember(mod);
+  if (active !== 'zespol' && !jpkOnly) remember(mod);
   const M = MODULES[mod];
 
   const switcher = (() => {
@@ -95,7 +101,7 @@ function layout(active) {
 
   const link = ([href, label, key]) => {
     const ico = h('span', { class: 'tab-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS[key] || TAB_ICONS.default;
-    return h('a', { href, class: [active === key ? 'active' : '', /jpk$/.test(key) ? 'desk-only' : ''].filter(Boolean).join(' ') || null }, ico, h('span', { class: 'tab-full' }, label), h('span', { class: 'tab-short' }, TAB_SHORT[key] || label));
+    return h('a', { href, class: [active === key ? 'active' : '', /jpk$/.test(key) && !jpkOnly ? 'desk-only' : ''].filter(Boolean).join(' ') || null }, ico, h('span', { class: 'tab-full' }, label), h('span', { class: 'tab-short' }, TAB_SHORT[key] || label));
   };
   const header = h('header', { class: 'site-header' },
     h('div', { class: 'wrap nav' },
@@ -106,9 +112,9 @@ function layout(active) {
         ...M.tabs.map(link),
         me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
       h('div', { class: 'nav-user' },
-        (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
-        h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
-        h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, initials(me.full_name)),
+        jpkOnly ? null : (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
+        jpkOnly ? h('span', { class: 'who' }, me.full_name) : h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
+        jpkOnly ? h('span', { class: 'avatar', title: me.email }, initials(me.full_name)) : h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, initials(me.full_name)),
         h('button', { class: 'btn btn-ghost btn-sm logout', onclick: logout, 'aria-label': 'Wyloguj' }, (() => { const i = h('span', { class: 'logout-ico', 'aria-hidden': 'true' }); i.innerHTML = TAB_ICONS.logout; return i; })(), h('span', { class: 'logout-txt' }, 'Wyloguj')))));
   document.body.classList.toggle('has-tabbar', true);
   const main = h('main', { class: 'wrap' });
@@ -142,6 +148,11 @@ async function route() {
   if (cleanup) { try { cleanup(); } catch { /* */ } cleanup = null; }
   document.querySelector('.pop')?.remove();
   const { parts, params } = parseHash();
+  if (isJpkOnly()) {
+    if (parts[0] !== 'jpk') history.replaceState(null, '', '#/jpk');
+    try { cleanup = await renderJpk(layout('jpk'), { mod: 'rkdp' }); } catch (err) { console.error(err); toast('Nie udało się wczytać: ' + (err.message || err), true); }
+    return;
+  }
   const startMod = remembered() === 'm2' && hasModule('doradztwo') ? 'doradztwo' : null;
   const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'pulpit' : 'doradztwo');
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');

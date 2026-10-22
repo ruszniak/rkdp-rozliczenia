@@ -32,7 +32,12 @@ export async function renderZespol(main) {
       const mods = m.modules || ['rozliczenia'];
       const modBox = (key, label) => {
         const cb = h('input', { type: 'checkbox', checked: mods.includes(key), disabled: m.id === state.me.id });
-        cb.addEventListener('change', () => update(m, { modules: cb.checked ? [...new Set([...mods, key])] : mods.filter(x => x !== key) }));
+        cb.addEventListener('change', () => {
+          // „Tylko podgląd JPK” wyklucza pozostałe moduły i zawsze oznacza dostęp ograniczony
+          if (key === 'jpk') return update(m, cb.checked ? { modules: ['jpk'], role: 'limited' } : { modules: ['rozliczenia'] });
+          const next = cb.checked ? [...new Set([...mods.filter(x => x !== 'jpk'), key])] : mods.filter(x => x !== key);
+          update(m, { modules: next.length ? next : ['jpk'] });
+        });
         return h('label', { class: 'check small' }, cb, label);
       };
       const count = assigns.filter(a => a.member_id === m.id).length;
@@ -60,7 +65,7 @@ export async function renderZespol(main) {
       return h('tr', {},
         h('td', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, m.email)),
         h('td', {}, m.short_name),
-        h('td', {}, modBox('rozliczenia', 'Rozliczenia'), h('br'), modBox('doradztwo', 'Doradztwo M2 TAX')),
+        h('td', {}, modBox('rozliczenia', 'Rozliczenia'), h('br'), modBox('doradztwo', 'Doradztwo M2 TAX'), h('br'), h('span', { 'data-tip': 'Konto, które widzi wyłącznie zakładkę JPK (podgląd plików JPK_CIT). Nie ma dostępu do klientów, rozliczeń ani M2 TAX.' }, modBox('jpk', 'Tylko podgląd JPK'))),
         h('td', {}, role),
         h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany')),
         loginCell,
@@ -81,11 +86,13 @@ export async function renderZespol(main) {
     const role = h('select', { class: 'select' }, Object.entries(ROLE).map(([k, v]) => h('option', { value: k }, v)));
     role.value = 'limited';
     const mod = h('select', { class: 'select', 'aria-label': 'Moduł' }, h('option', { value: 'rozliczenia' }, 'Moduł: Rozliczenia'),
-      h('option', { value: 'doradztwo' }, 'Moduł: Doradztwo M2 TAX'), h('option', { value: 'oba' }, 'Moduł: oba'));
+      h('option', { value: 'doradztwo' }, 'Moduł: Doradztwo M2 TAX'), h('option', { value: 'oba' }, 'Moduł: oba'), h('option', { value: 'jpk' }, 'Tylko podgląd JPK'));
+    mod.addEventListener('change', () => { if (mod.value === 'jpk') role.value = 'limited'; });
     return h('form', { class: 'toolbar', style: { marginTop: '14px' }, onsubmit: async (e) => {
       e.preventDefault();
       const modules = mod.value === 'oba' ? ['rozliczenia', 'doradztwo'] : [mod.value];
-      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: role.value, modules });
+      // konto „tylko JPK” zawsze z dostępem ograniczonym – nie widzi żadnych klientów
+      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: mod.value === 'jpk' ? 'limited' : role.value, modules });
       if (error) return fail(error);
       toast('Dodano. Ta osoba loguje się przez „Pierwsze logowanie”: kod z e-maila, potem własne hasło.');
       e.target.reset(); role.value = 'limited';

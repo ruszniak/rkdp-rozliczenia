@@ -22,3 +22,5 @@ export const isAdmin = () => state.me?.role === 'admin';
 export const memberById = id => state.members.find(m => m.id === id);
 export const activeTasks = () => state.taskTypes.filter(t => t.active);
 export const hasModule = (m) => (state.me?.modules || ['rozliczenia']).includes(m);
+// konto tylko do podglądu plików JPK (bez dostępu do danych RKDP i M2 TAX)
+export const isJpkOnly = () => hasModule('jpk') && !hasModule('rozliczenia') && !hasModule('doradztwo');
