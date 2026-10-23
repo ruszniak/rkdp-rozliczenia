@@ -4,7 +4,7 @@
 // Jeśli w bazie coś się zmieniło, widok odświeża się sam. Każdy zapis (insert/update/delete/rpc) czyści pamięć.
 // Widoki edycji (karta klienta, umowy, protokoły itp.) zawsze czytają prosto z bazy.
 const CACHE_MAX_AGE = 10 * 60 * 1000;
-const READ_RPC = new Set(['auth_touch', 'auth_state', 'login_mode']);
+const READ_RPC = new Set(['auth_touch', 'auth_state', 'login_mode', 'terms_status']);
 const cache = new Map(); // key -> { t, status, headers, body }
 const inflight = new Map();
 let onStale = null;

@@ -206,7 +206,7 @@ export async function renderLogin(app, initialError = '') {
       h('div', {},
         h('h2', {}, 'Rozliczenia klientów ', h('em', {}, 'w jednym miejscu.')),
         h('p', {}, 'Statusy księgowań, ZUS, PIT/CIT, VAT i JPK dla każdego klienta, miesiąc po miesiącu. Dostęp tylko dla zespołu RKDP.')),
-      h('p', { style: { fontSize: '13px' } }, `© ${new Date().getFullYear()} Właściciel oprogramowania: Michał Ruszniak. Wszelkie prawa zastrzeżone.`, h('br'), 'Dane objęte tajemnicą doradcy podatkowego.')),
+      h('p', { style: { fontSize: '13px' } }, `© ${new Date().getFullYear()} Właściciel oprogramowania: RKDP spółka doradztwa podatkowego sp. z o.o. Wszelkie prawa zastrzeżone.`, h('br'), 'Dane objęte tajemnicą doradcy podatkowego.')),
     h('section', { class: 'login-main' }, box)));
   box.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
   if (await newMode()) stepPassword(); else legacyEmail();

@@ -212,6 +212,12 @@ export async function renderZespol(main) {
       secSelect('device_trust_days', 'Pamiętanie przeglądarki', [['7', '7 dni'], ['14', '14 dni'], ['30', '30 dni'], ['60', '60 dni']],
         'Jak długo w zapamiętanej przeglądarce wystarczy samo hasło, bez kodu z e-maila.')),
     h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Logowanie: hasło + kod z e-maila. W zapamiętanej przeglądarce wystarczy hasło. Nowe hasło można ustawić tylko za zgodą administratora (kolumna „Logowanie” wyżej).')));
+  const termsBox = h('div', {}, h('p', { class: 'hint' }, 'Wczytywanie…'));
+  main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Regulamin – akceptacje')),
+    h('p', { class: 'small muted', style: { margin: '0 0 10px' } }, 'Każdy użytkownik akceptuje regulamin przy pierwszym logowaniu, co najmniej raz na 30 dni i po zmianie treści. Historii nie można zmienić ani usunąć.'),
+    termsBox));
+  import('./regulamin.js').then(m => m.termsAdminSection(state.members)).then(el => termsBox.replaceChildren(el)).catch(() => termsBox.replaceChildren(h('p', { class: 'hint' }, 'Historia akceptacji jest niedostępna.')));
   main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
     h('div', { class: 'section-head' }, h('h2', {}, 'Kopia zapasowa'), backupBtn),
     h('p', { class: 'hint' }, 'Plik ZIP ze wszystkimi danymi aplikacji (klienci, rozliczenia, notatki, Doradztwo M2 TAX, historia zmian) – w formacie JSON i Excel. ',

@@ -1,6 +1,7 @@
 import { h, initials, toast, initTooltips, initMobileTables } from './ui.js';
 import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
 import { renderLogin } from './views/login.js';
+import { TERMS_VERSION } from './regulamin.js';
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
 const renderRozliczenia = lazy(() => import('./views/rozliczenia.js'), 'renderRozliczenia');
@@ -17,6 +18,7 @@ const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
 const renderM2 = lazy(() => import('./views/m2.js'), 'renderM2');
 const renderJpk = lazy(() => import('./views/jpk.js'), 'renderJpk');
+const renderRegulamin = lazy(() => import('./views/regulamin.js'), 'renderRegulamin');
 const renderKalkulator = lazy(() => import('./views/kalkulator.js'), 'renderKalkulator');
 const renderWzory = lazy(() => import('./views/wzory.js'), 'renderWzory');
 // po wyświetleniu pierwszego ekranu pobieramy w tle pozostałe widoki, żeby przełączanie zakładek było natychmiastowe
@@ -124,7 +126,7 @@ function layout(active) {
     mod === 'm2' ? 'M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p.' : 'RKDP spółka doradztwa podatkowego sp. z o.o.',
     ' · aplikacja wewnętrzna · wykonanie: ',
     h('a', { href: 'https://ruszniak.io', target: '_blank', rel: 'noopener' }, 'druslak'),
-    h('div', { class: 'owner' }, `© ${new Date().getFullYear()} Właściciel oprogramowania: Michał Ruszniak. Wszelkie prawa zastrzeżone.`));
+    h('div', { class: 'owner' }, `© ${new Date().getFullYear()} Właściciel oprogramowania: RKDP spółka doradztwa podatkowego sp. z o.o. Wszelkie prawa zastrzeżone. · `, h('a', { href: '#/regulamin' }, 'Regulamin')));
   pending = [header, main, foot];
   if (!routing) commit();
   return main;
@@ -184,6 +186,7 @@ async function route(opts = {}) {
   document.querySelector('.pop')?.remove();
   const { parts, params } = parseHash();
   if (isJpkOnly()) {
+    if (parts[0] === 'regulamin') { try { c = await renderRegulamin(layout('regulamin')); } catch (err) { console.error(err); } return done(); }
     if (parts[0] !== 'jpk') history.replaceState(null, '', '#/jpk');
     try { c = await renderJpk(layout('jpk'), { mod: 'rkdp' }); } catch (err) { console.error(err); toast('Nie udało się wczytać: ' + (err.message || err), true); }
     return done();
@@ -193,6 +196,7 @@ async function route(opts = {}) {
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');
   try {
     if (view === 'obecnosc') c = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
+    else if (view === 'regulamin') c = await renderRegulamin(layout('regulamin'));
     else if (view === 'profil') c = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
     else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) c = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
     else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) c = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
@@ -227,10 +231,11 @@ async function start() {
   let idleMinutes = null;
   state.session = session;
   // tryb logowania, stan sesji i dane zespołu pobieramy równolegle (zamiast po kolei)
-  const [{ data: mode }, stRes, ctx] = await Promise.all([
+  const [{ data: mode }, stRes, ctx, tsRes] = await Promise.all([
     sb.rpc('login_mode'),
     sb.rpc('auth_state'),
     loadContext().then(() => null, err => err),
+    sb.rpc('terms_status', { p_version: TERMS_VERSION }).then(r => r, () => ({ error: true })),
   ]);
   if (mode === 'haslo_kod') {
     const { data: st, error } = stRes;
@@ -253,6 +258,11 @@ async function start() {
     return;
   }
   if (idleMinutes) { sb.rpc('auth_touch'); startIdleWatch(idleMinutes); }
+  // regulamin: przy pierwszym logowaniu, co 30 dni i po zmianie wersji – bez akceptacji brak dostępu
+  if (!tsRes?.error && tsRes?.data?.needs) {
+    const { termsGate } = await import('./views/regulamin.js');
+    if (!(await termsGate({ onLogout: logout, first: !tsRes.data.last }))) return;
+  }
   window.addEventListener('hashchange', () => route());
   // dane w bazie zmieniły się od ostatniej wizyty – przerysuj widok po cichu, o ile użytkownik nic teraz nie wpisuje
   let lastAuto = 0;
