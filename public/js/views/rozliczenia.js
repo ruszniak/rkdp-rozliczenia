@@ -172,7 +172,7 @@ export async function renderRozliczenia(main, params) {
   const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj klienta…', value: prefs.q, 'aria-label': 'Szukaj klienta' });
   const personSel = h('select', { class: 'select', 'aria-label': 'Osoba' });
   const showSel = h('select', { class: 'select', 'aria-label': 'Pokaż' },
-    h('option', { value: '' }, 'Wszyscy klienci'), h('option', { value: 'nierozliczeni' }, 'Tylko nierozliczeni'),
+    h('option', { value: '' }, 'Wszyscy klienci'), h('option', { value: 'nierozliczeni' }, 'Tylko do rozliczenia'),
     h('option', { value: 'braki' }, 'Z brakiem dokumentów'), h('option', { value: 'uwagi' }, 'Z uwagami / pytaniami'));
   showSel.value = prefs.show;
   const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: (ev) => exportMenu(ev.currentTarget) }, icon('download'), 'Pobierz');
@@ -243,8 +243,12 @@ export async function renderRozliczenia(main, params) {
       onclick: () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
     h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n));
     tiles.replaceChildren(
-      h('div', { class: 'card tile dark' }, h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
-        h('span', { class: 'num' }, `${settled} / ${rows.length}`), h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } }))),
+      h('button', { class: 'card tile dark tile-btn' + (prefs.show === 'nierozliczeni' ? ' on' : ''), type: 'button',
+        'data-tip': prefs.show === 'nierozliczeni' ? 'Pokaż wszystkich klientów' : 'Pokaż tylko klientów do rozliczenia',
+        onclick: () => { prefs.show = prefs.show === 'nierozliczeni' ? '' : 'nierozliczeni'; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
+        h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
+        h('span', { class: 'num' }, `${settled} / ${rows.length}`), h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } })),
+        h('span', { class: 'tile-more' }, prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
       tile(toSend, area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania', 'do_wyslania'),
       tile(miss, 'Klientów z brakiem dokumentów', 'braki'),
       tile(nts, 'Klientów z uwagami', 'uwagi'));
