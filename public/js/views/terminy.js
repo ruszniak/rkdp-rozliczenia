@@ -159,7 +159,7 @@ export async function renderTerminy(main, params) {
     }));
   }
   drawList();
-  main.replaceChildren(head, nav, tiles, h('div', { class: 'ob-layout' }, map, h('div', { class: 'ob-list' }, listBox)));
+  main.replaceChildren(head, nav, h('div', { class: 'ob-layout' }, map, h('div', { class: 'ob-list' }, listBox)), h('div', { class: 'tiles ob-tiles' }, ...tiles.children));
   if (dayFilter) markSel();
 }
 function addD(s, n) { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); }
