@@ -239,11 +239,12 @@ export async function renderRozliczenia(main, params) {
     const miss = rows.filter(c => hasMissing(c, area)).length;
     const nts = rows.filter(hasNote).length;
     const pct = rows.length ? Math.round(settled / rows.length * 100) : 0;
-    const tile = (n, lbl, show) => h('button', { class: 'card tile' + (prefs.show === show ? ' on' : ''), style: { textAlign: 'left', cursor: 'pointer' },
+    const tile = (n, lbl, show) => h('button', { class: 'card tile tile-btn' + (prefs.show === show ? ' on dark' : ''), type: 'button', 'aria-pressed': String(prefs.show === show),
+      'data-tip': prefs.show === show ? 'Kliknij, aby pokazać wszystkich' : 'Kliknij, aby pokazać tylko tych klientów',
       onclick: () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
     h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n));
     tiles.replaceChildren(
-      h('button', { class: 'card tile dark tile-btn' + (prefs.show === 'nierozliczeni' ? ' on' : ''), type: 'button',
+      h('button', { class: 'card tile tile-btn' + (prefs.show === 'nierozliczeni' ? ' on dark' : ''), type: 'button', 'aria-pressed': String(prefs.show === 'nierozliczeni'),
         'data-tip': prefs.show === 'nierozliczeni' ? 'Pokaż wszystkich klientów' : 'Pokaż tylko klientów do rozliczenia',
         onclick: () => { prefs.show = prefs.show === 'nierozliczeni' ? '' : 'nierozliczeni'; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
         h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),

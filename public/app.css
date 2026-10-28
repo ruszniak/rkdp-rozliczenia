@@ -1048,3 +1048,9 @@ a.tile.dark::after{color:#E0C098}
 main.wrap{padding-top:24px;padding-bottom:64px}
 main>.page-head:first-child{margin-top:0!important}
 @media (max-width:820px){main.wrap{padding-top:16px}}
+/* kafelki-filtry: ciemne tylko, gdy filtr jest włączony */
+.tile-btn{transition:transform .18s ease,box-shadow .18s ease,border-color .18s,background-color .25s,color .25s}
+.tile-more{color:var(--bronze)}
+.tile.dark .tile-more{color:#E0C098}
+.tile.on{box-shadow:0 14px 30px -16px rgba(29,26,22,.55),0 0 0 2px color-mix(in srgb,#CFAE86 60%,transparent)}
+.tile.dark.tile-btn:hover{box-shadow:0 14px 30px -16px rgba(29,26,22,.55),0 0 0 2px #CFAE86}
