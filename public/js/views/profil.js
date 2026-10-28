@@ -2,6 +2,7 @@
 import { h, toast, fail, infoTip } from '../ui.js';
 import { sb, state } from '../store.js';
 import { validNip, cleanNip } from '../nip.js';
+import { isIOS, isStandalone, pushSupported, canInstall, onInstallChange, promptInstall, currentSubscription, enablePush, disablePush, savePrefs, loadPrefs, sendTest, DEFAULT_PREFS } from '../push.js';
 
 const HELP = `Te dane wpisują się automatycznie w pełnomocnictwa UPL-1, PEL (ZUS) i PPS-1, gdy w „Umowy i pełnomocnictwa” wybierzesz siebie jako pełnomocnika.
 
@@ -12,6 +13,55 @@ const HELP = `Te dane wpisują się automatycznie w pełnomocnictwa UPL-1, PEL (
 
 const pick = (o, keys) => Object.fromEntries(keys.map(k => [k, (o[k] ?? '').toString().trim() || null]));
 const ADDR = ['voiv', 'county', 'commune', 'street', 'house', 'flat', 'zip', 'city', 'post'];
+
+// ---------- aplikacja na urządzeniu: instalacja i powiadomienia push ----------
+let offInstall = null;
+function appSection() {
+  const installBox = h('div', { class: 'pw-row' });
+  const drawInstall = () => {
+    if (isStandalone()) return installBox.replaceChildren(h('span', { class: 'pw-ok' }, '✓'), h('span', {}, h('b', {}, 'Aplikacja jest zainstalowana na tym urządzeniu.'), h('br'), h('span', { class: 'small muted' }, 'Otwierasz ją z ikony – działa w osobnym oknie, jak zwykły program.')));
+    if (canInstall()) return installBox.replaceChildren(h('span', {}, h('b', {}, 'Zainstaluj aplikację na tym urządzeniu'), h('br'), h('span', { class: 'small muted' }, 'Ikona na pulpicie lub ekranie głównym, osobne okno, powiadomienia.')),
+      h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => promptInstall().then(ok => ok && toast('Aplikacja zainstalowana')) }, 'Zainstaluj'));
+    if (isIOS()) return installBox.replaceChildren(h('span', {}, h('b', {}, 'iPhone / iPad: dodaj aplikację do ekranu początkowego'), h('br'),
+      h('span', { class: 'small muted' }, 'W Safari stuknij „Udostępnij” (kwadrat ze strzałką), potem „Do ekranu początkowego” i „Dodaj”. Otwieraj aplikację z nowej ikony – dopiero wtedy działają powiadomienia.')));
+    installBox.replaceChildren(h('span', {}, h('b', {}, 'Instalacja'), h('br'), h('span', { class: 'small muted' }, 'W Chrome lub Edge kliknij ikonę instalacji w pasku adresu (monitor ze strzałką) albo w menu „Zainstaluj aplikację”. Na Macu w Safari: Plik → Dodaj do Docka.')));
+  };
+  drawInstall();
+  offInstall?.(); offInstall = onInstallChange(drawInstall);
+
+  const pushBox = h('div', {}, h('p', { class: 'hint' }, 'Sprawdzanie…'));
+  const LABELS = [['zgloszenia', 'Nowe i przypisane do mnie zgłoszenia'], ['komentarze', 'Komentarze i wykonanie w moich zgłoszeniach'], ['terminy', 'Poranny plan dnia (dni robocze): zgłoszenia na dziś, po terminie, terminy spraw M2 TAX']];
+  async function drawPush() {
+    if (isIOS() && !isStandalone()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Na iPhonie i iPadzie powiadomienia działają tylko w aplikacji dodanej do ekranu początkowego (iOS 16.4 lub nowszy). Dodaj ją (instrukcja wyżej), otwórz z ikony i włącz powiadomienia tutaj.'));
+    if (!pushSupported()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Ta przeglądarka nie obsługuje powiadomień. Użyj Chrome, Edge, Firefox albo Safari w aktualnej wersji.'));
+    const sub = await currentSubscription().catch(() => null);
+    const on = !!sub && Notification.permission === 'granted';
+    const prefs = { ...DEFAULT_PREFS, ...(on ? (await loadPrefs().catch(() => null)) || {} : {}) };
+    const checks = LABELS.map(([k, l]) => {
+      const cb = h('input', { type: 'checkbox', checked: prefs[k] !== false, disabled: !on });
+      cb.addEventListener('change', () => { prefs[k] = cb.checked; savePrefs(prefs).then(() => toast('Zapisano ustawienia powiadomień')).catch(e => fail(e)); });
+      return h('label', { class: 'check', style: { margin: '4px 0' } }, cb, l);
+    });
+    const btn = h('button', { class: on ? 'btn btn-outline btn-sm' : 'btn btn-primary btn-sm', type: 'button', onclick: async () => {
+      btn.disabled = true;
+      try { if (on) { await disablePush(); toast('Powiadomienia wyłączone na tym urządzeniu'); } else { await enablePush(prefs); toast('Powiadomienia włączone na tym urządzeniu'); } }
+      catch (e) { fail(e, 'Powiadomienia'); }
+      drawPush();
+    } }, on ? 'Wyłącz na tym urządzeniu' : 'Włącz powiadomienia');
+    const test = on ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
+      try { const n = await sendTest(); toast(n ? 'Wysłano powiadomienie testowe' : 'Brak aktywnych urządzeń – włącz powiadomienia ponownie', !n); } catch (e) { fail(e, 'Powiadomienie testowe'); }
+    } }, 'Wyślij testowe') : null;
+    pushBox.replaceChildren(
+      h('div', { class: 'pw-row' }, h('span', {}, h('b', {}, on ? 'Powiadomienia są włączone na tym urządzeniu.' : 'Powiadomienia są wyłączone na tym urządzeniu.'), h('br'),
+        h('span', { class: 'small muted' }, Notification.permission === 'denied' ? 'Przeglądarka blokuje powiadomienia dla tej strony – odblokuj je w ustawieniach witryny (ikona kłódki przy adresie).' : 'Każde urządzenie (komputer, telefon) włączasz osobno.')),
+        h('span', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 'none' } }, test, btn)),
+      h('div', { style: { display: 'flex', flexDirection: 'column', marginTop: '8px' } }, ...checks));
+  }
+  drawPush();
+  return h('section', { class: 'card section' },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Aplikacja i powiadomienia na tym urządzeniu')),
+    installBox, h('hr', { class: 'pw-hr' }), pushBox);
+}
 
 export async function renderProfil(main) {
   const me = state.me;
@@ -75,10 +125,11 @@ export async function renderProfil(main) {
       h('div', { class: 'section-head' }, h('h2', {}, 'Adres do doręczeń')),
       h('div', { style: { display: 'flex', gap: '22px', flexWrap: 'wrap' } }, radio('biuro', 'Biuro RKDP (Beaty Artemskiej 11/44)'), radio('wlasny', 'Mój adres')),
       addrBox),
+    appSection(),
     h('div', { class: 'savebar' }, info, h('button', { class: 'btn btn-primary', onclick: save }, 'Zapisz')));
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);
-  return () => window.removeEventListener('beforeunload', beforeUnload);
+  return () => { window.removeEventListener('beforeunload', beforeUnload); offInstall?.(); };
 }
 
 // Dane pełnomocników-pracowników do formularzy (PESEL tylko własny – RLS nie pokaże cudzego)

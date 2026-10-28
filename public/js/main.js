@@ -2,6 +2,7 @@ import { h, initials, toast, initTooltips, initMobileTables } from './ui.js';
 import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
 import { renderLogin } from './views/login.js';
 import { TERMS_VERSION } from './regulamin.js';
+import { registerSW } from './push.js';
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
 const renderRozliczenia = lazy(() => import('./views/rozliczenia.js'), 'renderRozliczenia');
@@ -285,3 +286,5 @@ document.addEventListener('click', () => { document.querySelectorAll('.mod-menu'
 initTooltips();
 initMobileTables();
 start();
+// instalacja jako aplikacja, powiadomienia push, ekran „brak internetu”
+if (document.readyState === 'complete') registerSW(); else window.addEventListener('load', () => registerSW());

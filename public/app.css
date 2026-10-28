@@ -781,3 +781,9 @@ table.tr-table{width:100%;border-collapse:collapse;font-size:13px}
 .tile-btn{text-align:left;cursor:pointer;font:inherit}
 .tile.dark.tile-btn:hover{box-shadow:0 0 0 2px var(--gold)}
 .tile-more{font-size:12px;font-weight:600;color:var(--gold);margin-top:2px}
+
+/* Aplikacja i powiadomienia (profil) */
+.pw-row{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;line-height:1.45}
+.pw-ok{width:28px;height:28px;border-radius:99px;background:var(--ok-bg, #E3EFE3);color:var(--ok, #2F5F38);display:inline-flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.pw-hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+.pw-row>span{flex:1 1 260px}.pw-row>.pw-ok{flex:none}
