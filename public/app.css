@@ -936,3 +936,47 @@ main.view-enter{animation:view-in .22s ease-out}
 :root[data-theme="dark"] .tk-c.zmiana .av,:root[data-theme="dark"] .tk-c.utworzenie .av{color:var(--muted)}
 @media (max-width:1560px){.site-header .nav-user .who{display:none}}
 @media (max-width:1320px){.site-header .logout-txt{display:none}}
+
+/* ===== Tabele rozliczeń – nowa szata (kolory logo: brąz #806341 → złoto #E0C098) ===== */
+.grid-wrap{border-radius:18px;border-color:var(--line);box-shadow:0 1px 2px rgba(29,26,22,.04),0 10px 30px -18px rgba(29,26,22,.25)}
+.grid th,.grid td{border-bottom-color:color-mix(in srgb,var(--line) 70%,transparent)}
+.grid tbody tr:nth-child(even) td{background:var(--card)}
+.grid thead th{background:var(--card);color:var(--muted);font-family:var(--mono,inherit);font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;padding:14px 8px 10px;border-bottom:1px solid var(--line-2)}
+.grid thead th.c-name,.grid thead th.c-person{padding-left:16px}
+.grid thead th .sub{font-family:var(--sans);text-transform:none;letter-spacing:0;font-size:11px;color:var(--label);margin-top:4px}
+.grid .colbar{display:block;height:3px;border-radius:9px;background:color-mix(in srgb,var(--line) 80%,transparent);margin:6px auto 0;width:52px;overflow:hidden}
+.grid .colbar i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#806341,#CFAE86);transition:width .4s ease}
+.grid .colbar.full i{background:linear-gradient(90deg,#A3814F,#E0C098)}
+.grid td.c-name{padding-left:16px}
+.grid tbody tr td{transition:background-color .15s}
+.grid tbody tr:hover td{background:color-mix(in srgb,var(--gold) 9%,var(--card))}
+/* kratki: „zrobione” w gradiencie logo */
+.cb{border-radius:9px;border-width:1.5px;transition:transform .12s,box-shadow .15s,background .2s}
+.cb-done{background:linear-gradient(140deg,#8A6B45 0%,#B38F62 100%);border-color:transparent;color:#FFF9EF;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(80,58,30,.25)}
+.cb-na{background:transparent;border:1.5px dashed var(--line-2);color:var(--label)}
+.cb-missing_docs{background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 70%,transparent)}
+.cb-todo{background:var(--card);border-color:var(--line-2)}
+.cb:hover:not([disabled]){box-shadow:0 0 0 4px color-mix(in srgb,var(--gold) 35%,transparent)}
+/* rozliczony klient: delikatne złoto zamiast zieleni */
+.grid tbody tr.settled td,.grid tbody tr.settled:nth-child(even) td{background:color-mix(in srgb,var(--gold) 7%,var(--card))}
+.grid tbody tr.settled:hover td{background:color-mix(in srgb,var(--gold) 14%,var(--card))}
+.grid tr.settled td.c-name{box-shadow:inset 3px 0 0 #B38F62}
+.grid tbody tr.settled td.c-name a{color:var(--ink)}
+.sum{font-size:11.5px;padding:5px 12px;gap:7px}
+.sum.ok,.grid tbody tr.settled .sum.ok{background:#1D1A16;color:#E0C098;box-shadow:inset 0 0 0 1px rgba(224,192,152,.25)}
+.sum.no{background:transparent;color:var(--text);padding-left:4px}
+.sum .ring{width:18px;height:18px;border-radius:50%;flex:none;background:conic-gradient(#A3814F calc(var(--p)*1%),color-mix(in srgb,var(--line) 90%,transparent) 0);-webkit-mask:radial-gradient(circle,transparent 5px,#000 5.5px);mask:radial-gradient(circle,transparent 5px,#000 5.5px)}
+.sum.bad{background:var(--warn-bg);color:var(--warn)}
+.legend .cb-done{box-shadow:none}
+@keyframes rowFlash{0%{background:color-mix(in srgb,var(--gold) 45%,var(--card))}100%{background:color-mix(in srgb,var(--gold) 7%,var(--card))}}
+.grid tbody tr.flash td{animation:rowFlash 1.1s ease-out}
+@keyframes cbPop{0%{transform:scale(.7)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.grid tbody tr.flash .cb-done{animation:cbPop .3s ease-out}
+.table-title h2{font-size:17px;letter-spacing:-.01em}
+.table-title .muted{font-family:var(--mono,inherit);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+/* ciemny motyw */
+:root[data-theme="dark"] .grid-wrap{box-shadow:0 10px 30px -18px rgba(0,0,0,.6)}
+:root[data-theme="dark"] .cb-done{background:linear-gradient(140deg,#B38F62,#E0C098);color:#1D1A16}
+:root[data-theme="dark"] .sum.ok,:root[data-theme="dark"] .grid tbody tr.settled .sum.ok{background:linear-gradient(140deg,#B38F62,#E0C098);color:#1D1A16;box-shadow:none}
+:root[data-theme="dark"] .grid tr.settled td.c-name{box-shadow:inset 3px 0 0 #E0C098}
+:root[data-theme="dark"] .sum .ring{background:conic-gradient(#E0C098 calc(var(--p)*1%),#3A3942 0)}

@@ -351,7 +351,8 @@ export async function renderRozliczenia(main, params) {
     const done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
     if (cs.length && done === cs.length) return h('span', { class: 'sum ok' }, '✓ Rozliczony');
     if (cs.some(e => e.status === 'missing_docs')) return h('span', { class: 'sum bad', 'data-tip': 'Brakuje dokumentów' }, `! ${done}/${cs.length}`);
-    return h('span', { class: 'sum no', 'data-tip': `Zrobione ${done} z ${cs.length}` }, `${done}/${cs.length}`);
+    return h('span', { class: 'sum no', 'data-tip': `Zrobione ${done} z ${cs.length}` },
+      h('span', { class: 'ring', style: `--p:${cs.length ? Math.round(done * 100 / cs.length) : 0}`, 'aria-hidden': 'true' }), `${done}/${cs.length}`);
   }
 
   function noteCell(c) {
@@ -383,14 +384,16 @@ export async function renderRozliczenia(main, params) {
     const cols = t.cols;
     const stat = (col) => {
       const rel = t.all.map(c => byClient.get(c.id)?.get(col.code)).filter(e => e && e.status !== 'na');
-      return `${rel.filter(e => e.status === 'done').length}/${rel.length}`;
+      const d = rel.filter(e => e.status === 'done').length;
+      return { txt: `${d}/${rel.length}`, pct: rel.length ? Math.round(d * 100 / rel.length) : 0 };
     };
     const thead = h('thead', {}, h('tr', {},
       h('th', { class: 'c-name' }, 'Klient'),
       h('th', { class: 'c-person' }, AREAS[area].personLabel),
       area === 'kadry' ? h('th', { 'data-tip': 'Czy firma zatrudnia pracowników lub zleceniobiorców' }, 'Pracownicy') : null,
       cols.map(col => h('th', { class: 'c-task' + (col.counts_to_settled === false ? ' optional' : ''), 'data-tip': (col.description || col.label) + (col.counts_to_settled === false ? '\nNie wpływa na status „Klient rozliczony”.' : '') },
-        col.label, h('span', { class: 'sub' }, stat(col) + (col.counts_to_settled === false ? ' · info' : '')))),
+        col.label, (() => { const st = stat(col); return [h('span', { class: 'sub' }, st.txt + (col.counts_to_settled === false ? ' · info' : '')),
+          h('span', { class: 'colbar' + (st.pct === 100 ? ' full' : ''), 'aria-hidden': 'true' }, h('i', { style: { width: st.pct + '%' } }))]; })())),
       h('th', { class: 'c-sum', 'data-tip': 'Rozliczony = wszystkie kratki „Zrobione” albo „Nie dotyczy”' }, 'Klient rozliczony'),
       h('th', { 'data-tip': 'Uwagi i pytania do klienta w tym miesiącu' }, 'Uwagi')));
     const tbody = h('tbody', {}, t.rows.map(c => rowFor(c, area, cols)));
@@ -429,7 +432,9 @@ export async function renderRozliczenia(main, params) {
     const c = clientMap.get(clientId);
     body.querySelectorAll(`tr[data-client="${clientId}"]`).forEach(tr => {
       const area = tr.dataset.area;
-      tr.replaceWith(rowFor(c, area, tr.closest('table')._cols));
+      const nr = rowFor(c, area, tr.closest('table')._cols);
+      if (!tr.classList.contains('settled') && nr.classList.contains('settled')) nr.classList.add('flash');
+      tr.replaceWith(nr);
     });
     queueSummary();
   }
