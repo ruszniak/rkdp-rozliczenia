@@ -108,6 +108,30 @@ export function parseMarker(code) {
   return out;
 }
 const accMarkers = a => [a.S_12_1, a.S_12_2].flatMap(parseMarker);
+
+// ---------- hierarchia kont: syntetyczne (np. 011) i analityczne (011-01, 011-01-02) ----------
+// Konto nadrzędne pomijamy w bilansie / RZiS, jeśli jego analityki mają własne znaczniki (inaczej kwoty liczyłyby się podwójnie).
+const SEP = /^[-./ _]/;
+export function hierarchy(m) {
+  if (m._h) return m._h;
+  const sorted = [...m.accounts].filter(a => a.S_1).sort((a, b) => (a.S_1 < b.S_1 ? -1 : a.S_1 > b.S_1 ? 1 : 0));
+  const parent = new Set(), markedB = new Set(), markedR = { RP: new Set(), RK: new Set() };
+  const stack = [];
+  for (const a of sorted) {
+    while (stack.length && !(a.S_1.startsWith(stack.at(-1).S_1) && SEP.test(a.S_1.slice(stack.at(-1).S_1.length)))) stack.pop();
+    const mk = accMarkers(a);
+    const hasB = mk.some(x => x.kind === 'BA' || x.kind === 'BP');
+    for (const anc of stack) {
+      parent.add(anc.S_1);
+      if (hasB) markedB.add(anc.S_1);
+      for (const v of ['RP', 'RK']) if (mk.some(x => x.kind === v)) markedR[v].add(anc.S_1);
+    }
+    stack.push(a);
+  }
+  return (m._h = { parent, markedB, markedR, isLeaf: a => !parent.has(a.S_1) });
+}
+// czy konto pominąć w zestawieniu danego rodzaju ('B' – bilans, 'RP' / 'RK' – RZiS)
+const skipAcc = (m, a, kind) => { const H = hierarchy(m); return kind === 'B' ? H.markedB.has(a.S_1) : H.markedR[kind].has(a.S_1); };
 const parents = path => path.split('.').map((_, i, arr) => arr.slice(0, i + 1).join('.'));
 
 // ---------- BILANS ----------
@@ -123,6 +147,7 @@ export function buildBilans(m) {
   const warnings = { opposite: [], unmarked: [], dual: 0 };
   let rStart = 0, rEnd = 0; // salda kont wynikowych (niezamknięty wynik)
   for (const a of m.accounts) {
+    if (skipAcc(m, a, 'B')) continue;
     const mk = accMarkers(a);
     const ba = mk.find(x => x.kind === 'BA'), bp = mk.find(x => x.kind === 'BP');
     const sWn = num(a.S_4), sMa = num(a.S_5), eWn = num(a.S_10), eMa = num(a.S_11);
@@ -185,18 +210,27 @@ export function buildRzis(m, variant = 'RP') {
   const resultAccs = new Set(m.accounts.filter(isResultAcc).map(a => a.S_1));
   const closing = new Set();
   if (resultAccs.size) for (const j of m.journal) if (j._z.some(i => resultAccs.has(m.postings[i].Z_3))) closing.add(j._i);
-  const turn = new Map();
+  // obroty kont z ZOiS (S_6 / S_7 – za okres pliku), pomniejszone o zapisy przeksięgowania wyniku z dziennika;
+  // gdy ZOiS nie ma obrotów okresu – obroty z dziennika
+  const closingTurn = new Map(), journalTurn = new Map();
   for (const p of m.postings) {
-    if (p._d !== null && p._d !== undefined && closing.has(p._d)) continue;
-    const t = turn.get(p.Z_3) || { wn: 0, ma: 0 }; t.wn += num(p.Z_4); t.ma += num(p.Z_7); turn.set(p.Z_3, t);
+    const isClose = p._d !== null && p._d !== undefined && closing.has(p._d);
+    const map = isClose ? closingTurn : journalTurn;
+    const t = map.get(p.Z_3) || { wn: 0, ma: 0 }; t.wn += num(p.Z_4); t.ma += num(p.Z_7); map.set(p.Z_3, t);
   }
-  const usePostings = m.postings.length > 0;
+  const zoisHasTurn = m.accounts.some(a => String(a.S_6 ?? '').trim() !== '' || String(a.S_7 ?? '').trim() !== '');
+  const turnOf = a => {
+    const c = closingTurn.get(a.S_1) || { wn: 0, ma: 0 };
+    if (zoisHasTurn) return { wn: num(a.S_6) - c.wn, ma: num(a.S_7) - c.ma };
+    return journalTurn.get(a.S_1) || (m.postings.length ? { wn: 0, ma: 0 } : { wn: num(a.S_8), ma: num(a.S_9) });
+  };
+  const usePostings = !zoisHasTurn && m.postings.length > 0;
   const sign = Object.fromEntries(T.rows.filter(r => r[2]).map(r => [r[0], r[2]]));
   const acc = new Map();
   for (const a of m.accounts) {
     const mk = accMarkers(a).find(x => x.kind === variant);
-    if (!mk) continue;
-    const t = usePostings ? (turn.get(a.S_1) || { wn: 0, ma: 0 }) : { wn: num(a.S_8), ma: num(a.S_9) };
+    if (!mk || skipAcc(m, a, variant)) continue;
+    const t = turnOf(a);
     const s = sign[mk.path.split('.')[0]] || 1;
     const v = s > 0 ? t.ma - t.wn : t.wn - t.ma;
     for (const p of parents(mk.path)) {
@@ -222,7 +256,7 @@ export function buildRzis(m, variant = 'RP') {
     }
     return 0;
   });
-  return { variant: T.name, rows, net: r2(vals[T.result]), closingEntries: closing.size, fromPostings: usePostings, acc, vals };
+  return { variant: T.name, rows, net: r2(vals[T.result]), closingEntries: closing.size, fromPostings: usePostings, fromZois: zoisHasTurn, acc, vals };
 }
 
 // ---------- KONTROLA PLIKU: błędy (error) i ostrzeżenia (warn) ----------
@@ -248,6 +282,8 @@ export function validateKr(m, A, B) {
   // 1. sumy kontrolne
   const badCtrl = A.ctrlRows.filter(r => r.ok === false);
   if (badCtrl.length) add('error', 'Sumy kontrolne (Ctrl) nie zgadzają się z danymi', badCtrl.map(r => `${r.k}: w pliku ${fmt(num(r.file))}, z danych ${fmt(r.calc)}`).join('; ') + '. Plik może być niekompletny albo uszkodzony.', [], 'sum');
+  // 1a. zdublowane zapisy dziennika
+  if (m.dupJournal) add('error', `Plik zawiera zdublowane zapisy dziennika (${m.dupJournal.toLocaleString('pl-PL')})`, `Te same zapisy (ten sam numer, data, konta i kwoty) występują w pliku wielokrotnie – razem ${m.dupPostings.toLocaleString('pl-PL')} powtórzonych pozycji na kontach. Aplikacja pominęła powtórzenia w analizie, ale plik w tej postaci zawyża obroty w dzienniku – wygeneruj JPK ponownie albo zgłoś błąd dostawcy programu księgowego.${m.dupExamples?.length ? ' Np. ' + m.dupExamples.join(', ') + '.' : ''}`, [], 'jr', m.dupExamples?.[0]);
   // 2. bilans obrotów i sald (Wn = Ma)
   for (const b of A.balance) if (Math.abs(b.diff) >= 0.005) add('error', `${b.name}: Wn ≠ Ma`, `Różnica ${fmt(b.diff)} (Wn ${fmt(b.wn)}, Ma ${fmt(b.ma)}).`, [], 'sum');
   // 3. niezbilansowane zapisy
@@ -259,8 +295,10 @@ export function validateKr(m, A, B) {
   const turn = new Map();
   for (const p of m.postings) { const t = turn.get(p.Z_3) || { wn: 0, ma: 0 }; t.wn += num(p.Z_4); t.ma += num(p.Z_7); turn.set(p.Z_3, t); }
   const badSaldo = [], badTurn = [];
+  const H = hierarchy(m);
   for (const a of m.accounts) {
     const saldo = num(a.S_10) - num(a.S_11), bo = num(a.S_4) - num(a.S_5), nar = num(a.S_8) - num(a.S_9);
+    if (!H.isLeaf(a)) { if (Math.abs(saldo - bo - nar) >= 0.01 && Math.abs(saldo - nar) >= 0.01) badSaldo.push(accLine(a, `saldo ${fmt(saldo)}, BO + obroty ${fmt(bo + nar)}`)); continue; }
     if (Math.abs(saldo - bo - nar) >= 0.01 && Math.abs(saldo - nar) >= 0.01) badSaldo.push(accLine(a, `saldo ${fmt(saldo)}, BO + obroty ${fmt(bo + nar)}`));
     if (m.postings.length) {
       const t = turn.get(a.S_1) || { wn: 0, ma: 0 };
@@ -274,7 +312,7 @@ export function validateKr(m, A, B) {
   const noMarker = [], unknown = [], outside = [], wrongType = [], singleOpp = [], negRzis = [];
   for (const a of m.accounts) {
     const active = [a.S_4, a.S_5, a.S_6, a.S_7, a.S_10, a.S_11].some(v => Math.abs(num(v)) >= 0.005);
-    if (!active) continue;
+    if (!active || (!H.isLeaf(a) && (H.markedB.has(a.S_1) || H.markedR.RP.has(a.S_1) || H.markedR.RK.has(a.S_1)) && !accMarkers(a).length)) continue;
     if (!String(a.S_12_1 || '').trim()) { noMarker.push(accLine(a, `saldo ${fmt(num(a.S_10) - num(a.S_11))}`)); continue; }
     for (const raw of [a.S_12_1, a.S_12_2].filter(x => String(x || '').trim())) {
       const parsed = parseMarker(raw);
@@ -446,4 +484,45 @@ export function rzisSimple(R, wz, variant) {
   });
   const last = rows[rows.length - 1];
   return { variant: R.variant, rows, net: last.v, fromPostings: R.fromPostings, closingEntries: R.closingEntries };
+}
+
+// ---------- MAPOWANIE KONT: które konto, z jakim znacznikiem, trafia do której pozycji bilansu i RZiS ----------
+const RZ_NAMES = { RP: Object.fromEntries(RZIS_P.rows.map(r => [r[0], r[1]])), RK: Object.fromEntries(RZIS_K.rows.map(r => [r[0], r[1]])) };
+export function buildMapping(m, B = buildBilans(m), R = { RP: hasVariant(m, 'RP') ? buildRzis(m, 'RP') : null, RK: hasVariant(m, 'RK') ? buildRzis(m, 'RK') : null }) {
+  const H = hierarchy(m);
+  const rows = new Map(m.accounts.map(a => [a.S_1, {
+    S_1: a.S_1, S_2: a.S_2 || '', S_12_1: a.S_12_1 || '', S_12_2: a.S_12_2 || '', S_12_3: a.S_12_3 || '',
+    level: H.isLeaf(a) ? 'analityczne' : 'syntetyczne', saldo: r2(num(a.S_10) - num(a.S_11)),
+    bil: [], rp: '', rk: '', note: '',
+  }]));
+  // kwoty z bilansu (konto może trafić do aktywów i pasywów – rozrachunki z dwoma znacznikami)
+  const amt = new Map();
+  for (const [map, side] of [[B.mapA, 'A'], [B.mapP, 'P']]) for (const n of map.values()) for (const ac of n.accounts) {
+    const x = amt.get(ac.S_1) || { A: 0, P: 0 }; x[side] += ac.end; amt.set(ac.S_1, x);
+  }
+  for (const a of m.accounts) {
+    const r = rows.get(a.S_1); if (!r || skipAcc(m, a, 'B')) continue;
+    const mk = accMarkers(a), ba = mk.find(x => x.kind === 'BA'), bp = mk.find(x => x.kind === 'BP');
+    const x = amt.get(a.S_1) || { A: 0, P: 0 };
+    if (ba) r.bil.push(`Aktywa ${ba.path}${AKTYWA[ba.path] ? ' – ' + AKTYWA[ba.path] : ''} (${bp ? 'saldo Wn' : 'Wn − Ma'})`);
+    if (bp) r.bil.push(`Pasywa ${bp.path}${PASYWA[bp.path] ? ' – ' + PASYWA[bp.path] : ''} (${ba ? 'saldo Ma' : 'Ma − Wn'})`);
+    if (ba) r.bilA = r2(x.A);
+    if (bp) r.bilP = r2(x.P);
+  }
+  for (const v of ['RP', 'RK']) if (R[v]) for (const [path, n] of R[v].acc) for (const ac of n.accounts) {
+    const r = rows.get(ac.S_1); if (!r) continue;
+    r[v.toLowerCase()] = `${path}${RZ_NAMES[v][path] ? ' – ' + RZ_NAMES[v][path] : ''}`; r[v.toLowerCase() + 'V'] = ac.v;
+  }
+  const accBy = new Map(m.accounts.map(a => [a.S_1, a]));
+  for (const r of rows.values()) {
+    const a = accBy.get(r.S_1);
+    const active = [a.S_4, a.S_5, a.S_6, a.S_7, a.S_10, a.S_11].some(x => Math.abs(num(x)) >= 0.005);
+    if (r.level === 'syntetyczne' && !r.bil.length && !r.rp && !r.rk) r.note = 'konto nadrzędne – kwoty liczone na kontach analitycznych';
+    else if (!String(r.S_12_1).trim() && active) r.note = 'brak znacznika – poza bilansem i RZiS';
+    else if (!r.bil.length && !r.rp && !r.rk && active) r.note = /^INNE$/i.test(String(r.S_12_1).trim()) ? 'znacznik INNE – poza bilansem i RZiS' : 'znacznik nie wskazuje pozycji bilansu ani RZiS';
+    else if (!r.bil.length && (r.rp || r.rk)) r.note = 'konto wynikowe – w bilansie przez wynik (pasywa A.VI)';
+    r.bilTxt = r.bil.join('; '); r.cat = r.bil.length ? (r.rp || r.rk ? 'oba' : 'bilans') : r.rp || r.rk ? 'rzis' : (r.note.startsWith('konto nadrzędne') ? 'synt' : 'brak');
+    r.active = active;
+  }
+  return [...rows.values()];
 }

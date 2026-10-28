@@ -2,7 +2,7 @@
 // Plik jest czytany wyłącznie w przeglądarce – nic nie jest wysyłane na serwer ani zapisywane w bazie.
 import { h, toast, infoTip, printHtml, modal, icon } from '../ui.js';
 import { downloadXlsx } from '../xlsx.js';
-import { buildBilans, buildRzis, hasVariant, validateKr, WZORY, bilansSimple, rzisSimple } from './jpk-fin.js';
+import { buildBilans, buildRzis, hasVariant, validateKr, WZORY, bilansSimple, rzisSimple, hierarchy, buildMapping } from './jpk-fin.js';
 
 const HELP = `Podgląd plików JPK (JPK_CIT):
 • Przeciągnij plik XML albo kliknij „Wybierz plik”. Obsługiwane: JPK_KR_PD (księgi rachunkowe), JPK_ST_KR (środki trwałe), a także inne pliki JPK – jako tabele.
@@ -102,19 +102,30 @@ function parseKrPd(doc) {
   const accounts = all(doc, 'S_1').map(s1 => s1.parentNode).filter((p, i, a) => a.indexOf(p) === i).map(p => ({ _typ: p.localName, ...leafObj(p) }));
   const contractors = all(doc, 'T_1').map(t => leafObj(t.parentNode));
   const journal = [], postings = [];
+  // statystyki surowego pliku (do porównania z sumami kontrolnymi Ctrl) i wykrywanie zdublowanych zapisów
+  const raw = { C_1: 0, C_2: 0, C_3: 0, C_4: 0, C_5: 0 };
+  const seen = new Set(); let dupJournal = 0, dupPostings = 0; const dupExamples = [];
   for (const d of all(doc, 'D_1').map(x => x.parentNode)) {
-    const o = leafObj(d); o._i = journal.length; o._z = [];
-    for (const z of kids(d).filter(c => c.localName === 'KontoZapis' || first(c, 'Z_3'))) {
-      const zo = { ...leafObj(z), _d: o._i, D_1: o.D_1, D_8: o.D_8, D_3: o.D_3 };
+    const o = leafObj(d);
+    const zs = kids(d).filter(c => c.localName === 'KontoZapis' || first(c, 'Z_3')).map(leafObj);
+    raw.C_1++; raw.C_2 += num(o.D_11); raw.C_3 += zs.length; for (const z of zs) { raw.C_4 += num(z.Z_4); raw.C_5 += num(z.Z_7); }
+    // identyczny zapis (ten sam numer, nagłówek i dekretacja) już był – pomijamy powtórzenie
+    const sig = JSON.stringify([o, zs]);
+    if (seen.has(sig)) { dupJournal++; dupPostings += zs.length; if (dupExamples.length < 5 && !dupExamples.includes(o.D_1)) dupExamples.push(o.D_1); continue; }
+    seen.add(sig);
+    o._i = journal.length; o._z = [];
+    for (const z of zs) {
+      const zo = { ...z, _d: o._i, D_1: o.D_1, D_8: o.D_8, D_3: o.D_3 };
       o._z.push(postings.length); postings.push(zo);
     }
     journal.push(o);
   }
+  seen.clear();
   // pozycje KontoZapis zapisane poza Dziennikiem (gdyby plik miał je jako osobne elementy)
   if (!postings.length) for (const z of all(doc, 'Z_3').map(x => x.parentNode)) postings.push({ ...leafObj(z), _d: null });
   const ctrlEl = first(doc, 'Ctrl'); const ctrl = ctrlEl ? leafObj(ctrlEl) : {};
   const rpdEl = first(doc, 'RPD'); const rpd = rpdEl ? leafObj(rpdEl) : null;
-  return { accounts, contractors, journal, postings, ctrl, rpd };
+  return { accounts, contractors, journal, postings, ctrl, rpd, raw: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, r2(v)])), dupJournal, dupPostings, dupExamples };
 }
 
 function parseStKr(doc) {
@@ -153,18 +164,20 @@ function parseGeneric(doc) {
 // ---------- analiza KR_PD ----------
 function analyzeKr(m) {
   const sum = (rows, k) => r2(rows.reduce((s, r) => s + num(r[k]), 0));
-  const acc = m.accounts;
+  // sumy kontrolne Wn = Ma liczone na kontach najniższego poziomu (bez syntetyk, żeby nie liczyć kwot podwójnie)
+  const H = hierarchy(m);
+  const acc = m.accounts.filter(H.isLeaf);
   const t = Object.fromEntries(['S_4', 'S_5', 'S_6', 'S_7', 'S_8', 'S_9', 'S_10', 'S_11'].map(k => [k, sum(acc, k)]));
-  const computed = { C_1: m.journal.length, C_2: sum(m.journal, 'D_11'), C_3: m.postings.length, C_4: sum(m.postings, 'Z_4'), C_5: sum(m.postings, 'Z_7') };
+  const computed = m.raw || { C_1: m.journal.length, C_2: sum(m.journal, 'D_11'), C_3: m.postings.length, C_4: sum(m.postings, 'Z_4'), C_5: sum(m.postings, 'Z_7') };
   const ctrlRows = ['C_1', 'C_2', 'C_3', 'C_4', 'C_5'].map(k => ({ k, file: m.ctrl[k], calc: computed[k], ok: m.ctrl[k] === undefined ? null : Math.abs(num(m.ctrl[k]) - computed[k]) < 0.005 }));
   const balance = [
     ['Bilans otwarcia', t.S_4, t.S_5], ['Obroty za okres', t.S_6, t.S_7], ['Obroty narastająco', t.S_8, t.S_9], ['Salda końcowe', t.S_10, t.S_11],
-    ['Zapisy na kontach (Wn / Ma)', computed.C_4, computed.C_5],
+    ['Zapisy na kontach (Wn / Ma)', sum(m.postings, 'Z_4'), sum(m.postings, 'Z_7')],
   ].map(([name, wn, ma]) => ({ name, wn, ma, diff: r2(wn - ma) }));
   // zapisy dziennika, w których Wn ≠ Ma albo kwota operacji ≠ Wn
   const bad = m.journal.filter(j => j._z.length && (Math.abs(sum(j._z.map(i => m.postings[i]), 'Z_4') - sum(j._z.map(i => m.postings[i]), 'Z_7')) >= 0.005));
   // konta w zapisach, których brak w ZOiS
-  const known = new Set(acc.map(a => a.S_1));
+  const known = new Set(m.accounts.map(a => a.S_1));
   const unknown = [...new Set(m.postings.map(p => p.Z_3).filter(k => k && !known.has(k)))];
   return { totals: t, computed, ctrlRows, balance, unbalanced: bad, unknownAccounts: unknown };
 }
@@ -326,6 +339,28 @@ function issuesPanel(m, goTo) {
 }
 
 // ----- JPK_KR_PD -----
+// ---------- mapowanie kont → pozycje bilansu i RZiS ----------
+const mappingOf = m => m._map || (m._map = buildMapping(m, m._bil || (m._bil = buildBilans(m)), { RP: hasVariant(m, 'RP') ? buildRzis(m, 'RP') : null, RK: hasVariant(m, 'RK') ? buildRzis(m, 'RK') : null }));
+const MAP_FILTERS = [['all', 'Wszystkie konta'], ['bilans', 'W bilansie'], ['rzis', 'W RZiS'], ['brak', 'Z kwotą, poza bilansem i RZiS'], ['synt', 'Konta nadrzędne (pominięte)']];
+const mapFilter = f => r => f === 'all' ? true : f === 'bilans' ? (r.cat === 'bilans' || r.cat === 'oba') : f === 'rzis' ? (r.cat === 'rzis' || r.cat === 'oba') : f === 'brak' ? (r.cat === 'brak' && r.active) : r.cat === 'synt';
+const MAP_COLS = (m) => [
+  { key: 'S_1', label: 'Konto', w: 110 }, { key: 'S_2', label: 'Nazwa konta', w: 220, wrap: true }, { key: 'level', label: 'Poziom' },
+  { key: 'S_12_1', label: 'Znacznik S_12_1' }, ...(m.accounts.some(a => a.S_12_2) ? [{ key: 'S_12_2', label: 'Znacznik S_12_2' }] : []),
+  { key: 'bilTxt', label: 'Pozycja bilansu', w: 300, wrap: true }, { key: 'bilA', label: 'Aktywa – stan na koniec', num: true, fmt: v => (v === undefined ? '' : fmtN(v)) }, { key: 'bilP', label: 'Pasywa – stan na koniec', num: true, fmt: v => (v === undefined ? '' : fmtN(v)) },
+  ...(hasVariant(m, 'RP') ? [{ key: 'rp', label: 'RZiS porównawczy', w: 240, wrap: true }, { key: 'rpV', label: 'Kwota RZiS (P)', num: true, fmt: v => (v === undefined ? '' : fmtN(v)) }] : []),
+  ...(hasVariant(m, 'RK') ? [{ key: 'rk', label: 'RZiS kalkulacyjny', w: 240, wrap: true }, { key: 'rkV', label: 'Kwota RZiS (K)', num: true, fmt: v => (v === undefined ? '' : fmtN(v)) }] : []),
+  { key: 'note', label: 'Uwagi', w: 220, wrap: true },
+];
+function mappingView(m, openAcc) {
+  const rows = mappingOf(m);
+  let f = m._mapF || 'all';
+  const cnt = k => rows.filter(mapFilter(k)).length;
+  const pick = h('div', { class: 'tabs', style: { marginBottom: '10px', flexWrap: 'wrap' } }, ...MAP_FILTERS.map(([k, l]) => h('button', { class: f === k ? 'on' : '', onclick: () => { m._mapF = k; holder.replaceChildren(table(k)); [...pick.children].forEach((b, i) => b.classList.toggle('on', MAP_FILTERS[i][0] === k)); } }, `${l} (${cnt(k)})`)));
+  const table = k => dataTable({ cols: MAP_COLS(m), rows, filters: [mapFilter(k)], pageSize: 200, onRow: r => openAcc(r.S_1) }).el;
+  const holder = h('div', {}, table(f));
+  return [h('p', { class: 'hint' }, 'Dla każdego konta: znacznik z pliku, pozycja bilansu (aktywa / pasywa, sposób liczenia salda) i pozycja RZiS z kwotą. Kliknij konto, aby zobaczyć jego zapisy. Pełne zestawienie pobierzesz w Excelu (arkusz „Mapowanie kont”) albo w PDF.'), pick, holder];
+}
+
 function viewKr(m) {
   const A = m._a || (m._a = analyzeKr(m));
   let tab = 'sum';
@@ -354,7 +389,7 @@ function viewKr(m) {
 
   const render = () => {
     tabs.replaceWith(tabs = tabsBar([['sum', 'Podsumowanie'], ['acc', 'Konta (ZOiS)', m.accounts.length], ['jr', 'Dziennik', m.journal.length], ['zp', 'Zapisy na kontach', m.postings.length],
-      ['mk', 'Znaczniki'], ['bil', 'Bilans'], ['rzis', 'RZiS'], m.contractors.length ? ['kt', 'Kontrahenci', m.contractors.length] : null, m.rpd ? ['rpd', 'RPD'] : null], k => { tab = k; render(); }, tab));
+      ['mk', 'Znaczniki'], ['map', 'Mapowanie kont'], ['bil', 'Bilans'], ['rzis', 'RZiS'], m.contractors.length ? ['kt', 'Kontrahenci', m.contractors.length] : null, m.rpd ? ['rpd', 'RPD'] : null], k => { tab = k; render(); }, tab));
     if (tab === 'sum') body.replaceChildren(...summaryKr(m, A));
     if (tab === 'acc') body.replaceChildren(h('p', { class: 'hint' }, 'Kliknij konto, aby zobaczyć jego zapisy.'), dataTable({ cols: accCols, rows: m.accounts, onRow: a => { accFilter = a.S_1; tab = 'zp'; render(); } }).el);
     if (tab === 'jr') body.replaceChildren(h('p', { class: 'hint' }, 'Kliknij zapis, aby zobaczyć dekretację na kontach.'), dataTable({ cols: jCols, rows: m.journal, onRow: showJournal }).el);
@@ -373,6 +408,7 @@ function viewKr(m) {
         dataTable({ cols: [{ key: 'marker', label: 'Znacznik', w: 160 }, { key: 'n', label: 'Kont', num: true, dec: 0 }, ...['S_4', 'S_5', 'S_6', 'S_7', 'S_10', 'S_11'].map(k => ({ key: k, label: lbl(k), num: true })), { key: 'saldo', label: 'Saldo (Wn − Ma)', num: true }],
           rows: groups, pageSize: 500, onRow: g => { tab = 'acc'; render(); setTimeout(() => { const s = body.querySelector('.jpk-search'); if (s && g.marker !== '(brak znacznika)') { s.value = g.marker; s.dispatchEvent(new Event('input')); } }, 0); } }).el);
     }
+    if (tab === 'map') body.replaceChildren(...mappingView(m, a => { accFilter = a; tab = 'zp'; render(); }));
     if (tab === 'bil') body.replaceChildren(...bilansView(m, () => render()).filter(Boolean));
     if (tab === 'rzis') body.replaceChildren(...rzisView(m, () => render()).filter(Boolean));
     if (tab === 'kt') body.replaceChildren(dataTable({ cols: ['T_1', 'T_2', 'T_3'].map(k => ({ key: k, label: lbl(k) })), rows: m.contractors }).el);
@@ -469,7 +505,7 @@ function rzisView(m, rerender) {
   const R = wz === 'pelny' ? RF : { ...rzisSimple(RF, wz, v), variant: wz === 'mikro' ? 'jednostki mikro' : RF.variant };
   const pick = hasRP && hasRK && wz !== 'mikro' ? h('div', { class: 'tabs', style: { marginBottom: '10px' } }, ...[['RP', 'Wariant porównawczy'], ['RK', 'Wariant kalkulacyjny']].map(([k, l]) => h('button', { class: v === k ? 'on' : '', onclick: () => { m._rzv = k; rerender(); } }, l))) : null;
   const B = m._bil || (m._bil = buildBilans(m));
-  return [wzPicker(m, rerender), finNote(R.fromPostings ? `Kwoty to obroty z dziennika za okres pliku${R.closingEntries ? ` z pominięciem ${R.closingEntries} zapisów przeksięgowania na wynik finansowy` : ''}: przychody = Ma − Wn, koszty = Wn − Ma.` : 'Kwoty to obroty narastająco z zestawienia obrotów i sald.'),
+  return [wzPicker(m, rerender), finNote(R.fromZois ? `Kwoty to obroty kont za okres pliku z zestawienia obrotów i sald (S_6 / S_7)${R.closingEntries ? `, pomniejszone o ${R.closingEntries} zapisów przeksięgowania na wynik finansowy z dziennika` : ''}: przychody = Ma − Wn, koszty = Wn − Ma.${hierarchy(m).parent.size ? ' Konta syntetyczne, których analityki mają własne znaczniki, są pominięte (bez podwójnego liczenia).' : ''}` : R.fromPostings ? `Kwoty to obroty z dziennika za okres pliku${R.closingEntries ? ` z pominięciem ${R.closingEntries} zapisów przeksięgowania na wynik finansowy` : ''}: przychody = Ma − Wn, koszty = Wn − Ma.` : 'Kwoty to obroty narastająco z zestawienia obrotów i sald.'),
     pick,
     h('div', { class: 'jpk-tiles' }, ...[['Zysk (strata) netto', R.net], [`Wariant`, null]].map(([l, n]) => n === null ? h('div', { class: 'card tile' }, h('span', { class: 'num', style: { fontSize: '22px' } }, R.variant), h('span', { class: 'lbl' }, 'Wariant RZiS')) : h('div', { class: 'card tile' + (n < 0 ? ' jpk-bad' : '') }, h('span', { class: 'num', style: { fontSize: '22px' } }, fmtN(n)), h('span', { class: 'lbl' }, l)))),
     wz === 'mikro' && v === 'RK' ? h('p', { class: 'jpk-warn' }, 'Plik ma tylko znaczniki wariantu kalkulacyjnego – koszty w RZiS jednostki mikro pokazano bez podziału na rodzaje (amortyzacja, materiały, wynagrodzenia, pozostałe).') : null,
@@ -548,6 +584,7 @@ function exportExcel(m) {
       (() => { const n = new Map(m.accounts.map(a => [a.S_1, a.S_2])); return m.postings.map(p => ({ ...p, _n: n.get(p.Z_3) || '' })); })()));
     for (const k of ['S_12_1', 'S_12_2', 'S_12_3']) if (m.accounts.some(a => a[k]))
       sheets.push(sheetFrom(`Znaczniki ${k}`, [{ key: 'marker', label: lbl(k) }, { key: 'n', label: 'Liczba kont' }, ...['S_4', 'S_5', 'S_6', 'S_7', 'S_8', 'S_9', 'S_10', 'S_11'].map(f => ({ key: f, label: lbl(f), num: true })), { key: 'saldo', label: 'Saldo (Wn − Ma)', num: true }], markerGroups(m.accounts, k)));
+    sheets.push(sheetFrom('Mapowanie kont', MAP_COLS(m), mappingOf(m)));
     const iss = issuesOf(m);
     sheets.splice(1, 0, { name: 'Kontrola', widths: [10, 60, 14, 40, 60], rows: [[{ v: 'Kontrola pliku', s: 'title' }], [],
       ['Poziom', 'Problem', 'Konto', 'Nazwa konta', 'Szczegóły'].map(v => ({ v, s: 'header' })),
@@ -580,11 +617,12 @@ function exportPdfDialog(m) {
   const cb = (label, checked) => { const i = h('input', { type: 'checkbox', checked }); return [i, h('label', { class: 'check', style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '6px 0' } }, i, label)]; };
   const [zo, zoL] = cb('Zestawienie obrotów i sald (konta)', true);
   const [mk, mkL] = cb('Sumy według znaczników kont', true);
+  const [mp, mpL] = cb('Mapowanie kont do bilansu i RZiS', true);
   const [fin, finL] = cb(`Bilans i RZiS – ${WZORY[getWz(m)].toLowerCase()} (zestawienia pomocnicze)`, true);
   const [jr, jrL] = cb(`Dziennik z dekretacją (${fmtInt(m.journal.length)} zapisów)`, m.journal.length <= 300);
-  modal('Raport PDF', h('div', {}, h('p', { class: 'small muted' }, 'Raport zawsze zawiera dane podmiotu, sumy kontrolne i kontrolę bilansu.'), finL, zoL, mkL, jrL,
+  modal('Raport PDF', h('div', {}, h('p', { class: 'small muted' }, 'Raport zawsze zawiera dane podmiotu, sumy kontrolne i kontrolę bilansu.'), finL, mpL, zoL, mkL, jrL,
     m.journal.length > 2000 ? h('p', { class: 'small muted' }, 'Dziennik jest duży – wydruk może mieć kilkaset stron. Do analizy lepiej użyć Excela.') : null),
-  close => [h('button', { class: 'btn btn-outline btn-sm', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); printReport(m, { fin: fin.checked, zois: zo.checked, markers: mk.checked, journal: jr.checked }); } }, 'Utwórz PDF')]);
+  close => [h('button', { class: 'btn btn-outline btn-sm', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); printReport(m, { fin: fin.checked, map: mp.checked, zois: zo.checked, markers: mk.checked, journal: jr.checked }); } }, 'Utwórz PDF')]);
 }
 
 function printReport(m, o) {
@@ -606,6 +644,14 @@ function printReport(m, o) {
       const tA = ['', 'Aktywa razem', fmtN(B.tA.start), fmtN(B.tA.end)]; tA._cls = 'tot'; const tP = ['', 'Pasywa razem', fmtN(B.tP.start), fmtN(B.tP.end)]; tP._cls = 'tot';
       parts.push(`<h2 class="pb">Bilans – ${esc(WZORY[wz])} (zestawienie pomocnicze)</h2>` + note + tbl(['Poz.', 'Aktywa', 'Stan na początek', 'Stan na koniec'], [...fr(B.aktywa, ['start', 'end']), tA], [2, 3]) + tbl(['Poz.', 'Pasywa', 'Stan na początek', 'Stan na koniec'], [...fr(B.pasywa, ['start', 'end']), tP], [2, 3]));
       for (const v of rzisVariants(m, wz)) { const RF = buildRzis(m, v), R = wz === 'pelny' ? RF : rzisSimple(RF, wz, v); parts.push(`<h2 class="pb">Rachunek zysków i strat – ${esc(WZORY[wz])}${wz === 'mikro' ? '' : ' – wariant ' + RF.variant} (zestawienie pomocnicze)</h2>` + note + tbl(['Poz.', 'Wyszczególnienie', 'Kwota'], fr(R.rows, ['v']), [2])); }
+    }
+    if (o.map) {
+      const mr = mappingOf(m).filter(r => r.active || r.bilTxt || r.rp || r.rk);
+      const hasRP = hasVariant(m, 'RP'), hasRK = hasVariant(m, 'RK');
+      parts.push('<h2 class="pb">Mapowanie kont do bilansu i RZiS</h2><p class="sub">Konta z saldem lub obrotami: znacznik, pozycja bilansu (sposób liczenia) i pozycja RZiS.</p>' +
+        tbl(['Konto', 'Nazwa', 'Znacznik', 'Pozycja bilansu', 'Aktywa', 'Pasywa', ...(hasRP ? ['RZiS (P)', 'Kwota'] : []), ...(hasRK ? ['RZiS (K)', 'Kwota'] : []), 'Uwagi'],
+          mr.map(r => [r.S_1, r.S_2, [r.S_12_1, r.S_12_2].filter(Boolean).join(' / '), r.bilTxt, r.bilA !== undefined ? fmtN(r.bilA) : '', r.bilP !== undefined ? fmtN(r.bilP) : '', ...(hasRP ? [r.rp, r.rp ? fmtN(r.rpV) : ''] : []), ...(hasRK ? [r.rk, r.rk ? fmtN(r.rkV) : ''] : []), r.note]),
+          [4, 5, ...(hasRP ? [7] : []), ...(hasRK ? [hasRP ? 9 : 7] : [])]));
     }
     if (o.markers) for (const k of ['S_12_1', 'S_12_2', 'S_12_3']) if (m.accounts.some(a => a[k]))
       parts.push(`<h2>Sumy według znacznika: ${esc(lbl(k))} (${k})</h2>` + tbl(['Znacznik', 'Kont', 'BO Wn', 'BO Ma', 'Obroty Wn', 'Obroty Ma', 'Saldo Wn', 'Saldo Ma'], markerGroups(m.accounts, k).map(g => [g.marker, g.n, fmtN(g.S_4), fmtN(g.S_5), fmtN(g.S_6), fmtN(g.S_7), fmtN(g.S_10), fmtN(g.S_11)]), [1, 2, 3, 4, 5, 6, 7]));
