@@ -52,7 +52,7 @@ async function loadData(period) {
   return { tickets, clients, active, settle, cname: Object.fromEntries(clients.map(c => [c.id, c.name])), opened: new Set(entries.map(e => e.client_id)) };
 }
 
-const tile = (n, lbl, href, o = {}) => h('a', { class: 'card tile' + (o.dark ? ' dark' : ''), href, style: { textDecoration: 'none', color: 'inherit' } },
+const tile = (n, lbl, href, o = {}) => h('a', { class: 'card tile' + (o.dark ? ' alert' : ''), href, style: { textDecoration: 'none', color: 'inherit' } },
   h('span', { class: 'num' }, String(n)), h('span', { class: 'lbl' }, lbl), o.bar !== undefined ? h('div', { class: 'bar' }, h('i', { style: { width: `${Math.round(o.bar * 100)}%` } })) : null);
 const ticketRow = (t, cname, showWho) => h('a', { class: 'tk-mini', href: `#/zgloszenia/${t.id}` },
   h('div', { style: { minWidth: 0 } }, h('b', {}, t.title), h('div', { class: 'small muted' }, [`#${t.no}`, cname[t.client_id], showWho ? (t.assignee_id ? who(t.assignee_id) : 'nieprzypisane') : TK_CAT[t.category]].filter(Boolean).join(' · '))),

@@ -1054,3 +1054,10 @@ main>.page-head:first-child{margin-top:0!important}
 .tile.dark .tile-more{color:#E0C098}
 .tile.on{box-shadow:0 14px 30px -16px rgba(29,26,22,.55),0 0 0 2px color-mix(in srgb,#CFAE86 60%,transparent)}
 .tile.dark.tile-btn:hover{box-shadow:0 14px 30px -16px rgba(29,26,22,.55),0 0 0 2px #CFAE86}
+/* zasada dla całej aplikacji: ciemny kafelek = aktywny filtr; ostrzeżenie = czerwona liczba i pasek */
+.tile.alert{border-color:color-mix(in srgb,var(--warn) 35%,var(--line))}
+.tile.alert::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--warn)}
+.tile.alert .num{color:var(--warn)}
+.tile.alert.dark::before{background:var(--warn)}
+.tile.alert.dark .num{color:#F0A58E}
+button.tile{font:inherit;color:inherit;text-align:left}
