@@ -980,3 +980,8 @@ main.view-enter{animation:view-in .22s ease-out}
 :root[data-theme="dark"] .sum.ok,:root[data-theme="dark"] .grid tbody tr.settled .sum.ok{background:linear-gradient(140deg,#B38F62,#E0C098);color:#1D1A16;box-shadow:none}
 :root[data-theme="dark"] .grid tr.settled td.c-name{box-shadow:inset 3px 0 0 #E0C098}
 :root[data-theme="dark"] .sum .ring{background:conic-gradient(#E0C098 calc(var(--p)*1%),#3A3942 0)}
+/* nagłówki tabel – Inter zamiast kroju maszynowego */
+.grid thead th{font-family:var(--sans);font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink)}
+.grid thead th .sub{font-size:11.5px;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.grid thead th.optional{color:var(--muted)}
+.table-title .muted{font-family:var(--sans);font-size:13px;letter-spacing:0;text-transform:none}
