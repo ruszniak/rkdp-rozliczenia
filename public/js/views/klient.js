@@ -1,4 +1,7 @@
-import { h, toast, fail, fmtDateTime, periodLabel, shiftPeriod, defaultPeriod } from '../ui.js';
+import { monitorCard } from '../monitoring.js';
+import { rememberRecent } from '../cmdk.js';
+import { openDocRequest } from '../prosba.js';
+import { h, icon, toast, fail, fmtDateTime, periodLabel, shiftPeriod, defaultPeriod } from '../ui.js';
 import { sb, state, memberById, canEditClients, isAdmin, activeTasks, hasModule } from '../store.js';
 import { LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, CIT_ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS, CLIENT_STATUS,
   STATUS, FIELD_LABELS, isCompany, isPartnership } from '../dict.js';
@@ -104,6 +107,7 @@ export async function renderKlient(main, id) {
   ]);
   if (error) throw error;
   if (!c) { main.replaceChildren(h('div', { class: 'card empty' }, 'Nie znaleziono klienta albo nie masz do niego dostępu.')); return; }
+  rememberRecent({ label: c.name, href: `#/klient/${c.id}`, meta: c.nip ? `NIP ${c.nip}` : '', panel: c.id });
 
   // pełny dostęp – wszystko; pracownik z ograniczonym dostępem – dane swoich klientów (bez przypisań, pilnuje tego baza)
   const editable = canEditClients() || hasModule('rozliczenia');
@@ -298,13 +302,14 @@ export async function renderKlient(main, id) {
       h('div', {}, h('p', { class: 'eyebrow' }, 'Karta klienta'), titleEl, compEl),
       h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         editable ? null : h('span', { class: 'badge' }, 'Tylko podgląd'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, defaultPeriod(), []) }, icon('mail'), 'Poproś o dokumenty'),
         h('a', { class: 'btn btn-outline btn-sm', href: `#/oferty/nowa?klient=${c.id}` }, 'Oferta'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => dokumentyDialog({ client: { ...c, ...draft } }).catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'))),
     h('div', { class: 'two' },
       h('div', {}, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null,
         sectionsBox, partnersBox,
         editable ? h('div', { class: 'savebar' }, saveInfo, saveBtn) : null),
-      h('div', {}, clientTicketsBox(c), amlCard({ module: 'rkdp', client: c }), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
+      h('div', {}, clientTicketsBox(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);

@@ -5,6 +5,7 @@ import { TERMS_VERSION } from './regulamin.js';
 import { registerSW } from './push.js';
 import { openCmdk, initShortcuts } from './cmdk.js';
 import { getTheme, toggleTheme, onThemeChange, ICON_MOON, ICON_SUN } from './motyw.js';
+import { initPanelLinks, closePanel } from './panel.js';
 const LIGHT_LOGO = src => src.replace('/m2tax-logo.png', '/m2tax-logo-light.png');
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
@@ -25,6 +26,10 @@ const renderJpk = lazy(() => import('./views/jpk.js'), 'renderJpk');
 const renderRegulamin = lazy(() => import('./views/regulamin.js'), 'renderRegulamin');
 const renderKalkulator = lazy(() => import('./views/kalkulator.js'), 'renderKalkulator');
 const renderWzory = lazy(() => import('./views/wzory.js'), 'renderWzory');
+const renderTerminy = lazy(() => import('./views/terminy.js'), 'renderTerminy');
+const renderRok = lazy(() => import('./views/rok.js'), 'renderRok');
+const renderRentownosc = lazy(() => import('./views/rentownosc.js'), 'renderRentownosc');
+const renderRaport = lazy(() => import('./views/raport.js'), 'renderRaport');
 // po wyświetleniu pierwszego ekranu pobieramy w tle pozostałe widoki, żeby przełączanie zakładek było natychmiastowe
 const prefetchViews = () => {
   const go = () => {
@@ -195,6 +200,7 @@ async function route(opts = {}) {
     cleanup = c; routing = false; commit(); hideProgress();
   };
   document.querySelector('.pop')?.remove();
+  closePanel();
   const { parts, params } = parseHash();
   if (isJpkOnly()) {
     if (parts[0] === 'regulamin') { try { c = await renderRegulamin(layout('regulamin')); } catch (err) { console.error(err); } return done(); }
@@ -219,7 +225,12 @@ async function route(opts = {}) {
     else if (view === 'klient') c = await renderKlient(layout('klienci'), parts[1]);
     else if (view === 'aml') c = await renderAml(layout('klienci'), 'rkdp');
     else if (view === 'oferty') c = await renderOferty(layout('klienci'), parts[1], 'rkdp');
-    else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'));
+    else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
+    else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
+    else if (view === 'terminy') c = await renderTerminy(layout('rozliczenia'), params);
+    else if (view === 'zamkniecie-roku') c = await renderRok(layout('rozliczenia'), params);
+    else if (view === 'rentownosc' && ['admin', 'full'].includes(state.me.role)) c = await renderRentownosc(layout('klienci'), params);
+    else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('pulpit'), params);
     else if (view === 'zgloszenia') c = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
     else if (view === 'dokumenty') c = await renderDokumenty(layout('sprawozdania'));
     else if (view === 'kalkulator') c = await renderKalkulator(layout('sprawozdania'), { mod: 'rkdp' });
@@ -296,6 +307,7 @@ sb.auth.onAuthStateChange((event) => {
 document.addEventListener('click', () => { document.querySelectorAll('.mod-menu').forEach(m => { m.hidden = true; }); document.querySelectorAll('.mod-switch').forEach(b => b.setAttribute('aria-expanded', 'false')); });
 initTooltips();
 initMobileTables();
+initPanelLinks();
 start();
 // instalacja jako aplikacja, powiadomienia push, ekran „brak internetu”
 if (document.readyState === 'complete') registerSW(); else window.addEventListener('load', () => registerSW());

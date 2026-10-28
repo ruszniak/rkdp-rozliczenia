@@ -1,6 +1,6 @@
 // Powiadomienia push (PWA): wysyłka do urządzeń członków zespołu.
 // Wywołania:
-//  • z bazy (wyzwalacze i harmonogram) – nagłówek x-push-secret: { event: 'ticket_new' | 'ticket_assigned' | 'comment' | 'daily', id? }
+//  • z bazy (wyzwalacze i harmonogram) – nagłówek x-push-secret: { event: 'ticket_new' | 'ticket_assigned' | 'comment' | 'daily' | 'docs_uploaded' | 'docs_remind' | 'monitor_alert', id? }
 //  • z aplikacji przez zalogowanego użytkownika – { event: 'test' } (powiadomienie testowe na jego urządzenia)
 // Treść jest szyfrowana dla każdego urządzenia (Web Push, RFC 8291); w powiadomieniu nie ma danych wrażliwych poza tytułem zgłoszenia.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -76,6 +76,29 @@ async function onComment(id: string) {
   });
 }
 
+// klient wgrał pliki z prośby o dokumenty / prośba bez odpowiedzi od 3 dni
+async function onDocs(id: string, remind: boolean, count: number) {
+  const { data: r } = await db.from('doc_requests').select('id, client_id, period, created_by, clients(name, accountant_id)').eq('id', id).maybeSingle();
+  if (!r) return 0;
+  const c: any = (r as any).clients || {};
+  const per = String(r.period).slice(0, 7);
+  return notify([c.accountant_id, r.created_by], 'zgloszenia', remind
+    ? { title: 'Klient nie odesłał dokumentów', body: `${c.name || 'Klient'} · ${per} – minęły 3 dni od prośby. Przypomnij klientowi.`, url: `/#/rozliczenia?okres=${per}`, tag: `docs-${r.id}` }
+    : { title: `Klient wgrał dokumenty (${count})`, body: `${c.name || 'Klient'} · ${per}`, url: `/#/rozliczenia?okres=${per}`, tag: `docs-${r.id}` });
+}
+
+// monitoring klientów: zmiana statusu VAT / danych w KRS
+async function onMonitor(b: any) {
+  const ids: string[] = [];
+  if (b.module === 'rkdp' && b.client_id) {
+    const { data: c } = await db.from('clients').select('accountant_id').eq('id', b.client_id).maybeSingle();
+    if (c?.accountant_id) ids.push(c.accountant_id);
+  }
+  const { data: admins } = await db.from('team_members').select('id').eq('role', 'admin').eq('active', true);
+  (admins || []).forEach(a => ids.push(a.id));
+  return notify(ids, 'terminy', { title: 'Monitoring klienta: zmiana', body: short(String(b.summary || ''), 140), url: b.module === 'm2' ? `/#/doradztwo/klient/${b.m2_client_id}` : `/#/klient/${b.client_id}`, tag: `mon-${b.client_id || b.m2_client_id}` });
+}
+
 // poranny przegląd: zgłoszenia na dziś / po terminie oraz terminy spraw M2 na dziś i jutro
 async function daily() {
   const d0 = today(), d1 = plusDays(1);
@@ -95,7 +118,7 @@ async function daily() {
     const dToday = myDl.filter(x => x.due_date === d0).length, dTom = myDl.length - dToday;
     const parts = [now ? `${now} zgłosz. na dziś` : '', late ? `${late} po terminie` : '', dToday ? `${dToday} termin(y) M2 dziś` : '', dTom ? `${dTom} termin(y) M2 jutro` : ''].filter(Boolean);
     if (!parts.length) continue;
-    sent += await notify([m.id], 'terminy', { title: 'Plan na dziś', body: parts.join(' · '), url: '/#/pulpit', tag: `daily-${d0}` });
+    sent += await notify([m.id], 'terminy', { title: 'Plan na dziś', body: parts.join(' · '), url: '/#/pulpit?widok=dzis', tag: `daily-${d0}` });
   }
   return sent;
 }
@@ -114,6 +137,8 @@ Deno.serve(async (req) => {
       if (body.event === 'ticket_assigned') return json({ sent: await onTicket(body.id, true, body.actor) });
       if (body.event === 'comment') return json({ sent: await onComment(body.id) });
       if (body.event === 'daily') return json({ sent: await daily() });
+      if (body.event === 'docs_uploaded' || body.event === 'docs_remind') return json({ sent: await onDocs(String(body.request_id || ''), body.event === 'docs_remind', +body.count || 0) });
+      if (body.event === 'monitor_alert') return json({ sent: await onMonitor(body) });
       return json({ error: 'Nieznane zdarzenie' }, 400);
     }
     // zalogowany użytkownik: tylko powiadomienie testowe na własne urządzenia

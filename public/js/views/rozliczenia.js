@@ -1,8 +1,13 @@
-import { h, icon, toast, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials, printHtml } from '../ui.js';
+import { h, icon, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials, printHtml } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
 import { downloadXlsx } from '../xlsx.js';
 import { fileTile, dropZone, pastedFiles, named, safeName } from './zgloszenia.js';
+import { openDocRequest } from '../prosba.js';
+import { celebrate } from '../efekty.js';
+import { sparkline } from '../wykres.js';
+import { loadMemberPrefs, saveMemberPrefs, settledHistory, lastPeriods } from '../data.js';
+import { setDensity } from '../motyw.js';
 
 const PREF_KEY = 'rkdp-rozliczenia-v2';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch { return {}; } };
@@ -52,7 +57,7 @@ export async function renderRozliczenia(main, params) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie rozliczeń…'));
   const [clients, entries, notes] = await Promise.all([
     fetchAll(() => sb.from('clients')
-      .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id').order('name')),
+      .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id,email').order('name')),
     fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at').eq('period', pdate)),
     fetchAll(() => sb.from('period_notes').select('client_id,notes,questions').eq('period', pdate)),
   ]);
@@ -64,6 +69,11 @@ export async function renderRozliczenia(main, params) {
   });
 
   const tasksAll = state.taskTypes.filter(t => t.active);
+  // trend rozliczeń z 6 miesięcy (dociągany w tle – nie opóźnia tabeli)
+  let hist = null;
+  const histPeriods = lastPeriods(period, 6);
+  const activeIds = new Set(clients.filter(c => c.status === 'aktywny').map(c => c.id));
+  settledHistory(histPeriods, tasksAll, id => activeIds.has(id)).then(r => { hist = r; try { renderTiles(); } catch { /* */ } });
   const byClient = new Map();
   for (const e of entries) {
     if (!byClient.has(e.client_id)) byClient.set(e.client_id, new Map());
@@ -162,7 +172,11 @@ export async function renderRozliczenia(main, params) {
       h('a', { class: 'icon-btn', href: `#/rozliczenia?okres=${shiftPeriod(period, 1)}`, 'aria-label': 'Następny miesiąc', 'data-tip': 'Następny miesiąc' }, icon('right')));
 
   const tabsBox = h('div', { class: 'tabs', role: 'tablist' });
-  const head = h('div', { class: 'top-bar' }, h('div'), tabsBox, monthNav);
+  const head = h('div', { class: 'top-bar' },
+    h('div', { class: 'tb-links' },
+      h('a', { class: 'btn btn-ghost btn-sm', href: `#/terminy?rok=${+period.slice(0, 4) + (period.slice(5) === '12' ? 1 : 0)}&m=${period.slice(5) === '12' ? 1 : +period.slice(5) + 1}`, 'data-tip': 'Kalendarz obowiązków klientów – terminy z profilu klienta' }, icon('calendar'), 'Kalendarz obowiązków'),
+      h('a', { class: 'btn btn-ghost btn-sm', href: '#/zamkniecie-roku', 'data-tip': 'Zamknięcie roku: sprawozdania, CIT-8, PIT roczny, PIT-11, KRS' }, 'Zamknięcie roku')),
+    tabsBox, monthNav);
   const tiles = h('div', { class: 'tiles' });
   const deadlines = h('div', { class: 'panel deadlines' });
   const banner = h('div', { class: 'card', style: { padding: '18px 22px', marginBottom: '18px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' } });
@@ -199,7 +213,29 @@ export async function renderRozliczenia(main, params) {
   document.addEventListener('fullscreenchange', onFsChange);
   document.addEventListener('keydown', onKey);
   setFs(false);
-  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, exportBtn, fsBtn);
+  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, h('span', { class: 'sel-wrap' }), exportBtn, fsBtn);
+
+  // ---------- zapisane widoki (wspólne dla wszystkich urządzeń) ----------
+  const viewsBar = h('div', { class: 'views-bar' });
+  let views = [];
+  const viewOf = () => ({ area: prefs.area, q: prefs.q, person: prefs.person, show: prefs.show, layout: prefs.layout?.[prefs.area] || null });
+  const sameView = v => v.area === prefs.area && (v.q || '') === (prefs.q || '') && (v.person || '') === (prefs.person || '') && (v.show || '') === (prefs.show || '');
+  function drawViews() {
+    viewsBar.replaceChildren(h('span', { class: 'vb-l' }, 'Widoki:'),
+      ...views.map((v, i) => h('span', { class: 'vchip' + (sameView(v) ? ' on' : '') },
+        h('button', { type: 'button', onclick: () => {
+          Object.assign(prefs, { area: v.area, q: v.q || '', person: v.person || '', show: v.show || '' });
+          if (v.layout) prefs.layout = { ...(prefs.layout || {}), [v.area]: v.layout };
+          search.value = prefs.q; savePrefs(prefs); renderAll(); } }, v.name),
+        h('button', { type: 'button', class: 'vx', 'aria-label': `Usuń widok ${v.name}`, onclick: async () => { if (!confirm(`Usunąć widok „${v.name}”?`)) return; views.splice(i, 1); await saveMemberPrefs({ views_rozliczenia: views }, state.me.id); drawViews(); } }, '×'))),
+      h('button', { type: 'button', class: 'vchip add', onclick: async () => {
+        const name = prompt('Nazwa widoku (np. „Moi klienci z VAT”, „Spółki – braki”):', '');
+        if (!name?.trim()) return;
+        views.push({ name: name.trim().slice(0, 40), ...viewOf() });
+        await saveMemberPrefs({ views_rozliczenia: views }, state.me.id); drawViews(); toast('Zapisano widok');
+      } }, '+ Zapisz bieżący'));
+  }
+  loadMemberPrefs().then(p => { views = Array.isArray(p.views_rozliczenia) ? p.views_rozliczenia : []; drawViews(); });
   const onFilter = () => { Object.assign(prefs, { q: search.value, person: personSel.value, show: showSel.value }); savePrefs(prefs); renderBody(); };
   let searchTimer;
   search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(onFilter, 180); });
@@ -248,7 +284,9 @@ export async function renderRozliczenia(main, params) {
         'data-tip': prefs.show === 'nierozliczeni' ? 'Pokaż wszystkich klientów' : 'Pokaż tylko klientów do rozliczenia',
         onclick: () => { prefs.show = prefs.show === 'nierozliczeni' ? '' : 'nierozliczeni'; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
         h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
-        h('span', { class: 'num' }, `${settled} / ${rows.length}`), h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } })),
+        h('span', { class: 'num' }, `${settled} / ${rows.length}`,
+          hist ? h('span', { class: 'tile-spark', 'data-tip': 'Odsetek rozliczonych klientów w ostatnich 6 miesiącach' }, sparkline(hist[area].map((v, i) => i === hist[area].length - 1 ? pct : v), { labels: histPeriods.map(periodLabel) })) : null),
+        h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } })),
         h('span', { class: 'tile-more' }, prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
       tile(toSend, area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania', 'do_wyslania'),
       tile(miss, 'Klientów z brakiem dokumentów', 'braki'),
@@ -305,8 +343,12 @@ export async function renderRozliczenia(main, params) {
     const who = entry.updated_by && entry.updated_by !== 'system'
       ? (state.members.find(m => m.email === entry.updated_by)?.short_name || entry.updated_by) : null;
     const tip = `${headerLabel}: ${st.label}` + (who ? `\nZmienił(a): ${who}, ${new Date(entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
-    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}`, 'data-tip': tip, 'aria-label': tip,
-      onclick: (ev) => statusMenu(ev.currentTarget, entry, headerLabel) }, st.mark);
+    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry.id,
+      onclick: (ev) => {
+        if (ev.shiftKey && anchorId) return selectRange(ev.currentTarget);
+        if (ev.ctrlKey || ev.metaKey || selectMode) return toggleSel(entry.id, ev.currentTarget);
+        statusMenu(ev.currentTarget, entry, headerLabel);
+      } }, st.mark);
   }
 
   function personCell(c, area) {
@@ -351,7 +393,8 @@ export async function renderRozliczenia(main, params) {
     const cs = requiredOf(c, area);
     const done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
     if (cs.length && done === cs.length) return h('span', { class: 'sum ok' }, '✓ Rozliczony');
-    if (cs.some(e => e.status === 'missing_docs')) return h('span', { class: 'sum bad', 'data-tip': 'Brakuje dokumentów' }, `! ${done}/${cs.length}`);
+    if (cs.some(e => e.status === 'missing_docs')) return h('button', { class: 'sum bad', type: 'button', 'data-tip': 'Brakuje dokumentów – kliknij, aby poprosić klienta (link do wgrania plików)',
+      onclick: () => requestDocs(c, area) }, `! ${done}/${cs.length}`, h('span', { class: 'mail-ico', html: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>' }));
     return h('span', { class: 'sum no', 'data-tip': `Zrobione ${done} z ${cs.length}` },
       h('span', { class: 'ring', style: `--p:${cs.length ? Math.round(done * 100 / cs.length) : 0}`, 'aria-hidden': 'true' }), `${done}/${cs.length}`);
   }
@@ -369,7 +412,7 @@ export async function renderRozliczenia(main, params) {
     const settled = isSettled(c, area);
     return h('tr', { class: settled ? 'settled' : null, 'data-client': c.id, 'data-area': area },
       h('td', { class: 'c-name' }, h('div', { class: 'cname' },
-        h('a', { href: `#/klient/${c.id}` }, c.name),
+        h('a', { href: `#/klient/${c.id}`, 'data-panel': c.id }, c.name),
         h('div', { class: 'meta' }, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?'),
           c.status !== 'aktywny' ? h('span', { class: 'badge warn' }, c.status === 'zawieszony' ? 'zawieszony' : 'zakończony') : null))),
       h('td', { class: 'c-person' }, personCell(c, area)),
@@ -420,7 +463,7 @@ export async function renderRozliczenia(main, params) {
       if (open) out.push(t.rows.length ? tableFor(area, t) : emptyBox());
     }
     body.replaceChildren(...out);
-    renderTiles(); renderTabs();
+    renderTiles(); renderTabs(); if (views) drawViews();
   }
   const emptyBox = () => h('div', { class: 'card empty' }, entries.length ? 'Żaden klient nie pasuje do filtrów.' : 'Brak listy na ten miesiąc – użyj przycisku „Otwórz miesiąc”.');
 
@@ -438,6 +481,7 @@ export async function renderRozliczenia(main, params) {
       tr.replaceWith(nr);
     });
     queueSummary();
+    if (selected.size) paintSel();
   }
 
   function renderShowSel() {
@@ -451,16 +495,105 @@ export async function renderRozliczenia(main, params) {
   }
 
   function renderAll() {
-    renderShowSel(); renderPersonSel(); renderDeadlines(); renderBanner(); renderBody();
+    renderShowSel(); renderPersonSel(); renderDeadlines(); renderBanner(); renderBody(); drawViews();
   }
 
   // ---------- zapisy ----------
-  async function setStatus(entry, status) {
-    const before = entry.status;
+  const taskLabel = code => tasksAll.find(t => t.code === code)?.label || code;
+  const allSettled = () => { const rs = selectedActive(prefs.area); return rs.length > 0 && rs.every(c => isSettled(c, prefs.area)); };
+  async function setStatus(entry, status, { silent = false } = {}) {
+    const before = entry.status, wasAll = allSettled();
     entry.status = status; entry.updated_by = state.me.email; entry.updated_at = new Date().toISOString();
     refreshRow(entry.client_id);
     const { error } = await sb.from('checklist_entries').update({ status }).eq('id', entry.id);
-    if (error) { entry.status = before; refreshRow(entry.client_id); fail(error, 'Nie zapisano'); }
+    if (error) { entry.status = before; refreshRow(entry.client_id); return fail(error, 'Nie zapisano'); }
+    if (!silent) toastAction(`${clientMap.get(entry.client_id)?.name || ''} · ${taskLabel(entry.task_code)}: ${STATUS[status].label}`, 'Cofnij', () => setStatus(entry, before, { silent: true }));
+    if (!wasAll && allSettled()) celebrate(`Wszyscy klienci rozliczeni – ${AREAS[prefs.area].label.toLowerCase()}, ${periodLabel(period).toLowerCase()}!`);
+  }
+  // zmiana wielu kratek naraz (jedno „Cofnij” dla całej operacji)
+  async function setMany(list, status) {
+    const prev = list.map(e => [e, e.status]).filter(([e]) => e.status !== status);
+    if (!prev.length) return;
+    const wasAll = allSettled();
+    prev.forEach(([e]) => { e.status = status; e.updated_by = state.me.email; e.updated_at = new Date().toISOString(); });
+    [...new Set(prev.map(([e]) => e.client_id))].forEach(refreshRow);
+    const { error } = await sb.from('checklist_entries').update({ status }).in('id', prev.map(([e]) => e.id));
+    if (error) { prev.forEach(([e, b]) => { e.status = b; }); [...new Set(prev.map(([e]) => e.client_id))].forEach(refreshRow); return fail(error, 'Nie zapisano'); }
+    toastAction(`Zmieniono ${prev.length} ${prev.length === 1 ? 'kratkę' : prev.length < 5 ? 'kratki' : 'kratek'}: ${STATUS[status].label}`, 'Cofnij', async () => {
+      const groups = new Map(); prev.forEach(([e, b]) => { if (!groups.has(b)) groups.set(b, []); groups.get(b).push(e); });
+      for (const [b, es] of groups) {
+        es.forEach(e => { e.status = b; });
+        const { error: e2 } = await sb.from('checklist_entries').update({ status: b }).in('id', es.map(e => e.id));
+        if (e2) fail(e2);
+      }
+      [...new Set(prev.map(([e]) => e.client_id))].forEach(refreshRow);
+      toast('Cofnięto');
+    });
+    if (!wasAll && allSettled()) celebrate(`Wszyscy klienci rozliczeni – ${AREAS[prefs.area].label.toLowerCase()}, ${periodLabel(period).toLowerCase()}!`);
+  }
+
+  // ---------- zaznaczanie wielu kratek ----------
+  const selected = new Set();
+  let anchorId = null, selectMode = false;
+  const entryById = id => entries.find(e => e.id === id);
+  const bulkBar = h('div', { class: 'bulkbar', hidden: true, role: 'toolbar', 'aria-label': 'Zaznaczone kratki' });
+  function drawBulk() {
+    if (!selected.size && !selectMode) { bulkBar.hidden = true; return; }
+    bulkBar.hidden = false;
+    const act = (st, lbl) => h('button', { class: 'bb-btn', type: 'button', disabled: !selected.size, onclick: async () => { const list = [...selected].map(entryById).filter(Boolean); clearSel(); await setMany(list, st); } },
+      h('span', { class: `cb cb-${st}` }, STATUS[st].mark), lbl);
+    bulkBar.replaceChildren(h('b', {}, selected.size ? `Zaznaczono: ${selected.size}` : 'Kliknij kratki do zaznaczenia'),
+      act('done', 'Zrobione'), act('na', 'Nie dotyczy'), act('missing_docs', 'Brak dok.'), act('todo', 'Wyczyść'),
+      h('button', { class: 'bb-x', type: 'button', onclick: () => { selectMode = false; selBtn.classList.remove('on'); clearSel(); } }, 'Zakończ'));
+  }
+  function paintSel() { body.querySelectorAll('.cb[data-eid]').forEach(b => b.classList.toggle('sel', selected.has(b.dataset.eid))); drawBulk(); }
+  function toggleSel(id, el) { if (selected.has(id)) selected.delete(id); else selected.add(id); anchorId = id; el?.classList.toggle('sel', selected.has(id)); drawBulk(); }
+  function clearSel() { selected.clear(); anchorId = null; paintSel(); }
+  // Shift+klik: zakres w tej samej kolumnie tabeli
+  function selectRange(el) {
+    const a = body.querySelector(`.cb[data-eid="${anchorId}"]`);
+    if (!a) return toggleSel(el.dataset.eid, el);
+    const ta = a.closest('table'), tb = el.closest('table');
+    const col = el.closest('td').cellIndex;
+    if (ta !== tb || a.closest('td').cellIndex !== col) return toggleSel(el.dataset.eid, el);
+    const rows = [...tb.tBodies[0].rows];
+    let i1 = rows.indexOf(a.closest('tr')), i2 = rows.indexOf(el.closest('tr'));
+    if (i1 > i2) [i1, i2] = [i2, i1];
+    for (let i = i1; i <= i2; i++) { const b = rows[i].cells[col]?.querySelector('.cb[data-eid]'); if (b) selected.add(b.dataset.eid); }
+    paintSel();
+  }
+  const selBtn = h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'Zaznacz wiele kratek i zmień je naraz\nNa komputerze: Ctrl/⌘ + klik, Shift + klik – zakres w kolumnie',
+    onclick: () => { selectMode = !selectMode; selBtn.classList.toggle('on', selectMode); if (!selectMode) clearSel(); else drawBulk(); } },
+  h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="m14.5 17.5 2 2 4-4"/></svg>', style: { display: 'inline-flex' } }), 'Zaznacz');
+
+  // ---------- klawiatura: strzałki, spacja (zrobione / wyczyść), N – nie dotyczy, B – brak dok., Enter – menu, X – zaznacz ----------
+  function onGridKey(e) {
+    const b = e.target.closest?.('.grid .cb[data-eid]');
+    if (!b || document.querySelector('.pop, .modal-back')) return;
+    const td = b.closest('td'), tr = td.parentElement, col = td.cellIndex;
+    const move = (dr, dc) => {
+      e.preventDefault();
+      if (dc) { let c = td; do { c = dc > 0 ? c.nextElementSibling : c.previousElementSibling; } while (c && !c.querySelector('.cb[data-eid]')); c?.querySelector('.cb[data-eid]')?.focus(); return; }
+      const rows = [...tr.parentElement.rows]; let i = rows.indexOf(tr);
+      for (i += dr; rows[i]; i += dr) { const n = rows[i].cells[col]?.querySelector('.cb[data-eid]'); if (n) { n.focus(); n.scrollIntoView({ block: 'nearest' }); return; } }
+    };
+    const entry = entryById(b.dataset.eid);
+    const k = e.key;
+    if (k === 'ArrowRight') return move(0, 1);
+    if (k === 'ArrowLeft') return move(0, -1);
+    if (k === 'ArrowDown') return move(1, 0);
+    if (k === 'ArrowUp') return move(-1, 0);
+    if (!entry || e.ctrlKey || e.metaKey || e.altKey) return;
+    const keep = () => requestAnimationFrame(() => body.querySelector(`.cb[data-eid="${entry.id}"]`)?.focus());
+    if (k === ' ') { e.preventDefault(); setStatus(entry, entry.status === 'done' ? 'todo' : 'done'); keep(); }
+    else if (k.toLowerCase() === 'n') { e.preventDefault(); setStatus(entry, 'na'); keep(); }
+    else if (k.toLowerCase() === 'b') { e.preventDefault(); setStatus(entry, 'missing_docs'); keep(); }
+    else if (k.toLowerCase() === 'x') { e.preventDefault(); toggleSel(entry.id, b); }
+  }
+
+  function requestDocs(c, area) {
+    const codes = cellsOf(c, area).filter(e => e.status === 'missing_docs').map(e => e.task_code);
+    openDocRequest(c, period, codes);
   }
 
   // ---------- menu ----------
@@ -523,8 +656,13 @@ export async function renderRozliczenia(main, params) {
     const pop = openPop(anchor, h('div', { class: 'pop-body pop-notes' },
       h('label', {}, `Uwagi – ${c.name}`), ta1,
       h('label', {}, 'Pytania / problemy'), ta2,
-      h('label', {}, 'Załączniki – zrzuty ekranu, PDF, inne pliki'),
-      dropZone(fs => addFiles(fs), 'albo wklej zrzut Ctrl+V / ⌘V'), files,
+      h('label', {}, 'Załączniki – zrzuty ekranu, PDF, zdjęcia dokumentów'),
+      dropZone(fs => addFiles(fs), 'albo wklej zrzut Ctrl+V / ⌘V'),
+      (() => { const inp = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true }); inp.addEventListener('change', () => { addFiles([...inp.files]); inp.value = ''; });
+        return h('div', { class: 'row-btns' }, inp,
+          h('button', { class: 'btn btn-outline btn-sm cam-btn', type: 'button', onclick: () => inp.click() }, icon('camera'), 'Zrób zdjęcie dokumentu'),
+          h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => { closePop(); requestDocs(c, prefs.area); } }, icon('mail'), 'Poproś klienta o dokumenty')); })(),
+      files,
       h('div', { class: 'row' }, h('button', { class: 'btn btn-ghost btn-sm', onclick: closePop }, 'Anuluj'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: save }, 'Zapisz'))));
     const ar = anchor.getBoundingClientRect();
@@ -533,7 +671,7 @@ export async function renderRozliczenia(main, params) {
       const { data, error } = await sb.from('period_files').select('*').eq('client_id', c.id).eq('period', pdate).order('created_at');
       if (error) { files.replaceChildren(h('p', { class: 'hint' }, 'Załączniki będą dostępne po aktualizacji bazy danych.')); return; }
       fileCount.set(c.id, data.length); refreshRow(c.id);
-      files.replaceChildren(...data.map(f => fileTile({ ...f, bucket: 'rozliczenia' }, { onDelete: (f.uploaded_by === state.me.id || state.me.role === 'admin') ? async () => {
+      files.replaceChildren(...data.map(f => fileTile({ ...f, bucket: 'rozliczenia', name: (f.source === 'klient' ? '[od klienta] ' : '') + f.name }, { onDelete: (f.uploaded_by === state.me.id || state.me.role === 'admin' || f.source === 'klient') ? async () => {
         if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
         const { error: e1 } = await sb.from('period_files').delete().eq('id', f.id);
         if (e1) return fail(e1);
@@ -583,6 +721,13 @@ export async function renderRozliczenia(main, params) {
         const rb = h('input', { type: 'radio', name: 'layout-mode', checked: l.mode === m });
         rb.addEventListener('change', () => setLayout({ mode: m }));
         return h('label', { class: 'check', style: chkStyle }, rb, title);
+      }),
+      h('div', { class: 'sep' }),
+      h('label', {}, 'Gęstość tabel (cała aplikacja)'),
+      [['comfort', 'Wygodna'], ['compact', 'Kompaktowa – więcej wierszy na ekranie']].map(([v, t]) => {
+        const rb = h('input', { type: 'radio', name: 'density', checked: (document.documentElement.dataset.density || 'comfort') === v });
+        rb.addEventListener('change', () => setDensity(v));
+        return h('label', { class: 'check', style: chkStyle }, rb, t);
       }),
       h('div', { class: 'row', style: { marginTop: '8px' } },
         h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { setLayout({ ...DEFAULT_LAYOUT[prefs.area] }); closePop(); } }, 'Przywróć domyślny'),
@@ -703,7 +848,10 @@ ${tables || '<p>Brak danych.</p>'}
     downloadCsv(fileBase() + '.csv', out);
   }
 
-  main.replaceChildren(head, tiles, deadlines, banner, toolbar, legend, body);
+  toolbar.querySelector('.sel-wrap').replaceWith(selBtn);
+  legend.lastChild.textContent = '· kliknij kratkę, aby zmienić · klawiatura: strzałki, spacja = zrobione, N = nie dotyczy, B = brak dok. · Ctrl/⌘ + klik – zaznacz wiele';
+  body.addEventListener('keydown', onGridKey);
+  main.replaceChildren(head, tiles, deadlines, banner, toolbar, viewsBar, legend, body, bulkBar);
   renderAll();
 
   // ---------- zmiany na żywo od innych osób ----------
@@ -727,7 +875,7 @@ ${tables || '<p>Brak danych.</p>'}
     .subscribe();
 
   return () => {
-    sb.removeChannel(channel); closePop();
+    sb.removeChannel(channel); closePop(); body.removeEventListener('keydown', onGridKey);
     document.removeEventListener('fullscreenchange', onFsChange); document.removeEventListener('keydown', onKey);
     document.body.classList.remove('focus-mode');
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1D1A16">
+  <title>Wgraj dokumenty · RKDP</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#F8F5F0;--card:#FFFDF9;--line:#E3D9CA;--ink:#1D1A16;--text:#4A433B;--muted:#6A6157;--bronze:#806341;--gold:#CFAE86;--warn:#A4462F;--ok:#3E6B47}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 Inter,system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100vh}
+    header{background:radial-gradient(70% 220% at 95% -40%,rgba(207,174,134,.2),transparent 60%),url(/siec.svg) 85% 22%/1100px auto no-repeat,#1D1A16;padding:22px 20px 70px;color:#E6DED2}
+    header img{height:34px;display:block}
+    .wrap{max-width:640px;margin:0 auto}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px 24px;margin:-48px auto 24px;box-shadow:0 18px 40px rgba(29,26,22,.12)}
+    h1{font:800 26px/1.15 Montserrat,system-ui,sans-serif;color:var(--ink);margin:4px 0 6px;letter-spacing:-.01em}
+    .eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--bronze);margin:0}
+    ul{padding-left:20px;margin:10px 0}
+    .msg{background:#F3E6D2;border-radius:12px;padding:10px 14px;margin:12px 0;color:#5E4529;white-space:pre-line}
+    .drop{border:2px dashed #CFAE86;border-radius:16px;padding:26px 16px;text-align:center;margin:18px 0 12px;background:#FBF6EE;transition:.15s;cursor:pointer}
+    .drop.over{background:#F3E6D2;border-color:var(--bronze)}
+    .drop b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+    button,.btn{font:600 14.5px Inter,system-ui,sans-serif;border:0;border-radius:999px;padding:12px 20px;cursor:pointer;background:var(--bronze);color:#fff;display:inline-flex;align-items:center;gap:8px}
+    .btn.alt{background:#1D1A16;color:#E0C098}
+    button:disabled{opacity:.5;cursor:default}
+    .files{list-style:none;padding:0;margin:8px 0 0}
+    .files li{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+    .files li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .files li i{font-style:normal;font-size:12.5px;color:var(--muted)}
+    .files li.ok i{color:var(--ok);font-weight:600}.files li.bad i{color:var(--warn);font-weight:600}
+    .done{text-align:center;padding:12px 0}
+    .done .ico{width:64px;height:64px;border-radius:50%;margin:0 auto 10px;display:grid;place-items:center;background:linear-gradient(140deg,#8A6B45,#B38F62);color:#fff;font-size:30px}
+    .err{color:var(--warn);font-weight:600}
+    .foot{font-size:12.5px;color:var(--muted);text-align:center;margin:0 16px 30px}
+    .muted{color:var(--muted);font-size:13.5px}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <header><div class="wrap"><img src="/logo-rkdp.png" alt="RKDP spółka doradztwa podatkowego"></div></header>
+  <main class="wrap">
+    <div class="card" id="box"><p class="muted">Wczytywanie…</p></div>
+    <p class="foot">Pliki trafiają bezpośrednio do biura RKDP spółka doradztwa podatkowego sp. z o.o. i są widoczne tylko dla zespołu prowadzącego Twoje rozliczenia.<br>Dane objęte tajemnicą doradcy podatkowego.</p>
+  </main>
+  <script src="/config.js"></script>
+  <script src="/wgraj.js"></script>
+</body>
+</html>

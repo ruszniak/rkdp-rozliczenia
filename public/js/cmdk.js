@@ -1,7 +1,8 @@
 // Szybkie wyszukiwanie (Ctrl+K / ⌘K): klienci RKDP i M2 TAX, sprawy, zgłoszenia, zakładki, narzędzia i akcje.
-import { h } from './ui.js';
+import { h, toast, toastAction, fail, defaultPeriod, periodLabel } from './ui.js';
 import { sb, state, hasModule, isJpkOnly } from './store.js';
-import { toggleTheme, getTheme } from './motyw.js';
+import { toggleTheme, getTheme, getDensity, setDensity } from './motyw.js';
+import { STATUS } from './dict.js';
 import { canInstall, promptInstall } from './push.js';
 
 const IC = {
@@ -12,7 +13,73 @@ const IC = {
   tool: '<path d="M14 7l3-3 3 3-3 3"/><path d="M4 20l10-10"/>',
   theme: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
   install: '<path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M5 21h14"/>',
+  recent: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  bolt: '<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
 };
+
+// ostatnio otwierane (na tym urządzeniu)
+const RKEY = 'rkdp_recent';
+export function rememberRecent(item) {
+  try {
+    const list = JSON.parse(localStorage.getItem(RKEY) || '[]').filter(x => x.href !== item.href);
+    list.unshift({ label: item.label, href: item.href, meta: item.meta || '', icon: item.icon || 'client', panel: item.panel || null });
+    localStorage.setItem(RKEY, JSON.stringify(list.slice(0, 8)));
+  } catch { /* */ }
+}
+const recents = () => { try { return JSON.parse(localStorage.getItem(RKEY) || '[]').map(x => ({ ...x, group: 'Ostatnio otwierane', icon: 'recent' })); } catch { return []; } };
+
+// polecenia: „nowe zgłoszenie kowalski”, „oznacz pit nowak”, „poproś o dokumenty nowak”, „czas 30 nowak”
+const TASK_WORDS = [[/^(pit|cit|pit\/cit|zaliczka)$/, 'pit_cit'], [/^vat$/, 'vat'], [/^jpk$/, 'jpk'], [/^saldeo$/, 'saldeo'], [/^(rewizor|ksiegowanie|ksiegi)$/, 'ksiegowanie'],
+  [/^(pit4|pit-4)$/, 'pit4'], [/^(wyciagi|wb|bank)$/, 'wb'], [/^zus$/, 'zus_wyslany'], [/^(podany|zus_podany)$/, 'zus_podany']];
+const STOPW = new Set(['dla', 'u', 'o', 'w', 'dokumenty', 'dokumentow', 'jako', 'zrobione', 'zrobiony', 'klienta', 'klient', 'min', 'minut']);
+function commandItems(query, data) {
+  const toks = norm(query).split(/\s+/).filter(Boolean);
+  if (!toks.length || !hasModule('rozliczenia')) return [];
+  const verb = toks[0], second = toks[1] || '';
+  let kind = null, rest = toks.slice(1);
+  if (verb === 'nowe' && /^zglosz/.test(second)) { kind = 'ticket'; rest = toks.slice(2); }
+  else if (/^zglos/.test(verb)) kind = 'ticket';
+  else if (/^oznacz|^zrob/.test(verb)) kind = 'mark';
+  else if (/^popros|^prosba/.test(verb)) kind = 'docs';
+  else if (/^czas/.test(verb)) kind = 'time';
+  if (!kind) return [];
+  let task = null, minutes = null;
+  rest = rest.filter(t => {
+    if (kind === 'mark' && !task) { const m = TASK_WORDS.find(([re]) => re.test(t)); if (m) { task = m[1]; return false; } }
+    if (kind === 'time' && minutes == null && /^\d{1,3}$/.test(t)) { minutes = +t; return false; }
+    return !STOPW.has(t);
+  });
+  const clients = data.filter(d => d.group === 'Klienci RKDP' && rest.length && rest.every(t => d._n.includes(t))).slice(0, 5);
+  const label = state.taskTypes.find(t => t.code === task)?.label;
+  const out = [];
+  for (const c of clients) {
+    const cl = { id: c.href.split('/').pop(), name: c.label, email: c.email || null };
+    if (kind === 'ticket') out.push({ group: 'Polecenia', icon: 'bolt', label: `Nowe zgłoszenie dla: ${c.label}`, run: async () => { const z = await import('./views/zgloszenia.js'); z.newTicketDialog({ client: cl }).catch(fail); } });
+    if (kind === 'docs') out.push({ group: 'Polecenia', icon: 'bolt', label: `Poproś o dokumenty: ${c.label}`, meta: periodLabel(defaultPeriod()), run: async () => { const { openDocRequest } = await import('./prosba.js'); const { data: full } = await sb.from('clients').select('id,name,email').eq('id', cl.id).maybeSingle(); openDocRequest(full || cl, defaultPeriod(), []); } });
+    if (kind === 'time') out.push({ group: 'Polecenia', icon: 'bolt', label: `Zapisz czas pracy: ${minutes || '?'} min – ${c.label}`, run: () => logTime(cl, minutes) });
+    if (kind === 'mark') out.push({ group: 'Polecenia', icon: 'bolt', label: task ? `Oznacz „${label}” jako zrobione – ${c.label}` : `Oznacz… (dopisz: pit, vat, jpk, saldeo, rewizor, zus, pit4) – ${c.label}`, meta: periodLabel(defaultPeriod()), run: () => task ? markTask(cl, task, label) : null });
+  }
+  if (!clients.length) out.push({ group: 'Polecenia', icon: 'bolt', label: rest.length ? 'Nie znaleziono klienta – dopisz fragment nazwy' : 'Dopisz nazwę klienta…', run: () => null });
+  return out;
+}
+async function markTask(c, code, label) {
+  const per = defaultPeriod() + '-01';
+  const { data: e, error } = await sb.from('checklist_entries').select('id,status').eq('client_id', c.id).eq('period', per).eq('task_code', code).maybeSingle();
+  if (error) return fail(error);
+  if (!e) return toast(`${c.name}: brak kratki „${label}” w ${periodLabel(defaultPeriod()).toLowerCase()}`, true);
+  const before = e.status;
+  const { error: e2 } = await sb.from('checklist_entries').update({ status: 'done' }).eq('id', e.id);
+  if (e2) return fail(e2);
+  toastAction(`${c.name} · ${label}: ${STATUS.done.label}`, 'Cofnij', async () => { await sb.from('checklist_entries').update({ status: before }).eq('id', e.id); toast('Cofnięto'); });
+}
+async function logTime(c, minutes) {
+  let m = minutes;
+  if (!m) { const v = prompt(`Ile minut pracy przy: ${c.name}?`, '30'); m = Math.round(+v); }
+  if (!(m > 0 && m <= 1440)) return;
+  const { error } = await sb.from('client_time').insert({ client_id: c.id, minutes: m, work_date: new Date().toLocaleDateString('sv-SE') });
+  if (error) return fail(error, 'Nie zapisano czasu');
+  toast(`Zapisano ${m} min – ${c.name}`);
+}
 const icon = k => { const s = h('span', { class: 'i', 'aria-hidden': 'true' }); s.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`; return s; };
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
 
@@ -22,7 +89,10 @@ function staticItems() {
   const out = [];
   if (isJpkOnly()) out.push(tool('Podgląd JPK_CIT', '#/jpk'), go('Regulamin', '#/regulamin'));
   else {
-    if (hasModule('rozliczenia')) out.push(go('Pulpit', '#/pulpit', 'RKDP'), go('Rozliczenia', '#/rozliczenia', 'RKDP'), go('Klienci', '#/klienci', 'RKDP'), go('Zgłoszenia', '#/zgloszenia', 'RKDP'), go('Dokumenty', '#/dokumenty', 'RKDP'),
+    if (hasModule('rozliczenia')) out.push(go('Dziś – moja lista na dzisiaj', '#/pulpit?widok=dzis', 'RKDP'), go('Kalendarz obowiązków klientów', '#/terminy', 'RKDP'), go('Zamknięcie roku', '#/zamkniecie-roku', 'RKDP'),
+      go('Rentowność klientów', '#/rentownosc', 'RKDP'), ...(state.me?.role === 'admin' ? [go('Raport miesięczny dla zarządu', '#/raport', 'RKDP')] : []),
+      { group: 'Akcje', label: 'Nowe zgłoszenie', meta: 'albo: nowe zgłoszenie <klient>', icon: 'bolt', run: async () => { const z = await import('./views/zgloszenia.js'); z.newTicketDialog().catch(fail); } },
+      go('Pulpit', '#/pulpit', 'RKDP'), go('Rozliczenia', '#/rozliczenia', 'RKDP'), go('Klienci', '#/klienci', 'RKDP'), go('Zgłoszenia', '#/zgloszenia', 'RKDP'), go('Dokumenty', '#/dokumenty', 'RKDP'),
       tool('Protokół ZZW – zatwierdzenie sprawozdania', '#/sprawozdania/nowy'), tool('Oferta na usługi', '#/oferty/nowa'), tool('Weryfikacja AML', '#/aml'));
     if (hasModule('doradztwo')) out.push(go('Pulpit M2 TAX', '#/doradztwo', 'M2 TAX'), go('Sprawy', '#/doradztwo/sprawy', 'M2 TAX'), go('Klienci M2 TAX', '#/doradztwo/klienci', 'M2 TAX'), go('Kalendarz', '#/doradztwo/kalendarz', 'M2 TAX'),
       go('Dokumenty – wzory pism', '#/doradztwo/dokumenty', 'M2 TAX'), go('Zlecenia i umowy', '#/doradztwo/zlecenia', 'M2 TAX'), go('Zgłoszenia M2 TAX', '#/doradztwo/zgloszenia', 'M2 TAX'));
@@ -31,6 +101,7 @@ function staticItems() {
     if (state.me?.role === 'admin') out.push(go('Zespół i ustawienia', '#/zespol'));
   }
   out.push({ group: 'Akcje', label: getTheme() === 'dark' ? 'Przełącz na motyw jasny' : 'Przełącz na motyw ciemny', meta: 'Ctrl Shift L', icon: 'theme', run: toggleTheme });
+  out.push({ group: 'Akcje', label: getDensity() === 'compact' ? 'Tabele: wygodne odstępy' : 'Tabele: tryb kompaktowy', meta: 'gęstość', icon: 'tool', run: () => { setDensity(getDensity() === 'compact' ? 'comfort' : 'compact'); toast(getDensity() === 'compact' ? 'Tabele kompaktowe' : 'Tabele z wygodnymi odstępami'); } });
   if (canInstall()) out.push({ group: 'Akcje', label: 'Zainstaluj aplikację na tym urządzeniu', icon: 'install', run: () => promptInstall() });
   return out;
 }
@@ -41,13 +112,13 @@ async function loadData() {
   if (cache && Date.now() - cacheAt < 120000) return cache;
   const q = [];
   const rk = hasModule('rozliczenia') && !isJpkOnly(), m2 = hasModule('doradztwo');
-  q.push(rk ? sb.from('clients').select('id,name,nip,status').order('name').limit(2000) : null);
+  q.push(rk ? sb.from('clients').select('id,name,nip,status,email').order('name').limit(2000) : null);
   q.push(m2 ? sb.from('m2_clients').select('id,name,nip').order('name').limit(2000) : null);
   q.push(m2 ? sb.from('m2_matters').select('id,number,title,status').order('opened_at', { ascending: false }).limit(1000) : null);
   q.push(rk || m2 ? sb.from('rkdp_tickets').select('id,no,title,module,status').order('created_at', { ascending: false }).limit(600) : null);
   const [c, mc, mm, tk] = await Promise.all(q.map(p => p ? p.then(r => r.data || [], () => []) : Promise.resolve([])));
   const out = [
-    ...c.map(x => ({ group: 'Klienci RKDP', label: x.name, meta: x.nip ? `NIP ${x.nip}` : (x.status || ''), extra: x.nip, icon: 'client', href: `#/klient/${x.id}` })),
+    ...c.map(x => ({ group: 'Klienci RKDP', label: x.name, meta: x.nip ? `NIP ${x.nip}` : (x.status || ''), extra: x.nip, email: x.email, icon: 'client', href: `#/klient/${x.id}`, panel: x.id })),
     ...mc.map(x => ({ group: 'Klienci M2 TAX', label: x.name, meta: x.nip ? `NIP ${x.nip}` : '', extra: x.nip, icon: 'client', href: `#/doradztwo/klient/${x.id}` })),
     ...mm.map(x => ({ group: 'Sprawy M2 TAX', label: `${x.number} – ${x.title}`, meta: x.status || '', icon: 'matter', href: `#/doradztwo/sprawa/${x.id}` })),
     ...tk.filter(x => (x.module === 'm2' ? m2 : rk)).map(x => ({ group: 'Zgłoszenia', label: `#${x.no} ${x.title}`, meta: x.status === 'zrobione' ? 'zrobione' : (x.module === 'm2' ? 'M2 TAX' : 'RKDP'), icon: 'ticket', href: x.module === 'm2' ? `#/doradztwo/zgloszenia/${x.id}` : `#/zgloszenia/${x.id}` })),
@@ -57,7 +128,7 @@ async function loadData() {
   return out;
 }
 
-const LIMITS = { 'Przejdź do': 6, 'Narzędzia': 6, 'Akcje': 3, 'Klienci RKDP': 7, 'Klienci M2 TAX': 6, 'Sprawy M2 TAX': 6, 'Zgłoszenia': 6 };
+const LIMITS = { 'Polecenia': 6, 'Ostatnio otwierane': 6, 'Przejdź do': 6, 'Narzędzia': 6, 'Akcje': 3, 'Klienci RKDP': 7, 'Klienci M2 TAX': 6, 'Sprawy M2 TAX': 6, 'Zgłoszenia': 6 };
 function search(items, query) {
   const toks = norm(query).split(/\s+/).filter(Boolean);
   if (!toks.length) return items.filter(i => !i.href || false);
@@ -73,7 +144,7 @@ function search(items, query) {
   for (const [, it] of scored) { per[it.group] = (per[it.group] || 0) + 1; if (per[it.group] <= (LIMITS[it.group] || 6)) out.push(it); }
   return out;
 }
-const ORDER = ['Akcje', 'Przejdź do', 'Narzędzia', 'Klienci RKDP', 'Klienci M2 TAX', 'Sprawy M2 TAX', 'Zgłoszenia'];
+const ORDER = ['Polecenia', 'Ostatnio otwierane', 'Akcje', 'Przejdź do', 'Narzędzia', 'Klienci RKDP', 'Klienci M2 TAX', 'Sprawy M2 TAX', 'Zgłoszenia'];
 
 function highlight(label, query) {
   const toks = norm(query).split(/\s+/).filter(Boolean);
@@ -87,14 +158,22 @@ let openEl = null;
 export function openCmdk() {
   if (openEl) { openEl.querySelector('input')?.focus(); return; }
   const prevFocus = document.activeElement;
-  const input = h('input', { type: 'text', placeholder: 'Szukaj klienta, NIP, sprawy, zgłoszenia, narzędzia…', 'aria-label': 'Szukaj', autocomplete: 'off', spellcheck: 'false' });
+  const input = h('input', { type: 'text', placeholder: 'Szukaj albo wpisz polecenie, np. „oznacz pit kowalski”…', 'aria-label': 'Szukaj', autocomplete: 'off', spellcheck: 'false' });
   const list = h('div', { class: 'cmdk-list', role: 'listbox' });
   let items = staticItems(), data = [], shown = [], active = 0;
   const close = () => { back.remove(); openEl = null; document.removeEventListener('keydown', onKey, true); prevFocus?.focus?.(); };
-  const run = it => { if (!it) return; close(); if (it.run) it.run(); else if (it.href) location.hash = it.href; };
+  const run = async it => {
+    if (!it) return; close();
+    if (it.href) rememberRecent(it);
+    if (it.run) return it.run();
+    // klient RKDP: karta w panelu bocznym (Shift+Enter – pełna karta)
+    if (it.panel && !runFull && hasModule('rozliczenia')) { const { openClientPanel } = await import('./panel.js'); return openClientPanel(it.panel); }
+    location.hash = it.href;
+  };
+  let runFull = false;
   const draw = () => {
     const q = input.value.trim();
-    shown = q ? search([...items, ...data], q) : items;
+    shown = q ? [...commandItems(q, data), ...search([...items, ...data], q)] : [...recents(), ...items];
     shown = [...shown].sort((a, b) => ORDER.indexOf(a.group) - ORDER.indexOf(b.group));
     if (active >= shown.length) active = 0;
     if (!shown.length) { list.replaceChildren(h('div', { class: 'cmdk-empty' }, data.length || !q ? 'Nic nie znaleziono.' : 'Wczytywanie…')); return; }
@@ -112,14 +191,15 @@ export function openCmdk() {
     if (e.key === 'Escape') { e.preventDefault(); close(); }
     else if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(shown.length - 1, active + 1); mark(); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); mark(); }
-    else if (e.key === 'Enter' && document.activeElement === input) { e.preventDefault(); run(shown[active]); }
+    else if (e.key === 'Enter' && document.activeElement === input) { e.preventDefault(); runFull = e.shiftKey; run(shown[active]); }
   };
   input.addEventListener('input', () => { active = 0; draw(); });
   const back = h('div', { class: 'cmdk-back', onclick: e => { if (e.target === back) close(); } },
     h('div', { class: 'cmdk', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Szybkie wyszukiwanie' },
       h('div', { class: 'cmdk-in' }, (() => { const s = h('span', { 'aria-hidden': 'true' }); s.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'; return s; })(), input, h('kbd', {}, 'Esc')),
       list,
-      h('div', { class: 'cmdk-foot' }, h('span', {}, '↑ ↓ wybór'), h('span', {}, 'Enter otwórz'), h('span', {}, 'Esc zamknij'), h('span', { style: { marginLeft: 'auto' } }, 'Ctrl K – w każdej chwili'))));
+      h('div', { class: 'cmdk-foot' }, h('span', {}, '↑ ↓ wybór'), h('span', {}, 'Enter otwórz'), h('span', {}, 'Shift+Enter pełna karta'), h('span', {}, 'Esc zamknij'),
+        h('span', { style: { marginLeft: 'auto' }, 'data-tip': 'Polecenia: „nowe zgłoszenie kowalski”, „oznacz pit nowak”, „poproś nowak”, „czas 30 nowak”' }, 'Polecenia: nowe zgłoszenie · oznacz · poproś · czas'))));
   document.body.append(back); openEl = back;
   document.addEventListener('keydown', onKey, true);
   draw(); input.focus();

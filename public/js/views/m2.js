@@ -18,6 +18,7 @@ import { renderM2Dokumenty } from './m2pisma.js';
 import { amlCard, renderAml, amlDashCard } from '../aml/aml.js';
 import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
+import { pdfText, analyzeLetter } from '../pismo.js';
 
 const BASE = '#/doradztwo';
 const members = () => state.members.filter(m => m.active && (m.modules || []).includes('doradztwo'));
@@ -133,6 +134,33 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
     syncForm();
   };
   [ruleSel, served, custom, year].forEach(e => e.addEventListener('input', recalc));
+  // ---- odczyt pisma z urzędu (PDF) – rozpoznanie rodzaju, daty doręczenia i terminu; plik zostaje w przeglądarce ----
+  let letter = null;
+  const pdfInfo = h('div', { class: 'small', style: { marginTop: '8px' } });
+  const pdfInp = h('input', { type: 'file', accept: 'application/pdf,.pdf', hidden: true });
+  pdfInp.addEventListener('change', async () => {
+    const f = pdfInp.files[0]; pdfInp.value = '';
+    if (!f) return;
+    pdfInfo.replaceChildren(h('span', { class: 'muted' }, `Czytam „${f.name}”…`));
+    try {
+      const { text } = await pdfText(f);
+      if (text.replace(/\s/g, '').length < 40) { pdfInfo.replaceChildren(h('span', { class: 'late-t' }, 'Pismo nie zawiera tekstu (skan) – uzupełnij dane ręcznie.')); return; }
+      const a = analyzeLetter(text); letter = { ...a, file: f.name };
+      if (a.rule) ruleSel.value = a.rule;
+      served.value = a.served || todayIso();
+      if (a.days && (a.rule === 'wezwanie' || !a.rule)) { ruleSel.value = 'wezwanie'; custom.value = a.days; }
+      const ttl = [a.kind || 'Pismo', a.org ? '– ' + a.org.replace(/^Naczelnik\s+/i, 'Naczelnik ') : '', a.sig ? `(${a.sig})` : ''].filter(Boolean).join(' ');
+      d.title = ruleSel.value === 'wezwanie' ? `Odpowiedź: ${ttl}` : ttl; d._auto = false;
+      d.notes = [a.letterDate ? `Data pisma: ${fmtDate(a.letterDate)}` : '', a.sig ? `Znak: ${a.sig}` : '', a.daysText ? `„${a.daysText}”` : '', `Odczytano z pliku: ${f.name}`].filter(Boolean).join('\n');
+      recalc();
+      pdfInfo.replaceChildren(h('b', {}, 'Odczytano: '), [a.kind || 'rodzaj pisma nierozpoznany', a.letterDate ? `pismo z ${fmtDate(a.letterDate)}` : null, a.days ? `termin ${a.days} dni` : null, a.sig || null].filter(Boolean).join(' · '),
+        h('br'), h('span', { class: a.served ? 'muted' : 'late-t' }, a.served ? `Data doręczenia z pisma: ${fmtDate(a.served)}.` : 'Nie znaleziono daty doręczenia – przyjęto dziś; popraw, jeśli pismo doręczono wcześniej.'),
+        h('br'), h('span', { class: 'muted' }, 'Sprawdź wyliczenie z treścią pisma przed zapisem.'));
+    } catch (e) { console.error(e); pdfInfo.replaceChildren(h('span', { class: 'late-t' }, 'Nie udało się odczytać PDF.')); }
+  });
+  calcBox.append(h('div', { class: 'pdf-drop' }, pdfInp,
+    h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => pdfInp.click() }, icon('file'), 'Wczytaj pismo z urzędu (PDF)'),
+    h('span', { class: 'muted small' }, 'Odczytamy rodzaj pisma, datę doręczenia i termin – plik nie jest wysyłany na serwer.'), pdfInfo));
   calcBox.append(h('p', { class: 'eyebrow', style: { marginBottom: '10px' } }, 'Kalkulator terminu'),
     h('div', { class: 'form-grid' }, h('label', { class: 'field wide' }, h('span', {}, 'Czynność'), ruleSel), servedLbl, customLbl, yearLbl), result);
 
@@ -152,6 +180,8 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
       const { data: ins, error } = await sb.from('m2_deadlines').insert(row).select('id').single();
       if (error) return fail(error);
       gcalSync([ins.id]);
+      // pismo z PDF trafia do dziennika sprawy jako „pismo otrzymane”
+      if (letter && matter?.id) await sb.from('m2_journal').insert({ matter_id: matter.id, entry_date: d.served_at || todayIso(), kind: 'pismo_otrzymane', title: d.title, body: d.notes || null, author: state.me.email }).then(() => null, () => null);
       toast('Dodano termin'); close(); onSaved?.();
     } }, 'Zapisz termin')]);
 }

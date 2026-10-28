@@ -27,6 +27,24 @@ export function toast(msg, bad = false) {
   toastTimer = setTimeout(() => t.remove(), bad ? 6000 : 2600);
 }
 
+// komunikat z przyciskiem (np. „Cofnij”); Ctrl+Z wywołuje ostatnią akcję cofania
+let undoFn = null;
+export function toastAction(msg, label, fn, ms = 7000) {
+  document.querySelector('.toast')?.remove();
+  const btn = h('button', { type: 'button', class: 'toast-btn' }, label);
+  const t = h('div', { class: 'toast with-btn', role: 'status' }, h('span', {}, msg), btn);
+  const done = () => { t.remove(); if (undoFn === run) undoFn = null; };
+  const run = () => { done(); fn(); };
+  btn.addEventListener('click', run);
+  undoFn = run;
+  document.body.append(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(done, ms);
+}
+document.addEventListener('keydown', (e) => {
+  if (undoFn && (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) { e.preventDefault(); undoFn(); }
+});
+
 export function fail(error, prefix = 'Błąd') {
   console.error(error);
   toast(`${prefix}: ${error?.message || error}`, true);
@@ -37,6 +55,10 @@ export const icons = {
   right: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
   download: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>',
   plus: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  mail: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+  camera: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  file: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M10 13h6M10 17h4"/></svg>',
+  calendar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
 };
 
 export function icon(name) {

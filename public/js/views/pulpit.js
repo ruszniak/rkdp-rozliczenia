@@ -6,6 +6,9 @@ import { sectionOf, deadlinesFor } from '../dict.js';
 import { todayWidget, teamTodayCard, canSeeTeam } from './obecnosc.js';
 import { amlDashCard } from '../aml/aml.js';
 import { TK_OPEN, TK_CAT, statusTag, dueTag, newTicketDialog, generateRecurring } from './zgloszenia.js';
+import { settledHistory, lastPeriods, loadMemberPrefs, saveMemberPrefs, fetchSoft } from '../data.js';
+import { sparkline, delta } from '../wykres.js';
+import { renderDzis } from './dzis.js';
 
 const PREF = 'rkdp-pulpit-widok';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -53,7 +56,15 @@ async function loadData(period) {
 }
 
 const tile = (n, lbl, href, o = {}) => h('a', { class: 'card tile' + (o.dark ? ' dark alert' : ''), href, style: { textDecoration: 'none', color: 'inherit' } },
-  h('span', { class: 'num' }, String(n)), h('span', { class: 'lbl' }, lbl), o.bar !== undefined ? h('div', { class: 'bar' }, h('i', { style: { width: `${Math.round(o.bar * 100)}%` } })) : null);
+  h('span', { class: 'num' }, String(n), o.spark ? h('span', { class: 'tile-spark', 'data-tip': o.sparkTip || 'Ostatnie 6 miesięcy' }, o.spark) : null), h('span', { class: 'lbl' }, lbl, o.delta ? [' ', o.delta] : null),
+  o.bar !== undefined ? h('div', { class: 'bar' }, h('i', { style: { width: `${Math.round(o.bar * 100)}%` } })) : null);
+// trend: % rozliczonych w 6 miesiącach (ostatni punkt = stan bieżący)
+const trendOpts = (hist, area, cur, period) => {
+  if (!hist) return {};
+  const vals = hist[area].map((v, i, a) => i === a.length - 1 ? cur : v);
+  const prev = vals.at(-2);
+  return { spark: sparkline(vals, { labels: lastPeriods(period, 6).map(periodLabel) }), delta: delta(cur, prev, { label: 'Zmiana względem poprzedniego miesiąca (punkty procentowe)' }) };
+};
 const ticketRow = (t, cname, showWho) => h('a', { class: 'tk-mini', href: `#/zgloszenia/${t.id}` },
   h('div', { style: { minWidth: 0 } }, h('b', {}, t.title), h('div', { class: 'small muted' }, [`#${t.no}`, cname[t.client_id], showWho ? (t.assignee_id ? who(t.assignee_id) : 'nieprzypisane') : TK_CAT[t.category]].filter(Boolean).join(' · '))),
   h('div', { style: { textAlign: 'right', flex: 'none' } }, statusTag(t.status), h('div', {}, dueTag(t))));
@@ -69,7 +80,7 @@ function deadlinesCard(period) {
 }
 
 // ---------- pulpit pracownika ----------
-function myDashboard(D, period) {
+function myDashboard(D, period, hist) {
   const me = state.me.id;
   const mine = D.tickets.filter(t => TK_OPEN.includes(t.status) && t.assignee_id === me).sort(byDue);
   const late = mine.filter(isLate);
@@ -87,30 +98,32 @@ function myDashboard(D, period) {
     h('div', { class: 'pl-prog' }, h('div', { class: 'bar' }, h('i', { style: { width: `${a.list.length ? Math.round(a.settled / a.list.length * 100) : 0}%` } })),
       h('span', { class: 'small' }, h('b', {}, `${a.settled} z ${a.list.length}`), ' klientów rozliczonych')),
     ...a.list.filter(x => !x.s.settled).sort((x, y) => Number(y.s.missing) - Number(x.s.missing) || x.c.name.localeCompare(y.c.name, 'pl')).slice(0, 12)
-      .map(x => h('a', { class: 'tk-mini', href: `#/klient/${x.c.id}` }, h('span', {}, x.c.name),
+      .map(x => h('a', { class: 'tk-mini', href: `#/klient/${x.c.id}`, 'data-panel': x.c.id }, h('span', {}, x.c.name),
         h('span', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, x.s.missing ? h('span', { class: 'badge warn' }, 'brak dokumentów') : null, h('span', { class: 'small muted' }, `${x.s.done}/${x.s.total}`)))),
     a.list.length - a.settled > 12 ? h('p', { class: 'hint', style: { marginTop: '8px' } }, `… i ${a.list.length - a.settled - 12} więcej`) : null,
     a.settled === a.list.length ? empty('Wszyscy Twoi klienci są rozliczeni. 🎉') : null))
     : [card(`Rozliczenia – ${periodLabel(period)}`, null, empty('Nie jesteś przypisany(-a) jako księgowa ani kadrowa do żadnego klienta.'))];
 
-  return [
-    h('div', { class: 'tiles' },
+  return {
+    tiles: [h('div', { class: 'tiles' },
       tile(mine.length, 'Moje otwarte zgłoszenia', '#/zgloszenia?f=moje'),
       tile(late.length, 'Moje po terminie', '#/zgloszenia?f=moje', { dark: late.length > 0 }),
       tile(totalMine ? `${settledMine}/${totalMine}` : '—', `Moi klienci rozliczeni (${periodLabel(period).toLowerCase()})`, `#/rozliczenia?okres=${period}`, { bar: totalMine ? settledMine / totalMine : undefined }),
-      tile(missingMine, 'Klienci z brakiem dokumentów', `#/rozliczenia?okres=${period}`, { dark: false })),
-    h('div', { class: 'two' },
-      h('div', {},
-        card(`Moje zgłoszenia (${mine.length})`, h('button', { class: 'btn btn-outline btn-sm', onclick: () => newTicketDialog().catch(e => fail(e)) }, icon('plus'), 'Nowe'),
-          ...(mine.length ? mine.slice(0, 12).map(t => ticketRow(t, D.cname)) : [empty('Nie masz otwartych zgłoszeń.')]),
-          mine.length > 12 ? h('a', { class: 'small', href: '#/zgloszenia?f=moje', style: { display: 'block', marginTop: '10px' } }, `Wszystkie (${mine.length}) →`) : null),
-        delegated.length ? card(`Przekazane innym (${delegated.length})`, null, ...delegated.slice(0, 8).map(t => ticketRow(t, D.cname, true))) : null),
-      h('div', {}, todayWidget(), deadlinesCard(period), ...settleCards)),
-  ];
+      tile(missingMine, 'Klienci z brakiem dokumentów', `#/rozliczenia?okres=${period}`, { dark: missingMine > 0 }))],
+    blocks: [
+      { key: 'moje_zgloszenia', title: 'Moje zgłoszenia', el: card(`Moje zgłoszenia (${mine.length})`, h('button', { class: 'btn btn-outline btn-sm', onclick: () => newTicketDialog().catch(e => fail(e)) }, icon('plus'), 'Nowe'),
+        ...(mine.length ? mine.slice(0, 12).map(t => ticketRow(t, D.cname)) : [empty('Nie masz otwartych zgłoszeń.')]),
+        mine.length > 12 ? h('a', { class: 'small', href: '#/zgloszenia?f=moje', style: { display: 'block', marginTop: '10px' } }, `Wszystkie (${mine.length}) →`) : null) },
+      { key: 'obecnosc', title: 'Obecność dziś', el: todayWidget() },
+      { key: 'terminy', title: 'Terminy ustawowe', el: deadlinesCard(period) },
+      delegated.length ? { key: 'przekazane', title: 'Przekazane innym', el: card(`Przekazane innym (${delegated.length})`, null, ...delegated.slice(0, 8).map(t => ticketRow(t, D.cname, true))) } : null,
+      ...settleCards.map((el, i) => ({ key: 'rozliczenia_' + (areas[i]?.area || i), title: `Rozliczenia – ${areas[i]?.label || ''}`, el })),
+    ].filter(Boolean),
+  };
 }
 
 // ---------- pulpit doradcy (administrator) ----------
-function adminDashboard(D, period) {
+function adminDashboard(D, period, hist, alerts) {
   const open = D.tickets.filter(t => TK_OPEN.includes(t.status));
   const late = open.filter(isLate).sort(byDue);
   const hot = open.filter(t => ['pilny', 'wysoki'].includes(t.priority));
@@ -153,58 +166,121 @@ function adminDashboard(D, period) {
     notOpened.length ? h('a', { class: 'pl-info', href: `#/rozliczenia?okres=${period}` }, h('b', {}, String(notOpened.length)), ` klientów bez otwartego miesiąca ${periodLabel(period).toLowerCase()}`) : null,
   ].filter(Boolean);
 
-  return [
-    h('div', { class: 'tiles' },
+  const accPct = acc.length ? accOk * 100 / acc.length : 0, hrPct = hr.length ? hrOk * 100 / hr.length : 0;
+  const openAlerts = (alerts || []).filter(a => !a.resolved_at);
+  return {
+    tiles: [h('div', { class: 'tiles' },
       tile(open.length, 'Otwarte zgłoszenia', '#/zgloszenia?f=otwarte'),
       tile(late.length, 'Po terminie', '#/zgloszenia?f=po_terminie', { dark: late.length > 0 }),
       tile(hot.length, 'Pilne i wysokie', '#/zgloszenia?f=otwarte'),
       tile(wait.length, 'Czeka na klienta', '#/zgloszenia?f=czeka')),
     h('div', { class: 'tiles' },
-      tile(acc.length ? `${accOk}/${acc.length}` : '—', `Księgowość rozliczona – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=ksiegowosc`, { bar: acc.length ? accOk / acc.length : 0 }),
-      tile(hr.length ? `${hrOk}/${hr.length}` : '—', `Kadry rozliczone – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=kadry`, { bar: hr.length ? hrOk / hr.length : 0 }),
-      tile(missing.length, 'Brak dokumentów', `#/rozliczenia?okres=${period}`, { dark: false }),
-      tile(doneWeek.length, 'Zgłoszenia zamknięte w 7 dni', '#/zgloszenia?f=zrobione')),
-    card('Zespół', null, h('div', { class: 'list-wrap' }, h('table', { class: 'list pl-team' },
-      h('thead', {}, h('tr', {}, ...['Osoba', 'Zgłoszenia otwarte', 'Po terminie', 'Zamknięte (7 dni)', 'Księgowość', 'Kadry', 'Brak dok.'].map(x => h('th', {}, x)))),
-      h('tbody', {}, ...team.map(row))))),
-    h('div', { class: 'two' },
-      h('div', {},
-        card('Wymaga uwagi', null, ...(info.length ? [h('div', { class: 'pl-infos' }, ...info)] : []),
-          ...(attention.length ? attention : [empty('Brak zgłoszeń po terminie i pilnych. 👍')])),
-        missing.length ? card(`Brak dokumentów – ${periodLabel(period).toLowerCase()} (${missing.length})`, null,
-          ...missing.slice(0, 15).map(x => h('a', { class: 'tk-mini', href: `#/klient/${x.c.id}` }, h('span', {}, x.c.name), h('span', { class: 'small muted' }, `${x.area} · ${x.person ? who(x.person) : 'nieprzypisany'}`)))) : null),
-      h('div', {},
-        canSeeTeam() ? teamTodayCard() : null,
-        amlDashCard('rkdp'),
-        deadlinesCard(period),
-        card(`Ostatnio zamknięte (${doneWeek.length})`, null, ...(doneWeek.length ? doneWeek.slice(0, 10).map(t => h('a', { class: 'tk-mini', href: `#/zgloszenia/${t.id}` },
-          h('div', { style: { minWidth: 0 } }, h('b', {}, t.title), h('div', { class: 'small muted' }, [D.cname[t.client_id], who(t.done_by || t.assignee_id)].filter(Boolean).join(' · '))),
-          h('span', { class: 'small muted', style: { flex: 'none' } }, new Date(t.done_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }))))
-          : [empty('W ostatnich 7 dniach nie zamknięto zgłoszeń.')])))),
-  ];
+      tile(acc.length ? `${accOk}/${acc.length}` : '—', `Księgowość rozliczona – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=ksiegowosc`, { bar: acc.length ? accOk / acc.length : 0, ...trendOpts(hist, 'ksiegowosc', accPct, period) }),
+      tile(hr.length ? `${hrOk}/${hr.length}` : '—', `Kadry rozliczone – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=kadry`, { bar: hr.length ? hrOk / hr.length : 0, ...trendOpts(hist, 'kadry', hrPct, period) }),
+      tile(missing.length, 'Brak dokumentów', `#/rozliczenia?okres=${period}`, { dark: missing.length > 0 }),
+      tile(doneWeek.length, 'Zgłoszenia zamknięte w 7 dni', '#/zgloszenia?f=zrobione'))],
+    blocks: [
+      { key: 'zespol', title: 'Zespół', wide: true, el: card('Zespół', h('a', { class: 'btn btn-ghost btn-sm', href: '#/raport' }, 'Raport miesięczny →'), h('div', { class: 'list-wrap' }, h('table', { class: 'list pl-team' },
+        h('thead', {}, h('tr', {}, ...['Osoba', 'Zgłoszenia otwarte', 'Po terminie', 'Zamknięte (7 dni)', 'Księgowość', 'Kadry', 'Brak dok.'].map(x => h('th', {}, x)))),
+        h('tbody', {}, ...team.map(row))))) },
+      { key: 'uwaga', title: 'Wymaga uwagi', el: card('Wymaga uwagi', null, ...(info.length ? [h('div', { class: 'pl-infos' }, ...info)] : []),
+        ...(attention.length ? attention : [empty('Brak zgłoszeń po terminie i pilnych. 👍')])) },
+      openAlerts.length ? { key: 'monitoring', title: 'Monitoring klientów', el: card(`Monitoring klientów – zmiany (${openAlerts.length})`, null,
+        ...openAlerts.slice(0, 8).map(a => h('a', { class: 'tk-mini', href: `#/klient/${a.client_id}`, 'data-panel': a.client_id }, h('div', { style: { minWidth: 0 } }, h('b', {}, D.cname[a.client_id] || 'Klient'), h('div', { class: 'small muted' }, a.summary)),
+          h('span', { class: 'small muted', style: { flex: 'none' } }, new Date(a.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }))))) } : null,
+      canSeeTeam() ? { key: 'obecnosc', title: 'Obecność zespołu', el: teamTodayCard() } : null,
+      missing.length ? { key: 'braki', title: 'Brak dokumentów', el: card(`Brak dokumentów – ${periodLabel(period).toLowerCase()} (${missing.length})`, null,
+        ...missing.slice(0, 15).map(x => h('a', { class: 'tk-mini', href: `#/klient/${x.c.id}`, 'data-panel': x.c.id }, h('span', {}, x.c.name), h('span', { class: 'small muted' }, `${x.area} · ${x.person ? who(x.person) : 'nieprzypisany'}`)))) } : null,
+      { key: 'aml', title: 'AML', el: amlDashCard('rkdp') },
+      { key: 'terminy', title: 'Terminy ustawowe', el: deadlinesCard(period) },
+      { key: 'zamkniete', title: 'Ostatnio zamknięte', el: card(`Ostatnio zamknięte (${doneWeek.length})`, null, ...(doneWeek.length ? doneWeek.slice(0, 10).map(t => h('a', { class: 'tk-mini', href: `#/zgloszenia/${t.id}` },
+        h('div', { style: { minWidth: 0 } }, h('b', {}, t.title), h('div', { class: 'small muted' }, [D.cname[t.client_id], who(t.done_by || t.assignee_id)].filter(Boolean).join(' · '))),
+        h('span', { class: 'small muted', style: { flex: 'none' } }, new Date(t.done_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }))))
+        : [empty('W ostatnich 7 dniach nie zamknięto zgłoszeń.')])) },
+    ].filter(Boolean),
+  };
 }
 
-export async function renderPulpit(main) {
+// ---------- układ pulpitu: kolejność i ukryte sekcje (zapisywane dla osoby, na wszystkich urządzeniach) ----------
+function arrange(view, dash, lay, editing, onChange) {
+  const order = lay.order || [];
+  const hidden = new Set(lay.hidden || []);
+  const blocks = [...dash.blocks].sort((a, b) => { const ia = order.indexOf(a.key), ib = order.indexOf(b.key); return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib); });
+  const tilesHidden = hidden.has('kafelki');
+  const out = [];
+  if (!tilesHidden || editing) out.push(h('div', { class: 'dash-tiles' + (tilesHidden ? ' is-hidden' : '') }, editing ? editBar('kafelki', 'Kafelki', tilesHidden) : null, ...dash.tiles));
+  const grid = h('div', { class: 'dash' + (editing ? ' editing' : '') });
+  let dragKey = null;
+  blocks.forEach((b, i) => {
+    const off = hidden.has(b.key);
+    if (off && !editing) return;
+    const w = h('div', { class: 'dash-b' + (b.wide ? ' wide' : '') + (off ? ' is-hidden' : ''), 'data-key': b.key, draggable: editing ? 'true' : null }, editing ? editBar(b.key, b.title, off, i) : null, b.el);
+    if (editing) {
+      w.addEventListener('dragstart', e => { dragKey = b.key; w.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; });
+      w.addEventListener('dragend', () => w.classList.remove('drag'));
+      w.addEventListener('dragover', e => { e.preventDefault(); w.classList.add('over'); });
+      w.addEventListener('dragleave', () => w.classList.remove('over'));
+      w.addEventListener('drop', e => { e.preventDefault(); w.classList.remove('over'); if (dragKey && dragKey !== b.key) move(dragKey, blocks.findIndex(x => x.key === b.key)); });
+    }
+    grid.append(w);
+  });
+  out.push(grid);
+  function editBar(key, title, off, idx) {
+    return h('div', { class: 'dash-edit' }, h('span', { class: 'dash-grip', 'aria-hidden': 'true' }, '⠿'), h('b', {}, title),
+      idx != null ? h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'W górę', onclick: () => move(key, Math.max(0, idx - 1)) }, '↑') : null,
+      idx != null ? h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'W dół', onclick: () => move(key, Math.min(blocks.length - 1, idx + 1)) }, '↓') : null,
+      h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { off ? hidden.delete(key) : hidden.add(key); onChange({ order: blocks.map(x => x.key), hidden: [...hidden] }); } }, off ? 'Pokaż' : 'Ukryj'));
+  }
+  function move(key, to) {
+    const keys = blocks.map(x => x.key); const from = keys.indexOf(key);
+    keys.splice(to, 0, keys.splice(from, 1)[0]);
+    onChange({ order: keys, hidden: [...hidden] });
+  }
+  return out;
+}
+
+const HELP_DZIS = `Dziś – Twoja lista na dzisiaj w jednym miejscu:
+• Kratki do zrobienia u Twoich klientów (od najbliższego terminu) – odhaczasz od razu, bez przechodzenia do rozliczeń. Na telefonie: przesuń wiersz w lewo = „Zrobione”.
+• Zgłoszenia przypisane do Ciebie, terminy obowiązków w 7 dni, braki dokumentów (z prośbą do klienta), terminy spraw M2.
+• Szybki zapis czasu pracy przy kliencie (do rentowności).`;
+
+export async function renderPulpit(main, params) {
   const period = defaultPeriod();
   const admin = state.me.role === 'admin';
-  let view = admin ? (() => { try { return localStorage.getItem(PREF) || 'doradca'; } catch { return 'doradca'; } })() : 'moj';
+  const want = params?.get?.('widok');
+  let view = want && ['dzis', 'moj', 'doradca'].includes(want) && (want !== 'doradca' || admin) ? want
+    : (() => { try { const v = localStorage.getItem(PREF); return v && (v !== 'doradca' || admin) ? v : (admin ? 'doradca' : 'dzis'); } catch { return admin ? 'doradca' : 'dzis'; } })();
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie pulpitu…'));
-  // zadania cykliczne i dane pulpitu równolegle; gdy powstały nowe zgłoszenia – odświeżamy dane
-  let [created, D] = await Promise.all([generateRecurring(), loadData(period)]);
+  // zadania cykliczne, dane pulpitu, trend 6 miesięcy, monitoring i układ – równolegle
+  const tasks = state.taskTypes.filter(t => t.active);
+  let [created, D, hist, alerts, mp] = await Promise.all([generateRecurring(), loadData(period),
+    settledHistory(lastPeriods(period, 6), tasks).catch(() => null),
+    fetchSoft(() => sb.from('monitor_alerts').select('id,client_id,summary,created_at,resolved_at').eq('module', 'rkdp').is('resolved_at', null).order('created_at', { ascending: false })),
+    loadMemberPrefs()]);
   if (created > 0) D = await loadData(period);
   const body = h('div');
-  const switcher = admin ? h('div', { class: 'tabs', style: { margin: 0 } }) : null;
+  let editing = false;
+  const switcher = h('div', { class: 'tabs', style: { margin: 0 } });
+  const editBtn = h('button', { class: 'btn btn-outline btn-sm dash-edit-btn', type: 'button', onclick: () => { editing = !editing; draw(); } });
   const draw = () => {
-    if (switcher) switcher.replaceChildren(...[['doradca', 'Pulpit doradcy'], ['moj', 'Mój pulpit']].map(([k, l]) => h('button', { class: view === k ? 'on' : '', type: 'button', onclick: () => { view = k; try { localStorage.setItem(PREF, k); } catch { /* */ } draw(); } }, l)));
-    body.replaceChildren(...(view === 'doradca' ? adminDashboard(D, period) : myDashboard(D, period)).filter(Boolean));
-    title.replaceChildren(view === 'doradca' ? 'Pulpit doradcy' : `Dzień dobry, ${first(state.me.full_name)}`, infoTip(view === 'doradca' ? HELP_ADMIN : HELP_ME, 'Pulpit – instrukcja'));
+    const tabs = [['dzis', 'Dziś'], ['moj', 'Mój pulpit'], ...(admin ? [['doradca', 'Pulpit doradcy']] : [])];
+    switcher.replaceChildren(...tabs.map(([k, l]) => h('button', { class: view === k ? 'on' : '', type: 'button', onclick: () => { view = k; editing = false; try { localStorage.setItem(PREF, k); } catch { /* */ } history.replaceState(null, '', '#/pulpit?widok=' + k); draw(); } }, l)));
+    editBtn.hidden = view === 'dzis';
+    editBtn.replaceChildren(editing ? '✓ Gotowe' : 'Dostosuj pulpit');
+    editBtn.classList.toggle('on', editing);
+    title.replaceChildren(view === 'doradca' ? 'Pulpit doradcy' : `Dzień dobry, ${first(state.me.full_name)}`, infoTip(view === 'doradca' ? HELP_ADMIN : view === 'dzis' ? HELP_DZIS : HELP_ME, 'Pulpit – instrukcja'));
+    if (view === 'dzis') { body.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…')); renderDzis(body, D); return; }
+    const dash = view === 'doradca' ? adminDashboard(D, period, hist, alerts) : myDashboard(D, period, hist);
+    const key = 'pulpit_' + view;
+    body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.')] : []),
+      ...arrange(view, dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
   };
   const title = h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } });
   main.replaceChildren(
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })), title,
         h('p', { class: 'sub' }, `Bieżący miesiąc rozliczeniowy: ${periodLabel(period).toLowerCase()}.`)),
-      switcher),
+      h('div', { class: 'ph-actions' }, editBtn, switcher)),
     body);
   draw();
 }
