@@ -235,8 +235,7 @@ function arrange(view, dash, lay, editing, onChange) {
 
 const HELP_DZIS = `Dziś – Twoja lista na dzisiaj w jednym miejscu:
 • Kratki do zrobienia u Twoich klientów (od najbliższego terminu) – odhaczasz od razu, bez przechodzenia do rozliczeń. Na telefonie: przesuń wiersz w lewo = „Zrobione”.
-• Zgłoszenia przypisane do Ciebie, terminy obowiązków w 7 dni, braki dokumentów (z prośbą do klienta), terminy spraw M2.
-• Szybki zapis czasu pracy przy kliencie (do rentowności).`;
+• Zgłoszenia przypisane do Ciebie, terminy obowiązków w 7 dni, braki dokumentów (z prośbą do klienta), terminy spraw M2.`;
 
 export async function renderPulpit(main, params) {
   const period = defaultPeriod();

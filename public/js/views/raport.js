@@ -1,8 +1,8 @@
 // Raport miesięczny dla zarządu: rozliczenia (z porównaniem m/m i trendem), obciążenie zespołu, zaległości,
-// zgłoszenia, czas pracy, nowe sprawy M2, monitoring. Jedna strona – podgląd w aplikacji i PDF na papierze firmowym.
+// zgłoszenia, nowe sprawy M2, monitoring. Jedna strona – podgląd w aplikacji i PDF na papierze firmowym.
 import { h, icon, printHtml, periodLabel, shiftPeriod } from '../ui.js';
 import { sb, state, hasModule } from '../store.js';
-import { fetchAll, fetchSoft, loadClients, todayIso, settledHistory, lastPeriods, fmtMin } from '../data.js';
+import { fetchAll, fetchSoft, loadClients, todayIso, settledHistory, lastPeriods } from '../data.js';
 import { sectionOf } from '../dict.js';
 import { sparkline, delta } from '../wykres.js';
 import { paper, esc } from '../papier.js';
@@ -14,11 +14,10 @@ export async function renderRaport(main, params) {
   const mFrom = M + '-01', mTo = new Date(+M.slice(0, 4), +M.slice(5, 7), 0).toLocaleDateString('sv-SE');
   main.replaceChildren(h('div', { class: 'spinner' }, 'Przygotowanie raportu…'));
   const tasks = state.taskTypes.filter(t => t.active);
-  const [clients, entries, tickets, times, hist, matters, alerts] = await Promise.all([
+  const [clients, entries, tickets, hist, matters, alerts] = await Promise.all([
     loadClients(),
     fetchAll(() => sb.from('checklist_entries').select('client_id,task_code,status').eq('period', P + '-01')),
     fetchSoft(() => sb.from('rkdp_tickets').select('id,status,assignee_id,created_at,done_at,due_date,done_by').eq('module', 'rkdp')),
-    fetchSoft(() => sb.from('client_time').select('member_id,minutes,work_date').gte('work_date', mFrom).lte('work_date', mTo)),
     settledHistory(lastPeriods(P, 6), tasks),
     hasModule('doradztwo') ? fetchSoft(() => sb.from('m2_matters').select('id,number,title,opened_at,status').gte('opened_at', mFrom).lte('opened_at', mTo)) : [],
     fetchSoft(() => sb.from('monitor_alerts').select('id,created_at,resolved_at').gte('created_at', mFrom).lte('created_at', mTo + 'T23:59:59')),
@@ -45,10 +44,8 @@ export async function renderRaport(main, params) {
     const open = a.reduce((s, x) => s + x.s.open, 0) + k.reduce((s, x) => s + x.s.open, 0);
     const tk = tickets.filter(t => ['nowe', 'w_toku', 'czeka'].includes(t.status) && t.assignee_id === m.id).length;
     const dn = tickets.filter(t => t.status === 'zrobione' && t.done_at?.slice(0, 7) === M && (t.done_by || t.assignee_id) === m.id).length;
-    const min = times.filter(t => t.member_id === m.id).reduce((s, t) => s + t.minutes, 0);
-    return { m, n, ok, open, tk, dn, min };
-  }).filter(p => p.n || p.tk || p.dn || p.min);
-  const totalMin = times.reduce((s, t) => s + t.minutes, 0);
+    return { m, n, ok, open, tk, dn };
+  }).filter(p => p.n || p.tk || p.dn);
   const pct = v => `${Math.round(v)}%`;
 
   const kpi = (val, lbl, d) => h('div', { class: 'card tile' }, h('span', { class: 'num' }, val), h('span', { class: 'lbl' }, lbl, d ? [' ', d] : null));
@@ -64,13 +61,12 @@ export async function renderRaport(main, params) {
 <tr><td class="l">Księgowość</td>${hist.ksiegowosc.map((v, i, a) => `<td>${i === a.length - 1 ? pct(A.pct) : v == null ? '—' : pct(v)}</td>`).join('')}</tr>
 <tr><td class="l">Kadry i ZUS</td>${hist.kadry.map((v, i, a) => `<td>${i === a.length - 1 ? pct(K.pct) : v == null ? '—' : pct(v)}</td>`).join('')}</tr></tbody></table>
 <h2>Obciążenie zespołu</h2>
-<table><thead><tr><th class="l">Osoba</th><th>Klienci rozliczeni</th><th>Kratki otwarte</th><th>Zgłoszenia otwarte</th><th>Zamknięte w miesiącu</th><th>Czas pracy</th></tr></thead><tbody>
-${people.map(p => `<tr><td class="l">${esc(p.m.full_name)}</td><td>${p.n ? `${p.ok}/${p.n}` : '—'}</td><td>${p.open}</td><td>${p.tk}</td><td>${p.dn}</td><td>${p.min ? esc(fmtMin(p.min)) : '—'}</td></tr>`).join('')}
+<table><thead><tr><th class="l">Osoba</th><th>Klienci rozliczeni</th><th>Kratki otwarte</th><th>Zgłoszenia otwarte</th><th>Zamknięte w miesiącu</th></tr></thead><tbody>
+${people.map(p => `<tr><td class="l">${esc(p.m.full_name)}</td><td>${p.n ? `${p.ok}/${p.n}` : '—'}</td><td>${p.open}</td><td>${p.tk}</td><td>${p.dn}</td></tr>`).join('')}
 </tbody></table>
 ${matters.length ? `<h2>Nowe sprawy M2 TAX <small>(${matters.length})</small></h2><table><tbody>${matters.map(x => `<tr><td class="l">${esc(x.number || '')}</td><td class="l">${esc(x.title)}</td><td>${esc(x.opened_at)}</td></tr>`).join('')}</tbody></table>` : ''}
 <h2>Pozostałe</h2>
-<table><tbody><tr><td class="l">Czas pracy zapisany przy klientach</td><td class="r">${esc(fmtMin(totalMin))}</td></tr>
-<tr><td class="l">Zmiany wykryte przez monitoring (VAT / KRS)</td><td class="r">${alerts.length}${alerts.filter(a => !a.resolved_at).length ? ` (niesprawdzone: ${alerts.filter(a => !a.resolved_at).length})` : ''}</td></tr>
+<table><tbody><tr><td class="l">Zmiany wykryte przez monitoring (VAT / KRS)</td><td class="r">${alerts.length}${alerts.filter(a => !a.resolved_at).length ? ` (niesprawdzone: ${alerts.filter(a => !a.resolved_at).length})` : ''}</td></tr>
 <tr><td class="l">Aktywni klienci</td><td class="r">${active.length}</td></tr></tbody></table>` }));
 
   main.replaceChildren(
@@ -92,15 +88,14 @@ ${matters.length ? `<h2>Nowe sprawy M2 TAX <small>(${matters.length})</small></h
       h('div', { class: 'card tile' + (openLate ? ' dark alert' : '') }, h('span', { class: 'num' }, String(openLate)), h('span', { class: 'lbl' }, `Zgłoszeń po terminie · braki dok.: ${missing}`))),
     h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Obciążenie zespołu')),
       h('div', { class: 'list-wrap' }, h('table', { class: 'list pl-team' },
-        h('thead', {}, h('tr', {}, ...['Osoba', 'Klienci rozliczeni', 'Kratki otwarte', 'Zgłoszenia otwarte', 'Zamknięte w miesiącu', 'Czas pracy'].map(x => h('th', {}, x)))),
+        h('thead', {}, h('tr', {}, ...['Osoba', 'Klienci rozliczeni', 'Kratki otwarte', 'Zgłoszenia otwarte', 'Zamknięte w miesiącu'].map(x => h('th', {}, x)))),
         h('tbody', {}, people.map(p => h('tr', {}, h('td', {}, h('b', {}, p.m.full_name)),
           h('td', {}, p.n ? h('span', { class: 'frac' + (p.ok === p.n ? ' full' : '') }, h('span', { class: 'ring', style: `--p:${Math.round(p.ok * 100 / p.n)}` }), `${p.ok}/${p.n}`) : '—'),
-          h('td', {}, String(p.open)), h('td', {}, String(p.tk)), h('td', {}, String(p.dn)), h('td', {}, p.min ? fmtMin(p.min) : '—'))))))),
+          h('td', {}, String(p.open)), h('td', {}, String(p.tk)), h('td', {}, String(p.dn)))))))),
     h('div', { class: 'two' },
       h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, `Nowe sprawy M2 TAX (${matters.length})`)),
         ...(matters.length ? matters.map(x => h('a', { class: 'tk-mini', href: `#/doradztwo/sprawa/${x.id}` }, h('span', {}, `${x.number || ''} ${x.title}`), h('span', { class: 'small muted' }, x.opened_at))) : [h('p', { class: 'hint' }, hasModule('doradztwo') ? 'Brak nowych spraw w tym miesiącu.' : 'Brak dostępu do modułu M2 TAX.')])),
       h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Pozostałe')),
-        h('div', { class: 'pl-dl' }, h('span', {}, 'Czas pracy przy klientach'), h('b', {}, fmtMin(totalMin))),
         h('div', { class: 'pl-dl' }, h('span', {}, 'Zmiany z monitoringu (VAT / KRS)'), h('b', {}, String(alerts.length))),
         h('div', { class: 'pl-dl' }, h('span', {}, 'Aktywni klienci'), h('b', {}, String(active.length))))));
 }

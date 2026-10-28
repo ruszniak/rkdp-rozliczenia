@@ -1,9 +1,9 @@
 // „Dziś” – lista na dzisiaj dla zalogowanej osoby: kratki do zrobienia (odhaczane w miejscu, na telefonie przesunięciem),
-// zgłoszenia, terminy obowiązków w 7 dni, braki dokumentów z prośbą do klienta, terminy spraw M2, monitoring, zapis czasu pracy.
+// zgłoszenia, terminy obowiązków w 7 dni, braki dokumentów z prośbą do klienta, terminy spraw M2, monitoring.
 import { h, icon, toast, toastAction, fail, periodLabel, defaultPeriod } from '../ui.js';
 import { sb, state, hasModule } from '../store.js';
 import { STATUS, STATUS_ORDER, sectionOf } from '../dict.js';
-import { fetchAll, fetchSoft, loadClients, todayIso, addDays, fmtShort, weekday, fmtMin } from '../data.js';
+import { fetchAll, fetchSoft, loadClients, todayIso, addDays, fmtShort, weekday } from '../data.js';
 import { obligationsInMonth, obligationStatus, KINDS } from '../obowiazki.js';
 import { TK_OPEN, statusTag, dueTag } from './zgloszenia.js';
 import { openPop, closePop } from '../pop.js';
@@ -135,21 +135,6 @@ export async function renderDzis(box, D) {
   }
   drawStats(); drawItems();
 
-  // ---------- czas pracy ----------
-  const cSel = h('select', { class: 'select' }, h('option', { value: '' }, 'Klient…'), ...(myClients.length ? myClients : clients.filter(c => c.status === 'aktywny')).map(c => h('option', { value: c.id }, c.name)));
-  const mins = h('input', { class: 'input', type: 'number', min: 5, step: 5, value: 30, style: { width: '84px' } });
-  const desc = h('input', { class: 'input grow', placeholder: 'Opis (opcjonalnie)' });
-  const timeBox = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Zapisz czas pracy'), h('a', { class: 'small', href: '#/rentownosc' }, 'Rentowność →')),
-    h('div', { class: 'dz-time' }, cSel, mins, h('span', { class: 'muted small' }, 'min'), desc,
-      h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
-        const m = Math.round(+mins.value);
-        if (!cSel.value) return toast('Wybierz klienta', true);
-        if (!(m > 0 && m <= 1440)) return toast('Podaj liczbę minut', true);
-        const { error } = await sb.from('client_time').insert({ client_id: cSel.value, minutes: m, description: desc.value.trim() || null, work_date: today });
-        if (error) return fail(error, 'Nie zapisano czasu');
-        toast(`Zapisano ${fmtMin(m)} – ${cBy.get(cSel.value)?.name}`); desc.value = '';
-      } }, 'Zapisz')));
-
   const sec = (title, link, ...els) => h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, title), link || null), ...els);
   box.replaceChildren(stats, h('div', { class: 'two dz' },
     h('div', {}, sec(`Moje kratki – ${periodLabel(period).toLowerCase()}`, h('a', { class: 'small', href: `#/rozliczenia?okres=${period}` }, 'Rozliczenia →'),
@@ -168,8 +153,8 @@ export async function renderDzis(box, D) {
           r ? h('span', { class: 'small ' + (r.files_count ? 'ok-t' : 'muted') }, r.files_count ? `klient wgrał ${r.files_count} plik.` : r.sent_at ? `poproszono ${fmtShort(r.sent_at.slice(0, 10))}` : 'prośba niewysłana')
             : h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openDocRequest(c, period, entries.filter(e => e.client_id === c.id && e.status === 'missing_docs').map(e => e.task_code)) }, icon('mail'), 'Poproś'));
       })) : null,
-      myAlerts.length ? sec('Monitoring – zmiany u klientów', null, ...myAlerts.map(a => h('a', { class: 'tk-mini', href: `#/klient/${a.client_id}`, 'data-panel': a.client_id }, h('div', { style: { minWidth: 0 } }, h('b', {}, cBy.get(a.client_id)?.name || ''), h('div', { class: 'small muted' }, a.summary))))) : null,
-      timeBox)));
+      myAlerts.length ? sec('Monitoring – zmiany u klientów', null, ...myAlerts.map(a => h('a', { class: 'tk-mini', href: `#/klient/${a.client_id}`, 'data-panel': a.client_id }, h('div', { style: { minWidth: 0 } }, h('b', {}, cBy.get(a.client_id)?.name || ''), h('div', { class: 'small muted' }, a.summary))))) : null
+    )));
   function groupObl(list) {
     const g = new Map();
     list.sort((a, b) => a.date.localeCompare(b.date)).forEach(o => { const k = o.date + '|' + o.kind; if (!g.has(k)) g.set(k, []); g.get(k).push(o); });

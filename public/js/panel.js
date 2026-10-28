@@ -1,9 +1,9 @@
 // Karta klienta w panelu bocznym: dane, kratki z bieżącego miesiąca, uwagi, prośby o dokumenty, zgłoszenia,
-// najbliższe terminy, czas pracy, monitoring. Lista pod spodem zostaje na miejscu.
+// najbliższe terminy, monitoring. Lista pod spodem zostaje na miejscu.
 import { h, icon, toast, toastAction, fail, periodLabel, defaultPeriod, initials } from './ui.js';
 import { sb, state, memberById, hasModule } from './store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, VAT_SHORT, PIT_SHORT, CIT_SHORT, sectionOf } from './dict.js';
-import { CLIENT_COLS, todayIso, fmtShort, fmtFull, fmtMin, plMoney, fetchSoft } from './data.js';
+import { CLIENT_COLS, todayIso, fmtShort, fmtFull, fetchSoft } from './data.js';
 import { obligationsInMonth, KINDS } from './obowiazki.js';
 import { openPop, closePop } from './pop.js';
 import { openDocRequest, uploadLink } from './prosba.js';
@@ -45,13 +45,12 @@ export async function openClientPanel(id) {
   document.addEventListener('keydown', onEsc);
 
   const period = defaultPeriod(), pdate = period + '-01', today = todayIso();
-  const [{ data: c, error }, { data: ents }, { data: note }, { data: tickets }, reqs, times, alerts, files] = await Promise.all([
+  const [{ data: c, error }, { data: ents }, { data: note }, { data: tickets }, reqs, alerts, files] = await Promise.all([
     sb.from('clients').select(CLIENT_COLS + ',address,regon,notes').eq('id', id).maybeSingle(),
     sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at').eq('client_id', id).eq('period', pdate),
     sb.from('period_notes').select('notes,questions').eq('client_id', id).eq('period', pdate).maybeSingle(),
     sb.from('rkdp_tickets').select('id,no,title,status,due_date,priority').eq('client_id', id).in('status', ['nowe', 'w_toku', 'czeka']).order('due_date'),
     fetchSoft(() => sb.from('doc_requests').select('*').eq('client_id', id).order('created_at', { ascending: false })),
-    fetchSoft(() => sb.from('client_time').select('*').eq('client_id', id).gte('work_date', period.slice(0, 4) + '-01-01').order('work_date', { ascending: false })),
     fetchSoft(() => sb.from('monitor_alerts').select('*').eq('client_id', id).eq('module', 'rkdp').order('created_at', { ascending: false })),
     fetchSoft(() => sb.from('period_files').select('id').eq('client_id', id).eq('period', pdate)),
   ]);
@@ -85,22 +84,6 @@ export async function openClientPanel(id) {
     if (!silent) toastAction(`${c.name}: ${STATUS[s].label}`, 'Cofnij', () => set(e, before, true));
   }
   drawCells();
-
-  // czas pracy (rentowność)
-  const monthMin = (times || []).filter(t => t.work_date.startsWith(period)).reduce((a, t) => a + t.minutes, 0);
-  const yearMin = (times || []).reduce((a, t) => a + t.minutes, 0);
-  const mins = h('input', { class: 'input', type: 'number', min: 5, max: 600, step: 5, value: 30, style: { width: '86px' }, 'aria-label': 'Minuty' });
-  const desc = h('input', { class: 'input grow', placeholder: 'Co zrobiono (np. księgowanie, rozmowa z klientem)' });
-  const timeList = h('div', { class: 'cp-list' }, (times || []).slice(0, 5).map(t => h('div', { class: 'cp-li' }, h('span', {}, fmtShort(t.work_date), ' · ', fmtMin(t.minutes)), h('span', { class: 'muted small' }, (memberById(t.member_id)?.short_name || '') + (t.description ? ' – ' + t.description : '')))));
-  const addTime = async () => {
-    const m = Math.round(+mins.value);
-    if (!(m > 0 && m <= 1440)) return toast('Podaj liczbę minut', true);
-    const { error: er } = await sb.from('client_time').insert({ client_id: c.id, minutes: m, description: desc.value.trim() || null, work_date: today });
-    if (er) return fail(er, 'Nie zapisano czasu');
-    toast(`Zapisano ${fmtMin(m)} – ${c.name}`); desc.value = '';
-    timeList.prepend(h('div', { class: 'cp-li' }, h('span', {}, fmtShort(today), ' · ', fmtMin(m)), h('span', { class: 'muted small' }, state.me.short_name)));
-  };
-  const rate = c.monthly_fee && monthMin ? (c.monthly_fee / (monthMin / 60)) : null;
 
   // zdjęcie dokumentu / plik do bieżącego miesiąca
   const cam = h('input', { type: 'file', accept: 'image/*,application/pdf', capture: 'environment', hidden: true });
@@ -147,11 +130,5 @@ export async function openClientPanel(id) {
     h('a', { class: 'small', href: '#/terminy', onclick: () => closePanel() }, 'Kalendarz obowiązków →')),
     sec('Zgłoszenia w toku', (tickets || []).length ? h('div', { class: 'cp-list' }, tickets.map(t => h('a', { class: 'cp-li', href: `#/zgloszenia/${t.id}`, onclick: () => closePanel() }, h('span', {}, `#${t.no} ${t.title}`), h('span', { class: 'muted small' }, t.due_date ? fmtShort(t.due_date) : ''))))
       : h('p', { class: 'muted small' }, 'Brak otwartych zgłoszeń.')),
-    sec('Czas pracy', h('div', { class: 'cp-kpis' },
-      h('div', {}, h('b', {}, fmtMin(monthMin)), h('span', {}, 'w tym miesiącu')),
-      h('div', {}, h('b', {}, fmtMin(yearMin)), h('span', {}, `w ${period.slice(0, 4)}`)),
-      h('div', {}, h('b', {}, c.monthly_fee ? plMoney(c.monthly_fee) : '—'), h('span', {}, 'honorarium / mies.')),
-      h('div', { class: rate && rate < 150 ? 'low' : '' }, h('b', {}, rate ? plMoney(rate) + '/h' : '—'), h('span', {}, 'stawka efektywna'))),
-    h('div', { class: 'cp-time' }, mins, h('span', { class: 'muted small' }, 'min'), desc, h('button', { class: 'btn btn-primary btn-sm', onclick: addTime }, 'Zapisz')), timeList),
   ].filter(Boolean));
 }

@@ -28,7 +28,7 @@ export function rememberRecent(item) {
 }
 const recents = () => { try { return JSON.parse(localStorage.getItem(RKEY) || '[]').map(x => ({ ...x, group: 'Ostatnio otwierane', icon: 'recent' })); } catch { return []; } };
 
-// polecenia: „nowe zgłoszenie kowalski”, „oznacz pit nowak”, „poproś o dokumenty nowak”, „czas 30 nowak”
+// polecenia: „nowe zgłoszenie kowalski”, „oznacz pit nowak”, „poproś o dokumenty nowak”
 const TASK_WORDS = [[/^(pit|cit|pit\/cit|zaliczka)$/, 'pit_cit'], [/^vat$/, 'vat'], [/^jpk$/, 'jpk'], [/^saldeo$/, 'saldeo'], [/^(rewizor|ksiegowanie|ksiegi)$/, 'ksiegowanie'],
   [/^(pit4|pit-4)$/, 'pit4'], [/^(wyciagi|wb|bank)$/, 'wb'], [/^zus$/, 'zus_wyslany'], [/^(podany|zus_podany)$/, 'zus_podany']];
 const STOPW = new Set(['dla', 'u', 'o', 'w', 'dokumenty', 'dokumentow', 'jako', 'zrobione', 'zrobiony', 'klienta', 'klient', 'min', 'minut']);
@@ -41,12 +41,10 @@ function commandItems(query, data) {
   else if (/^zglos/.test(verb)) kind = 'ticket';
   else if (/^oznacz|^zrob/.test(verb)) kind = 'mark';
   else if (/^popros|^prosba/.test(verb)) kind = 'docs';
-  else if (/^czas/.test(verb)) kind = 'time';
   if (!kind) return [];
-  let task = null, minutes = null;
+  let task = null;
   rest = rest.filter(t => {
     if (kind === 'mark' && !task) { const m = TASK_WORDS.find(([re]) => re.test(t)); if (m) { task = m[1]; return false; } }
-    if (kind === 'time' && minutes == null && /^\d{1,3}$/.test(t)) { minutes = +t; return false; }
     return !STOPW.has(t);
   });
   const clients = data.filter(d => d.group === 'Klienci RKDP' && rest.length && rest.every(t => d._n.includes(t))).slice(0, 5);
@@ -56,7 +54,6 @@ function commandItems(query, data) {
     const cl = { id: c.href.split('/').pop(), name: c.label, email: c.email || null };
     if (kind === 'ticket') out.push({ group: 'Polecenia', icon: 'bolt', label: `Nowe zgłoszenie dla: ${c.label}`, run: async () => { const z = await import('./views/zgloszenia.js'); z.newTicketDialog({ client: cl }).catch(fail); } });
     if (kind === 'docs') out.push({ group: 'Polecenia', icon: 'bolt', label: `Poproś o dokumenty: ${c.label}`, meta: periodLabel(defaultPeriod()), run: async () => { const { openDocRequest } = await import('./prosba.js'); const { data: full } = await sb.from('clients').select('id,name,email').eq('id', cl.id).maybeSingle(); openDocRequest(full || cl, defaultPeriod(), []); } });
-    if (kind === 'time') out.push({ group: 'Polecenia', icon: 'bolt', label: `Zapisz czas pracy: ${minutes || '?'} min – ${c.label}`, run: () => logTime(cl, minutes) });
     if (kind === 'mark') out.push({ group: 'Polecenia', icon: 'bolt', label: task ? `Oznacz „${label}” jako zrobione – ${c.label}` : `Oznacz… (dopisz: pit, vat, jpk, saldeo, rewizor, zus, pit4) – ${c.label}`, meta: periodLabel(defaultPeriod()), run: () => task ? markTask(cl, task, label) : null });
   }
   if (!clients.length) out.push({ group: 'Polecenia', icon: 'bolt', label: rest.length ? 'Nie znaleziono klienta – dopisz fragment nazwy' : 'Dopisz nazwę klienta…', run: () => null });
@@ -72,14 +69,6 @@ async function markTask(c, code, label) {
   if (e2) return fail(e2);
   toastAction(`${c.name} · ${label}: ${STATUS.done.label}`, 'Cofnij', async () => { await sb.from('checklist_entries').update({ status: before }).eq('id', e.id); toast('Cofnięto'); });
 }
-async function logTime(c, minutes) {
-  let m = minutes;
-  if (!m) { const v = prompt(`Ile minut pracy przy: ${c.name}?`, '30'); m = Math.round(+v); }
-  if (!(m > 0 && m <= 1440)) return;
-  const { error } = await sb.from('client_time').insert({ client_id: c.id, minutes: m, work_date: new Date().toLocaleDateString('sv-SE') });
-  if (error) return fail(error, 'Nie zapisano czasu');
-  toast(`Zapisano ${m} min – ${c.name}`);
-}
 const icon = k => { const s = h('span', { class: 'i', 'aria-hidden': 'true' }); s.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`; return s; };
 const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
 
@@ -90,7 +79,7 @@ function staticItems() {
   if (isJpkOnly()) out.push(tool('Podgląd JPK_CIT', '#/jpk'), go('Regulamin', '#/regulamin'));
   else {
     if (hasModule('rozliczenia')) out.push(go('Dziś – moja lista na dzisiaj', '#/pulpit?widok=dzis', 'RKDP'), go('Kalendarz obowiązków klientów', '#/terminy', 'RKDP'), go('Zamknięcie roku', '#/zamkniecie-roku', 'RKDP'),
-      go('Rentowność klientów', '#/rentownosc', 'RKDP'), ...(state.me?.role === 'admin' ? [go('Raport miesięczny dla zarządu', '#/raport', 'RKDP')] : []),
+      ...(state.me?.role === 'admin' ? [go('Raport miesięczny dla zarządu', '#/raport', 'RKDP')] : []),
       { group: 'Akcje', label: 'Nowe zgłoszenie', meta: 'albo: nowe zgłoszenie <klient>', icon: 'bolt', run: async () => { const z = await import('./views/zgloszenia.js'); z.newTicketDialog().catch(fail); } },
       go('Pulpit', '#/pulpit', 'RKDP'), go('Rozliczenia', '#/rozliczenia', 'RKDP'), go('Klienci', '#/klienci', 'RKDP'), go('Zgłoszenia', '#/zgloszenia', 'RKDP'), go('Dokumenty', '#/dokumenty', 'RKDP'),
       tool('Protokół ZZW – zatwierdzenie sprawozdania', '#/sprawozdania/nowy'), tool('Oferta na usługi', '#/oferty/nowa'), tool('Weryfikacja AML', '#/aml'));
@@ -199,7 +188,7 @@ export function openCmdk() {
       h('div', { class: 'cmdk-in' }, (() => { const s = h('span', { 'aria-hidden': 'true' }); s.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'; return s; })(), input, h('kbd', {}, 'Esc')),
       list,
       h('div', { class: 'cmdk-foot' }, h('span', {}, '↑ ↓ wybór'), h('span', {}, 'Enter otwórz'), h('span', {}, 'Shift+Enter pełna karta'), h('span', {}, 'Esc zamknij'),
-        h('span', { style: { marginLeft: 'auto' }, 'data-tip': 'Polecenia: „nowe zgłoszenie kowalski”, „oznacz pit nowak”, „poproś nowak”, „czas 30 nowak”' }, 'Polecenia: nowe zgłoszenie · oznacz · poproś · czas'))));
+        h('span', { style: { marginLeft: 'auto' }, 'data-tip': 'Polecenia: „nowe zgłoszenie kowalski”, „oznacz pit nowak”, „poproś nowak”' }, 'Polecenia: nowe zgłoszenie · oznacz · poproś'))));
   document.body.append(back); openEl = back;
   document.addEventListener('keydown', onKey, true);
   draw(); input.focus();

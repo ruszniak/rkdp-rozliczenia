@@ -28,7 +28,6 @@ const renderKalkulator = lazy(() => import('./views/kalkulator.js'), 'renderKalk
 const renderWzory = lazy(() => import('./views/wzory.js'), 'renderWzory');
 const renderTerminy = lazy(() => import('./views/terminy.js'), 'renderTerminy');
 const renderRok = lazy(() => import('./views/rok.js'), 'renderRok');
-const renderRentownosc = lazy(() => import('./views/rentownosc.js'), 'renderRentownosc');
 const renderRaport = lazy(() => import('./views/raport.js'), 'renderRaport');
 // po wyświetleniu pierwszego ekranu pobieramy w tle pozostałe widoki, żeby przełączanie zakładek było natychmiastowe
 const prefetchViews = () => {
@@ -229,7 +228,6 @@ async function route(opts = {}) {
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('rozliczenia'), params);
     else if (view === 'zamkniecie-roku') c = await renderRok(layout('rozliczenia'), params);
-    else if (view === 'rentownosc' && ['admin', 'full'].includes(state.me.role)) c = await renderRentownosc(layout('klienci'), params);
     else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('pulpit'), params);
     else if (view === 'zgloszenia') c = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
     else if (view === 'dokumenty') c = await renderDokumenty(layout('sprawozdania'));
