@@ -224,6 +224,8 @@ export async function renderZespol(main) {
       'Niezależnie od tego co noc wykonywana jest automatyczna, zaszyfrowana kopia bazy w GitHubie. ',
       'Plik zawiera dane osobowe – trzymaj go na zaszyfrowanym dysku.')));
 
+  main.append(saldeoSection());
+
   // ---------- ustawienia M2 TAX ----------
   const [{ data: settings }, { data: signers }] = await Promise.all([
     sb.from('app_settings').select('key,value'), sb.from('m2_signers').select('*').order('sort')]);
@@ -299,4 +301,70 @@ function gcalBox() {
     st,
     h('p', { class: 'hint', style: { margin: '6px 0 10px' } }, 'Nowe terminy i oznaczenie „wykonane” trafiają do Google od razu. „Wyślij terminy do Google” przesyła wszystkie terminy od 60 dni wstecz (np. po pierwszym podłączeniu).'),
     h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, h('button', { class: 'btn btn-outline btn-sm', onclick: check }, 'Sprawdź połączenie'), syncBtn));
+}
+
+// ---------- SaldeoSMART: dopasowanie firm i automatyczne kratki ----------
+const SALDEO_HELP = `Jak podłączyć SaldeoSMART (jednorazowo):
+
+1. SaldeoSMART → konto administratora biura → Ustawienia → API: wygeneruj NOWY token tylko dla aplikacji RKDP (nie ten, którego używa e-bit – wtedy wyłączenie jednego nie psuje drugiego).
+2. Supabase → projekt rkdp-rozliczenia → Edge Functions → Secrets → „Add new secret”:
+   • SALDEO_USERNAME – login użytkownika, do którego należy token,
+   • SALDEO_TOKEN – token API.
+   Tokenu nie wysyłaj mailem ani na czacie.
+3. Kliknij „Połącz i dopasuj firmy po NIP”. Firmy bez NIP-u albo z innym NIP-em dopasuj ręcznie z listy.
+
+Co robi automat (dni robocze ok. 7:20, 11:20 i 15:20, albo przycisk „Saldeo” w Rozliczeniach):
+• „Saldeo” – zaznacza, gdy klient zatwierdził w miesiącu co najmniej jedną fakturę z KSeF albo zaznaczył „komplet dokumentów”.
+• „Rewizor” – zaznacza, gdy wszystkie dokumenty miesiąca zostały przeniesione do programu księgowego (przez e-bit).
+Tylko odczytuje dane z Saldeo – niczego tam nie zmienia. Zaznacza wyłącznie kratki „do zrobienia”, nigdy nie odznacza. Jeśli ktoś odznaczy kratkę zaznaczoną przez automat, automat nie zaznaczy jej ponownie w tym miesiącu.`;
+
+function saldeoSection() {
+  const st = h('p', { class: 'small' }, 'Sprawdzam połączenie…');
+  const listBox = h('div');
+  const runsBox = h('div');
+  let companies = [];
+  const call = async (body) => { const { data, error } = await sb.functions.invoke('saldeo', { body }); if (error) throw error; return data; };
+  const showStatus = (d) => {
+    if (d.configured === false) { st.replaceChildren(h('b', {}, 'Niepodłączone. '), d.reason || ''); listBox.replaceChildren(); return; }
+    companies = d.companies || [];
+    st.replaceChildren(h('b', { style: { color: 'var(--ok)' } }, '✓ Połączono. '),
+      `Firm w Saldeo: ${companies.length} · dopasowanych klientów: ${d.matched}` + (d.unmatched?.length ? ` · bez dopasowania: ${d.unmatched.length}` : ''));
+    if (!d.unmatched?.length) { listBox.replaceChildren(); return; }
+    const used = new Set(d.used || []);
+    listBox.replaceChildren(h('p', { class: 'eyebrow', style: { margin: '12px 0 6px' } }, 'Aktywni klienci bez firmy w Saldeo'),
+      h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
+        h('thead', {}, h('tr', {}, h('th', {}, 'Klient'), h('th', {}, 'NIP'), h('th', {}, 'Firma w Saldeo'))),
+        h('tbody', {}, ...d.unmatched.map(c => {
+          const sel = h('select', { class: 'select' }, h('option', { value: '' }, '— nie dotyczy / brak w Saldeo —'),
+            ...companies.filter(x => !used.has(x.id)).map(x => h('option', { value: x.id }, `${x.name}${x.nip ? ' · ' + x.nip : ''}`)));
+          sel.addEventListener('change', async () => {
+            const { error } = await sb.from('clients').update({ saldeo_company_id: sel.value || null }).eq('id', c.id);
+            if (error) return fail(error); toast('Zapisano');
+          });
+          return h('tr', {}, h('td', {}, c.name), h('td', {}, c.nip || '—'), h('td', {}, sel));
+        })))));
+  };
+  const loadRuns = async () => {
+    const { data } = await sb.from('integration_runs').select('*').eq('source', 'saldeo').order('started_at', { ascending: false }).limit(6);
+    if (!data?.length) return runsBox.replaceChildren();
+    const fmt = iso => iso ? new Date(iso).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '…';
+    runsBox.replaceChildren(h('p', { class: 'eyebrow', style: { margin: '14px 0 6px' } }, 'Ostatnie sprawdzenia'),
+      h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
+        h('thead', {}, h('tr', {}, ...['Kiedy', 'Miesiąc', 'Uruchomienie', 'Firm', 'Zaznaczono', 'Błędy'].map(t => h('th', {}, t)))),
+        h('tbody', {}, ...data.map(r => h('tr', {}, h('td', {}, fmt(r.started_at)), h('td', {}, r.period ? r.period.slice(0, 7) : '—'),
+          h('td', {}, r.trigger + (r.run_by ? ` (${r.run_by})` : '')), h('td', {}, r.companies ?? '—'), h('td', {}, r.ticked ?? '—'),
+          h('td', { 'data-tip': (r.errors || []).slice(0, 8).join('\n') || null }, (r.errors || []).length || (r.finished_at ? '0' : 'w toku'))))))));
+  };
+  const check = async () => { st.textContent = 'Sprawdzam połączenie…'; try { showStatus(await call({ action: 'status' })); } catch (e) { st.textContent = 'Nie udało się sprawdzić: ' + (e.message || e); } };
+  const matchBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+    matchBtn.disabled = true;
+    try { const d = await call({ action: 'match' }); if (d.configured !== false) toast(`Dopasowano po NIP: ${d.newly ?? 0} nowych`); showStatus(d); } catch (e) { fail(e); }
+    matchBtn.disabled = false;
+  } }, 'Połącz i dopasuj firmy po NIP');
+  check(); loadRuns();
+  return h('section', { class: 'card section', style: { marginTop: '16px' } },
+    h('div', { class: 'section-head' }, h('h2', { style: { display: 'flex', alignItems: 'center' } }, 'SaldeoSMART – automatyczne kratki', infoTip(SALDEO_HELP, 'SaldeoSMART – podłączenie'))),
+    h('p', { class: 'hint', style: { margin: '0 0 8px' } }, 'Kratka „Saldeo”: klient zatwierdził fakturę z KSeF albo oznaczył komplet dokumentów. Kratka „Rewizor”: e-bit przeniósł wszystkie dokumenty miesiąca. Tylko odczyt z Saldeo – niczego tam nie zmienia.'),
+    st, h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, h('button', { class: 'btn btn-outline btn-sm', onclick: () => { check(); loadRuns(); } }, 'Sprawdź połączenie'), matchBtn),
+    listBox, runsBox);
 }

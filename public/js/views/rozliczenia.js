@@ -58,7 +58,7 @@ export async function renderRozliczenia(main, params) {
   const [clients, entries, notes] = await Promise.all([
     fetchAll(() => sb.from('clients')
       .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id,email').order('name')),
-    fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at').eq('period', pdate)),
+    fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at,auto_source,auto_at,auto_detail').eq('period', pdate)),
     fetchAll(() => sb.from('period_notes').select('client_id,notes,questions').eq('period', pdate)),
   ]);
   // załączniki do uwag (tabela może jeszcze nie istnieć – wtedy po prostu brak plików)
@@ -213,7 +213,20 @@ export async function renderRozliczenia(main, params) {
   document.addEventListener('fullscreenchange', onFsChange);
   document.addEventListener('keydown', onKey);
   setFs(false);
-  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, h('span', { class: 'sel-wrap' }), exportBtn, fsBtn);
+  // Saldeo: ręczne sprawdzenie miesiąca (automat działa też sam w dni robocze 3 razy dziennie)
+  const saldeoBtn = editClients ? h('button', { class: 'btn btn-outline btn-sm', type: 'button',
+    'data-tip': 'Sprawdź w SaldeoSMART, czy klienci zatwierdzili dokumenty (kratka „Saldeo”) i czy e-bit przeniósł je do Rewizora (kratka „Rewizor”).\nAutomat tylko zaznacza kratki „do zrobienia” – niczego nie odznacza.',
+    onclick: async () => {
+      saldeoBtn.disabled = true; const label = saldeoBtn.lastChild; label.textContent = 'Sprawdzam…';
+      try {
+        const { data, error } = await sb.functions.invoke('saldeo', { body: { action: 'run', period: pdate } });
+        if (error) throw error;
+        if (data?.configured === false) toast(data.reason, true);
+        else toast(`Saldeo: sprawdzono ${data.companies} firm, zaznaczono ${data.ticked} ${data.ticked === 1 ? 'kratkę' : 'kratek'}` + (data.errors?.length ? ` · błędy: ${data.errors.length}` : ''), !!data.errors?.length);
+      } catch (e) { fail(e, 'Saldeo'); }
+      saldeoBtn.disabled = false; label.textContent = 'Saldeo';
+    } }, icon('refresh'), h('span', {}, 'Saldeo')) : null;
+  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, h('span', { class: 'sel-wrap' }), saldeoBtn, exportBtn, fsBtn);
 
   // ---------- zapisane widoki (wspólne dla wszystkich urządzeń) ----------
   const viewsBar = h('div', { class: 'views-bar' });
@@ -244,6 +257,7 @@ export async function renderRozliczenia(main, params) {
 
   const legend = h('div', { class: 'legend' },
     ['done', 'na', 'missing_docs', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
+    h('span', {}, h('span', { class: 'cb cb-done auto' }, STATUS.done.mark), 'Zaznaczone przez Saldeo'),
     h('span', { class: 'muted' }, '· kliknij kratkę, aby zmienić · najedź na nagłówek, aby zobaczyć opis'));
 
   function renderTabs() {
@@ -340,10 +354,12 @@ export async function renderRozliczenia(main, params) {
   function checkbox(entry, task, headerLabel) {
     if (!entry) return h('span', { class: 'muted small' }, '');
     const st = STATUS[entry.status];
-    const who = entry.updated_by && entry.updated_by !== 'system'
+    const isAuto = !!entry.auto_source && entry.status === 'done';
+    const who = isAuto ? 'automat Saldeo' : entry.updated_by && entry.updated_by !== 'system' && !entry.updated_by.startsWith('auto:')
       ? (state.members.find(m => m.email === entry.updated_by)?.short_name || entry.updated_by) : null;
-    const tip = `${headerLabel}: ${st.label}` + (who ? `\nZmienił(a): ${who}, ${new Date(entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
-    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry.id,
+    const tip = `${headerLabel}: ${st.label}` + (who ? `\nZmienił(a): ${who}, ${new Date(isAuto ? entry.auto_at || entry.updated_at : entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '')
+      + (isAuto && entry.auto_detail?.reason ? `\n${entry.auto_detail.reason}` : '');
+    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (isAuto ? ' auto' : '') + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry.id,
       onclick: (ev) => {
         if (ev.shiftKey && anchorId) return selectRange(ev.currentTarget);
         if (ev.ctrlKey || ev.metaKey || selectMode) return toggleSel(entry.id, ev.currentTarget);

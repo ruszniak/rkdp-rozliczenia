@@ -148,6 +148,8 @@ table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px
 .cb-na{background:var(--soft,#EFE9E0);border-color:#E3DACC;color:#A79C8E}
 .cb-missing_docs{background:var(--warn-bg);border-color:var(--warn);color:var(--warn)}
 .cb-todo{background:var(--card)}
+.cb.auto{position:relative}
+.cb.auto::after{content:'';position:absolute;right:-3px;top:-3px;width:9px;height:9px;border-radius:50%;background:var(--bronze);border:2px solid var(--card)}
 
 .person{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:4px 6px 4px 4px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink)}
 .person:hover:not([disabled]){background:var(--panel)}
