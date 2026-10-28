@@ -1454,3 +1454,20 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 .page-head h1{overflow-wrap:anywhere;hyphens:auto}
 .page-head>div:first-child{min-width:0}
 @media (max-width:700px){.page-head{flex-wrap:wrap}.page-head>div:last-child{flex-wrap:wrap}}
+/* czat uwag: zawsze mieści się w oknie; załączniki w rozmowie */
+.pop:has(.pop-chat){max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);display:flex;flex-direction:column;overflow:hidden;padding:0}
+.pop .pop-chat{position:relative;flex:1;min-height:0;max-height:calc(100dvh - 16px)}
+.pop-chat .chat-thread{flex:1 1 auto;min-height:90px;max-height:none}
+.pop-chat .chat-head,.pop-chat .chat-compose{flex:none}
+.chat-row{align-items:center}
+.chat-tool{flex:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);background:transparent;color:var(--label);display:grid;place-items:center;cursor:pointer}
+.chat-tool:hover{color:#806341;border-color:#CFAE86}
+.chat-file .chat-bub{padding:7px 8px 8px;width:220px;max-width:100%}
+.chat-file .tk-file{border-radius:10px;margin-top:4px;background:var(--card)}
+.chat-file .tk-thumb{height:110px}
+.chat-file.mine .tk-file{color:var(--text)}
+.chat-file.client .chat-bub{border-color:#C9A25A;background:#F7ECD6}
+.chat-dropzone{display:none;position:absolute;inset:6px;border:2px dashed #CFAE86;border-radius:14px;background:color-mix(in srgb,var(--card) 88%,transparent);align-items:center;justify-content:center;gap:8px;font-weight:700;color:#806341;z-index:5;pointer-events:none}
+.pop.dropping .chat-dropzone{display:flex}
+.pop.busy .chat-send{opacity:.5}
+@media (hover:hover) and (pointer:fine){.chat-tool.cam-btn{display:none}}
