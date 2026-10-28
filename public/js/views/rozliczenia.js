@@ -222,7 +222,7 @@ export async function renderRozliczenia(main, params) {
         const { data, error } = await sb.functions.invoke('saldeo', { body: { action: 'run', period: pdate } });
         if (error) throw error;
         if (data?.configured === false) toast(data.reason, true);
-        else toast(`Saldeo: sprawdzono ${data.companies} firm, zaznaczono ${data.ticked} ${data.ticked === 1 ? 'kratkę' : 'kratek'}` + (data.errors?.length ? ` · błędy: ${data.errors.length}` : ''), !!data.errors?.length);
+        else toast(`Saldeo: sprawdzono ${data.companies} firm, zaznaczono ${data.ticked} ${data.ticked === 1 ? 'kratkę' : 'kratek'}` + (data.remaining ? ` · do sprawdzenia jeszcze ${data.remaining} (kliknij ponownie)` : '') + (data.errors?.length ? ` · ${data.errors[0]}${data.errors.length > 1 ? ` (+${data.errors.length - 1})` : ''}` : ''), !!data.errors?.length);
       } catch (e) { fail(e, 'Saldeo'); }
       saldeoBtn.disabled = false; label.textContent = 'Saldeo';
     } }, icon('refresh'), h('span', {}, 'Saldeo')) : null;
