@@ -3,6 +3,9 @@ import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, inv
 import { renderLogin } from './views/login.js';
 import { TERMS_VERSION } from './regulamin.js';
 import { registerSW } from './push.js';
+import { openCmdk, initShortcuts } from './cmdk.js';
+import { getTheme, toggleTheme, onThemeChange, ICON_MOON, ICON_SUN } from './motyw.js';
+const LIGHT_LOGO = src => src.replace('/m2tax-logo.png', '/m2tax-logo-light.png');
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
 const renderRozliczenia = lazy(() => import('./views/rozliczenia.js'), 'renderRozliczenia');
@@ -82,6 +85,7 @@ const TAB_ICONS = {
 TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
 const TAB_SHORT = { 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
 
+let themeOff = null;
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
 function layout(active) {
   const me = state.me;
@@ -98,7 +102,7 @@ function layout(active) {
       href: MODULES[k].home, role: 'menuitem', class: k === mod ? 'on' : null,
       onclick: () => { remember(k); menu.hidden = true; },
       'aria-label': MODULES[k].full, title: MODULES[k].full },
-      h('img', { src: MODULES[k].logo, alt: MODULES[k].label }))));
+      h('img', { src: LIGHT_LOGO(MODULES[k].logo), alt: MODULES[k].label }))));
     const btn = h('button', { class: 'mod-switch', type: 'button', 'aria-haspopup': 'menu', title: 'Zmień moduł',
       onclick: (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; e.currentTarget.setAttribute('aria-expanded', String(!menu.hidden)); } }, M.label, h('span', { class: 'caret' }, '▾'));
     return h('div', { class: 'mod-wrap' }, btn, menu);
@@ -111,12 +115,17 @@ function layout(active) {
   const header = h('header', { class: 'site-header' },
     h('div', { class: 'wrap nav' },
       h('div', { class: 'nav-brand' },
-        h('a', { href: M.home, class: 'brand-logo' }, h('img', { src: M.logo, alt: M.alt })),
+        h('a', { href: M.home, class: 'brand-logo' }, h('img', { src: LIGHT_LOGO(M.logo), alt: M.alt })),
         switcher),
       h('nav', { class: 'nav-links' },
         ...M.tabs.map(link),
         me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
       h('div', { class: 'nav-user' },
+        (() => { const b = h('button', { type: 'button', class: 'hdr-search', onclick: () => openCmdk(), 'aria-label': 'Szukaj (Ctrl K)', 'data-tip': 'Szukaj klienta, sprawy, zgłoszenia, narzędzia' });
+          b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Szukaj…</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl') + ' K</kbd>'; return b; })(),
+        (() => { const b = h('button', { type: 'button', class: 'hdr-icon', onclick: () => toggleTheme() });
+          const draw = () => { const d = getTheme() === 'dark'; b.innerHTML = d ? ICON_SUN : ICON_MOON; b.setAttribute('aria-label', d ? 'Motyw jasny' : 'Motyw ciemny'); b.setAttribute('data-tip', d ? 'Przełącz na motyw jasny' : 'Przełącz na motyw ciemny'); };
+          draw(); themeOff?.(); themeOff = onThemeChange(draw); return b; })(),
         jpkOnly ? null : (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
         jpkOnly ? h('span', { class: 'who' }, me.full_name) : h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
         jpkOnly ? h('span', { class: 'avatar', title: me.email }, initials(me.full_name)) : h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, initials(me.full_name)),
@@ -153,7 +162,7 @@ async function loadContext() {
 
 // ---------- przełączanie widoków bez „pustej strony” ----------
 // Nowy widok rysuje się poza ekranem; stary zostaje widoczny (z paskiem postępu) do chwili, gdy nowy jest gotowy.
-let pending = null, routing = false, routeSeq = 0, keepScrollY = null;
+let pending = null, routing = false, routeSeq = 0, keepScrollY = null, animate = true;
 const prog = h('div', { id: 'nprog', 'aria-hidden': 'true' });
 document.body.append(prog);
 let progTimer = null;
@@ -162,6 +171,7 @@ const hideProgress = () => { clearTimeout(progTimer); prog.classList.remove('on'
 function commit() {
   if (!pending) return;
   app.replaceChildren(...pending); pending = null; hideProgress();
+  const mn = app.querySelector('main'); if (mn && animate) mn.classList.add('view-enter');
   if (keepScrollY !== null) { const y = keepScrollY; requestAnimationFrame(() => window.scrollTo(0, y)); } else window.scrollTo(0, 0);
 }
 // od razu podświetl klikniętą zakładkę – nie czekając na dane
@@ -174,7 +184,7 @@ function markActiveTab() {
 
 async function route(opts = {}) {
   const seq = ++routeSeq;
-  routing = true; keepScrollY = opts.keepScroll ? window.scrollY : null;
+  routing = true; keepScrollY = opts.keepScroll ? window.scrollY : null; animate = !opts.silent;
   if (!opts.silent) { markActiveTab(); showProgress(); }
   const early = setTimeout(() => { if (seq === routeSeq) commit(); }, opts.silent ? 4000 : 700);
   let c = null;
@@ -265,6 +275,7 @@ async function start() {
     if (!(await termsGate({ onLogout: logout, first: !tsRes.data.last }))) return;
   }
   window.addEventListener('hashchange', () => route());
+  initShortcuts();
   // dane w bazie zmieniły się od ostatniej wizyty – przerysuj widok po cichu, o ile użytkownik nic teraz nie wpisuje
   let lastAuto = 0;
   setStaleHandler(() => {

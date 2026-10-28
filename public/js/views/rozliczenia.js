@@ -656,7 +656,7 @@ export async function renderRozliczenia(main, params) {
 <style>
 @page{size:A4 landscape;margin:10mm}
 *{box-sizing:border-box}body{font-family:Montserrat,Arial,sans-serif;color:#1D1A16;font-size:9.5px;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #7A5A37;padding-bottom:6px;margin-bottom:8px}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #806341;padding-bottom:6px;margin-bottom:8px}
 header h1{font-size:16px;margin:0}header p{margin:2px 0 0;color:#6A6157}
 header img{height:28px}
 h2{font-size:12px;margin:12px 0 4px}h2 small{font-weight:400;color:#6A6157}
