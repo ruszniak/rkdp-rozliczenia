@@ -276,7 +276,7 @@ export async function renderAml(main, module) {
   const tbody = h('tbody');
   const base = isM2 ? '#/doradztwo/klient/' : '#/klient/';
   const draw = () => {
-    document.querySelectorAll('.aml-tiles [data-st]').forEach(b => { const on = b.dataset.st === f.st; b.classList.toggle('on', on); b.classList.toggle('dark', on); b.setAttribute('aria-pressed', String(on)); });
+    document.querySelectorAll('.aml-tiles [data-st]').forEach(b => { const on = b.dataset.st === f.st; b.classList.toggle('on', on); b.classList.toggle('dark', on || b.classList.contains('alert')); b.setAttribute('aria-pressed', String(on)); });
     const rows = active.filter(c => (!f.q || (c.name + ' ' + (c.nip || '')).toLowerCase().includes(f.q.toLowerCase())) && (!f.st || (f.st === 'przeglad' ? due(c) : stateOf(c) === f.st)));
     tbody.replaceChildren(...(rows.length ? rows.map(c => {
       const k = byClient.get(c.id);
@@ -288,7 +288,7 @@ export async function renderAml(main, module) {
     }) : [h('tr', {}, h('td', { colspan: 7, class: 'empty' }, 'Brak klientów dla wybranych filtrów.'))]));
   };
   const cnt = s => active.filter(c => stateOf(c) === s).length;
-  const tile = (n, l, st, dark) => h('button', { type: 'button', class: 'card tile tile-btn' + (dark ? ' alert' : '') + (f.st === st ? ' on dark' : ''), 'aria-pressed': String(f.st === st), 'data-st': st, style: { textAlign: 'left', cursor: 'pointer' }, onclick: () => { f.st = f.st === st ? '' : st; sSel.value = f.st; draw(); } }, h('span', { class: 'lbl' }, l), h('span', { class: 'num' }, String(n)));
+  const tile = (n, l, st, dark) => h('button', { type: 'button', class: 'card tile tile-btn' + (dark ? ' dark alert' : '') + (f.st === st ? ' on dark' : ''), 'aria-pressed': String(f.st === st), 'data-st': st, style: { textAlign: 'left', cursor: 'pointer' }, onclick: () => { f.st = f.st === st ? '' : st; sSel.value = f.st; draw(); } }, h('span', { class: 'lbl' }, l), h('span', { class: 'num' }, String(n)));
   const q = h('input', { class: 'input', placeholder: 'Szukaj klienta lub NIP…', oninput: e => { f.q = e.target.value; draw(); } });
   const sSel = h('select', { class: 'select', style: { width: 'auto' }, onchange: e => { f.st = e.target.value; draw(); } }, h('option', { value: '' }, 'Wszystkie statusy'), ...Object.entries(AML_STATUS).map(([k, v]) => h('option', { value: k }, v.label)), h('option', { value: 'przeglad' }, 'Przegląd w 30 dni / zaległy'));
   const prog = h('span', { class: 'small muted' });

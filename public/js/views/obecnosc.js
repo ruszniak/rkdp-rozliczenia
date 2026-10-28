@@ -248,7 +248,7 @@ export async function renderObecnosc(main, sub, params) {
   const sumBox = h('div', { class: 'tiles' });
   const drawSum = () => {
     const s = summarize(m, [...by.values()]);
-    const tile = (n, l, dark) => h('div', { class: 'card tile' + (dark ? ' alert' : '') }, h('span', { class: 'lbl' }, l), h('span', { class: 'num' }, n));
+    const tile = (n, l, dark) => h('div', { class: 'card tile' + (dark ? ' dark alert' : '') }, h('span', { class: 'lbl' }, l), h('span', { class: 'num' }, n));
     const leave = Object.keys(KINDS).filter(k => !KINDS[k].work).reduce((a, k) => a + (s.kinds[k] || 0), 0);
     sumBox.replaceChildren(tile(String(s.workDays), s.remote ? `Dni pracy (zdalnie: ${s.remote})` : 'Dni pracy'), tile(fmtH(s.workMin), `Godziny / wymiar ${fmtH(s.norm)}`),
       tile(String(leave), 'Urlopy i nieobecności'), tile(String(s.missing), 'Dni robocze bez wpisu', s.missing > 0 && m <= curMonth()));

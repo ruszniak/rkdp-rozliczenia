@@ -211,7 +211,7 @@ async function viewDashboard(main) {
   const late = deadlines.filter(d => d.due_date < today);
   const week = deadlines.filter(d => d.due_date >= today && d.due_date <= addDaysIso(7));
   const mine = open.filter(m => [m.lead_id, m.second_id, m.assistant_id].includes(state.me.id));
-  const tile = (n, lbl, href, dark) => h('a', { class: 'card tile' + (dark ? ' alert' : ''), href, style: { textDecoration: 'none', color: 'inherit' } },
+  const tile = (n, lbl, href, dark) => h('a', { class: 'card tile' + (dark ? ' dark alert' : ''), href, style: { textDecoration: 'none', color: 'inherit' } },
     h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n));
   const list = h('div', { class: 'card', style: { padding: '8px 0' } });
   const renderList = () => list.replaceChildren(...(deadlines.length

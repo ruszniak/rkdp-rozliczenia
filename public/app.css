@@ -1061,3 +1061,20 @@ main>.page-head:first-child{margin-top:0!important}
 .tile.alert.dark::before{background:var(--warn)}
 .tile.alert.dark .num{color:#F0A58E}
 button.tile{font:inherit;color:inherit;text-align:left}
+/* telefon: komórki listy jako siatka etykieta | wartości (kilka elementów w komórce układa się pod sobą, nie wychodzi poza ekran) */
+@media (max-width:820px){
+  table.list td:not(:first-child):not(.empty){display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);column-gap:14px;row-gap:2px;align-items:start}
+  table.list td:not(:first-child):not(.empty)::before{grid-column:1;grid-row:1;max-width:none}
+  table.list td:not(:first-child):not(.empty)>*{grid-column:2;justify-self:end;min-width:0;max-width:100%}
+  table.list td:not(:first-child):not(.empty)>br{height:0;line-height:0;overflow:hidden}
+  table.list td{overflow-wrap:anywhere}
+  table.list td .check{justify-content:flex-end;text-align:right}
+  body{overflow-x:clip}
+}
+/* ostrzeżenie = ciemny kafelek (jak wcześniej) */
+.tile.alert.dark{border-color:#1D1A16}
+.tile.alert.dark .num{color:#E0C098}
+.tile.alert.dark::before{background:linear-gradient(#E0C098,#806341)}
+:root[data-theme="dark"] .tile.alert.dark{border-color:color-mix(in srgb,#E0C098 35%,transparent)}
+@media (max-width:820px){.tr-table th,.tr-table td{white-space:normal}}
+@media (max-width:820px){.tr-table .aml-st{white-space:normal;height:auto;min-height:22px;padding:3px 10px;line-height:1.3}}

@@ -159,7 +159,7 @@ export async function renderZgloszenia(main, id, params, module = 'rkdp') {
 
   const tile = (key, dark) => {
     const n = tickets.filter(F[key][1]).length;
-    return h('button', { class: 'card tile tk-tile tile-btn' + (dark && n ? ' alert' : '') + (filter === key ? ' on dark' : ''), type: 'button', 'aria-pressed': String(filter === key), onclick: () => { filter = key; history.replaceState(null, '', `${BASE}?f=${key}`); draw(); } },
+    return h('button', { class: 'card tile tk-tile tile-btn' + (dark && n ? ' dark alert' : '') + (filter === key ? ' on dark' : ''), type: 'button', 'aria-pressed': String(filter === key), onclick: () => { filter = key; history.replaceState(null, '', `${BASE}?f=${key}`); draw(); } },
       h('span', { class: 'num' }, String(n)), h('span', { class: 'lbl' }, F[key][0]));
   };
   const tiles = h('div', { class: 'tiles' });
