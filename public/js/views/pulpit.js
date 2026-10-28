@@ -9,6 +9,7 @@ import { TK_OPEN, TK_CAT, statusTag, dueTag, newTicketDialog, generateRecurring 
 import { settledHistory, lastPeriods, loadMemberPrefs, saveMemberPrefs, fetchSoft } from '../data.js';
 import { sparkline, delta } from '../wykres.js';
 import { renderDzis } from './dzis.js';
+import { obligationsCard } from './terminy.js';
 
 const PREF = 'rkdp-pulpit-widok';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -71,13 +72,6 @@ const ticketRow = (t, cname, showWho) => h('a', { class: 'tk-mini', href: `#/zgl
 const card = (title, extra, ...body) => h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, title), extra || null), ...body.filter(Boolean));
 const empty = txt => h('p', { class: 'hint' }, txt);
 
-function deadlinesCard(period) {
-  const all = [...deadlinesFor(period, 'ksiegowosc'), ...deadlinesFor(period, 'kadry')]
-    .sort((a, b) => a.date - b.date).filter((d, i, arr) => arr.findIndex(x => x.label === d.label) === i);
-  return card(`Terminy ustawowe – za ${periodLabel(period).toLowerCase()}`, null,
-    ...all.map(d => { const n = daysTo(d.date); return h('div', { class: 'pl-dl' + (n < 0 ? ' past' : n <= 3 ? ' soon' : '') },
-      h('span', {}, d.label), h('b', {}, fmtD(d.date)), h('span', { class: 'small muted' }, n < 0 ? 'minął' : n === 0 ? 'dziś' : n === 1 ? 'jutro' : `za ${n} dni`)); }));
-}
 
 // ---------- pulpit pracownika ----------
 function myDashboard(D, period, hist) {
@@ -115,7 +109,7 @@ function myDashboard(D, period, hist) {
         ...(mine.length ? mine.slice(0, 12).map(t => ticketRow(t, D.cname)) : [empty('Nie masz otwartych zgłoszeń.')]),
         mine.length > 12 ? h('a', { class: 'small', href: '#/zgloszenia?f=moje', style: { display: 'block', marginTop: '10px' } }, `Wszystkie (${mine.length}) →`) : null) },
       { key: 'obecnosc', title: 'Obecność dziś', el: todayWidget() },
-      { key: 'terminy', title: 'Terminy ustawowe', el: deadlinesCard(period) },
+      { key: 'terminy', title: 'Obowiązki w miesiącu', el: obligationsCard({ mine: true }) },
       delegated.length ? { key: 'przekazane', title: 'Przekazane innym', el: card(`Przekazane innym (${delegated.length})`, null, ...delegated.slice(0, 8).map(t => ticketRow(t, D.cname, true))) } : null,
       ...settleCards.map((el, i) => ({ key: 'rozliczenia_' + (areas[i]?.area || i), title: `Rozliczenia – ${areas[i]?.label || ''}`, el })),
     ].filter(Boolean),
@@ -192,7 +186,7 @@ function adminDashboard(D, period, hist, alerts) {
       missing.length ? { key: 'braki', title: 'Brak dokumentów', el: card(`Brak dokumentów – ${periodLabel(period).toLowerCase()} (${missing.length})`, null,
         ...missing.slice(0, 15).map(x => h('a', { class: 'tk-mini', href: `#/klient/${x.c.id}`, 'data-panel': x.c.id }, h('span', {}, x.c.name), h('span', { class: 'small muted' }, `${x.area} · ${x.person ? who(x.person) : 'nieprzypisany'}`)))) } : null,
       { key: 'aml', title: 'AML', el: amlDashCard('rkdp') },
-      { key: 'terminy', title: 'Terminy ustawowe', el: deadlinesCard(period) },
+      { key: 'terminy', title: 'Obowiązki w miesiącu', el: obligationsCard() },
       { key: 'zamkniete', title: 'Ostatnio zamknięte', el: card(`Ostatnio zamknięte (${doneWeek.length})`, null, ...(doneWeek.length ? doneWeek.slice(0, 10).map(t => h('a', { class: 'tk-mini', href: `#/zgloszenia/${t.id}` },
         h('div', { style: { minWidth: 0 } }, h('b', {}, t.title), h('div', { class: 'small muted' }, [D.cname[t.client_id], who(t.done_by || t.assignee_id)].filter(Boolean).join(' · '))),
         h('span', { class: 'small muted', style: { flex: 'none' } }, new Date(t.done_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }))))

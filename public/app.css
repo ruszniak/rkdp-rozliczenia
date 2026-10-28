@@ -1324,3 +1324,15 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 }
 @media (max-width:560px){.tile-spark{display:none}}
 .ob-tiles{margin-top:18px}
+/* karta obowiązków na pulpicie */
+.oc{display:grid;grid-template-columns:minmax(200px,250px) minmax(0,1fr);gap:20px;align-items:start}
+.oc-map .mm-c{border-radius:7px;padding-top:0;justify-content:center;text-decoration:none}
+.oc-map .mm-d{font-size:11.5px}
+.oc-map .mm-w,.oc-map .mm-g{gap:3px}
+.oc-list{display:flex;flex-direction:column}
+.oc-row{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);text-decoration:none;color:inherit;font-size:13.5px}
+.oc-row:first-child{border-top:0}.oc-row:hover .oc-l{color:var(--bronze)}
+.oc-d{font-family:var(--serif);font-weight:700;display:flex;flex-direction:column;line-height:1.1}.oc-d small{font-family:var(--sans);font-weight:500;font-size:11px;color:var(--muted)}
+.oc-l{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oc-late{display:block;background:var(--warn-bg);color:var(--warn);font-weight:600;font-size:13px;border-radius:10px;padding:8px 12px;margin-bottom:6px;text-decoration:none}
+@media (max-width:1180px){.oc{grid-template-columns:1fr}.oc-map{max-width:320px}}

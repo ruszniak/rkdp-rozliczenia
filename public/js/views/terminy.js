@@ -163,3 +163,57 @@ export async function renderTerminy(main, params) {
   if (dayFilter) markSel();
 }
 function addD(s, n) { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); }
+
+// Karta na pulpit: kalendarz obowiązków bieżącego miesiąca (mała mapa + najbliższe terminy). mine = tylko moi klienci.
+export function obligationsCard({ mine = false } = {}) {
+  const now = todayIso(), y = +now.slice(0, 4), m = +now.slice(5, 7);
+  const body = h('div', { class: 'oc' }, h('p', { class: 'hint' }, 'Wczytywanie terminów…'));
+  const card = h('section', { class: 'card section' },
+    h('div', { class: 'section-head' }, h('h2', {}, `Obowiązki – ${MONTHS_NOM[m - 1]} ${y}`),
+      h('a', { class: 'small', href: `#/terminy${mine ? '?kto=moi' : ''}` }, 'Kalendarz →')), body);
+  (async () => {
+    const per = `${m === 1 ? y - 1 : y}-${pad(m === 1 ? 12 : m - 1)}-01`, curPer = `${y}-${pad(m)}-01`;
+    const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    const [clients, entries, yEntries] = await Promise.all([
+      loadClients(),
+      fetchAll(() => sb.from('checklist_entries').select('client_id,period,task_code,status').gte('period', per).lte('period', curPer)),
+      fetchSoft(() => sb.from('year_close_entries').select('client_id,year,task_code,status').gte('year', y - 1).lte('year', y)),
+    ]);
+    const eMap = new Map(), yMap = new Map();
+    for (const e of entries) { if (!eMap.has(e.client_id)) eMap.set(e.client_id, new Map()); eMap.get(e.client_id).set(`${e.period.slice(0, 7)}|${e.task_code}`, e.status); }
+    for (const e of yEntries) { if (!yMap.has(e.client_id)) yMap.set(e.client_id, new Map()); yMap.get(e.client_id).set(`${e.year}|${e.task_code}`, e.status); }
+    const my = clients.filter(c => c.status === 'aktywny' && (!mine || [c.accountant_id, c.hr_id].includes(state.me.id)));
+    const list = my.flatMap(c => obligationsInMonth(c, y, m)).map(o => ({ ...o, status: obligationStatus(o, eMap, yMap) }));
+    const nextList = my.flatMap(c => obligationsInMonth(c, ny, nm)).map(o => ({ ...o, status: obligationStatus(o, eMap, yMap) }));
+    if (!list.length && !nextList.length) { body.replaceChildren(h('p', { class: 'hint' }, mine ? 'Twoi klienci nie mają terminów w tym miesiącu.' : 'Brak terminów – uzupełnij profile klientów.')); return; }
+    const byDay = new Map(); list.forEach(o => { if (!byDay.has(o.date)) byDay.set(o.date, []); byDay.get(o.date).push(o); });
+    const maxN = Math.max(1, ...[...byDay.values()].map(v => v.length));
+    const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7, days = new Date(y, m, 0).getDate();
+    const cells = Array.from({ length: lead }, () => h('div', { class: 'mm-c pad' }));
+    for (let d = 1; d <= days; d++) {
+      const iso = `${y}-${pad(m)}-${pad(d)}`, ds = byDay.get(iso) || [];
+      const done = ds.filter(o => DONE(o.status)).length, late = iso < now && ds.some(o => o.status && !DONE(o.status) && !o.opt);
+      const wd = new Date(y, m - 1, d).getDay();
+      cells.push(h(ds.length ? 'a' : 'div', { class: 'mm-c' + (iso === now ? ' today' : '') + (wd === 0 || wd === 6 ? ' we' : '') + (ds.length ? ' has' : '') + (late ? ' late' : '') + (ds.length && done === ds.length ? ' ok' : ''),
+        href: ds.length ? `#/terminy?rok=${y}&m=${m}&dzien=${iso}${mine ? '&kto=moi' : ''}` : null, style: ds.length ? `--i:${(0.18 + 0.82 * ds.length / maxN).toFixed(2)}` : null,
+        'data-tip': ds.length ? `${fmtDue(iso)}\n${ds.length} terminów · zrobione ${done}` : null }, h('span', { class: 'mm-d' }, d)));
+    }
+    // najbliższe terminy (od dziś), zgrupowane po dniu i rodzaju
+    const groups = new Map();
+    [...list, ...nextList].filter(o => o.date >= now).sort((a, b) => a.date.localeCompare(b.date)).forEach(o => { const k = o.date + '|' + o.label; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(o); });
+    const late = list.filter(o => o.status && !DONE(o.status) && o.date < now && !o.opt).length;
+    body.replaceChildren(
+      h('div', { class: 'oc-map' }, h('div', { class: 'mm-w' }, ['pn', 'wt', 'śr', 'cz', 'pt', 'sb', 'nd'].map(x => h('span', {}, x))), h('div', { class: 'mm-g' }, cells)),
+      h('div', { class: 'oc-list' },
+        late ? h('a', { class: 'oc-late', href: `#/terminy${mine ? '?kto=moi' : ''}` }, `${late} ${late === 1 ? 'termin' : 'terminów'} po czasie, niezrobione →`) : null,
+        ...[...groups.values()].slice(0, 6).map(os => {
+          const done = os.filter(o => DONE(o.status)).length, k = KINDS[os[0].kind];
+          return h('a', { class: 'oc-row', href: `#/terminy?rok=${os[0].date.slice(0, 4)}&m=${+os[0].date.slice(5, 7)}&dzien=${os[0].date}${mine ? '&kto=moi' : ''}` },
+            h('span', { class: 'oc-d' }, fmtShort(os[0].date), h('small', {}, weekday(os[0].date))),
+            h('span', { class: 'oc-l' }, h('span', { class: 'kchip', style: `--k:${k.color}` }, k.short), ' ', os[0].label),
+            h('span', { class: 'frac' + (done === os.length ? ' full' : '') }, h('span', { class: 'ring', style: `--p:${Math.round(done * 100 / os.length)}` }), `${done}/${os.length}`));
+        }),
+        groups.size ? null : h('p', { class: 'hint' }, 'Brak terminów w najbliższym czasie.')));
+  })().catch(e => { console.error(e); body.replaceChildren(h('p', { class: 'hint' }, 'Nie udało się wczytać terminów.')); });
+  return card;
+}
