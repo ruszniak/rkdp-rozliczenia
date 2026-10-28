@@ -50,7 +50,7 @@ async function loadData(period) {
     const cells = (ent.get(c.id) || []).filter(e => { const t = tByCode.get(e.task_code); return t && t.area === area && (area === 'kadry' || t.applies_to === 'all' || t.applies_to === sect); });
     const req = cells.filter(e => tByCode.get(e.task_code).counts_to_settled !== false);
     const done = req.filter(e => e.status === 'done' || e.status === 'na').length;
-    return { has: cells.length > 0, total: req.length, done, settled: req.length > 0 && done === req.length, missing: cells.some(e => e.status === 'missing_docs') };
+    return { has: cells.length > 0, total: req.length, done, settled: req.length > 0 && done === req.length, missing: cells.some(e => ['missing_docs', 'reminded'].includes(e.status)) };
   };
   const active = clients.filter(c => c.status === 'aktywny');
   return { tickets, clients, active, settle, cname: Object.fromEntries(clients.map(c => [c.id, c.name])), opened: new Set(entries.map(e => e.client_id)) };
@@ -163,14 +163,16 @@ function adminDashboard(D, period, hist, alerts) {
   const accPct = acc.length ? accOk * 100 / acc.length : 0, hrPct = hr.length ? hrOk * 100 / hr.length : 0;
   const openAlerts = (alerts || []).filter(a => !a.resolved_at);
   return {
+    // najważniejsze: stan rozliczeń księgowości i kadr – na górze pulpitu
+    top: h('div', { class: 'tiles tiles-top' },
+      tile(acc.length ? `${accOk}/${acc.length}` : '—', `Księgowość rozliczona – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=ksiegowosc`, { bar: acc.length ? accOk / acc.length : 0, ...trendOpts(hist, 'ksiegowosc', accPct, period) }),
+      tile(hr.length ? `${hrOk}/${hr.length}` : '—', `Kadry rozliczone – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=kadry`, { bar: hr.length ? hrOk / hr.length : 0, ...trendOpts(hist, 'kadry', hrPct, period) })),
     tiles: [h('div', { class: 'tiles' },
       tile(open.length, 'Otwarte zgłoszenia', '#/zgloszenia?f=otwarte'),
       tile(late.length, 'Po terminie', '#/zgloszenia?f=po_terminie', { dark: late.length > 0 }),
       tile(hot.length, 'Pilne i wysokie', '#/zgloszenia?f=otwarte'),
       tile(wait.length, 'Czeka na klienta', '#/zgloszenia?f=czeka')),
     h('div', { class: 'tiles' },
-      tile(acc.length ? `${accOk}/${acc.length}` : '—', `Księgowość rozliczona – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=ksiegowosc`, { bar: acc.length ? accOk / acc.length : 0, ...trendOpts(hist, 'ksiegowosc', accPct, period) }),
-      tile(hr.length ? `${hrOk}/${hr.length}` : '—', `Kadry rozliczone – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=kadry`, { bar: hr.length ? hrOk / hr.length : 0, ...trendOpts(hist, 'kadry', hrPct, period) }),
       tile(missing.length, 'Brak dokumentów', `#/rozliczenia?okres=${period}`, { dark: missing.length > 0 }),
       tile(doneWeek.length, 'Zgłoszenia zamknięte w 7 dni', '#/zgloszenia?f=zrobione'))],
     blocks: [
@@ -202,7 +204,7 @@ function arrange(view, dash, lay, editing, onChange) {
   const blocks = [...dash.blocks].sort((a, b) => { const ia = order.indexOf(a.key), ib = order.indexOf(b.key); return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib); });
   const tilesHidden = hidden.has('kafelki');
   const out = [];
-  if (!tilesHidden || editing) out.push(h('div', { class: 'dash-tiles' + (tilesHidden ? ' is-hidden' : '') }, editing ? editBar('kafelki', 'Kafelki', tilesHidden) : null, ...dash.tiles));
+  if (dash.top) out.push(dash.top);
   const grid = h('div', { class: 'dash' + (editing ? ' editing' : '') });
   let dragKey = null;
   blocks.forEach((b, i) => {
@@ -219,6 +221,8 @@ function arrange(view, dash, lay, editing, onChange) {
     grid.append(w);
   });
   out.push(grid);
+  // kafelki z podsumowaniem – na samym dole pulpitu
+  if (!tilesHidden || editing) out.push(h('div', { class: 'dash-tiles' + (tilesHidden ? ' is-hidden' : '') }, editing ? editBar('kafelki', 'Kafelki', tilesHidden) : null, ...dash.tiles));
   function editBar(key, title, off, idx) {
     return h('div', { class: 'dash-edit' }, h('span', { class: 'dash-grip', 'aria-hidden': 'true' }, '⠿'), h('b', {}, title),
       idx != null ? h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'W górę', onclick: () => move(key, Math.max(0, idx - 1)) }, '↑') : null,

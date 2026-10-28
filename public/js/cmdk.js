@@ -53,7 +53,7 @@ function commandItems(query, data) {
   for (const c of clients) {
     const cl = { id: c.href.split('/').pop(), name: c.label, email: c.email || null };
     if (kind === 'ticket') out.push({ group: 'Polecenia', icon: 'bolt', label: `Nowe zgłoszenie dla: ${c.label}`, run: async () => { const z = await import('./views/zgloszenia.js'); z.newTicketDialog({ client: cl }).catch(fail); } });
-    if (kind === 'docs') out.push({ group: 'Polecenia', icon: 'bolt', label: `Poproś o dokumenty: ${c.label}`, meta: periodLabel(defaultPeriod()), run: async () => { const { openDocRequest } = await import('./prosba.js'); const { data: full } = await sb.from('clients').select('id,name,email').eq('id', cl.id).maybeSingle(); openDocRequest(full || cl, defaultPeriod(), []); } });
+    if (kind === 'docs') out.push({ group: 'Polecenia', icon: 'bolt', label: `Wyślij wiadomość: ${c.label}`, meta: periodLabel(defaultPeriod()), run: async () => { const { openDocRequest } = await import('./prosba.js'); const { data: full } = await sb.from('clients').select('id,name,email').eq('id', cl.id).maybeSingle(); openDocRequest(full || cl, defaultPeriod(), []); } });
     if (kind === 'mark') out.push({ group: 'Polecenia', icon: 'bolt', label: task ? `Oznacz „${label}” jako zrobione – ${c.label}` : `Oznacz… (dopisz: pit, vat, jpk, saldeo, rewizor, zus, pit4) – ${c.label}`, meta: periodLabel(defaultPeriod()), run: () => task ? markTask(cl, task, label) : null });
   }
   if (!clients.length) out.push({ group: 'Polecenia', icon: 'bolt', label: rest.length ? 'Nie znaleziono klienta – dopisz fragment nazwy' : 'Dopisz nazwę klienta…', run: () => null });

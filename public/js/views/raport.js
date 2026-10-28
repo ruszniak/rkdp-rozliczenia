@@ -28,7 +28,7 @@ export async function renderRaport(main, params) {
   const settle = (c, area) => {
     const cells = (ent.get(c.id) || []).filter(e => { const t = tBy.get(e.task_code); return t && t.area === area && (area === 'kadry' || t.applies_to === 'all' || t.applies_to === sectionOf(c)); });
     const req = cells.filter(e => tBy.get(e.task_code).counts_to_settled !== false);
-    return { has: cells.length > 0, settled: req.length > 0 && req.every(e => e.status === 'done' || e.status === 'na'), open: cells.filter(e => !['done', 'na'].includes(e.status)).length, missing: cells.some(e => e.status === 'missing_docs') };
+    return { has: cells.length > 0, settled: req.length > 0 && req.every(e => e.status === 'done' || e.status === 'na'), open: cells.filter(e => !['done', 'na'].includes(e.status)).length, missing: cells.some(e => ['missing_docs', 'reminded'].includes(e.status)) };
   };
   const area = a => { const l = active.map(c => ({ c, s: settle(c, a) })).filter(x => x.s.has); const ok = l.filter(x => x.s.settled).length; return { n: l.length, ok, pct: l.length ? ok * 100 / l.length : 0, list: l }; };
   const A = area('ksiegowosc'), K = area('kadry');

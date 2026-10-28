@@ -4,6 +4,7 @@ import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../d
 import { downloadXlsx } from '../xlsx.js';
 import { fileTile, dropZone, pastedFiles, named, safeName } from './zgloszenia.js';
 import { openDocRequest } from '../prosba.js';
+import { openMessage } from '../wiadomosc.js';
 import { celebrate } from '../efekty.js';
 import { sparkline } from '../wykres.js';
 import { loadMemberPrefs, saveMemberPrefs, settledHistory, lastPeriods } from '../data.js';
@@ -107,7 +108,7 @@ export async function renderRozliczenia(main, params) {
   const countsCode = new Set(tasksAll.filter(t => t.counts_to_settled !== false).map(t => t.code));
   const requiredOf = (c, area) => cellsOf(c, area).filter(e => countsCode.has(e.task_code));
   const isSettled = (c, area) => { const cs = requiredOf(c, area); return cs.length > 0 && cs.every(e => e.status === 'done' || e.status === 'na'); };
-  const hasMissing = (c, area) => cellsOf(c, area).some(e => e.status === 'missing_docs');
+  const hasMissing = (c, area) => cellsOf(c, area).some(e => ['missing_docs', 'reminded'].includes(e.status));
   // JPK VAT (księgowość) / ZUS (kadry) jeszcze niewysłane: kratka nie jest „Zrobione” ani „Nie dotyczy”
   const pendingSend = (c, area) => {
     const e = byClient.get(c.id)?.get(area === 'kadry' ? 'zus_wyslany' : 'jpk');
@@ -213,7 +214,9 @@ export async function renderRozliczenia(main, params) {
   document.addEventListener('fullscreenchange', onFsChange);
   document.addEventListener('keydown', onKey);
   setFs(false);
-  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, h('span', { class: 'sel-wrap' }), exportBtn, fsBtn);
+  const msgBtn = h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'E-mail do jednego lub wielu klientów z kancelaria@rkdp.pl\nFaktury KSeF w Saldeo, wyciąg bankowy, inne dokumenty',
+    onclick: () => openMessage({ clients: [], kind: 'ksef', period }) }, icon('mail'), 'Wiadomość');
+  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, h('span', { class: 'sel-wrap' }), msgBtn, exportBtn, fsBtn);
 
   // ---------- zapisane widoki (wspólne dla wszystkich urządzeń) ----------
   const viewsBar = h('div', { class: 'views-bar' });
@@ -243,7 +246,7 @@ export async function renderRozliczenia(main, params) {
   showSel.addEventListener('change', onFilter);
 
   const legend = h('div', { class: 'legend' },
-    ['done', 'na', 'missing_docs', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
+    ['done', 'na', 'missing_docs', 'reminded', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
     h('span', { class: 'muted' }, '· kliknij kratkę, aby zmienić · najedź na nagłówek, aby zobaczyć opis'));
 
   function renderTabs() {
@@ -393,7 +396,7 @@ export async function renderRozliczenia(main, params) {
     const cs = requiredOf(c, area);
     const done = cs.filter(e => e.status === 'done' || e.status === 'na').length;
     if (cs.length && done === cs.length) return h('span', { class: 'sum ok' }, '✓ Rozliczony');
-    if (cs.some(e => e.status === 'missing_docs')) return h('button', { class: 'sum bad', type: 'button', 'data-tip': 'Brakuje dokumentów – kliknij, aby poprosić klienta (link do wgrania plików)',
+    if (cs.some(e => ['missing_docs', 'reminded'].includes(e.status))) return h('button', { class: 'sum bad', type: 'button', 'data-tip': 'Brakuje dokumentów – kliknij, aby poprosić klienta (link do wgrania plików)',
       onclick: () => requestDocs(c, area) }, `! ${done}/${cs.length}`, h('span', { class: 'mail-ico', html: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>' }));
     return h('span', { class: 'sum no', 'data-tip': `Zrobione ${done} z ${cs.length}` },
       h('span', { class: 'ring', style: `--p:${cs.length ? Math.round(done * 100 / cs.length) : 0}`, 'aria-hidden': 'true' }), `${done}/${cs.length}`);
@@ -543,7 +546,13 @@ export async function renderRozliczenia(main, params) {
     const act = (st, lbl) => h('button', { class: 'bb-btn', type: 'button', disabled: !selected.size, onclick: async () => { const list = [...selected].map(entryById).filter(Boolean); clearSel(); await setMany(list, st); } },
       h('span', { class: `cb cb-${st}` }, STATUS[st].mark), lbl);
     bulkBar.replaceChildren(h('b', {}, selected.size ? `Zaznaczono: ${selected.size}` : 'Kliknij kratki do zaznaczenia'),
-      act('done', 'Zrobione'), act('na', 'Nie dotyczy'), act('missing_docs', 'Brak dok.'), act('todo', 'Wyczyść'),
+      act('done', 'Zrobione'), act('na', 'Nie dotyczy'), act('missing_docs', 'Brak dok.'), act('reminded', 'Przypomniano'), act('todo', 'Wyczyść'),
+      h('button', { class: 'bb-btn', type: 'button', disabled: !selected.size, 'data-tip': 'Wiadomość e-mail do klientów zaznaczonych kratek (z kancelaria@rkdp.pl)', onclick: () => {
+        const list = [...selected].map(entryById).filter(Boolean);
+        const codes = new Set(list.map(e => e.task_code));
+        const cls = [...new Set(list.map(e => e.client_id))].map(id => clientMap.get(id)).filter(Boolean);
+        openMessage({ clients: cls, kind: codes.has('wb') && !codes.has('saldeo') ? 'wyciag' : codes.has('saldeo') ? 'ksef' : 'dokumenty', period });
+      } }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>', style: { display: 'inline-flex' } }), 'Wiadomość'),
       h('button', { class: 'bb-x', type: 'button', onclick: () => { selectMode = false; selBtn.classList.remove('on'); clearSel(); } }, 'Zakończ'));
   }
   function paintSel() { body.querySelectorAll('.cb[data-eid]').forEach(b => b.classList.toggle('sel', selected.has(b.dataset.eid))); drawBulk(); }
@@ -592,7 +601,7 @@ export async function renderRozliczenia(main, params) {
   }
 
   function requestDocs(c, area) {
-    const codes = cellsOf(c, area).filter(e => e.status === 'missing_docs').map(e => e.task_code);
+    const codes = cellsOf(c, area).filter(e => ['missing_docs', 'reminded'].includes(e.status)).map(e => e.task_code);
     openDocRequest(c, period, codes);
   }
 
@@ -642,35 +651,138 @@ export async function renderRozliczenia(main, params) {
       h('button', { class: 'opt', onclick: () => pick(null) }, 'Usuń przypisanie')]);
   }
 
+  // Uwagi do klienta w miesiącu jako czat: na górze rozmowa (uwagi, pytania, wysłane e-maile), na dole pole do pisania.
+  // Każdy wpis ma autora i godzinę; pytanie można oznaczyć jako wyjaśnione. Podsumowanie (kropka w tabeli, eksport) liczy baza.
   function notesMenu(anchor, c) {
-    const n = noteMap.get(c.id) || {};
-    const ta1 = h('textarea', { placeholder: 'Np. trzeba zrobić w piątek, zaimportuj faktury…' }, n.notes || '');
-    const ta2 = h('textarea', { placeholder: 'Np. jak ująć straty? brak pełnomocnictwa…' }, n.questions || '');
-    const save = async () => {
-      const payload = { client_id: c.id, period: pdate, notes: ta1.value.trim() || null, questions: ta2.value.trim() || null };
-      const { error } = await sb.from('period_notes').upsert(payload, { onConflict: 'client_id,period' });
-      if (error) return fail(error);
-      noteMap.set(c.id, payload); closePop(); refreshRow(c.id); toast('Zapisano');
-    };
+    let kind = 'uwaga', items = [], mails = [], prev = [];
+    const me = state.me.id, admin = state.me.role === 'admin';
+    const thread = h('div', { class: 'chat-thread', role: 'log', 'aria-live': 'polite' }, h('p', { class: 'hint chat-empty' }, 'Ładowanie…'));
+    const ta = h('textarea', { class: 'chat-input', rows: 1, placeholder: 'Napisz uwagę… (Enter – wyślij, Shift+Enter – nowa linia)' });
+    const kindBtn = (k, lbl) => h('button', { type: 'button', class: 'chat-kind' + (kind === k ? ' on' : ''), 'data-k': k, onclick: () => setKind(k) }, lbl);
+    const kinds = h('div', { class: 'chat-kinds', role: 'group', 'aria-label': 'Rodzaj wpisu' }, kindBtn('uwaga', 'Uwaga'), kindBtn('pytanie', 'Pytanie / problem'));
+    function setKind(k) {
+      kind = k; kinds.querySelectorAll('.chat-kind').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+      ta.placeholder = k === 'pytanie' ? 'Np. jak ująć straty? brak pełnomocnictwa…' : 'Napisz uwagę… (Enter – wyślij, Shift+Enter – nowa linia)';
+      ta.focus();
+    }
+    const sendBtn = h('button', { type: 'button', class: 'chat-send', 'aria-label': 'Wyślij', onclick: () => send() },
+      h('span', { html: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>', style: { display: 'inline-flex' } }));
+    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px'; };
+    ta.addEventListener('input', grow);
+    ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+
     const files = h('div', { class: 'tk-files pf-files' });
-    const pop = openPop(anchor, h('div', { class: 'pop-body pop-notes' },
-      h('label', {}, `Uwagi – ${c.name}`), ta1,
-      h('label', {}, 'Pytania / problemy'), ta2,
-      h('label', {}, 'Załączniki – zrzuty ekranu, PDF, zdjęcia dokumentów'),
+    const attach = h('details', { class: 'chat-attach' }, h('summary', {}, icon('paperclip'), h('span', { class: 'chat-att-n' }, 'Załączniki')),
       dropZone(fs => addFiles(fs), 'albo wklej zrzut Ctrl+V / ⌘V'),
       (() => { const inp = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true }); inp.addEventListener('change', () => { addFiles([...inp.files]); inp.value = ''; });
-        return h('div', { class: 'row-btns' }, inp,
-          h('button', { class: 'btn btn-outline btn-sm cam-btn', type: 'button', onclick: () => inp.click() }, icon('camera'), 'Zrób zdjęcie dokumentu'),
-          h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => { closePop(); requestDocs(c, prefs.area); } }, icon('mail'), 'Poproś klienta o dokumenty')); })(),
-      files,
-      h('div', { class: 'row' }, h('button', { class: 'btn btn-ghost btn-sm', onclick: closePop }, 'Anuluj'),
-        h('button', { class: 'btn btn-primary btn-sm', onclick: save }, 'Zapisz'))));
+        return h('div', { class: 'row-btns' }, inp, h('button', { class: 'btn btn-outline btn-sm cam-btn', type: 'button', onclick: () => inp.click() }, icon('camera'), 'Zrób zdjęcie dokumentu')); })(),
+      files);
+
+    const pop = openPop(anchor, h('div', { class: 'pop-body pop-notes pop-chat' },
+      h('div', { class: 'chat-head' }, h('div', { style: { minWidth: 0 } }, h('b', {}, c.name), h('span', { class: 'small muted' }, `Uwagi · ${periodLabel(period).toLowerCase()}`)),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-tip': 'E-mail do klienta z kancelaria@rkdp.pl', onclick: () => { closePop(); requestDocs(c, prefs.area); } }, icon('mail'), 'Wiadomość'),
+        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Zamknij', onclick: closePop }, '×')),
+      thread,
+      h('div', { class: 'chat-compose' }, kinds, h('div', { class: 'chat-row' }, ta, sendBtn)),
+      attach));
     const ar = anchor.getBoundingClientRect();
-    const place = () => { const r = ar, ph = pop.offsetHeight; pop.style.top = Math.max(8, Math.min(r.bottom + 6, innerHeight - ph - 8)) + 'px'; };
+    const place = () => { const ph = pop.offsetHeight; pop.style.top = Math.max(8, Math.min(ar.bottom + 6, innerHeight - ph - 8)) + 'px'; };
+    setTimeout(() => ta.focus(), 30);
+
+    const who = id => id ? (memberById(id)?.short_name || memberById(id)?.full_name || 'ktoś') : 'wcześniej';
+    const tm = t => new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    const dayLbl = t => { const d = new Date(t), today = new Date(); const y = new Date(); y.setDate(y.getDate() - 1);
+      if (d.toDateString() === today.toDateString()) return 'Dziś'; if (d.toDateString() === y.toDateString()) return 'Wczoraj';
+      return d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' }); };
+
+    function draw() {
+      const stream = [...items.map(x => ({ t: x.created_at, x })), ...mails.map(m => ({ t: m.sent_at, m }))].sort((a, b) => a.t.localeCompare(b.t));
+      const out = [];
+      if (prev.length) out.push(h('details', { class: 'chat-prev' }, h('summary', {}, `Poprzednie miesiące (${prev.length})`),
+        ...prev.map(p => h('div', { class: 'chat-prev-i' }, h('b', {}, periodLabel(p.period.slice(0, 7))),
+          p.notes ? h('div', {}, p.notes) : null, p.questions ? h('div', { class: 'muted' }, 'Pytania: ' + p.questions) : null))));
+      let lastDay = '';
+      for (const s of stream) {
+        const d = dayLbl(s.t);
+        if (d !== lastDay) { out.push(h('div', { class: 'chat-day' }, h('span', {}, d))); lastDay = d; }
+        if (s.m) {
+          out.push(h('div', { class: 'chat-sys' + (s.m.status === 'blad' ? ' err' : '') }, icon('mail'),
+            h('span', {}, h('b', {}, who(s.m.sent_by)), s.m.status === 'blad' ? ' – nie udało się wysłać: ' : ' wysłał(a) e-mail: ', s.m.subject, h('span', { class: 'muted' }, ` → ${s.m.email} · ${tm(s.t)}`))));
+          continue;
+        }
+        const x = s.x, mine = x.author === me, q = x.kind === 'pytanie';
+        const canDel = (mine || admin);
+        out.push(h('div', { class: 'chat-msg' + (mine ? ' mine' : '') + (q ? ' q' : '') + (x.resolved_at ? ' done' : '') },
+          !mine ? h('span', { class: 'av chat-av' + (x.author ? '' : ' none'), 'aria-hidden': 'true' }, x.author ? initials(memberById(x.author)?.full_name || '?') : '') : null,
+          h('div', { class: 'chat-bub' },
+            h('div', { class: 'chat-meta' }, h('b', {}, mine ? 'Ty' : who(x.author)), q ? h('span', { class: 'chat-tag' }, x.resolved_at ? 'pytanie · wyjaśnione' : 'pytanie') : null, h('span', {}, tm(x.created_at))),
+            h('div', { class: 'chat-txt' }, x.body),
+            h('div', { class: 'chat-acts' },
+              q ? h('button', { type: 'button', class: 'chat-a', onclick: () => resolve(x) }, x.resolved_at ? 'Otwórz ponownie' : '✓ Wyjaśnione') : null,
+              canDel ? h('button', { type: 'button', class: 'chat-a', onclick: () => del(x) }, 'Usuń') : null))));
+      }
+      if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, 'Brak uwag w tym miesiącu. Napisz pierwszą poniżej.'));
+      thread.replaceChildren(...out);
+      thread.scrollTop = thread.scrollHeight;
+      place();
+    }
+    async function load() {
+      const since = shiftPeriod(period, -3) + '-01';
+      const [cm, ms, pv] = await Promise.all([
+        sb.from('period_comments').select('*').eq('client_id', c.id).eq('period', pdate).order('created_at').then(r => r.data || [], () => []),
+        sb.from('client_messages').select('kind,subject,sent_at,sent_by,status,email,period').eq('client_id', c.id).order('sent_at', { ascending: false }).limit(20).then(r => r.data || [], () => []),
+        sb.from('period_notes').select('period,notes,questions').eq('client_id', c.id).gte('period', since).lt('period', pdate).order('period', { ascending: false }).then(r => r.data || [], () => []),
+      ]);
+      items = cm;
+      // e-maile dotyczące tego miesiąca albo wysłane w trakcie jego rozliczania
+      const pEnd = shiftPeriod(period, 2) + '-01';
+      mails = ms.filter(m => m.period === pdate || (!m.period && m.sent_at >= pdate && m.sent_at < pEnd));
+      prev = pv.filter(p => p.notes || p.questions);
+      draw();
+    }
+    async function syncNote() {
+      const { data } = await sb.from('period_notes').select('client_id,notes,questions').eq('client_id', c.id).eq('period', pdate).maybeSingle();
+      noteMap.set(c.id, data || { client_id: c.id }); refreshRow(c.id);
+    }
+    async function send() {
+      const body = ta.value.trim();
+      if (!body) return ta.focus();
+      sendBtn.disabled = true;
+      const { data, error } = await sb.from('period_comments').insert({ client_id: c.id, period: pdate, kind, body }).select().single();
+      sendBtn.disabled = false;
+      if (error) return fail(error);
+      ta.value = ''; grow();
+      if (!items.some(x => x.id === data.id)) items.push(data);
+      draw(); syncNote(); ta.focus();
+    }
+    async function resolve(x) {
+      const { data, error } = await sb.from('period_comments').update({ resolved_at: x.resolved_at ? null : new Date().toISOString() }).eq('id', x.id).select().single();
+      if (error) return fail(error);
+      Object.assign(x, data); draw(); syncNote();
+    }
+    async function del(x) {
+      if (!confirm('Usunąć ten wpis?')) return;
+      const { error } = await sb.from('period_comments').delete().eq('id', x.id);
+      if (error) return fail(error);
+      items = items.filter(y => y.id !== x.id); draw(); syncNote();
+    }
+    // nowe wpisy innych osób pojawiają się na żywo
+    const ch = sb.channel('pc-' + c.id + '-' + Math.random().toString(36).slice(2, 7))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'period_comments', filter: `client_id=eq.${c.id}` }, p => {
+        const row = p.new?.id ? p.new : null;
+        if (p.eventType === 'DELETE') items = items.filter(y => y.id !== p.old?.id);
+        else if (row && row.period === pdate) { const cur = items.find(y => y.id === row.id); cur ? Object.assign(cur, row) : items.push(row); }
+        if (pop.isConnected) draw();
+      }).subscribe();
+    const prevCleanup = pop._cleanup;
+    pop._cleanup = () => { prevCleanup?.(); sb.removeChannel(ch); };
+
     async function loadFiles() {
       const { data, error } = await sb.from('period_files').select('*').eq('client_id', c.id).eq('period', pdate).order('created_at');
       if (error) { files.replaceChildren(h('p', { class: 'hint' }, 'Załączniki będą dostępne po aktualizacji bazy danych.')); return; }
       fileCount.set(c.id, data.length); refreshRow(c.id);
+      attach.querySelector('.chat-att-n').textContent = data.length ? `Załączniki (${data.length})` : 'Załączniki';
+      if (data.length && !attach.dataset.seen) { attach.open = true; attach.dataset.seen = '1'; }
       files.replaceChildren(...data.map(f => fileTile({ ...f, bucket: 'rozliczenia', name: (f.source === 'klient' ? '[od klienta] ' : '') + f.name }, { onDelete: (f.uploaded_by === state.me.id || state.me.role === 'admin' || f.source === 'klient') ? async () => {
         if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
         const { error: e1 } = await sb.from('period_files').delete().eq('id', f.id);
@@ -695,9 +807,11 @@ export async function renderRozliczenia(main, params) {
       }
       pop.classList.remove('busy');
       if (ok) toast(ok === 1 ? 'Dodano załącznik' : `Dodano załączniki: ${ok}`);
+      attach.open = true;
       loadFiles();
     }
     pop.addEventListener('paste', e => { const fs = pastedFiles(e); if (fs.length) { e.preventDefault(); addFiles(fs); } });
+    load();
     loadFiles();
   }
 
@@ -746,7 +860,7 @@ export async function renderRozliczenia(main, params) {
 
   // ---------- eksport ----------
   const statusText = (e) => !e ? '' : (e.status === 'todo' || e.status === 'in_progress') ? '' : STATUS[e.status].label;
-  const statusStyle = (e) => !e ? 'normal' : ({ done: 'done', na: 'na', missing_docs: 'missing' }[e.status] || 'todo');
+  const statusStyle = (e) => !e ? 'normal' : ({ done: 'done', na: 'na', missing_docs: 'missing', reminded: 'missing' }[e.status] || 'todo');
   const empText = (c) => c.has_employees === true ? 'Tak' : c.has_employees === false ? (sectionOf(c) === 'osobowe' ? 'JDG bez pracowników' : 'Nie') : '';
   const filterInfo = () => {
     const parts = [];
@@ -773,7 +887,7 @@ export async function renderRozliczenia(main, params) {
             LEGAL_SHORT[c.legal_form] || '', memberById(c[AREAS[area].person])?.short_name || '',
             ...(area === 'kadry' ? [empText(c)] : []),
             ...t.cols.map(col => { const e = m?.get(col.code); return { v: statusText(e), s: e ? statusStyle(e) : 'normal' }; }),
-            isSettled(c, area) ? { v: 'Rozliczony', s: 'settled' } : { v: `${done}/${cs.length}`, s: cs.some(e => e.status === 'missing_docs') ? 'missing' : 'todo' },
+            isSettled(c, area) ? { v: 'Rozliczony', s: 'settled' } : { v: `${done}/${cs.length}`, s: cs.some(e => ['missing_docs', 'reminded'].includes(e.status)) ? 'missing' : 'todo' },
             { v: noteMap.get(c.id)?.notes || '', s: 'wrap' }, { v: noteMap.get(c.id)?.questions || '', s: 'wrap' }];
         })];
       const widths = [38, 11, 14, ...(area === 'kadry' ? [20] : []), ...t.cols.map(() => 16), 18, 40, 40];
@@ -820,12 +934,13 @@ tr.ok td{background:#EAF2E5}
 .m{display:inline-block;width:14px;height:14px;line-height:12px;border-radius:3px;border:1.2px solid #CFC4B4;font-weight:700;font-size:10px}
 .m-done{background:#3E6B47;border-color:#3E6B47;color:#fff}.m-na{background:#EFE9E0;color:#A79C8E}
 .m-missing_docs{background:#F6E1DA;border-color:#A4462F;color:#A4462F}
+.m-reminded{background:#F7ECD6;border-color:#B7862F;color:#8A6420}
 .s{color:#3E6B47}.legend{margin-top:8px;color:#6A6157;font-size:8.5px}
 </style></head><body>
 <header><div><h1>${esc(AREAS[area].label)} – ${esc(periodLabel(period))}</h1><p>${esc(filterInfo())} · wygenerowano ${esc(new Date().toLocaleString('pl-PL'))}</p></div>
 <img src="${location.origin}/logo-rkdp.png" alt="RKDP"></header>
 ${tables || '<p>Brak danych.</p>'}
-<p class="legend"><span class="m m-done">✓</span> zrobione &nbsp; <span class="m m-na">–</span> nie dotyczy &nbsp; <span class="m m-missing_docs">!</span> brak dokumentów &nbsp; <span class="m"></span> do zrobienia</p>
+<p class="legend"><span class="m m-done">✓</span> zrobione &nbsp; <span class="m m-na">–</span> nie dotyczy &nbsp; <span class="m m-missing_docs">!</span> brak dokumentów &nbsp; <span class="m m-reminded">@</span> wysłano przypomnienie &nbsp; <span class="m"></span> do zrobienia</p>
 </body></html>`;
     printHtml(html);
   }

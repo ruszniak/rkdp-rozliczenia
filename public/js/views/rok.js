@@ -31,7 +31,7 @@ export async function renderRok(main, params) {
   const tasksOf = g => YEAR_TASKS.filter(t => t.group === 'all' || t.group === g);
   const req = (c) => tasksOf(yearGroup(c)).filter(t => !t.opt).map(t => map.get(c.id)?.get(t.code)).filter(Boolean);
   const closed = c => { const r = req(c); return r.length > 0 && r.every(e => DONE(e.status)); };
-  const missing = c => [...(map.get(c.id)?.values() || [])].some(e => e.status === 'missing_docs');
+  const missing = c => [...(map.get(c.id)?.values() || [])].some(e => ['missing_docs', 'reminded'].includes(e.status));
   const lateOf = c => tasksOf(yearGroup(c)).filter(t => !t.opt && t.due(y).date < now && map.get(c.id)?.get(t.code) && !DONE(map.get(c.id).get(t.code).status));
   const notOpened = active.filter(c => !map.has(c.id));
 
@@ -126,7 +126,7 @@ export async function renderRok(main, params) {
           h('td', { class: 'c-name' }, h('div', { class: 'cname' }, h('a', { href: `#/klient/${c.id}`, 'data-panel': c.id }, c.name), h('div', { class: 'meta' }, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?')))),
           h('td', { class: 'c-person' }, h('span', { class: 'person' + (m ? '' : ' unassigned'), style: { cursor: 'default' } }, h('span', { class: 'av' }, m ? initials(m.full_name) : '–'), m ? m.short_name : 'brak')),
           ts.map(t => h('td', { class: 'c-task' }, cell(c, t))),
-          h('td', { class: 'c-sum' }, ok ? h('span', { class: 'sum ok' }, '✓ Zamknięty') : r.some(e => e.status === 'missing_docs') ? h('span', { class: 'sum bad' }, `! ${dn}/${r.length}`)
+          h('td', { class: 'c-sum' }, ok ? h('span', { class: 'sum ok' }, '✓ Zamknięty') : r.some(e => ['missing_docs', 'reminded'].includes(e.status)) ? h('span', { class: 'sum bad' }, `! ${dn}/${r.length}`)
             : h('span', { class: 'sum no' }, h('span', { class: 'ring', style: `--p:${r.length ? Math.round(dn * 100 / r.length) : 0}` }), `${dn}/${r.length}`)));
       }))));
   }
@@ -144,7 +144,7 @@ export async function renderRok(main, params) {
   }
   main.replaceChildren(head, tiles, banner, h('div', { class: 'toolbar' }, search, personSel,
     h('a', { class: 'btn btn-outline btn-sm', href: `#/terminy?rok=${y + 1}&widok=rok` }, 'Kalendarz obowiązków')),
-  h('div', { class: 'legend' }, ['done', 'na', 'missing_docs', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
+  h('div', { class: 'legend' }, ['done', 'na', 'missing_docs', 'reminded', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
     h('span', { class: 'muted' }, '· terminy w nagłówkach kolumn · najedź, aby zobaczyć opis obowiązku')), body);
   draw();
   return () => closePop();

@@ -515,7 +515,7 @@ async function viewMatter(main, id, params) {
     [statusPill(m.status), h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/dokumenty?sprawa=${m.id}` }, 'Pismo'), reportBtn, poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
-  h('div', { class: 'two' }, h('div', {}, formCard, journalCard), h('div', {}, dlCard, timeCard, ordersCard, historyCard({ matter: m.id }))));
+  h('div', { class: 'two' }, h('div', {}, formCard), h('div', {}, dlCard, journalCard, ordersCard, timeCard, historyCard({ matter: m.id }))));
 }
 
 // ================= KLIENCI =================

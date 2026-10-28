@@ -49,7 +49,7 @@ export async function renderDzis(box, D) {
   const items = entries.filter(e => {
     const c = cBy.get(e.client_id), t = tBy.get(e.task_code);
     if (!c || !t || c.status !== 'aktywny') return false;
-    if (!['todo', 'in_progress', 'missing_docs'].includes(e.status)) return false;
+    if (!['todo', 'in_progress', 'missing_docs', 'reminded'].includes(e.status)) return false;
     return t.area === 'kadry' ? mineHr(c) : mineAcc(c);
   }).map(e => ({ e, c: cBy.get(e.client_id), t: tBy.get(e.task_code), due: dueOf(cBy.get(e.client_id), e.task_code) }))
     .sort((a, b) => a.due.localeCompare(b.due) || a.c.name.localeCompare(b.c.name, 'pl'));
@@ -60,7 +60,7 @@ export async function renderDzis(box, D) {
     const ms = new Set([today.slice(0, 7), in7.slice(0, 7)]);
     return [...ms].flatMap(ym => obligationsInMonth(c, +ym.slice(0, 4), +ym.slice(5, 7)));
   }).filter(o => o.date >= today && o.date <= in7).map(o => ({ ...o, status: obligationStatus(o, eMap, yMap) })).filter(o => o.status !== 'done' && o.status !== 'na');
-  const missing = myClients.filter(c => entries.some(e => e.client_id === c.id && e.status === 'missing_docs'));
+  const missing = myClients.filter(c => entries.some(e => e.client_id === c.id && ['missing_docs', 'reminded'].includes(e.status)));
   const myAlerts = alerts.filter(a => myClients.some(c => c.id === a.client_id));
   const myM2 = m2dl.filter(d => d.assignee_id === me);
 
@@ -68,7 +68,7 @@ export async function renderDzis(box, D) {
   const listBox = h('div', { class: 'dz-list' });
   let showAll = false;
   function drawItems() {
-    const open = items.filter(x => ['todo', 'in_progress', 'missing_docs'].includes(x.e.status));
+    const open = items.filter(x => ['todo', 'in_progress', 'missing_docs', 'reminded'].includes(x.e.status));
     if (!open.length) { listBox.replaceChildren(emptyState('Wszystko odhaczone', `Twoje kratki za ${periodLabel(period).toLowerCase()} są zrobione. 🎉`)); return; }
     const groups = new Map();
     (showAll ? open : open.slice(0, 40)).forEach(x => { const k = x.due < today ? 'late' : x.due; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
@@ -79,7 +79,7 @@ export async function renderDzis(box, D) {
   }
   function itemRow(x) {
     const st = x.e.status;
-    const row = h('div', { class: 'dz-item' + (st === 'missing_docs' ? ' miss' : ''), 'data-eid': x.e.id },
+    const row = h('div', { class: 'dz-item' + (['missing_docs', 'reminded'].includes(st) ? ' miss' : ''), 'data-eid': x.e.id },
       h('div', { class: 'dz-swipe', 'aria-hidden': 'true' }, '✓ Zrobione'),
       h('div', { class: 'dz-in' },
         h('button', { class: `cb cb-${st === 'in_progress' ? 'todo' : st}`, type: 'button', 'data-tip': 'Kliknij: Zrobione · prawy przycisk / przytrzymaj: inne statusy', 'aria-label': `${x.t.label} – oznacz jako zrobione`,
@@ -87,7 +87,7 @@ export async function renderDzis(box, D) {
           oncontextmenu: ev => { ev.preventDefault(); menu(ev.currentTarget, x); } }, STATUS[st].mark),
         h('div', { class: 'dz-t' }, h('a', { href: `#/klient/${x.c.id}`, 'data-panel': x.c.id }, x.c.name),
           h('span', { class: 'muted small' }, `${x.t.code === 'pit_cit' ? (sectionOf(x.c) === 'kapitalowe' ? 'CIT' : 'PIT') : x.t.label}${x.t.area === 'kadry' ? ' · kadry' : ''}`)),
-        st === 'missing_docs' ? h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openDocRequest(x.c, period, entries.filter(e => e.client_id === x.c.id && e.status === 'missing_docs').map(e => e.task_code)) }, icon('mail'), 'Poproś') : null,
+        st === 'missing_docs' ? h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openDocRequest(x.c, period, entries.filter(e => e.client_id === x.c.id && ['missing_docs', 'reminded'].includes(e.status)).map(e => e.task_code)) }, icon('mail'), 'Wiadomość') : null,
         h('button', { class: 'icon-btn dz-more', type: 'button', 'aria-label': 'Inne statusy', onclick: ev => menu(ev.currentTarget, x) }, '⋯')));
     swipe(row, () => setSt(x, 'done'));
     return row;
@@ -102,7 +102,7 @@ export async function renderDzis(box, D) {
     const { error } = await sb.from('checklist_entries').update({ status: s }).eq('id', x.e.id);
     if (error) { x.e.status = before; drawItems(); drawStats(); return fail(error, 'Nie zapisano'); }
     if (!silent) toastAction(`${x.c.name} · ${x.t.label}: ${STATUS[s].label}`, 'Cofnij', () => setSt(x, before, true));
-    if (!items.some(i => ['todo', 'in_progress', 'missing_docs'].includes(i.e.status))) celebrate('Wszystkie Twoje kratki na ten miesiąc są zrobione!');
+    if (!items.some(i => ['todo', 'in_progress', 'missing_docs', 'reminded'].includes(i.e.status))) celebrate('Wszystkie Twoje kratki na ten miesiąc są zrobione!');
   }
 
   // przesunięcie w lewo na telefonie = „Zrobione”
@@ -127,7 +127,7 @@ export async function renderDzis(box, D) {
   // ---------- statystyki ----------
   const stats = h('div', { class: 'dz-stats' });
   function drawStats() {
-    const open = items.filter(x => ['todo', 'in_progress', 'missing_docs'].includes(x.e.status));
+    const open = items.filter(x => ['todo', 'in_progress', 'missing_docs', 'reminded'].includes(x.e.status));
     const late = open.filter(x => x.due < today).length;
     const chip = (n, l, cls) => h('div', { class: 'dz-stat ' + (cls || '') }, h('b', {}, String(n)), h('span', {}, l));
     stats.replaceChildren(chip(open.length, 'kratek do zrobienia', late ? 'warn' : ''), chip(late, 'po terminie', late ? 'warn' : ''), chip(myTickets.length, 'moich zgłoszeń'),
@@ -151,7 +151,7 @@ export async function renderDzis(box, D) {
         const r = reqs.filter(x => x.client_id === c.id && !x.closed_at).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
         return h('div', { class: 'tk-mini' }, h('a', { href: `#/klient/${c.id}`, 'data-panel': c.id }, c.name),
           r ? h('span', { class: 'small ' + (r.files_count ? 'ok-t' : 'muted') }, r.files_count ? `klient wgrał ${r.files_count} plik.` : r.sent_at ? `poproszono ${fmtShort(r.sent_at.slice(0, 10))}` : 'prośba niewysłana')
-            : h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openDocRequest(c, period, entries.filter(e => e.client_id === c.id && e.status === 'missing_docs').map(e => e.task_code)) }, icon('mail'), 'Poproś'));
+            : h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openDocRequest(c, period, entries.filter(e => e.client_id === c.id && ['missing_docs', 'reminded'].includes(e.status)).map(e => e.task_code)) }, icon('mail'), 'Wiadomość'));
       })) : null,
       myAlerts.length ? sec('Monitoring – zmiany u klientów', null, ...myAlerts.map(a => h('a', { class: 'tk-mini', href: `#/klient/${a.client_id}`, 'data-panel': a.client_id }, h('div', { style: { minWidth: 0 } }, h('b', {}, cBy.get(a.client_id)?.name || ''), h('div', { class: 'small muted' }, a.summary))))) : null
     )));

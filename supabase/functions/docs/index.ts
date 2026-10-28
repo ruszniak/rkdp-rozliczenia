@@ -22,7 +22,7 @@ const OK_TYPES = /^(application\/pdf|image\/(jpeg|png|heic|heif|webp|gif|tiff)|t
 const OK_EXT = /\.(pdf|jpe?g|png|heic|heif|webp|gif|tiff?|xml|csv|txt|zip|xlsx?|docx?|jpk|epp)$/i;
 const MONTHS = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 const periodLabel = (p: string) => `${MONTHS[+p.slice(5, 7) - 1]} ${p.slice(0, 4)}`;
-const safeName = (n: string) => (n || 'plik').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^\w.\-]+/g, '_').slice(-80);
+const safeName = (n: string) => (n || 'plik').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^\w.\-]+/g, '_').slice(-80);
 const validToken = (t: unknown) => typeof t === 'string' && /^[0-9a-f]{48}$/.test(t);
 
 async function requestByToken(token: string) {
@@ -55,10 +55,10 @@ async function gmailToken(sender: string) {
   return j.access_token as string;
 }
 const encWord = (s: string) => `=?UTF-8?B?${btoa(String.fromCharCode(...new TextEncoder().encode(s)))}?=`;
-async function sendMail(sender: string, to: string, subject: string, text: string) {
-  const token = await gmailToken(sender);
+async function sendMail(cfg: { sub: string; from: string }, to: string, subject: string, text: string) {
+  const token = await gmailToken(cfg.sub);
   const body = btoa(String.fromCharCode(...new TextEncoder().encode(text))).replace(/(.{76})/g, '$1\r\n');
-  const mime = [`From: ${encWord('RKDP – biuro')} <${sender}>`, `To: ${to}`, `Subject: ${encWord(subject)}`, 'MIME-Version: 1.0',
+  const mime = [`From: ${encWord('RKDP – biuro')} <${cfg.from}>`, `Reply-To: ${cfg.from}`, `To: ${to}`, `Subject: ${encWord(subject)}`, 'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', body].join('\r\n');
   const r = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: b64url(mime) }) });
@@ -73,9 +73,11 @@ export function mailText(r: any, reminder = false) {
     '', `Link jest ważny do ${new Date(r.expires_at).toLocaleDateString('pl-PL')}.`, '', 'Dziękujemy,', 'RKDP spółka doradztwa podatkowego sp. z o.o.',
   ].join('\n');
 }
+// konto Workspace (delegacja) i adres nadawcy – alias, np. kancelaria@rkdp.pl
 async function sender() {
-  const { data } = await admin.from('app_settings').select('value').eq('key', 'mail_sender').maybeSingle();
-  return (data?.value || '').trim();
+  const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_sender', 'mail_from']);
+  const m = Object.fromEntries((data || []).map((x: any) => [x.key, (x.value || '').trim()]));
+  return m.mail_sender ? { sub: m.mail_sender, from: m.mail_from || m.mail_sender } : null;
 }
 async function hookSecret() {
   const { data } = await admin.rpc('push_get_config');
@@ -121,7 +123,7 @@ Deno.serve(async (req: Request) => {
         await admin.from('doc_requests').update({ files_count: r.files_count + saved.length, last_upload_at: new Date().toISOString() }).eq('id', r.id);
         // kratki „Brak dokumentów” z prośby wracają do „Do zrobienia”
         const codes = (r.items || []).map((i: any) => i.code).filter(Boolean);
-        if (codes.length) await admin.from('checklist_entries').update({ status: 'todo' }).eq('client_id', r.client_id).eq('period', r.period).eq('status', 'missing_docs').in('task_code', codes);
+        if (codes.length) await admin.from('checklist_entries').update({ status: 'todo' }).eq('client_id', r.client_id).eq('period', r.period).in('status', ['missing_docs', 'reminded']).in('task_code', codes);
         await notifyTeam('docs_uploaded', { request_id: r.id, count: saved.length });
       }
       return json({ saved, rejected });

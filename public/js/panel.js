@@ -101,7 +101,7 @@ export async function openClientPanel(id) {
   const upcoming = [0, 1].flatMap(k => { const d = new Date(+today.slice(0, 4), +today.slice(5, 7) - 1 + k, 1); return obligationsInMonth(c, d.getFullYear(), d.getMonth() + 1); })
     .filter(o => o.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   const openReq = reqs.filter(r => !r.closed_at && new Date(r.expires_at) > new Date());
-  const missingCodes = (ents || []).filter(e => e.status === 'missing_docs').map(e => e.task_code);
+  const missingCodes = (ents || []).filter(e => ['missing_docs', 'reminded'].includes(e.status)).map(e => e.task_code);
 
   box.replaceChildren(...[
     h('div', { class: 'cp-head' },
@@ -116,7 +116,7 @@ export async function openClientPanel(id) {
         h('span', { class: 'person', style: { cursor: 'default' } }, h('span', { class: 'av' }, hr ? initials(hr.full_name) : '–'), hr ? `Kadry: ${hr.short_name}` : 'Kadry: brak')),
       h('div', { class: 'cp-actions' },
         h('a', { class: 'btn btn-primary btn-sm', href: `#/klient/${c.id}`, onclick: () => closePanel() }, 'Pełna karta klienta →'),
-        h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, period, missingCodes) }, icon('mail'), 'Poproś o dokumenty'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, period, missingCodes) }, icon('mail'), 'Wyślij wiadomość'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => cam.click() }, icon('camera'), 'Zdjęcie dokumentu'), cam)),
     alerts.filter(a => !a.resolved_at).length ? sec('Monitoring – zmiany do sprawdzenia', ...alerts.filter(a => !a.resolved_at).map(a => h('div', { class: 'cp-alert' }, h('b', {}, fmtFull(a.created_at.slice(0, 10))), ' ', a.summary,
       h('button', { class: 'btn btn-ghost btn-sm', onclick: async (e) => { const { error: er } = await sb.from('monitor_alerts').update({ resolved_at: new Date().toISOString(), resolved_by: state.me.id }).eq('id', a.id); if (er) return fail(er); e.target.closest('.cp-alert').remove(); toast('Oznaczono jako sprawdzone'); } }, 'Sprawdzone')))) : null,

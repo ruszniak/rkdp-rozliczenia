@@ -1,4 +1,5 @@
 import { h } from '../ui.js';
+import { liveNetwork } from '../siec.js';
 import { sb } from '../store.js';
 import { deviceToken, saveDeviceToken, deviceLabel, markActive } from '../session.js';
 
@@ -208,6 +209,7 @@ export async function renderLogin(app, initialError = '') {
         h('p', {}, 'Statusy księgowań, ZUS, PIT/CIT, VAT i JPK dla każdego klienta, miesiąc po miesiącu. Dostęp tylko dla zespołu RKDP.')),
       h('p', { style: { fontSize: '13px' } }, `© ${new Date().getFullYear()} Właściciel oprogramowania: RKDP spółka doradztwa podatkowego sp. z o.o. Wszelkie prawa zastrzeżone.`, h('br'), 'Dane objęte tajemnicą doradcy podatkowego.')),
     h('section', { class: 'login-main' }, box)));
+  const side = app.querySelector('.login-side'); if (side) liveNetwork(side);
   box.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
   if (await newMode()) stepPassword(); else legacyEmail();
 }
