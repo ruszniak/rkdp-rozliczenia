@@ -131,11 +131,17 @@ function adminDashboard(D, period) {
     const dw = doneWeek.filter(t => t.done_by === m.id || (!t.done_by && t.assignee_id === m.id)).length;
     const a = acc.filter(x => x.c.accountant_id === m.id), k = hr.filter(x => x.c.hr_id === m.id);
     const ms = a.filter(x => x.s.missing).length + k.filter(x => x.s.missing).length;
-    const frac = (arr) => arr.length ? `${arr.filter(x => x.s.settled).length}/${arr.length}` : '—';
+    const frac = (arr) => {
+      if (!arr.length) return h('span', { class: 'muted' }, '—');
+      const d = arr.filter(x => x.s.settled).length, p = Math.round(d * 100 / arr.length);
+      return h('span', { class: 'frac' + (p === 100 ? ' full' : ''), 'data-tip': `Rozliczeni: ${d} z ${arr.length}` },
+        h('span', { class: 'ring', style: `--p:${p}`, 'aria-hidden': 'true' }), `${d}/${arr.length}`);
+    };
+    const num = (n, cls) => n ? h('span', { class: 'cnt ' + cls }, String(n)) : h('span', { class: 'cnt zero' }, '0');
     return h('tr', {},
       h('td', {}, h('span', { class: 'person', style: { padding: 0 } }, h('span', { class: 'av' }, initials(m.full_name)), m.full_name)),
-      h('td', {}, String(o.length)), h('td', {}, l.length ? h('b', { style: { color: '#B3261E' } }, String(l.length)) : '0'), h('td', {}, String(dw)),
-      h('td', {}, frac(a)), h('td', {}, frac(k)), h('td', {}, ms ? h('span', { class: 'badge warn' }, String(ms)) : '0'));
+      h('td', {}, num(o.length, 'open')), h('td', {}, num(l.length, 'late')), h('td', {}, num(dw, 'done')),
+      h('td', {}, frac(a)), h('td', {}, frac(k)), h('td', {}, num(ms, 'late')));
   };
   const attention = [
     ...late.slice(0, 10).map(t => ticketRow(t, D.cname, true)),

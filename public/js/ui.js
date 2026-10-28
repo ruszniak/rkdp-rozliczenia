@@ -92,26 +92,39 @@ export function initTooltips() {
   tipEl = document.createElement('div');
   tipEl.className = 'tip'; tipEl.hidden = true; tipEl.setAttribute('role', 'tooltip');
   document.body.append(tipEl);
+  let timer = 0, cur = null;
+  const hide = () => { clearTimeout(timer); cur = null; tipEl.hidden = true; tipEl.classList.remove('in'); };
   const show = (target) => {
     const text = target.getAttribute('data-tip');
     if (!text) return;
-    tipEl.textContent = text;
+    cur = target;
+    // pierwsza krótka linia jako tytuł dymka, reszta jako opis
+    const nl = text.indexOf('\n');
+    if (nl > 0 && nl <= 60) { tipEl.replaceChildren(h('b', { class: 'tip-t' }, text.slice(0, nl)), h('span', {}, text.slice(nl + 1))); }
+    else tipEl.textContent = text;
     tipEl.classList.toggle('wide', target.hasAttribute('data-tip-wide'));
+    tipEl.classList.remove('in', 'below');
     tipEl.hidden = false;
     const r = target.getBoundingClientRect();
     const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
     let left = r.left + r.width / 2 - tw / 2;
     left = Math.max(8, Math.min(left, innerWidth - tw - 8));
-    let top = r.top - th - 8;
-    if (top < 8) top = r.bottom + 8;
+    let top = r.top - th - 10;
+    if (top < 8) { top = r.bottom + 10; tipEl.classList.add('below'); }
     tipEl.style.left = left + 'px'; tipEl.style.top = top + 'px';
+    tipEl.style.setProperty('--ax', Math.max(12, Math.min(tw - 12, r.left + r.width / 2 - left)) + 'px');
+    void tipEl.offsetWidth; tipEl.classList.add('in');
   };
   document.addEventListener('mouseover', (e) => {
     const t = e.target.closest?.('[data-tip]');
-    if (t) show(t); else tipEl.hidden = true;
+    if (!t) { if (cur) hide(); return; }
+    if (t === cur) return;
+    clearTimeout(timer);
+    // natychmiast, gdy dymek już jest widoczny (przesuwanie po nagłówkach); inaczej krótka zwłoka
+    if (!tipEl.hidden) show(t); else { cur = t; timer = setTimeout(() => { if (cur === t) show(t); }, 140); }
   });
-  document.addEventListener('focusin', (e) => { const t = e.target.closest?.('[data-tip]'); if (t) show(t); });
-  ['scroll', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { tipEl.hidden = true; }, true));
+  document.addEventListener('focusin', (e) => { const t = e.target.closest?.('[data-tip]'); if (t && t.matches(':focus-visible')) show(t); });
+  ['scroll', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, hide, true));
 }
 
 // Ikonka „i” z instrukcją: podpowiedź po najechaniu, pełna treść w okienku po kliknięciu (też na telefonie)
