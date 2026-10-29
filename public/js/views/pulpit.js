@@ -155,7 +155,7 @@ function adminDashboard(D, period, hist, alerts) {
     ...hot.filter(t => !isLate(t)).sort(byDue).slice(0, 6).map(t => ticketRow(t, D.cname, true)),
   ];
   const info = [
-    unassigned.length ? h('a', { class: 'pl-info', href: '#/zgloszenia' }, h('b', {}, String(unassigned.length)), ' nieprzypisanych zgłoszeń') : null,
+    unassigned.length ? h('a', { class: 'pl-info', href: '#/rozmowy?f=nieprzypisane' }, h('b', {}, String(unassigned.length)), ' nieprzypisanych zadań') : null,
     noAcc.length ? h('a', { class: 'pl-info', href: '#/klienci' }, h('b', {}, String(noAcc.length)), ' aktywnych klientów bez przypisanej księgowej') : null,
     notOpened.length ? h('a', { class: 'pl-info', href: `#/rozliczenia?okres=${period}` }, h('b', {}, String(notOpened.length)), ` klientów bez otwartego miesiąca ${periodLabel(period).toLowerCase()}`) : null,
   ].filter(Boolean);
@@ -168,13 +168,13 @@ function adminDashboard(D, period, hist, alerts) {
       tile(acc.length ? `${accOk}/${acc.length}` : '—', `Księgowość rozliczona – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=ksiegowosc`, { bar: acc.length ? accOk / acc.length : 0, ...trendOpts(hist, 'ksiegowosc', accPct, period) }),
       tile(hr.length ? `${hrOk}/${hr.length}` : '—', `Kadry rozliczone – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=kadry`, { bar: hr.length ? hrOk / hr.length : 0, ...trendOpts(hist, 'kadry', hrPct, period) })),
     tiles: [h('div', { class: 'tiles' },
-      tile(open.length, 'Otwarte zgłoszenia', '#/zgloszenia?f=otwarte'),
+      tile(open.length, 'Otwarte zadania', '#/rozmowy?f=otwarte'),
       tile(late.length, 'Po terminie', '#/rozmowy?f=po_terminie', { dark: late.length > 0 }),
-      tile(hot.length, 'Pilne i wysokie', '#/zgloszenia?f=otwarte'),
+      tile(hot.length, 'Pilne i wysokie', '#/rozmowy?f=otwarte'),
       tile(wait.length, 'Czeka na klienta', '#/rozmowy?f=czeka')),
     h('div', { class: 'tiles' },
       tile(missing.length, 'Brak dokumentów', `#/rozliczenia?okres=${period}`, { dark: missing.length > 0 }),
-      tile(doneWeek.length, 'Zgłoszenia zamknięte w 7 dni', '#/zgloszenia?f=zrobione'))],
+      tile(doneWeek.length, 'Zadania zamknięte w 7 dni', '#/rozmowy?f=zrobione'))],
     blocks: [
       { key: 'zespol', title: 'Zespół', wide: true, el: card('Zespół', h('a', { class: 'btn btn-ghost btn-sm', href: '#/raport' }, 'Raport miesięczny →'), h('div', { class: 'list-wrap' }, h('table', { class: 'list pl-team' },
         h('thead', {}, h('tr', {}, ...['Osoba', 'Zadania otwarte', 'Po terminie', 'Zamknięte (7 dni)', 'Księgowość', 'Kadry', 'Brak dok.'].map(x => h('th', {}, x)))),

@@ -1647,3 +1647,6 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 .sh-wrap{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.06)}
 .sh-frame{border:0;display:block;transform-origin:0 0;background:#fff}
 .sh-pub-msg{max-width:520px;margin:12vh auto;text-align:center}
+.chat-tag.wt-done{background:var(--ok-bg);color:var(--ok)}
+.chat-a.wt-ok{color:var(--ok)}
+.rz-view{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 16px;background:var(--panel);font-size:13.5px}

@@ -302,7 +302,7 @@ async function renderTicket(main, id) {
   const matter = cur.key === 'm2' && t.m2_matter_id ? ctx.matters.find(m => m.id === t.m2_matter_id) : null;
   const filesCard = attachmentsCard(t);
   main.replaceChildren(
-    h('a', { href: BASE, class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Wszystkie zgłoszenia'),
+    h('a', { href: BASE, class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, cur.key === 'm2' ? '← Wszystkie zgłoszenia' : '← Rozmowy'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, `Zgłoszenie #${t.no}${clientName ? ' · ' + clientName : ''}`),
         h('h1', { style: { marginTop: '6px' } }, t.title),
@@ -439,7 +439,7 @@ async function renderTemplates(main) {
   const reload = () => renderTemplates(main);
   const canEdit = t => cur.key === 'm2' || t.created_by === state.me.id || ['admin', 'full'].includes(state.me.role);
   main.replaceChildren(
-    h('a', { href: BASE, class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Wszystkie zgłoszenia'),
+    h('a', { href: BASE, class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, cur.key === 'm2' ? '← Wszystkie zgłoszenia' : '← Rozmowy'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, cur.eyebrow),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Zadania cykliczne', infoTip(TPL_HELP, 'Zadania cykliczne – instrukcja')),

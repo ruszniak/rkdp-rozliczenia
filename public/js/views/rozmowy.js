@@ -37,7 +37,6 @@ export async function renderRozmowy(main, params) {
         h('p', { class: 'sub' }, 'Uwagi, pytania i zadania o klientach – w jednym miejscu.')),
       h('div', { class: 'row-btns' },
         h('a', { class: 'btn btn-ghost btn-sm', href: '#/zgloszenia/cykliczne' }, 'Zadania cykliczne'),
-        h('a', { class: 'btn btn-ghost btn-sm', href: '#/zgloszenia?f=otwarte' }, 'Tabela zadań'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: () => newTask() }, icon('plus'), 'Nowe zadanie'))),
     tilesBox,
     h('div', { class: 'rz-bar' }, search, h('label', { class: 'check' }, mineCb, 'Tylko moi klienci (księgowa / kadry) i moje zadania')),
@@ -89,11 +88,16 @@ export async function renderRozmowy(main, params) {
 
     const cMatch = c => !q || c.name.toLowerCase().includes(q);
     // widoki zadań
-    if (['moje', 'po_terminie', 'czeka'].includes(filter)) {
-      const src = filter === 'moje' ? myT : openT.filter(t => filter === 'czeka' ? t.status === 'czeka' : t.due_date && t.due_date < today());
+    if (['moje', 'po_terminie', 'czeka', 'otwarte', 'nieprzypisane', 'zrobione'].includes(filter)) {
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+      const src = filter === 'moje' ? myT : filter === 'otwarte' ? openT : filter === 'nieprzypisane' ? tickets.filter(t => TK_OPEN.includes(t.status) && !t.assignee_id)
+        : filter === 'zrobione' ? tickets.filter(t => t.status === 'zrobione' && (t.updated_at || t.created_at) >= weekAgo)
+        : openT.filter(t => filter === 'czeka' ? t.status === 'czeka' : t.due_date && t.due_date < today());
+      const extra = { otwarte: 'Wszystkie otwarte zadania', nieprzypisane: 'Zadania bez osoby odpowiedzialnej', zrobione: 'Zadania zamknięte w ostatnich 7 dniach' }[filter];
       const rows = src.filter(t => !q || (clients.find(c => c.id === t.client_id)?.name || '').toLowerCase().includes(q) || t.title.toLowerCase().includes(q))
         .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
-      list.replaceChildren(...(rows.length ? rows.map(t => taskRow(t, clients.find(c => c.id === t.client_id))) : [h('p', { class: 'hint rz-empty' }, 'Brak zadań w tym widoku. 👍')]));
+      list.replaceChildren(...[extra ? h('div', { class: 'rz-view' }, h('b', {}, extra), h('button', { type: 'button', class: 'chat-a', onclick: () => { filter = 'aktywnosc'; history.replaceState(null, '', '#/rozmowy'); draw(); } }, '× pokaż rozmowy')) : null,
+        ...(rows.length ? rows.map(t => taskRow(t, clients.find(c => c.id === t.client_id))) : [h('p', { class: 'hint rz-empty' }, 'Brak zadań w tym widoku. 👍')])].filter(Boolean));
       return;
     }
     let rows = clients.filter(c => byC.has(c.id) || unread.has(c.id)).map(c => ({ c, x: byC.get(c.id) || { last: null, openT: [], lateT: 0, waitT: 0, q: 0 }, u: unread.get(c.id) }));

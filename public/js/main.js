@@ -240,6 +240,7 @@ async function route(opts = {}) {
     else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('pulpit'), params);
     else if (view === 'rozmowy') c = await renderRozmowy(layout('rozmowy'), params);
     else if (view === 'zgloszenia' && parts[1] && parts[1] !== 'cykliczne' && !params.has('pelne') && (tkRes = await openTicketInThread(parts[1]))) c = tkRes.c;
+    else if (view === 'zgloszenia' && !parts[1]) { const f = params.get('f'); history.replaceState(null, '', '#/rozmowy' + (f ? '?f=' + f : '')); c = await renderRozmowy(layout('rozmowy'), new URLSearchParams(f ? { f } : {})); }
     else if (view === 'zgloszenia') c = await renderZgloszenia(layout('rozmowy'), parts[1], params);
     else if (view === 'dokumenty') c = await renderDokumenty(layout('sprawozdania'));
     else if (view === 'sprawozdanie-finansowe') c = await renderEsf(layout('sprawozdania'), params);

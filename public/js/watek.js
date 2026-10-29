@@ -208,7 +208,8 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       ...x.history.map(v => h('div', {}, h('span', { class: 'muted' }, dt(v.at) + ': '), v.body))) : null;
     const acts = h('div', { class: 'chat-acts' },
       !reply ? h('button', { type: 'button', class: 'chat-a', onclick: () => setReply({ type: 'c', id: x.id, period: x.period, key: 'c' + x.id, label: x.body.slice(0, 60) }) }, 'Odpowiedz') : null,
-      q && !reply ? h('button', { type: 'button', class: 'chat-a', onclick: () => upd(x.id, { resolved_at: x.resolved_at ? null : new Date().toISOString() }) }, x.resolved_at ? 'Otwórz ponownie' : '✓ Wyjaśnione') : null,
+      !reply ? h('button', { type: 'button', class: 'chat-a' + (x.resolved_at ? '' : ' wt-ok'), onclick: () => upd(x.id, { resolved_at: x.resolved_at ? null : new Date().toISOString() }, x.resolved_at ? 'Otwarto ponownie' : (q ? 'Oznaczono jako wyjaśnione' : 'Oznaczono jako zrobione')) },
+        x.resolved_at ? 'Otwórz ponownie' : (q ? '✓ Wyjaśnione' : '✓ Zrobione')) : null,
       !reply ? h('button', { type: 'button', class: 'chat-a', onclick: () => upd(x.id, { pinned: !x.pinned }, x.pinned ? 'Odpięto' : 'Przypięto na górze wątku') }, x.pinned ? 'Odepnij' : 'Przypnij') : null,
       !reply ? h('button', { type: 'button', class: 'chat-a', onclick: () => toTask(x) }, 'Zrób zadanie') : null,
       mine ? h('button', { type: 'button', class: 'chat-a', onclick: () => { editing = x.id; draw(); } }, 'Edytuj') : null,
@@ -217,6 +218,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       !mine ? avatar(x.author) : null,
       h('div', { class: 'chat-bub' },
         h('div', { class: 'chat-meta' }, h('b', {}, mine ? 'Ty' : who(x.author)), q ? h('span', { class: 'chat-tag' }, x.resolved_at ? 'pytanie · wyjaśnione' : 'pytanie') : null,
+          !q && x.resolved_at && !reply ? h('span', { class: 'chat-tag wt-done' }, `✓ zrobione${x.resolved_by ? ' · ' + who(x.resolved_by) : ''}, ${new Date(x.resolved_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}`) : null,
           x.pinned ? h('span', { class: 'chat-tag' }, '📌') : null, h('span', {}, tm(x.created_at))),
         h('div', { class: 'chat-txt' }, ...mentionHtml(x.body)), hist, acts));
   }
