@@ -84,6 +84,20 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   const back = h('div', { class: 'wt-back', onclick: () => close() });
   document.body.append(back, drawer);
   requestAnimationFrame(() => { back.classList.add('on'); drawer.classList.add('on'); });
+  // iPhone: przy otwartej klawiaturze rozmowa zajmuje tylko widoczną część ekranu (pole pisania nad klawiaturą),
+  // strona pod spodem się nie przewija ani nie przesuwa
+  document.documentElement.classList.add('wt-lock');
+  const vv = window.visualViewport;
+  const fitVV = () => {
+    if (!vv) return;
+    const kb = window.innerHeight - vv.height > 120;
+    drawer.classList.toggle('kb', kb);
+    drawer.style.top = kb ? vv.offsetTop + 'px' : '';
+    drawer.style.height = kb ? vv.height + 'px' : '';
+    drawer.style.bottom = kb ? 'auto' : '';
+    if (kb) window.scrollTo(0, 0);
+  };
+  vv?.addEventListener('resize', fitVV); vv?.addEventListener('scroll', fitVV);
 
   const onKey = e => { if (e.key === 'Escape' && !document.querySelector('.modal-back')) { if (!mentionPop.hidden) { mentionPop.hidden = true; return; } close(); } };
   document.addEventListener('keydown', onKey);
@@ -100,7 +114,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     .subscribe();
   function close() {
     if (!drawer.isConnected) return;
-    sb.removeChannel(ch); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', onHash);
+    sb.removeChannel(ch); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', onHash); vv?.removeEventListener('resize', fitVV); vv?.removeEventListener('scroll', fitVV); document.documentElement.classList.remove('wt-lock');
     drawer.classList.remove('on'); back.classList.remove('on');
     setTimeout(() => { drawer.remove(); back.remove(); }, 220);
     markRead();

@@ -1668,3 +1668,8 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 .cpanel{padding-bottom:env(safe-area-inset-bottom)}
 /* zmiany kratek w rozmowie: zwykły tekst w jednej linii zamiast trzech kolumn */
 .chat-sys.wt-small{display:block;text-align:center}
+/* iPhone: pole pisania 16px – mniejsza czcionka powoduje automatyczne powiększenie strony przy dotknięciu */
+@media (max-width:900px),(pointer:coarse){.wt .chat-input,.pop .chat-input,.wt input,.wt select,.wt textarea{font-size:16px}}
+/* klawiatura otwarta: rozmowa dopasowana do widocznej części ekranu, bez zapasu na pasek gestów */
+.wt.kb .wt-compose{padding-bottom:8px}
+html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
