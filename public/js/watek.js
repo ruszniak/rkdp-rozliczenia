@@ -9,7 +9,9 @@ import { fileTile, pastedFiles, named, safeName, TK_STATUS, TK_PRIO } from './vi
 import { paper, esc } from './papier.js';
 
 const QUICK = ['Brak wyciągu bankowego – prośba wysłana', 'Czekamy na zatwierdzenie faktur KSeF w Saldeo', 'Zaksięgowane', 'Do wyjaśnienia z klientem', 'Klient potwierdził telefonicznie'];
-const who = id => id ? (memberById(id)?.short_name || memberById(id)?.full_name || 'ktoś') : 'wcześniej';
+const who = id => id ? (memberById(id)?.short_name || memberById(id)?.full_name || 'ktoś') : 'autor nieznany';
+// pełne imię i nazwisko autora w dymku rozmowy
+const fullWho = id => id ? (memberById(id)?.full_name || memberById(id)?.short_name || 'Były pracownik') : 'Autor nieznany (wpis sprzed rozmów)';
 const whoEmail = e => state.members.find(m => m.email === e)?.short_name || (e === 'system' ? 'system' : String(e || '').split('@')[0]);
 const tm = t => new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
 const dt = t => new Date(t).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -193,7 +195,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   }
 
   // ---------- rysowanie ----------
-  const avatar = id => h('span', { class: 'av chat-av' + (id ? '' : ' none'), 'aria-hidden': 'true' }, id ? ava(memberById(id) || { full_name: '?' }) : '');
+  const avatar = id => h('span', { class: 'av chat-av' + (id ? '' : ' unknown'), 'data-tip': fullWho(id) }, id ? ava(memberById(id) || { full_name: '?' }) : '?');
   function bubble(x, { reply = false } = {}) {
     if (x.deleted_at) return h('div', { class: 'chat-sys wt-del' }, `Wiadomość usunięta${x.deleted_by && x.deleted_by !== x.author ? ` przez ${who(x.deleted_by)}` : ''} · ${who(x.author)}, ${tm(x.created_at)}`);
     const mine = x.author === me, q = x.kind === 'pytanie';
@@ -215,9 +217,9 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       mine ? h('button', { type: 'button', class: 'chat-a', onclick: () => { editing = x.id; draw(); } }, 'Edytuj') : null,
       mine || admin ? h('button', { type: 'button', class: 'chat-a', onclick: () => { if (confirm('Usunąć wpis? W historii zostanie ślad „wiadomość usunięta”.')) upd(x.id, { deleted_at: new Date().toISOString() }, 'Usunięto'); } }, 'Usuń') : null);
     return h('div', { class: 'chat-msg' + (mine ? ' mine' : '') + (q ? ' q' : '') + (x.resolved_at ? ' done' : '') + (reply ? ' wt-r' : ''), 'data-id': x.id },
-      !mine ? avatar(x.author) : null,
+      avatar(x.author),
       h('div', { class: 'chat-bub' },
-        h('div', { class: 'chat-meta' }, h('b', {}, mine ? 'Ty' : who(x.author)), q ? h('span', { class: 'chat-tag' }, x.resolved_at ? 'pytanie · wyjaśnione' : 'pytanie') : null,
+        h('div', { class: 'chat-meta' }, h('b', { class: 'chat-who' }, fullWho(x.author) + (mine ? ' (Ty)' : '')), q ? h('span', { class: 'chat-tag' }, x.resolved_at ? 'pytanie · wyjaśnione' : 'pytanie') : null,
           !q && x.resolved_at && !reply ? h('span', { class: 'chat-tag wt-done' }, `✓ zrobione${x.resolved_by ? ' · ' + who(x.resolved_by) : ''}, ${new Date(x.resolved_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}`) : null,
           x.pinned ? h('span', { class: 'chat-tag' }, '📌') : null, h('span', {}, tm(x.created_at))),
         h('div', { class: 'chat-txt' }, ...mentionHtml(x.body)), hist, acts));
@@ -242,12 +244,12 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
         h('span', {}, '→ ', h('b', {}, t.assignee_id ? who(t.assignee_id) : 'nieprzypisane')),
         t.due_date ? h('span', { class: late ? 'wt-late' : '' }, 'termin ' + t.due_date.split('-').reverse().join('.')) : null,
         t.priority !== 'normalny' ? h('span', { class: 'tk-pr ' + t.priority }, TK_PRIO[t.priority]) : null,
-        h('span', { class: 'muted' }, `${who(t.created_by)} · ${tm(t.created_at)}`),
+        h('span', { class: 'muted' }, `dodał(a): ${fullWho(t.created_by)} · ${tm(t.created_at)}`),
         h('a', { href: `#/zgloszenia/${t.id}?pelne=1`, class: 'chat-a', onclick: () => close() }, 'szczegóły i pliki')),
       replies('t' + t.id, com, c => c.kind === 'zmiana'
         ? h('div', { class: 'chat-sys wt-small' }, `${who(c.author_id)} · ${c.body} · ${tm(c.created_at)}`)
-        : h('div', { class: 'chat-msg wt-r' + (c.author_id === me ? ' mine' : '') }, c.author_id !== me ? avatar(c.author_id) : null,
-          h('div', { class: 'chat-bub' }, h('div', { class: 'chat-meta' }, h('b', {}, c.author_id === me ? 'Ty' : who(c.author_id)), c.kind === 'wykonanie' ? h('span', { class: 'chat-tag' }, 'wykonanie') : null, h('span', {}, tm(c.created_at))),
+        : h('div', { class: 'chat-msg wt-r' + (c.author_id === me ? ' mine' : '') }, avatar(c.author_id),
+          h('div', { class: 'chat-bub' }, h('div', { class: 'chat-meta' }, h('b', { class: 'chat-who' }, fullWho(c.author_id) + (c.author_id === me ? ' (Ty)' : '')), c.kind === 'wykonanie' ? h('span', { class: 'chat-tag' }, 'wykonanie') : null, h('span', {}, tm(c.created_at))),
             h('div', { class: 'chat-txt' }, c.body)))),
       h('button', { type: 'button', class: 'chat-a wt-reply-btn', onclick: () => setReply({ type: 't', id: t.id, key: 't' + t.id, label: `zadanie #${t.no}` }) }, 'Odpowiedz w zadaniu'));
   }
