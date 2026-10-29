@@ -58,6 +58,7 @@ const transport = () => smtp || (smtp = nodemailer.createTransport({ host: 'smtp
 // ---------- stopki mailowe zespołu z rkdp.pl/stopki (strona w repozytorium ruszniak/rkdp) ----------
 const FROM_NAME = 'RKDP | Kancelaria';
 let sigCache: { at: number; map: Map<string, string> } | null = null;
+// klucze: imię i nazwisko z nagłówka sekcji oraz części adresów e-mail ze stopki (np. „weronika.rzepkowska”) – działa też po zmianie nazwiska
 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase().replace(/\s+/g, ' ').trim();
 async function signatures() {
   if (sigCache && Date.now() - sigCache.at < 10 * 60000) return sigCache.map;
@@ -67,7 +68,11 @@ async function signatures() {
     const html = r.ok ? await r.text() : '';
     for (const m of html.matchAll(/<section class="person" id="p-([^"]+)">\s*<h2>([^<]+)<\/h2>([\s\S]*?)<\/section>/g)) {
       const full = m[3].match(/<div class="preview" id="sig-[^"]+-full">([\s\S]*?)<\/div>\s*<div class="actions">/);
-      if (full) map.set(m[1] === 'kancelaria' ? '__kancelaria' : norm(m[2]), full[1].replace(/\sdata-abs="[^"]*"/g, '').trim());
+      if (!full) continue;
+      const sig = full[1].replace(/\sdata-abs="[^"]*"/g, '').trim();
+      if (m[1] === 'kancelaria') { map.set('__kancelaria', sig); continue; }
+      map.set(norm(m[2]), sig);
+      for (const e of sig.matchAll(/mailto:([^@"]+)@/g)) if (e[1] !== 'kancelaria' && !map.has('@' + e[1].toLowerCase())) map.set('@' + e[1].toLowerCase(), sig);
     }
   } catch (e) { console.error('stopki', e); }
   sigCache = { at: Date.now(), map };
@@ -138,7 +143,7 @@ Deno.serve(async (req: Request) => {
     const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
     // stopka osoby wysyłającej z rkdp.pl/stopki (po imieniu i nazwisku); brak – stopka ogólna kancelarii, a gdy strona niedostępna – tekstowa
     const sigs = await signatures();
-    const sigHtml = sigs.get(norm(me?.full_name || '')) || sigs.get('__kancelaria') || '';
+    const sigHtml = sigs.get(norm(me?.full_name || '')) || sigs.get('@' + String(me?.email || '').split('@')[0].toLowerCase()) || sigs.get('__kancelaria') || '';
     const signature = sigHtml ? '\n' + htmlToText(sigHtml)
       : ['', 'Pozdrawiam serdecznie,', me?.full_name || '', me?.job_title || '', 'RKDP spółka doradztwa podatkowego sp. z o.o.', cfg.from, 'www.rkdp.pl'].filter((x, i) => i < 2 || x).join('\n');
     const fromName = FROM_NAME;
