@@ -264,10 +264,13 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   }
   function taskCard(t) {
     const com = D.tcom.filter(c => c.ticket_id === t.id);
+    const fresh = readAt && com.some(c => c.kind !== 'zmiana' && c.author_id !== me && c.created_at > readAt);
+    if (fresh) expanded.add('t' + t.id);
     const stSel = h('select', { class: 'wt-st ' + t.status, 'aria-label': 'Status zadania' }, ...Object.entries(TK_STATUS).map(([k, v]) => h('option', { value: k, selected: k === t.status }, v)));
     stSel.addEventListener('change', () => setTicketStatus(t, stSel.value));
     const late = t.due_date && t.due_date < new Date().toLocaleDateString('sv-SE') && !['zrobione', 'anulowane'].includes(t.status);
-    return h('div', { class: 'wt-task' + (['zrobione', 'anulowane'].includes(t.status) ? ' closed' : ''), 'data-id': 't' + t.id },
+    return h('div', { class: 'wt-task' + (['zrobione', 'anulowane'].includes(t.status) ? ' closed' : '') + (fresh ? ' wt-fresh' : ''), 'data-id': 't' + t.id },
+      fresh ? h('div', { class: 'wt-new wt-new-in' }, h('span', {}, 'Nowe odpowiedzi')) : null,
       h('div', { class: 'wt-task-h' }, h('span', { class: 'wt-task-no' }, `Zadanie #${t.no}`), perTag(t.period || t.created_at), stSel),
       h('b', { class: 'wt-task-t' }, t.title),
       t.description ? h('div', { class: 'chat-txt small' }, t.description) : null,
@@ -316,7 +319,11 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     const atBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
     thread.replaceChildren(...out);
     if (focus) { const el = thread.querySelector(`[data-id="${focus}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('wt-flash'); } focus = null; }
-    else if (!thread.dataset.drawn && markEl) markEl.scrollIntoView({ block: 'start' });
+    else if (!thread.dataset.drawn && (markEl || thread.querySelector('.wt-fresh'))) {
+      // pierwsze nowe: znacznik „Nowe” w strumieniu albo zadanie z nowymi odpowiedziami – co wcześniej w rozmowie
+      const fr = thread.querySelector('.wt-fresh'), tgt = markEl && fr ? (markEl.compareDocumentPosition(fr) & Node.DOCUMENT_POSITION_FOLLOWING ? markEl : fr) : markEl || fr;
+      tgt.scrollIntoView({ block: 'start' }); if (tgt === fr) fr.classList.add('wt-flash');
+    }
     else if (atBottom || !thread.dataset.drawn) thread.scrollTop = thread.scrollHeight;
     thread.dataset.drawn = '1';
   }
@@ -412,7 +419,8 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     printHtml(paper({ title: `Historia współpracy – ${client.name}`, subtitle: `${periodLabel(a)} – ${periodLabel(b)} · wpisów: ${rows.length}`, body, landscape: true }), `Historia ${client.name}`);
   }
 
-  readAt = (await sb.from('thread_reads').select('read_at').eq('member_id', me).eq('client_id', client.id).maybeSingle().then(r => r.data?.read_at, () => null)) || null;
+  readAt = (await sb.from('thread_reads').select('read_at').eq('member_id', me).eq('client_id', client.id).maybeSingle().then(r => r.data?.read_at, () => null))
+    || new Date(Date.now() - 14 * 86400000).toISOString(); // jak w liczniku „Nieprzeczytane”: nigdy nieotwarta = nowe z ostatnich 14 dni
   if (!focus && matchMedia('(pointer:fine)').matches) setTimeout(() => ta.focus(), 60);
   await reload();
   markRead();
@@ -444,7 +452,7 @@ async function unreadMenu(anchor) {
   await refreshUnread();
   const { openPop, closePop } = await import('./pop.js');
   openPop(anchor, h('div', { class: 'pop-body wt-upop' }, h('label', {}, 'Nieprzeczytane rozmowy'),
-    ...(lastUnread.length ? lastUnread.map(u => h('button', { class: 'opt wt-uitem', onclick: () => { closePop(); openThread({ client: { id: u.client_id }, period: String(u.period).slice(0, 7) }); } },
+    ...(lastUnread.length ? lastUnread.map(u => h('button', { class: 'opt wt-uitem', onclick: () => { closePop(); openThread({ client: { id: u.client_id }, period: String(u.period).slice(0, 7) }).catch(e => fail(e, 'Nie udało się otworzyć rozmowy')); } },
       h('span', { class: 'wt-uname' }, u.name, u.mentioned ? h('span', { class: 'wt-at' }, ' @Ty') : null),
       h('span', { class: 'small muted' }, `${u.n} nowych · ${new Date(u.last_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`)))
       : [h('p', { class: 'hint', style: { padding: '6px 10px' } }, 'Wszystko przeczytane. 👍')]),

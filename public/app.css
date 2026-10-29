@@ -1713,3 +1713,5 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 .rz-bulk .btn-primary{background:#CFAE86;color:#1D1A16}
 .of-linkinfo{margin:6px 0 0;text-align:center}
 .of-linkinfo:empty{display:none}
+.wt-task.wt-fresh{border-color:color-mix(in srgb,var(--warn) 55%,var(--line));box-shadow:0 0 0 2px color-mix(in srgb,var(--warn) 18%,transparent)}
+.wt-new.wt-new-in{margin:0 0 6px}
