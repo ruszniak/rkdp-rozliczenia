@@ -32,7 +32,7 @@ const perShort = p => new Date(+p.slice(0, 4), +p.slice(5, 7) - 1, 1).toLocaleDa
 let open = null; // jeden wątek naraz
 export function closeThread(mode) { open?.close(mode); }
 
-export async function openThread({ client, period = defaultPeriod(), focus = null, onChange = null }) {
+export async function openThread({ client, period = defaultPeriod(), focus = null, onChange = null, onClose = null }) {
   closeThread('swap');
   if (!client?.name) { const { data } = await sb.from('clients').select('id,name,email,accountant_id,hr_id').eq('id', client.id || client).maybeSingle(); client = data; }
   if (!client) return toast('Nie znaleziono klienta', true);
@@ -131,11 +131,11 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     sb.removeChannel(ch); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', onHash); vv?.removeEventListener('resize', fitVV); vv?.removeEventListener('scroll', fitVV); document.documentElement.classList.remove('wt-lock');
     drawer.classList.remove('on'); back.classList.remove('on');
     setTimeout(() => { drawer.remove(); back.remove(); }, 220);
-    markRead();
+    markRead().then(() => onClose?.());
     if (open?.drawer === drawer) open = null;
   }
   open = { close, drawer };
-  const markRead = () => sb.from('thread_reads').upsert({ member_id: me, client_id: client.id, read_at: new Date().toISOString() }, { onConflict: 'member_id,client_id' }).then(() => refreshUnread(), () => {});
+  const markRead = () => Promise.resolve(sb.from('thread_reads').upsert({ member_id: me, client_id: client.id, read_at: new Date().toISOString() }, { onConflict: 'member_id,client_id' })).then(() => refreshUnread(), () => {});
 
   // ---------- pisanie ----------
   function setKind(k) {
