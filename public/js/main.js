@@ -23,6 +23,7 @@ const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
 const renderM2 = lazy(() => import('./views/m2.js'), 'renderM2');
 const renderJpk = lazy(() => import('./views/jpk.js'), 'renderJpk');
+const renderEsf = lazy(() => import('./views/esf.js'), 'renderEsf');
 const renderRegulamin = lazy(() => import('./views/regulamin.js'), 'renderRegulamin');
 const renderKalkulator = lazy(() => import('./views/kalkulator.js'), 'renderKalkulator');
 const renderWzory = lazy(() => import('./views/wzory.js'), 'renderWzory');
@@ -231,6 +232,7 @@ async function route(opts = {}) {
     else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('pulpit'), params);
     else if (view === 'zgloszenia') c = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
     else if (view === 'dokumenty') c = await renderDokumenty(layout('sprawozdania'));
+    else if (view === 'sprawozdanie-finansowe') c = await renderEsf(layout('sprawozdania'), params);
     else if (view === 'kalkulator') c = await renderKalkulator(layout('sprawozdania'), { mod: 'rkdp' });
     else if (view === 'wzory') c = await renderWzory(layout('sprawozdania'), { mod: 'rkdp', params });
     else if (view === 'sprawozdania') c = await renderSprawozdania(layout('sprawozdania'), parts[1]);

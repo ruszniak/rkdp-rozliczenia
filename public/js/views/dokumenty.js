@@ -45,6 +45,7 @@ export async function renderDokumenty(main) {
       tile('PPS-1', 'Pełnomocnictwo szczególne w sprawie podatkowej.', doc('pps1'), ['PDF']),
       tile('Pełnomocnictwo procesowe', 'Do WSA i NSA – na papierze firmowym RKDP.', doc('procesowe'), ['PDF', 'Word'])),
     group('Spółki',
+      tile('Sprawozdanie finansowe – jednostka mikro', 'e-Sprawozdanie (XML do eKRS) z JPK_KR_PD i ubiegłorocznego sprawozdania z KRS. Bilans, RZiS, informacje uzupełniające – do edycji.', '#/sprawozdanie-finansowe', ['XML', 'PDF']),
       tile('Protokół zgromadzenia wspólników (ZZW)', 'Zatwierdzenie sprawozdania finansowego, podział zysku / pokrycie straty, absolutoria. Dane z KRS.', '#/sprawozdania/nowy', ['PDF', 'Word']),
       h('div', { class: 'card dk-tile dk-list' }, h('b', {}, 'Ostatnie protokoły'), recent)),
     group('Wzory umów i uchwał dla klientów',

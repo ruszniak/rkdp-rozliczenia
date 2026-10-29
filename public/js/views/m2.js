@@ -250,11 +250,12 @@ async function viewDashboard(main) {
     tile(open.length, 'Otwarte sprawy', `${BASE}/sprawy`),
     tile(orders.filter(o => o.status === 'projekt' || o.status === 'wyslane').length, 'Zlecenia i umowy niepodpisane', `${BASE}/zlecenia`)),
   h('div', { class: 'two' },
-    h('div', {}, h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list),
-    h('div', {}, meetingsCard(settings), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'), h('div', { class: 'table-title' }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
+    h('div', {}, h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list,
+      h('div', { class: 'table-title', style: { marginTop: '22px' } }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
       h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
         h('div', {}, h('b', {}, m.number), ' ', m.title, h('div', { class: 'small muted' }, m.m2_clients?.name || '')), statusPill(m.status)))
-        : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')])))));
+        : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')]))),
+    h('div', {}, meetingsCard(settings), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'))));
 }
 
 // ================= SPRAWY =================

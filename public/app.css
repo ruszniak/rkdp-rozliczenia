@@ -1471,3 +1471,31 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 .pop.dropping .chat-dropzone{display:flex}
 .pop.busy .chat-send{opacity:.5}
 @media (hover:hover) and (pointer:fine){.chat-tool.cam-btn{display:none}}
+/* sprawozdanie finansowe (e-SF) */
+.esf-pick{display:flex;gap:8px;flex-wrap:wrap}
+.esf-pick .select{min-width:220px}
+.esf{display:flex;flex-direction:column;gap:16px;margin-top:6px}
+.esf-src{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.esf-src .tk-drop{margin:6px 0 0}
+.esf-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px}
+.esf-f{display:flex;flex-direction:column;gap:4px;margin:0;font-size:12px;font-weight:600;color:var(--label)}
+.esf-f.wide,.esf-grid .check.wide{grid-column:1/-1}
+.esf-f .input,.esf-f .select{font-weight:400;color:var(--text);width:100%}
+.esf-f textarea{min-height:64px;line-height:1.45}
+.esf-t td{vertical-align:middle}
+.esf-t .esf-mark{width:34px;color:var(--label);font-weight:600}
+.esf-t th:nth-child(3),.esf-t th:nth-child(4){width:170px}
+.esf-n{width:150px;text-align:right;font-variant-numeric:tabular-nums;padding:5px 8px;min-height:0}
+.esf-sum{display:inline-block;min-width:150px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;padding-right:9px}
+.esf-t tr.esf-d0 td,.esf-t tr.esf-auto td{background:color-mix(in srgb,var(--gold) 10%,transparent);font-weight:700}
+.esf-t tr.esf-d1 td:nth-child(2){font-weight:600}
+.esf-t tr.esf-d2 td:nth-child(2){padding-left:26px;color:var(--ink-2,var(--text))}
+.esf-checks p{margin:4px 0;font-size:13px}
+.esf-err{color:var(--warn)}.esf-warn{color:#8A6420}.esf-ok{color:var(--ok);font-weight:600}
+.esf-info{display:flex;flex-direction:column;gap:8px}
+.esf-info-i{display:grid;grid-template-columns:24px 1fr 32px;gap:8px;align-items:start}
+.esf-info-i .esf-mark{padding-top:8px;font-weight:700;color:var(--label)}
+.esf-actions .row-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+@media (max-width:900px){.esf-src{grid-template-columns:1fr}.esf-grid{grid-template-columns:1fr 1fr}.esf-n,.esf-sum{width:110px;min-width:110px}}
+@media (max-width:560px){.esf-grid{grid-template-columns:1fr}}
+.page-head .esf-pick .select{background:var(--card);color:var(--text);border-color:transparent}

@@ -64,14 +64,14 @@ const leafObj = el => { const o = {}; for (const c of kids(el)) if (!c.children.
 const all = (doc, name) => [...doc.getElementsByTagNameNS('*', name)];
 const first = (doc, name) => doc.getElementsByTagNameNS('*', name)[0] || null;
 
-async function readText(file) {
+export async function readText(file) {
   const buf = await file.arrayBuffer();
   const head = new TextDecoder('latin1').decode(buf.slice(0, 300));
   const enc = (head.match(/encoding=["']([\w-]+)["']/i) || [])[1] || 'utf-8';
   try { return new TextDecoder(enc.toLowerCase()).decode(buf); } catch { return new TextDecoder('utf-8').decode(buf); }
 }
 
-function parseJpk(text, fileName) {
+export function parseJpk(text, fileName) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length) throw new Error('To nie jest poprawny plik XML.');
   const kf = first(doc, 'KodFormularza');
