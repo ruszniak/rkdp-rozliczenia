@@ -2,7 +2,7 @@ import { h, toast, fail, infoTip } from '../ui.js';
 import { sb, state } from '../store.js';
 import { ROLE, RULE } from '../dict.js';
 import { fetchAll } from './rozliczenia.js';
-import { downloadBackup } from '../backup.js';
+import { downloadBackup, downloadFilesBackup } from '../backup.js';
 
 export async function renderZespol(main) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
@@ -29,6 +29,8 @@ export async function renderZespol(main) {
       role.addEventListener('change', () => update(m, { role: role.value }));
       const active = h('input', { type: 'checkbox', checked: m.active, disabled: m.id === state.me.id });
       active.addEventListener('change', () => update(m, { active: active.checked }));
+      const att = h('input', { type: 'checkbox', checked: !!m.attendance });
+      att.addEventListener('change', () => update(m, { attendance: att.checked }));
       const mods = m.modules || ['rozliczenia'];
       const modBox = (key, label) => {
         const cb = h('input', { type: 'checkbox', checked: mods.includes(key), disabled: m.id === state.me.id });
@@ -67,7 +69,8 @@ export async function renderZespol(main) {
         h('td', {}, m.short_name),
         h('td', {}, modBox('rozliczenia', 'Rozliczenia'), h('br'), modBox('doradztwo', 'Doradztwo M2 TAX'), h('br'), h('span', { 'data-tip': 'Konto, które widzi wyłącznie zakładkę JPK (podgląd plików JPK_CIT). Nie ma dostępu do klientów, rozliczeń ani M2 TAX.' }, modBox('jpk', 'Tylko podgląd JPK'))),
         h('td', {}, role),
-        h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany')),
+        h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany'),
+          h('label', { class: 'check small', 'data-tip': 'Czy ta osoba prowadzi listę obecności (widżet „Moja obecność dziś”, listy obecności, „Obecność dziś” na pulpicie).' }, att, 'lista obecności')),
         loginCell,
         h('td', { class: 'small' }, `księgowość: ${nAcc}`, h('br'), `kadry: ${nHr}`),
         h('td', {}, h('button', { class: 'btn btn-ghost btn-sm', onclick: () => renderAssign(m) }, `Dodatkowy dostęp (${count})`)));
@@ -193,6 +196,12 @@ export async function renderZespol(main) {
     catch (e) { fail(e, 'Nie udało się zrobić kopii'); }
     finally { backupBtn.disabled = false; backupBtn.textContent = 'Pobierz kopię danych'; }
   } }, 'Pobierz kopię danych');
+  const filesBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+    filesBtn.disabled = true;
+    try { const r = await downloadFilesBackup(t => { filesBtn.textContent = 'Pobieranie plików… ' + t; }); toast(`Kopia plików pobrana (${r.n})` + (r.errors ? ` – nie udało się: ${r.errors}, lista w CZYTAJ.txt` : ''), !!r.errors); }
+    catch (e) { fail(e, 'Nie udało się zrobić kopii plików'); }
+    finally { filesBtn.disabled = false; filesBtn.textContent = 'Pobierz kopię plików'; }
+  } }, 'Pobierz kopię plików');
   const { data: secRows } = await sb.from('app_settings').select('key,value').in('key', ['session_idle_minutes', 'device_trust_days']);
   const secVal = Object.fromEntries((secRows || []).map(r => [r.key, r.value]));
   const secSelect = (key, label, opts, tip) => {
@@ -219,9 +228,10 @@ export async function renderZespol(main) {
     termsBox));
   import('./regulamin.js').then(m => m.termsAdminSection(state.members)).then(el => termsBox.replaceChildren(el)).catch(() => termsBox.replaceChildren(h('p', { class: 'hint' }, 'Historia akceptacji jest niedostępna.')));
   main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
-    h('div', { class: 'section-head' }, h('h2', {}, 'Kopia zapasowa'), backupBtn),
-    h('p', { class: 'hint' }, 'Plik ZIP ze wszystkimi danymi aplikacji (klienci, rozliczenia, notatki, Doradztwo M2 TAX, historia zmian) – w formacie JSON i Excel. ',
-      'Niezależnie od tego co noc wykonywana jest automatyczna, zaszyfrowana kopia bazy w GitHubie. ',
+    h('div', { class: 'section-head' }, h('h2', {}, 'Kopia zapasowa'), h('div', { class: 'row-btns' }, filesBtn, backupBtn)),
+    h('p', { class: 'hint' }, 'Kopia danych: plik ZIP ze wszystkimi danymi aplikacji (klienci, rozliczenia, rozmowy, zadania, Doradztwo M2 TAX, historia zmian) – w formacie JSON i Excel. ',
+      'Kopia plików: ZIP ze wszystkimi wgranymi plikami (archiwum klienta, załączniki, pliki od klientów, załączniki zadań) w folderach według klientów. ',
+      'Niezależnie od tego co noc wykonywana jest automatyczna, zaszyfrowana kopia bazy w GitHubie (bez plików – pliki pobieraj przyciskiem co jakiś czas). ',
       'Plik zawiera dane osobowe – trzymaj go na zaszyfrowanym dysku.')));
 
   // ---------- poczta: wiadomości do klientów z kancelaria@rkdp.pl ----------

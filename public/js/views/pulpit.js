@@ -1,5 +1,5 @@
 // RKDP – pulpit: dla pracownika (moje zgłoszenia, moje rozliczenia, terminy) i pulpit doradcy dla administratora.
-import { h, fail, icon, periodLabel, defaultPeriod, initials, infoTip } from '../ui.js';
+import { h, fail, icon, periodLabel, defaultPeriod, initials, infoTip, ava } from '../ui.js';
 import { sb, state, memberById } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { sectionOf, deadlinesFor } from '../dict.js';
@@ -100,15 +100,15 @@ function myDashboard(D, period, hist) {
 
   return {
     tiles: [h('div', { class: 'tiles' },
-      tile(mine.length, 'Moje otwarte zgłoszenia', '#/zgloszenia?f=moje'),
-      tile(late.length, 'Moje po terminie', '#/zgloszenia?f=moje', { dark: late.length > 0 }),
+      tile(mine.length, 'Moje otwarte zadania', '#/rozmowy?f=moje'),
+      tile(late.length, 'Moje po terminie', '#/rozmowy?f=moje', { dark: late.length > 0 }),
       tile(totalMine ? `${settledMine}/${totalMine}` : '—', `Moi klienci rozliczeni (${periodLabel(period).toLowerCase()})`, `#/rozliczenia?okres=${period}`, { bar: totalMine ? settledMine / totalMine : undefined }),
       tile(missingMine, 'Klienci z brakiem dokumentów', `#/rozliczenia?okres=${period}`, { dark: missingMine > 0 }))],
     blocks: [
-      { key: 'moje_zgloszenia', title: 'Moje zgłoszenia', el: card(`Moje zgłoszenia (${mine.length})`, h('button', { class: 'btn btn-outline btn-sm', onclick: () => newTicketDialog().catch(e => fail(e)) }, icon('plus'), 'Nowe'),
-        ...(mine.length ? mine.slice(0, 12).map(t => ticketRow(t, D.cname)) : [empty('Nie masz otwartych zgłoszeń.')]),
-        mine.length > 12 ? h('a', { class: 'small', href: '#/zgloszenia?f=moje', style: { display: 'block', marginTop: '10px' } }, `Wszystkie (${mine.length}) →`) : null) },
-      { key: 'obecnosc', title: 'Obecność dziś', el: todayWidget() },
+      { key: 'moje_zgloszenia', title: 'Moje zadania', el: card(`Moje zadania (${mine.length})`, h('button', { class: 'btn btn-outline btn-sm', onclick: () => newTicketDialog().catch(e => fail(e)) }, icon('plus'), 'Nowe'),
+        ...(mine.length ? mine.slice(0, 12).map(t => ticketRow(t, D.cname)) : [empty('Nie masz otwartych zadań.')]),
+        mine.length > 12 ? h('a', { class: 'small', href: '#/rozmowy?f=moje', style: { display: 'block', marginTop: '10px' } }, `Wszystkie (${mine.length}) →`) : null) },
+      state.me.attendance ? { key: 'obecnosc', title: 'Obecność dziś', el: todayWidget() } : null,
       { key: 'terminy', title: 'Obowiązki w miesiącu', el: obligationsCard({ mine: true }) },
       delegated.length ? { key: 'przekazane', title: 'Przekazane innym', el: card(`Przekazane innym (${delegated.length})`, null, ...delegated.slice(0, 8).map(t => ticketRow(t, D.cname, true))) } : null,
       ...settleCards.map((el, i) => ({ key: 'rozliczenia_' + (areas[i]?.area || i), title: `Rozliczenia – ${areas[i]?.label || ''}`, el })),
@@ -146,7 +146,7 @@ function adminDashboard(D, period, hist, alerts) {
     };
     const num = (n, cls) => n ? h('span', { class: 'cnt ' + cls }, String(n)) : h('span', { class: 'cnt zero' }, '0');
     return h('tr', {},
-      h('td', {}, h('span', { class: 'person', style: { padding: 0 } }, h('span', { class: 'av' }, initials(m.full_name)), m.full_name)),
+      h('td', {}, h('span', { class: 'person', style: { padding: 0 } }, h('span', { class: 'av' }, ava(m)), m.full_name)),
       h('td', {}, num(o.length, 'open')), h('td', {}, num(l.length, 'late')), h('td', {}, num(dw, 'done')),
       h('td', {}, frac(a)), h('td', {}, frac(k)), h('td', {}, num(ms, 'late')));
   };
@@ -169,15 +169,15 @@ function adminDashboard(D, period, hist, alerts) {
       tile(hr.length ? `${hrOk}/${hr.length}` : '—', `Kadry rozliczone – ${periodLabel(period).toLowerCase()}`, `#/rozliczenia?okres=${period}&widok=kadry`, { bar: hr.length ? hrOk / hr.length : 0, ...trendOpts(hist, 'kadry', hrPct, period) })),
     tiles: [h('div', { class: 'tiles' },
       tile(open.length, 'Otwarte zgłoszenia', '#/zgloszenia?f=otwarte'),
-      tile(late.length, 'Po terminie', '#/zgloszenia?f=po_terminie', { dark: late.length > 0 }),
+      tile(late.length, 'Po terminie', '#/rozmowy?f=po_terminie', { dark: late.length > 0 }),
       tile(hot.length, 'Pilne i wysokie', '#/zgloszenia?f=otwarte'),
-      tile(wait.length, 'Czeka na klienta', '#/zgloszenia?f=czeka')),
+      tile(wait.length, 'Czeka na klienta', '#/rozmowy?f=czeka')),
     h('div', { class: 'tiles' },
       tile(missing.length, 'Brak dokumentów', `#/rozliczenia?okres=${period}`, { dark: missing.length > 0 }),
       tile(doneWeek.length, 'Zgłoszenia zamknięte w 7 dni', '#/zgloszenia?f=zrobione'))],
     blocks: [
       { key: 'zespol', title: 'Zespół', wide: true, el: card('Zespół', h('a', { class: 'btn btn-ghost btn-sm', href: '#/raport' }, 'Raport miesięczny →'), h('div', { class: 'list-wrap' }, h('table', { class: 'list pl-team' },
-        h('thead', {}, h('tr', {}, ...['Osoba', 'Zgłoszenia otwarte', 'Po terminie', 'Zamknięte (7 dni)', 'Księgowość', 'Kadry', 'Brak dok.'].map(x => h('th', {}, x)))),
+        h('thead', {}, h('tr', {}, ...['Osoba', 'Zadania otwarte', 'Po terminie', 'Zamknięte (7 dni)', 'Księgowość', 'Kadry', 'Brak dok.'].map(x => h('th', {}, x)))),
         h('tbody', {}, ...team.map(row))))) },
       { key: 'uwaga', title: 'Wymaga uwagi', el: card('Wymaga uwagi', null, ...(info.length ? [h('div', { class: 'pl-infos' }, ...info)] : []),
         ...(attention.length ? attention : [empty('Brak zgłoszeń po terminie i pilnych. 👍')])) },

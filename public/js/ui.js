@@ -93,6 +93,11 @@ export function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// miniatura osoby: zdjęcie profilowe (jeśli ustawione) albo inicjały
+export function ava(m) {
+  if (m?.avatar) return h('img', { src: m.avatar, alt: '', class: 'av-img', loading: 'lazy', decoding: 'async' });
+  return initials(m?.full_name || m?.name || '?');
+}
 export function initials(name = '') {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase();
 }

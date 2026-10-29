@@ -1,5 +1,5 @@
 // RKDP – rejestr zgłoszeń (CRM zadań): zgłoszenie, termin, opis, odpowiedzialny, status, komentarze i historia.
-import { h, toast, fail, icon, modal, fmtDateTime, initials, infoTip } from '../ui.js';
+import { h, toast, fail, icon, modal, fmtDateTime, initials, infoTip, ava } from '../ui.js';
 import { sb, state, isAdmin, memberById, hasModule } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 
@@ -60,7 +60,7 @@ export const statusTag = s => h('span', { class: 'tk-st ' + s }, TK_STATUS[s] ||
 const prioTag = p => p === 'normalny' ? null : h('span', { class: 'tk-pr ' + p }, TK_PRIO[p]);
 export const dueTag = t => t.due_date ? h('span', { class: 'tk-due' + (isLate(t) ? ' late' : isSoon(t) ? ' soon' : '') },
   dShort(t.due_date) + (isLate(t) ? ' · po terminie' : t.due_date === today() && TK_OPEN.includes(t.status) ? ' · dziś' : '')) : h('span', { class: 'muted small' }, 'bez terminu');
-const avatar = id => id ? h('span', { class: 'person', style: { padding: 0 }, 'data-tip': who(id) }, h('span', { class: 'av' }, initials(who(id)))) : h('span', { class: 'person unassigned', style: { padding: 0 } }, h('span', { class: 'av' }, '?'));
+const avatar = id => id ? h('span', { class: 'person', style: { padding: 0 }, 'data-tip': who(id) }, h('span', { class: 'av' }, ava(memberById(id) || { full_name: who(id) }))) : h('span', { class: 'person unassigned', style: { padding: 0 } }, h('span', { class: 'av' }, '?'));
 
 // ---------- wspólne pola formularza ----------
 function fieldsGrid(t, ctx, onChange = () => {}) {
@@ -196,7 +196,7 @@ export async function renderZgloszenia(main, id, params, module = 'rkdp') {
   main.replaceChildren(
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, cur.eyebrow),
-        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Zgłoszenia', infoTip(cur.key === 'm2' ? HELP_M2 : HELP, 'Zgłoszenia – instrukcja')),
+        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, cur.key === 'm2' ? 'Zgłoszenia' : 'Tabela zadań', infoTip(cur.key === 'm2' ? HELP_M2 : HELP, 'Zgłoszenia – instrukcja')),
         h('p', { class: 'sub' }, 'Sprawy do załatwienia: kto, co, do kiedy – z komentarzami i historią.')),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
         h('a', { class: 'btn btn-outline', href: `${BASE}/cykliczne` }, '↻ Zadania cykliczne'),
@@ -287,7 +287,7 @@ async function renderTicket(main, id) {
   ta.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendBtn.click(); });
   const items = [{ kind: 'utworzenie', body: 'Utworzono zgłoszenie', author_id: t.created_by, created_at: t.created_at }, ...(comments || [])];
   const timeline = h('div', { class: 'tk-timeline' }, ...items.slice().reverse().map(c => h('div', { class: 'tk-c ' + c.kind },
-    h('span', { class: 'av' }, initials(who(c.author_id))),
+    h('span', { class: 'av' }, ava(memberById(c.author_id) || { full_name: who(c.author_id) })),
     h('div', { class: 'tk-c-body' },
       h('div', { class: 'small muted' }, h('b', { style: { color: 'var(--ink)' } }, who(c.author_id)), ' · ', fmtDateTime(c.created_at),
         c.kind === 'wykonanie' ? h('span', { class: 'tk-st zrobione', style: { marginLeft: '8px' } }, 'wykonanie') : null,

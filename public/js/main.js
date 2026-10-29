@@ -1,4 +1,4 @@
-import { h, initials, toast, initTooltips, initMobileTables } from './ui.js';
+import { h, initials, toast, initTooltips, initMobileTables, ava } from './ui.js';
 import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
 import { renderLogin } from './views/login.js';
 import { TERMS_VERSION } from './regulamin.js';
@@ -17,6 +17,7 @@ const renderProfil = lazy(() => import('./views/profil.js'), 'renderProfil');
 const renderObecnosc = lazy(() => import('./views/obecnosc.js'), 'renderObecnosc');
 const renderAml = lazy(() => import('./aml/aml.js'), 'renderAml');
 const renderZgloszenia = lazy(() => import('./views/zgloszenia.js'), 'renderZgloszenia');
+const renderRozmowy = lazy(() => import('./views/rozmowy.js'), 'renderRozmowy');
 const renderPulpit = lazy(() => import('./views/pulpit.js'), 'renderPulpit');
 const renderOferty = lazy(() => import('./views/oferty.js'), 'renderOferty');
 const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
@@ -37,7 +38,7 @@ const prefetchViews = () => {
   const go = () => {
     const list = [];
     if (isJpkOnly()) return;
-    if (hasModule('rozliczenia')) list.push(() => import('./views/pulpit.js'), () => import('./views/rozliczenia.js'), () => import('./views/klienci.js'), () => import('./views/klient.js'), () => import('./views/zgloszenia.js'), () => import('./views/dokumenty.js'));
+    if (hasModule('rozliczenia')) list.push(() => import('./views/pulpit.js'), () => import('./views/rozliczenia.js'), () => import('./views/klienci.js'), () => import('./views/klient.js'), () => import('./views/zgloszenia.js'), () => import('./views/rozmowy.js'), () => import('./watek.js'), () => import('./views/dokumenty.js'));
     if (hasModule('doradztwo')) list.push(() => import('./views/m2.js'));
     list.push(() => import('./views/obecnosc.js'), () => import('./views/profil.js'), () => import('./views/jpk.js'));
     list.reduce((p, f) => p.then(() => f().catch(() => null)), Promise.resolve());
@@ -48,6 +49,7 @@ import { logout as endSession, startIdleWatch, takeLogoutReason } from './sessio
 
 const app = document.getElementById('app');
 let cleanup = null;
+let tkRes = null;
 
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, '');
@@ -58,7 +60,7 @@ function parseHash() {
 
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
-    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/zgloszenia', 'Zgłoszenia', 'zgloszenia'], ['#/dokumenty', 'Dokumenty', 'sprawozdania']] },
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozmowy', 'Rozmowy', 'rozmowy'], ['#/dokumenty', 'Dokumenty', 'sprawozdania']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']] },
@@ -71,6 +73,7 @@ const remember = m => { try { localStorage.setItem('rkdp_module', m); } catch { 
 
 // ikony zakładek (dolny pasek na telefonie)
 const TAB_ICONS = {
+  'rozmowy': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 14h4.5"/></svg>',
   'pulpit': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
   'rozliczenia': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
   'klienci': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.9-5 5.5-5s4.9 2 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.3.2 4 1.9 4.5 4.8"/></svg>',
@@ -134,9 +137,9 @@ function layout(active) {
           const draw = () => { const d = getTheme() === 'dark'; b.innerHTML = d ? ICON_SUN : ICON_MOON; b.setAttribute('aria-label', d ? 'Motyw jasny' : 'Motyw ciemny'); b.setAttribute('data-tip', d ? 'Przełącz na motyw jasny' : 'Przełącz na motyw ciemny'); };
           draw(); themeOff?.(); themeOff = onThemeChange(draw); return b; })(),
         !jpkOnly && hasModule('rozliczenia') && mod === 'rkdp' ? unreadBadgeEl() : null,
-        jpkOnly ? null : (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
+        jpkOnly || !(state.me.attendance || state.me.role === 'admin' || state.me.attendance_scope) ? null : (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
         jpkOnly ? h('span', { class: 'who' }, me.full_name) : h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
-        jpkOnly ? h('span', { class: 'avatar', title: me.email }, initials(me.full_name)) : h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, initials(me.full_name)),
+        jpkOnly ? h('span', { class: 'avatar', title: me.email }, ava(me)) : h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, ava(me)),
         h('button', { class: 'btn btn-ghost btn-sm logout', onclick: logout, 'aria-label': 'Wyloguj' }, (() => { const i = h('span', { class: 'logout-ico', 'aria-hidden': 'true' }); i.innerHTML = TAB_ICONS.logout; return i; })(), h('span', { class: 'logout-txt' }, 'Wyloguj')))));
   document.body.classList.toggle('has-tabbar', true);
   const main = h('main', { class: 'wrap' });
@@ -205,6 +208,7 @@ async function route(opts = {}) {
   document.querySelector('.pop')?.remove();
   closePanel();
   const { parts, params } = parseHash();
+  if (parts[0] === 'wynik') { location.reload(); return; }
   if (isJpkOnly()) {
     if (parts[0] === 'regulamin') { try { c = await renderRegulamin(layout('regulamin')); } catch (err) { console.error(err); } return done(); }
     if (parts[0] !== 'jpk') history.replaceState(null, '', '#/jpk');
@@ -234,7 +238,9 @@ async function route(opts = {}) {
     else if (view === 'terminy') c = await renderTerminy(layout('rozliczenia'), params);
     else if (view === 'zamkniecie-roku') c = await renderRok(layout('rozliczenia'), params);
     else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('pulpit'), params);
-    else if (view === 'zgloszenia') c = await renderZgloszenia(layout('zgloszenia'), parts[1], params);
+    else if (view === 'rozmowy') c = await renderRozmowy(layout('rozmowy'), params);
+    else if (view === 'zgloszenia' && parts[1] && parts[1] !== 'cykliczne' && !params.has('pelne') && (tkRes = await openTicketInThread(parts[1]))) c = tkRes.c;
+    else if (view === 'zgloszenia') c = await renderZgloszenia(layout('rozmowy'), parts[1], params);
     else if (view === 'dokumenty') c = await renderDokumenty(layout('sprawozdania'));
     else if (view === 'sprawozdanie-finansowe') c = await renderEsf(layout('sprawozdania'), params);
     else if (view === 'kalkulator') c = await renderKalkulator(layout('sprawozdania'), { mod: 'rkdp' });
@@ -249,7 +255,20 @@ async function route(opts = {}) {
   done();
 }
 
+// zadanie (zgłoszenie) RKDP przypisane do klienta otwieramy w rozmowie klienta – to jedno miejsce na uwagi, pytania i zadania
+async function openTicketInThread(id) {
+  const { data: t } = await sb.from('rkdp_tickets').select('id,client_id,period,created_at,module').eq('id', id).maybeSingle();
+  if (!t?.client_id || t.module !== 'rkdp') return null;
+  history.replaceState(null, '', '#/rozmowy');
+  const c = await renderRozmowy(layout('rozmowy'), new URLSearchParams());
+  const { data: client } = await sb.from('clients').select('*').eq('id', t.client_id).maybeSingle();
+  if (client) import('./watek.js').then(m => m.openThread({ client, period: (t.period || t.created_at).slice(0, 7), focus: 't' + t.id }));
+  return { c };
+}
+
 async function start() {
+  // publiczny podgląd wyniku (link dla klienta) – bez logowania
+  if (/^#\/wynik\/[\w-]{20,}/.test(location.hash)) { const m = await import('./udostepnij.js'); return m.renderShared(app, location.hash.split('/')[2].split('?')[0]); }
   const reason = takeLogoutReason();
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { renderLogin(app, reason); return; }

@@ -83,7 +83,8 @@ export function summarize(m, rows) {
 export function visibleMembers() {
   const me = state.me;
   const scope = (me.attendance_scope || '').trim().toLowerCase();
-  return state.members.filter(m => m.active && (m.id === me.id || isAdmin() || (scope && (m.email || '').toLowerCase().endsWith('@' + scope))));
+  // lista obecności prowadzona jest tylko dla osób oznaczonych w „Zespół i ustawienia” (kolumna „Obecność”)
+  return state.members.filter(m => m.active && m.attendance && (m.id === me.id || isAdmin() || (scope && (m.email || '').toLowerCase().endsWith('@' + scope))));
 }
 export const canSeeTeam = () => visibleMembers().length > 1;
 const canEdit = memberId => memberId === state.me.id || isAdmin();
@@ -97,6 +98,7 @@ async function loadMonth(memberIds, m) {
 
 // ---------- widżet „dzisiaj” (pulpit i lista) ----------
 export function todayWidget({ onChange, link = true } = {}) {
+  if (!state.me.attendance) return null; // ta osoba nie prowadzi listy obecności
   const box = h('section', { class: 'card section ob-today' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const draw = async () => {
     const { data: r, error } = await sb.from('attendance').select('*').eq('member_id', state.me.id).eq('day', todayIso()).maybeSingle();
@@ -235,7 +237,12 @@ const HELP = `Lista obecności (ewidencja czasu pracy):
 export async function renderObecnosc(main, sub, params) {
   if (sub === 'zespol') return renderTeam(main, params);
   const vis = visibleMembers();
-  let member = vis.find(x => x.id === params.get('osoba')) || state.me;
+  let member = vis.find(x => x.id === params.get('osoba')) || (state.me.attendance ? state.me : vis[0]);
+  if (!member) {
+    main.replaceChildren(h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'Lista obecności'), h('h1', { style: { marginTop: '6px' } }, 'Lista obecności'),
+      h('p', { class: 'sub' }, 'Lista obecności nie jest prowadzona dla Twojego konta. Osoby objęte listą wybiera administrator w „Zespół i ustawienia” (kolumna „Obecność”).'))));
+    return;
+  }
   let m = /^\d{4}-\d{2}$/.test(params.get('m') || '') ? params.get('m') : curMonth();
   const editable = canEdit(member.id);
   const rows = await loadMonth([member.id], m);

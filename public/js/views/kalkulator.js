@@ -128,6 +128,8 @@ export async function renderKalkulator(main, { mod = 'rkdp' } = {}) {
     return B;
   }
   const pdf = () => printHtml(printableHtml(blocks(), `Porownanie_form_opodatkowania${d.dla ? '_' + d.dla.replace(/[^\p{L}\p{N}]+/gu, '_') : ''}`, location.origin + brand.logo, brand));
+  const share = () => import('../udostepnij.js').then(m => m.shareDialog({ kind: 'kalkulator', brand: brand.key, label: d.dla || '',
+    title: `Porownanie_form_opodatkowania${d.dla ? '_' + d.dla.replace(/[^\p{L}\p{N}]+/gu, '_') : ''}`, blocks: blocks() }));
   const copy = async () => {
     const txt = res.rows.map(r => `${r.label}: podatki i składki ${zl(r.obc)}, na rękę ${zl(r.naReke)}${r.wSpolce ? `, w spółce ${zl(r.wSpolce)}` : ''}`).join('\n');
     try { await navigator.clipboard.writeText(`Dochód ${zl(res.D)} (${res.P.rok} r., wyliczenie poglądowe)\n${txt}`); toast('Skopiowano wynik'); } catch { toast('Nie udało się skopiować', true); }
@@ -142,6 +144,7 @@ export async function renderKalkulator(main, { mod = 'rkdp' } = {}) {
         h('p', { class: 'sub' }, 'Porównanie obciążeń przy tym samym dochodzie: działalność na skali, liniowym i ryczałcie, spółka na CIT i na CIT estońskim.')),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
         h('button', { class: 'btn btn-outline btn-sm', onclick: copy }, 'Kopiuj wynik'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: share, 'data-tip': 'Link do podglądu wyniku dla osoby bez dostępu do aplikacji – bez logowania, tylko do odczytu' }, 'Link dla klienta'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: pdf }, icon('download'), 'PDF dla klienta'))),
     h('div', { class: 'fk-layout' }, form,
       h('div', { class: 'fk-res' }, info, warn, cards,

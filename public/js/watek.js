@@ -2,7 +2,7 @@
 // uwagi, pytania, zadania (zgłoszenia) z odpowiedziami, załączniki, wysłane e-maile i zmiany kratek.
 // Przypięte ustalenia na górze, otwarte pytania z wcześniejszych miesięcy, @wzmianki, edycja z historią,
 // usuwanie ze śladem, wyszukiwarka i eksport historii do PDF. Licznik „Nieprzeczytane” w górnym pasku.
-import { h, icon, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPeriod, initials, printHtml, modal } from './ui.js';
+import { h, icon, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPeriod, initials, printHtml, modal, ava } from './ui.js';
 import { sb, state, memberById } from './store.js';
 import { STATUS } from './dict.js';
 import { fileTile, pastedFiles, named, safeName, TK_STATUS, TK_PRIO } from './views/zgloszenia.js';
@@ -85,6 +85,8 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
 
   const onKey = e => { if (e.key === 'Escape' && !document.querySelector('.modal-back')) { if (!mentionPop.hidden) { mentionPop.hidden = true; return; } close(); } };
   document.addEventListener('keydown', onKey);
+  const onHash = () => close(); // przejście na inny ekran zamyka rozmowę
+  window.addEventListener('hashchange', onHash);
   ['dragenter', 'dragover'].forEach(ev => drawer.addEventListener(ev, e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); drawer.classList.add('dropping'); } }));
   drawer.addEventListener('dragleave', e => { if (!drawer.contains(e.relatedTarget)) drawer.classList.remove('dropping'); });
   drawer.addEventListener('drop', e => { e.preventDefault(); drawer.classList.remove('dropping'); const fs = [...(e.dataTransfer?.files || [])]; if (fs.length) addFiles(fs); });
@@ -96,7 +98,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     .subscribe();
   function close() {
     if (!drawer.isConnected) return;
-    sb.removeChannel(ch); document.removeEventListener('keydown', onKey);
+    sb.removeChannel(ch); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', onHash);
     drawer.classList.remove('on'); back.classList.remove('on');
     setTimeout(() => { drawer.remove(); back.remove(); }, 220);
     markRead();
@@ -130,7 +132,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     if (!list.length) { mentionPop.hidden = true; return; }
     mentionPop.replaceChildren(...list.map((x, i) => h('button', { type: 'button', class: 'wt-m' + (i === 0 ? ' on' : ''), onmousedown: e => e.preventDefault(), onclick: () => {
       ta.value = before.slice(0, -m[0].length) + '@' + x.short_name + ' ' + ta.value.slice(pos); mentionPop.hidden = true; ta.focus(); grow();
-    } }, h('span', { class: 'av chat-av' }, initials(x.full_name)), x.full_name)));
+    } }, h('span', { class: 'av chat-av' }, ava(x)), x.full_name)));
     mentionPop.hidden = false;
   }
   function setReply(r) {
@@ -191,7 +193,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   }
 
   // ---------- rysowanie ----------
-  const avatar = id => h('span', { class: 'av chat-av' + (id ? '' : ' none'), 'aria-hidden': 'true' }, id ? initials(memberById(id)?.full_name || '?') : '');
+  const avatar = id => h('span', { class: 'av chat-av' + (id ? '' : ' none'), 'aria-hidden': 'true' }, id ? ava(memberById(id) || { full_name: '?' }) : '');
   function bubble(x, { reply = false } = {}) {
     if (x.deleted_at) return h('div', { class: 'chat-sys wt-del' }, `Wiadomość usunięta${x.deleted_by && x.deleted_by !== x.author ? ` przez ${who(x.deleted_by)}` : ''} · ${who(x.author)}, ${tm(x.created_at)}`);
     const mine = x.author === me, q = x.kind === 'pytanie';
@@ -239,7 +241,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
         t.due_date ? h('span', { class: late ? 'wt-late' : '' }, 'termin ' + t.due_date.split('-').reverse().join('.')) : null,
         t.priority !== 'normalny' ? h('span', { class: 'tk-pr ' + t.priority }, TK_PRIO[t.priority]) : null,
         h('span', { class: 'muted' }, `${who(t.created_by)} · ${tm(t.created_at)}`),
-        h('a', { href: `#/zgloszenia/${t.id}`, class: 'chat-a', onclick: () => close() }, 'otwórz')),
+        h('a', { href: `#/zgloszenia/${t.id}?pelne=1`, class: 'chat-a', onclick: () => close() }, 'szczegóły i pliki')),
       replies('t' + t.id, com, c => c.kind === 'zmiana'
         ? h('div', { class: 'chat-sys wt-small' }, `${who(c.author_id)} · ${c.body} · ${tm(c.created_at)}`)
         : h('div', { class: 'chat-msg wt-r' + (c.author_id === me ? ' mine' : '') }, c.author_id !== me ? avatar(c.author_id) : null,
@@ -405,4 +407,36 @@ async function unreadMenu(anchor) {
       h('span', { class: 'small muted' }, `${u.n} nowych · ${new Date(u.last_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`)))
       : [h('p', { class: 'hint', style: { padding: '6px 10px' } }, 'Wszystko przeczytane. 👍')]),
     lastUnread.length ? h('button', { class: 'opt', onclick: async () => { closePop(); const now = new Date().toISOString(); await sb.from('thread_reads').upsert(lastUnread.map(u => ({ member_id: state.me.id, client_id: u.client_id, read_at: now })), { onConflict: 'member_id,client_id' }); refreshUnread(); } }, 'Oznacz wszystkie jako przeczytane') : null));
+}
+
+// Karta „Rozmowa i zadania” na karcie klienta (zamiast dawnych „Zgłoszeń”):
+// otwarte zadania, otwarte pytania, przypięte ustalenia i ostatnie wpisy; kliknięcie otwiera rozmowę.
+export function threadCard(client) {
+  const box = h('section', { class: 'card section wt-card' });
+  const go = (period, focus) => openThread({ client, period: period || defaultPeriod(), focus, onChange: load });
+  async function load() {
+    const soft = p => p.then(r => r.data || [], () => []);
+    const [tasks, qs, pins, last] = await Promise.all([
+      soft(sb.from('rkdp_tickets').select('id,no,title,status,due_date,assignee_id,period,created_at').eq('module', 'rkdp').eq('client_id', client.id).in('status', ['nowe', 'w_toku', 'czeka']).order('due_date', { ascending: true, nullsFirst: false })),
+      soft(sb.from('period_comments').select('id,period,body').eq('client_id', client.id).eq('kind', 'pytanie').is('resolved_at', null).is('deleted_at', null).is('parent_id', null).order('created_at')),
+      soft(sb.from('period_comments').select('id,period,body').eq('client_id', client.id).eq('pinned', true).is('deleted_at', null)),
+      soft(sb.from('period_comments').select('id,period,body,author,kind,created_at').eq('client_id', client.id).is('deleted_at', null).order('created_at', { ascending: false }).limit(4)),
+    ]);
+    const today = new Date().toLocaleDateString('sv-SE');
+    const li = (txt, meta, onclick, cls = '') => h('button', { type: 'button', class: 'wt-card-li ' + cls, onclick }, h('span', { class: 'wt-card-t' }, txt), meta ? h('span', { class: 'small muted' }, meta) : null);
+    const cut = s => (s = String(s || '').replace(/\s+/g, ' ')).length > 90 ? s.slice(0, 89) + '…' : s;
+    box.replaceChildren(...[
+      h('div', { class: 'section-head' }, h('h2', {}, 'Rozmowa i zadania'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => go() }, icon('plus'), 'Otwórz rozmowę')),
+      h('p', { class: 'small muted', style: { margin: '-4px 0 10px' } }, `${tasks.length} otwartych zadań · ${qs.length} otwartych pytań`),
+      ...pins.map(p => li('📌 ' + cut(p.body), periodLabel(p.period.slice(0, 7)), () => go(p.period.slice(0, 7), p.id), 'pin')),
+      ...tasks.map(t => li(`${t.title}`, `#${t.no} · ${TK_STATUS[t.status]} · ${who(t.assignee_id)}${t.due_date ? ' · termin ' + t.due_date.split('-').reverse().join('.') : ''}`,
+        () => go((t.period || t.created_at).slice(0, 7), 't' + t.id), t.due_date && t.due_date < today ? 'late' : '')),
+      ...qs.map(q => li('❓ ' + cut(q.body), periodLabel(q.period.slice(0, 7)), () => go(q.period.slice(0, 7), q.id))),
+      last.length ? h('div', { class: 'wt-card-sub small muted' }, 'Ostatnie wpisy') : null,
+      ...last.map(x => li(cut(x.body), `${who(x.author)} · ${new Date(x.created_at).toLocaleDateString('pl-PL')}`, () => go(x.period.slice(0, 7), x.id), 'muted')),
+      !tasks.length && !qs.length && !last.length ? h('p', { class: 'hint' }, 'Brak wpisów. Uwagi, pytania i zadania o kliencie piszesz w rozmowie.') : null].filter(Boolean));
+  }
+  load();
+  return box;
 }

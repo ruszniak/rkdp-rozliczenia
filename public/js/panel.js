@@ -1,6 +1,6 @@
 // Karta klienta w panelu bocznym: dane, kratki z bieżącego miesiąca, uwagi, prośby o dokumenty, zgłoszenia,
 // najbliższe terminy, monitoring. Lista pod spodem zostaje na miejscu.
-import { h, icon, toast, toastAction, fail, periodLabel, defaultPeriod, initials } from './ui.js';
+import { h, icon, toast, toastAction, fail, periodLabel, defaultPeriod, initials, ava } from './ui.js';
 import { sb, state, memberById, hasModule } from './store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, VAT_SHORT, PIT_SHORT, CIT_SHORT, sectionOf } from './dict.js';
 import { CLIENT_COLS, todayIso, fmtShort, fmtFull, fetchSoft } from './data.js';
@@ -112,8 +112,8 @@ export async function openClientPanel(id) {
         c.email ? h('a', { href: `mailto:${c.email}` }, c.email) : h('span', { class: 'muted' }, 'brak e-maila'),
         c.phone ? h('a', { href: `tel:${c.phone.replace(/\s/g, '')}` }, c.phone) : null),
       h('div', { class: 'cp-people' },
-        h('span', { class: 'person', style: { cursor: 'default' } }, h('span', { class: 'av' }, acc ? initials(acc.full_name) : '–'), acc ? `Księgowa: ${acc.short_name}` : 'Księgowa: brak'),
-        h('span', { class: 'person', style: { cursor: 'default' } }, h('span', { class: 'av' }, hr ? initials(hr.full_name) : '–'), hr ? `Kadry: ${hr.short_name}` : 'Kadry: brak')),
+        h('span', { class: 'person', style: { cursor: 'default' } }, h('span', { class: 'av' }, acc ? ava(acc) : '–'), acc ? `Księgowa: ${acc.short_name}` : 'Księgowa: brak'),
+        h('span', { class: 'person', style: { cursor: 'default' } }, h('span', { class: 'av' }, hr ? ava(hr) : '–'), hr ? `Kadry: ${hr.short_name}` : 'Kadry: brak')),
       h('div', { class: 'cp-actions' },
         h('a', { class: 'btn btn-primary btn-sm', href: `#/klient/${c.id}`, onclick: () => closePanel() }, 'Pełna karta klienta →'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('./watek.js').then(m => m.openThread({ client: c, period })) }, 'Rozmowa'),

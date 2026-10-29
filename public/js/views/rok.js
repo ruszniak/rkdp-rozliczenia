@@ -1,5 +1,5 @@
 // Zamknięcie roku: kratki roczne dla każdego klienta (sprawozdanie, CIT-8, PIT roczny, PIT-11, KRS…) z terminami.
-import { h, icon, toast, fail, initials } from '../ui.js';
+import { h, icon, toast, fail, initials, ava } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { fetchSoft, loadClients, todayIso, fmtShort } from '../data.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT } from '../dict.js';
@@ -124,7 +124,7 @@ export async function renderRok(main, params) {
         const m = memberById(c.accountant_id);
         return h('tr', { class: ok ? 'settled' : null },
           h('td', { class: 'c-name' }, h('div', { class: 'cname' }, h('a', { href: `#/klient/${c.id}`, 'data-panel': c.id }, c.name), h('div', { class: 'meta' }, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?')))),
-          h('td', { class: 'c-person' }, h('span', { class: 'person' + (m ? '' : ' unassigned'), style: { cursor: 'default' } }, h('span', { class: 'av' }, m ? initials(m.full_name) : '–'), m ? m.short_name : 'brak')),
+          h('td', { class: 'c-person' }, h('span', { class: 'person' + (m ? '' : ' unassigned'), style: { cursor: 'default' } }, h('span', { class: 'av' }, m ? ava(m) : '–'), m ? m.short_name : 'brak')),
           ts.map(t => h('td', { class: 'c-task' }, cell(c, t))),
           h('td', { class: 'c-sum' }, ok ? h('span', { class: 'sum ok' }, '✓ Zamknięty') : r.some(e => ['missing_docs', 'reminded'].includes(e.status)) ? h('span', { class: 'sum bad' }, `! ${dn}/${r.length}`)
             : h('span', { class: 'sum no' }, h('span', { class: 'ring', style: `--p:${r.length ? Math.round(dn * 100 / r.length) : 0}` }), `${dn}/${r.length}`)));

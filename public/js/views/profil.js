@@ -1,5 +1,5 @@
 // „Mój profil” – każdy pracownik sam uzupełnia swoje dane do pełnomocnictw (UPL-1, PEL, PPS-1).
-import { h, toast, fail, infoTip } from '../ui.js';
+import { h, toast, fail, infoTip, ava } from '../ui.js';
 import { sb, state } from '../store.js';
 import { validNip, cleanNip } from '../nip.js';
 import { isIOS, isStandalone, pushSupported, canInstall, onInstallChange, promptInstall, currentSubscription, enablePush, disablePush, savePrefs, loadPrefs, sendTest, DEFAULT_PREFS } from '../push.js';
@@ -112,6 +112,7 @@ export async function renderProfil(main) {
       h('div', {}, h('p', { class: 'eyebrow' }, 'Mój profil'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, me.full_name, infoTip(HELP, 'Dane do pełnomocnictw')),
         h('p', { class: 'sub' }, `${me.job_title ? me.job_title + ' · ' : ''}${me.email}`))),
+    photoCard(),
     h('section', { class: 'card section' },
       h('div', { class: 'section-head' }, h('h2', {}, 'Dane do pełnomocnictw (UPL-1, PEL, PPS-1)')),
       h('div', { class: 'form-grid' },
@@ -151,4 +152,40 @@ export async function loadTeamPoa(members) {
   ]);
   const P = Object.fromEntries((profs || []).map(x => [x.member_id, x])), Q = Object.fromEntries((privs || []).map(x => [x.member_id, x]));
   return Object.fromEntries(members.map(m => [m.id, memberPoa(m, P[m.id], Q[m.id])]));
+}
+
+// ---------- zdjęcie profilowe (miniatura zamiast inicjałów w całej aplikacji) ----------
+// zdjęcie zmniejszane w przeglądarce do 160×160 (kadr kwadratowy ze środka) i zapisywane jako mały JPEG
+function shrink(file, size = 160) {
+  return new Promise((ok, bad) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = size;
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, size, size);
+      g.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+      URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error('Nie udało się odczytać zdjęcia')); };
+    img.src = url;
+  });
+}
+function photoCard() {
+  const me = state.me;
+  const pp = h('span', { class: 'pp' });
+  const draw = () => { pp.replaceChildren(ava(me)); del.hidden = !me.avatar; document.querySelectorAll('.avatar').forEach(a => a.replaceChildren(ava(me))); };
+  const set = async v => {
+    const { error } = await sb.rpc('set_my_avatar', { p_avatar: v });
+    if (error) return fail(error);
+    me.avatar = v; const m = state.members.find(x => x.id === me.id); if (m) m.avatar = v;
+    draw(); toast(v ? 'Zapisano zdjęcie' : 'Usunięto zdjęcie');
+  };
+  const file = h('input', { type: 'file', accept: 'image/*', hidden: true });
+  file.addEventListener('change', async () => { const f = file.files?.[0]; file.value = ''; if (!f) return; try { await set(await shrink(f)); } catch (e) { fail(e); } });
+  const del = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => set(null) }, 'Usuń zdjęcie');
+  draw();
+  return h('section', { class: 'card section' },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Zdjęcie profilowe')),
+    h('div', { class: 'prof-photo' }, pp,
+      h('div', {}, h('p', { class: 'small muted', style: { margin: '0 0 10px' } }, 'Miniatura widoczna dla zespołu zamiast inicjałów (rozmowy, zadania, przypisania). Zdjęcie zmniejszy się automatycznie.'),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => file.click() }, me.avatar ? 'Zmień zdjęcie' : 'Dodaj zdjęcie'), del, file))));
 }

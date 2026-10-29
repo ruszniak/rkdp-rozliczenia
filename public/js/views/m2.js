@@ -1,6 +1,6 @@
 // Moduł Doradztwo podatkowe (M2 TAX)
 import { todayWidget as obTodayWidget, teamTodayCard, canSeeTeam } from './obecnosc.js';
-import { h, toast, fail, icon, initials, MONTHS, printHtml } from '../ui.js';
+import { h, toast, fail, icon, initials, MONTHS, printHtml, ava } from '../ui.js';
 import { sb, state, memberById, isAdmin } from '../store.js';
 import {
   MATTER_TYPE, MATTER_STATUS, OPEN_STATUSES, AUTHORITIES, TAX_KINDS, FEE_TYPE, BILLING_TYPE, SUBSCRIPTIONS, AML_RISK,
@@ -41,7 +41,7 @@ const orderPill = (s) => { const st = ORDER_STATUS[s] || { label: s, cls: 'unk' 
 function personChips(ids) {
   return h('span', { style: { display: 'inline-flex', gap: '4px' } }, ...ids.filter(Boolean).map(id => {
     const m = memberById(id); if (!m) return null;
-    return h('span', { class: 'person', style: { padding: 0 }, 'data-tip': m.full_name }, h('span', { class: 'av' }, initials(m.full_name)));
+    return h('span', { class: 'person', style: { padding: 0 }, 'data-tip': m.full_name }, h('span', { class: 'av' }, ava(m)));
   }));
 }
 
