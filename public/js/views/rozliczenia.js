@@ -2,7 +2,6 @@ import { h, icon, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPer
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
 import { downloadXlsx } from '../xlsx.js';
-import { fileTile, dropZone, pastedFiles, named, safeName } from './zgloszenia.js';
 import { openDocRequest } from '../prosba.js';
 import { openMessage } from '../wiadomosc.js';
 import { celebrate } from '../efekty.js';
@@ -408,7 +407,7 @@ export async function renderRozliczenia(main, params) {
     const fc = fileCount.get(c.id) || 0;
     const tip = ((has ? `Uwagi: ${n.notes}` : '') + (has && q ? '\n' : '') + (q ? `Pytania: ${n.questions}` : '') + (fc ? `${has || q ? '\n' : ''}Załączniki: ${fc}` : '')) || 'Dodaj uwagę, pytanie lub zrzut ekranu';
     return h('button', { class: 'note-btn' + (has || q || fc ? ' has' : '') + (q ? ' q' : ''), 'data-tip': tip, 'aria-label': 'Uwagi',
-      html: ICON_NOTE + (q ? '<span class="dot"></span>' : '') + (fc ? `<span class="clip">${fc}</span>` : ''), onclick: (ev) => notesMenu(ev.currentTarget, c) });
+      html: ICON_NOTE + (q ? '<span class="dot"></span>' : '') + (fc ? `<span class="clip">${fc}</span>` : ''), onclick: () => import('../watek.js').then(m => m.openThread({ client: c, period, onChange: () => syncClientNotes(c.id) })) });
   }
 
   function rowFor(c, area, cols) {
@@ -653,179 +652,13 @@ export async function renderRozliczenia(main, params) {
 
   // Uwagi do klienta w miesiącu jako czat: na górze rozmowa (uwagi, pytania, wysłane e-maile), na dole pole do pisania.
   // Każdy wpis ma autora i godzinę; pytanie można oznaczyć jako wyjaśnione. Podsumowanie (kropka w tabeli, eksport) liczy baza.
-  function notesMenu(anchor, c) {
-    let kind = 'uwaga', items = [], mails = [], prev = [];
-    const me = state.me.id, admin = state.me.role === 'admin';
-    const thread = h('div', { class: 'chat-thread', role: 'log', 'aria-live': 'polite' }, h('p', { class: 'hint chat-empty' }, 'Ładowanie…'));
-    const ta = h('textarea', { class: 'chat-input', rows: 1, placeholder: 'Napisz uwagę… (Enter – wyślij)' });
-    const kindBtn = (k, lbl) => h('button', { type: 'button', class: 'chat-kind' + (kind === k ? ' on' : ''), 'data-k': k, onclick: () => setKind(k) }, lbl);
-    const kinds = h('div', { class: 'chat-kinds', role: 'group', 'aria-label': 'Rodzaj wpisu' }, kindBtn('uwaga', 'Uwaga'), kindBtn('pytanie', 'Pytanie / problem'));
-    function setKind(k) {
-      kind = k; kinds.querySelectorAll('.chat-kind').forEach(b => b.classList.toggle('on', b.dataset.k === k));
-      ta.placeholder = k === 'pytanie' ? 'Np. jak ująć straty? brak pełnomocnictwa…' : 'Napisz uwagę… (Enter – wyślij)';
-      ta.focus();
-    }
-    const sendBtn = h('button', { type: 'button', class: 'chat-send', 'aria-label': 'Wyślij', onclick: () => send() },
-      h('span', { html: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>', style: { display: 'inline-flex' } }));
-    const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px'; };
-    ta.addEventListener('input', grow);
-    ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
-
-    // załączniki jak w komunikatorze: spinacz obok pola, przeciągnij na okno albo wklej zrzut; pliki pojawiają się w rozmowie
-    let files = [];
-    const fileIn = h('input', { type: 'file', multiple: true, hidden: true });
-    fileIn.addEventListener('change', () => { const fs = [...fileIn.files]; fileIn.value = ''; if (fs.length) addFiles(fs); });
-    const camIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
-    camIn.addEventListener('change', () => { const fs = [...camIn.files]; camIn.value = ''; if (fs.length) addFiles(fs); });
-    const clipBtn = h('button', { type: 'button', class: 'chat-tool', 'aria-label': 'Dodaj załącznik', 'data-tip': 'Załącz plik (albo przeciągnij / wklej zrzut Ctrl+V)', onclick: () => fileIn.click() }, icon('paperclip'));
-    const camBtn = h('button', { type: 'button', class: 'chat-tool cam-btn', 'aria-label': 'Zrób zdjęcie dokumentu', onclick: () => camIn.click() }, icon('camera'));
-
-    const pop = openPop(anchor, h('div', { class: 'pop-body pop-notes pop-chat' },
-      h('div', { class: 'chat-head' }, h('div', { style: { minWidth: 0 } }, h('b', {}, c.name), h('span', { class: 'small muted' }, `Uwagi · ${periodLabel(period).toLowerCase()}`)),
-        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-tip': 'E-mail do klienta z kancelaria@rkdp.pl', onclick: () => { closePop(); requestDocs(c, prefs.area); } }, icon('mail'), 'Wiadomość'),
-        h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Zamknij', onclick: closePop }, '×')),
-      thread,
-      h('div', { class: 'chat-compose' }, kinds, h('div', { class: 'chat-row' }, fileIn, camIn, clipBtn, camBtn, ta, sendBtn)),
-      h('div', { class: 'chat-dropzone', 'aria-hidden': 'true' }, icon('paperclip'), 'Upuść, aby załączyć')));
-    ['dragenter', 'dragover'].forEach(ev => pop.addEventListener(ev, e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); pop.classList.add('dropping'); } }));
-    pop.addEventListener('dragleave', e => { if (!pop.contains(e.relatedTarget)) pop.classList.remove('dropping'); });
-    pop.addEventListener('drop', e => { e.preventDefault(); pop.classList.remove('dropping'); const fs = [...(e.dataTransfer?.files || [])]; if (fs.length) addFiles(fs); });
-    const ar = anchor.getBoundingClientRect();
-    const place = () => { const ph = pop.offsetHeight; pop.style.top = Math.max(8, Math.min(ar.bottom + 6, innerHeight - ph - 8)) + 'px'; };
-    setTimeout(() => ta.focus(), 30);
-
-    const who = id => id ? (memberById(id)?.short_name || memberById(id)?.full_name || 'ktoś') : 'wcześniej';
-    const tm = t => new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-    const dayLbl = t => { const d = new Date(t), today = new Date(); const y = new Date(); y.setDate(y.getDate() - 1);
-      if (d.toDateString() === today.toDateString()) return 'Dziś'; if (d.toDateString() === y.toDateString()) return 'Wczoraj';
-      return d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' }); };
-
-    function draw() {
-      const stream = [...items.map(x => ({ t: x.created_at, x })), ...mails.map(m => ({ t: m.sent_at, m })), ...files.map(f => ({ t: f.created_at, f }))].sort((a, b) => a.t.localeCompare(b.t));
-      const out = [];
-      if (prev.length) out.push(h('details', { class: 'chat-prev' }, h('summary', {}, `Poprzednie miesiące (${prev.length})`),
-        ...prev.map(p => h('div', { class: 'chat-prev-i' }, h('b', {}, periodLabel(p.period.slice(0, 7))),
-          p.notes ? h('div', {}, p.notes) : null, p.questions ? h('div', { class: 'muted' }, 'Pytania: ' + p.questions) : null))));
-      let lastDay = '';
-      for (const s of stream) {
-        const d = dayLbl(s.t);
-        if (d !== lastDay) { out.push(h('div', { class: 'chat-day' }, h('span', {}, d))); lastDay = d; }
-        if (s.m) {
-          out.push(h('div', { class: 'chat-sys' + (s.m.status === 'blad' ? ' err' : '') }, icon('mail'),
-            h('span', {}, h('b', {}, who(s.m.sent_by)), s.m.status === 'blad' ? ' – nie udało się wysłać: ' : ' wysłał(a) e-mail: ', s.m.subject, h('span', { class: 'muted' }, ` → ${s.m.email} · ${tm(s.t)}`))));
-          continue;
-        }
-        if (s.f) {
-          const f = s.f, fromClient = f.source === 'klient', mine = !fromClient && f.uploaded_by === me;
-          const canDel = mine || admin || fromClient;
-          out.push(h('div', { class: 'chat-msg chat-file' + (mine ? ' mine' : '') + (fromClient ? ' client' : '') },
-            !mine ? h('span', { class: 'av chat-av' + (fromClient || !f.uploaded_by ? ' none' : ''), 'aria-hidden': 'true' }, f.uploaded_by ? initials(memberById(f.uploaded_by)?.full_name || '?') : '') : null,
-            h('div', { class: 'chat-bub' },
-              h('div', { class: 'chat-meta' }, h('b', {}, fromClient ? 'Klient (przez link)' : mine ? 'Ty' : who(f.uploaded_by)), h('span', { class: 'chat-tag' }, 'załącznik'), h('span', {}, tm(f.created_at))),
-              fileTile({ ...f, bucket: 'rozliczenia' }, { onDelete: canDel ? () => delFile(f) : null }))));
-          continue;
-        }
-        const x = s.x, mine = x.author === me, q = x.kind === 'pytanie';
-        const canDel = (mine || admin);
-        out.push(h('div', { class: 'chat-msg' + (mine ? ' mine' : '') + (q ? ' q' : '') + (x.resolved_at ? ' done' : '') },
-          !mine ? h('span', { class: 'av chat-av' + (x.author ? '' : ' none'), 'aria-hidden': 'true' }, x.author ? initials(memberById(x.author)?.full_name || '?') : '') : null,
-          h('div', { class: 'chat-bub' },
-            h('div', { class: 'chat-meta' }, h('b', {}, mine ? 'Ty' : who(x.author)), q ? h('span', { class: 'chat-tag' }, x.resolved_at ? 'pytanie · wyjaśnione' : 'pytanie') : null, h('span', {}, tm(x.created_at))),
-            h('div', { class: 'chat-txt' }, x.body),
-            h('div', { class: 'chat-acts' },
-              q ? h('button', { type: 'button', class: 'chat-a', onclick: () => resolve(x) }, x.resolved_at ? 'Otwórz ponownie' : '✓ Wyjaśnione') : null,
-              canDel ? h('button', { type: 'button', class: 'chat-a', onclick: () => del(x) }, 'Usuń') : null))));
-      }
-      if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, 'Brak uwag w tym miesiącu. Napisz pierwszą poniżej albo załącz plik (📎, przeciągnij, wklej zrzut).'));
-      thread.replaceChildren(...out);
-      thread.scrollTop = thread.scrollHeight;
-      place();
-    }
-    async function load() {
-      const since = shiftPeriod(period, -3) + '-01';
-      const [cm, ms, pv] = await Promise.all([
-        sb.from('period_comments').select('*').eq('client_id', c.id).eq('period', pdate).order('created_at').then(r => r.data || [], () => []),
-        sb.from('client_messages').select('kind,subject,sent_at,sent_by,status,email,period').eq('client_id', c.id).order('sent_at', { ascending: false }).limit(20).then(r => r.data || [], () => []),
-        sb.from('period_notes').select('period,notes,questions').eq('client_id', c.id).gte('period', since).lt('period', pdate).order('period', { ascending: false }).then(r => r.data || [], () => []),
-      ]);
-      items = cm;
-      // e-maile dotyczące tego miesiąca albo wysłane w trakcie jego rozliczania
-      const pEnd = shiftPeriod(period, 2) + '-01';
-      mails = ms.filter(m => m.period === pdate || (!m.period && m.sent_at >= pdate && m.sent_at < pEnd));
-      prev = pv.filter(p => p.notes || p.questions);
-      draw();
-    }
-    async function syncNote() {
-      const { data } = await sb.from('period_notes').select('client_id,notes,questions').eq('client_id', c.id).eq('period', pdate).maybeSingle();
-      noteMap.set(c.id, data || { client_id: c.id }); refreshRow(c.id);
-    }
-    async function send() {
-      const body = ta.value.trim();
-      if (!body) return ta.focus();
-      sendBtn.disabled = true;
-      const { data, error } = await sb.from('period_comments').insert({ client_id: c.id, period: pdate, kind, body }).select().single();
-      sendBtn.disabled = false;
-      if (error) return fail(error);
-      ta.value = ''; grow();
-      if (!items.some(x => x.id === data.id)) items.push(data);
-      draw(); syncNote(); ta.focus();
-    }
-    async function resolve(x) {
-      const { data, error } = await sb.from('period_comments').update({ resolved_at: x.resolved_at ? null : new Date().toISOString() }).eq('id', x.id).select().single();
-      if (error) return fail(error);
-      Object.assign(x, data); draw(); syncNote();
-    }
-    async function del(x) {
-      if (!confirm('Usunąć ten wpis?')) return;
-      const { error } = await sb.from('period_comments').delete().eq('id', x.id);
-      if (error) return fail(error);
-      items = items.filter(y => y.id !== x.id); draw(); syncNote();
-    }
-    // nowe wpisy innych osób pojawiają się na żywo
-    const ch = sb.channel('pc-' + c.id + '-' + Math.random().toString(36).slice(2, 7))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'period_comments', filter: `client_id=eq.${c.id}` }, p => {
-        const row = p.new?.id ? p.new : null;
-        if (p.eventType === 'DELETE') items = items.filter(y => y.id !== p.old?.id);
-        else if (row && row.period === pdate) { const cur = items.find(y => y.id === row.id); cur ? Object.assign(cur, row) : items.push(row); }
-        if (pop.isConnected) draw();
-      }).subscribe();
-    const prevCleanup = pop._cleanup;
-    pop._cleanup = () => { prevCleanup?.(); sb.removeChannel(ch); };
-
-    async function loadFiles() {
-      const { data, error } = await sb.from('period_files').select('*').eq('client_id', c.id).eq('period', pdate).order('created_at');
-      if (error) return;
-      files = data || []; fileCount.set(c.id, files.length); refreshRow(c.id);
-      draw();
-    }
-    async function delFile(f) {
-      if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
-      const { error: e1 } = await sb.from('period_files').delete().eq('id', f.id);
-      if (e1) return fail(e1);
-      await sb.storage.from('rozliczenia').remove([f.path]);
-      loadFiles();
-    }
-    async function addFiles(fs) {
-      pop.classList.add('busy');
-      let ok = 0;
-      for (const raw of fs) {
-        const f = named(raw);
-        if (f.size > 25 * 1048576) { toast(`„${f.name}” jest większy niż 25 MB`, true); continue; }
-        const path = `${c.id}/${period}/${crypto.randomUUID().slice(0, 8)}-${safeName(f.name)}`;
-        const { error } = await sb.storage.from('rozliczenia').upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
-        if (error) { fail(error, `Nie udało się wysłać „${f.name}”`); continue; }
-        const { error: e2 } = await sb.from('period_files').insert({ client_id: c.id, period: pdate, path, name: f.name, mime: f.type || null, size: f.size, uploaded_by: state.me.id });
-        if (e2) { await sb.storage.from('rozliczenia').remove([path]); fail(e2); continue; }
-        ok++;
-      }
-      pop.classList.remove('busy');
-      if (ok) toast(ok === 1 ? 'Dodano załącznik' : `Dodano załączniki: ${ok}`);
-      loadFiles();
-    }
-    pop.addEventListener('paste', e => { const fs = pastedFiles(e); if (fs.length) { e.preventDefault(); addFiles(fs); } });
-    Promise.all([load(), loadFiles()]);
+  // po zmianach w wątku klienta: podsumowanie uwag (kropka) i liczba załączników w wierszu
+  async function syncClientNotes(cid) {
+    const [{ data: n }, { count }] = await Promise.all([
+      sb.from('period_notes').select('client_id,notes,questions').eq('client_id', cid).eq('period', pdate).maybeSingle(),
+      sb.from('period_files').select('id', { count: 'exact', head: true }).eq('client_id', cid).eq('period', pdate)]);
+    noteMap.set(cid, n || { client_id: cid }); if (count != null) fileCount.set(cid, count); refreshRow(cid);
   }
-
   // ---------- menu układu ----------
   const chkStyle = { textTransform: 'none', letterSpacing: 0, fontSize: '13.5px', fontWeight: 500, color: 'var(--ink)', padding: '5px 0' };
   function layoutMenu(anchor) {

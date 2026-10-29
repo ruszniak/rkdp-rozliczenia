@@ -262,6 +262,7 @@ async function renderTicket(main, id) {
 
   const open = TK_OPEN.includes(t.status);
   const actions = h('div', { class: 'tk-actions' },
+    t.module !== 'm2' && t.client_id ? h('button', { class: 'btn btn-ghost btn-sm', onclick: () => import('../watek.js').then(m => m.openThread({ client: { id: t.client_id }, period: (t.period || t.created_at).slice(0, 7), focus: 't' + t.id })) }, 'Pokaż w rozmowie klienta') : null,
     t.status === 'nowe' ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => setStatus('w_toku') }, 'Rozpocznij') : null,
     t.status !== 'czeka' && open ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => setStatus('czeka') }, 'Czeka na klienta') : null,
     t.status === 'czeka' ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => setStatus('w_toku') }, 'Wróć do realizacji') : null,

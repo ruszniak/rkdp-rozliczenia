@@ -303,6 +303,7 @@ export async function renderKlient(main, id) {
       h('div', {}, h('p', { class: 'eyebrow' }, 'Karta klienta'), titleEl, compEl),
       h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         editable ? null : h('span', { class: 'badge' }, 'Tylko podgląd'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../watek.js').then(m => m.openThread({ client: c })) }, 'Rozmowa i zadania'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, defaultPeriod(), []) }, icon('mail'), 'Wyślij wiadomość'),
         h('a', { class: 'btn btn-outline btn-sm', href: `#/oferty/nowa?klient=${c.id}` }, 'Oferta'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => dokumentyDialog({ client: { ...c, ...draft } }).catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'))),

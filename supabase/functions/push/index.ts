@@ -76,6 +76,21 @@ async function onComment(id: string) {
   });
 }
 
+// wzmianka (@Imię) w wątku klienta
+async function onMention(id: string) {
+  const { data: c } = await db.from('period_comments').select('id, client_id, period, author, body, mentions, deleted_at').eq('id', id).maybeSingle();
+  if (!c || c.deleted_at) return 0;
+  const [{ data: cl }, { data: a }] = await Promise.all([
+    db.from('clients').select('name').eq('id', c.client_id).maybeSingle(),
+    db.from('team_members').select('full_name').eq('id', c.author).maybeSingle(),
+  ]);
+  const per = String(c.period).slice(0, 7);
+  return notify((c.mentions || []).filter((m: string) => m !== c.author), 'komentarze', {
+    title: `${a?.full_name || 'Ktoś'} oznaczył(a) Cię – ${cl?.name || 'klient'}`,
+    body: short(c.body, 140), url: `/#/watek/${c.client_id}?okres=${per}`, tag: `w-${c.client_id}`,
+  });
+}
+
 // klient wgrał pliki z prośby o dokumenty / prośba bez odpowiedzi od 3 dni
 async function onDocs(id: string, remind: boolean, count: number) {
   const { data: r } = await db.from('doc_requests').select('id, client_id, period, created_by, clients(name, accountant_id)').eq('id', id).maybeSingle();
@@ -136,6 +151,7 @@ Deno.serve(async (req) => {
       if (body.event === 'ticket_new') return json({ sent: await onTicket(body.id, false, body.actor) });
       if (body.event === 'ticket_assigned') return json({ sent: await onTicket(body.id, true, body.actor) });
       if (body.event === 'comment') return json({ sent: await onComment(body.id) });
+      if (body.event === 'mention') return json({ sent: await onMention(String(body.id || '')) });
       if (body.event === 'daily') return json({ sent: await daily() });
       if (body.event === 'docs_uploaded' || body.event === 'docs_remind') return json({ sent: await onDocs(String(body.request_id || ''), body.event === 'docs_remind', +body.count || 0) });
       if (body.event === 'monitor_alert') return json({ sent: await onMonitor(body) });

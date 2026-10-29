@@ -24,6 +24,8 @@ const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
 const renderM2 = lazy(() => import('./views/m2.js'), 'renderM2');
 const renderJpk = lazy(() => import('./views/jpk.js'), 'renderJpk');
 const renderEsf = lazy(() => import('./views/esf.js'), 'renderEsf');
+// licznik nieprzeczytanych rozmów – moduł wątku ładowany w tle
+const unreadBadgeEl = () => { const slot = h('span', { class: 'wt-uslot' }); import('./watek.js').then(m => slot.replaceWith(m.unreadBadge())).catch(() => {}); return slot; };
 const renderRegulamin = lazy(() => import('./views/regulamin.js'), 'renderRegulamin');
 const renderKalkulator = lazy(() => import('./views/kalkulator.js'), 'renderKalkulator');
 const renderWzory = lazy(() => import('./views/wzory.js'), 'renderWzory');
@@ -131,6 +133,7 @@ function layout(active) {
         (() => { const b = h('button', { type: 'button', class: 'hdr-icon', onclick: () => toggleTheme() });
           const draw = () => { const d = getTheme() === 'dark'; b.innerHTML = d ? ICON_SUN : ICON_MOON; b.setAttribute('aria-label', d ? 'Motyw jasny' : 'Motyw ciemny'); b.setAttribute('data-tip', d ? 'Przełącz na motyw jasny' : 'Przełącz na motyw ciemny'); };
           draw(); themeOff?.(); themeOff = onThemeChange(draw); return b; })(),
+        !jpkOnly && hasModule('rozliczenia') && mod === 'rkdp' ? unreadBadgeEl() : null,
         jpkOnly ? null : (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
         jpkOnly ? h('span', { class: 'who' }, me.full_name) : h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
         jpkOnly ? h('span', { class: 'avatar', title: me.email }, initials(me.full_name)) : h('a', { href: '#/profil', class: 'avatar', title: me.email, style: { textDecoration: 'none' } }, initials(me.full_name)),
@@ -223,6 +226,7 @@ async function route(opts = {}) {
     else if (view === 'jpk') c = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
     else if (view === 'klienci') c = await renderKlienci(layout('klienci'), params);
     else if (view === 'klient') c = await renderKlient(layout('klienci'), parts[1]);
+    else if (view === 'watek' && parts[1]) { c = await renderKlient(layout('klienci'), parts[1]); history.replaceState(null, '', `#/klient/${parts[1]}`); import('./watek.js').then(m => m.openThread({ client: { id: parts[1] }, period: params.get('okres') || undefined })); }
     else if (view === 'aml') c = await renderAml(layout('klienci'), 'rkdp');
     else if (view === 'oferty') c = await renderOferty(layout('klienci'), parts[1], 'rkdp');
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);

@@ -116,6 +116,7 @@ export async function openClientPanel(id) {
         h('span', { class: 'person', style: { cursor: 'default' } }, h('span', { class: 'av' }, hr ? initials(hr.full_name) : '–'), hr ? `Kadry: ${hr.short_name}` : 'Kadry: brak')),
       h('div', { class: 'cp-actions' },
         h('a', { class: 'btn btn-primary btn-sm', href: `#/klient/${c.id}`, onclick: () => closePanel() }, 'Pełna karta klienta →'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('./watek.js').then(m => m.openThread({ client: c, period })) }, 'Rozmowa'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, period, missingCodes) }, icon('mail'), 'Wyślij wiadomość'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => cam.click() }, icon('camera'), 'Zdjęcie dokumentu'), cam)),
     alerts.filter(a => !a.resolved_at).length ? sec('Monitoring – zmiany do sprawdzenia', ...alerts.filter(a => !a.resolved_at).map(a => h('div', { class: 'cp-alert' }, h('b', {}, fmtFull(a.created_at.slice(0, 10))), ' ', a.summary,
