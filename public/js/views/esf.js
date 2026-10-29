@@ -2,7 +2,7 @@
 // Kwoty: JPK_KR_PD (salda zamknięcia → rok bieżący, bilans otwarcia → rok poprzedni) + ubiegłoroczny XML z Repozytorium KRS
 // albo sprawozdanie zapisane w aplikacji (RZiS roku poprzedniego, teksty). Wszystko można poprawić ręcznie.
 // Plik JPK jest czytany tylko w przeglądarce – nie trafia na serwer. Zapisujemy wyłącznie dane sprawozdania.
-import { h, icon, toast, fail, infoTip, printHtml } from '../ui.js';
+import { h, icon, toast, fail, infoTip, printHtml, modal } from '../ui.js';
 import { sb, state } from '../store.js';
 import { dropZone } from './zgloszenia.js';
 import { BILANS, RZIS, PID, FORMY, TEKSTY, emptyData, recompute, fromJpk, fromPriorDoc, check, toXml, fmt, num } from '../esf/mikro.js';
@@ -134,11 +134,22 @@ export async function renderEsf(main, params) {
       markDirty(); draw();
     } catch (e) { fail(e, 'Nie udało się odczytać sprawozdania'); }
   }
+  // Repozytorium KRS nie przyjmuje numeru KRS w adresie, a przeglądarka nie pozwala wypełnić pola na cudzej stronie –
+  // dlatego numer trafia do schowka i jest pokazany duży, z instrukcją wklejenia.
   const openRdf = () => {
     const krs = d.firma.krs.replace(/\D/g, '');
-    if (krs) navigator.clipboard?.writeText(krs).catch(() => {});
-    window.open('https://rdf-przegladarka.ms.gov.pl/', '_blank', 'noopener');
-    toast(krs ? `Numer KRS ${krs} skopiowany – wklej go w wyszukiwarce, pobierz XML sprawozdania za ${year - 1} i przeciągnij tutaj.` : 'Wyszukaj spółkę, pobierz XML sprawozdania za poprzedni rok i przeciągnij go tutaj.');
+    const copy = () => navigator.clipboard?.writeText(krs).then(() => toast(`Skopiowano KRS ${krs}`), () => toast('Zaznacz numer i skopiuj ręcznie', true));
+    if (krs) copy();
+    modal('Sprawozdanie z Repozytorium KRS', h('div', { class: 'esf-rdf' },
+      krs ? h('div', { class: 'esf-rdf-krs' }, h('span', { class: 'small muted' }, 'Numer KRS (skopiowany do schowka)'), h('b', {}, krs),
+        h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: copy }, 'Kopiuj ponownie')) : h('p', { class: 'esf-err' }, 'Najpierw wpisz numer KRS w sekcji „Jednostka i okres”.'),
+      h('ol', { class: 'small' },
+        h('li', {}, 'W otwartej stronie kliknij pole „Numer KRS” i wklej numer (Ctrl+V / ⌘V) → „Wyszukaj”.'),
+        h('li', {}, `Na liście dokumentów wybierz sprawozdanie finansowe za ${year - 1} (rodzaj „Roczne sprawozdanie finansowe”) → „Pobierz”.`),
+        h('li', {}, 'Jeśli pobierze się archiwum ZIP – rozpakuj je. Plik .xml przeciągnij do pola „Sprawozdanie za ' + (year - 1) + '” w aplikacji.')),
+      h('p', { class: 'hint' }, 'Strona Ministerstwa nie pozwala przekazać numeru KRS w linku ani wypełnić pola z innej aplikacji – stąd jedno wklejenie.')),
+    c => [h('button', { class: 'btn btn-ghost', onclick: c }, 'Zamknij'),
+      h('a', { class: 'btn btn-primary', href: 'https://rdf-przegladarka.ms.gov.pl/', target: '_blank', rel: 'noopener', onclick: () => { if (krs) copy(); } }, 'Otwórz Repozytorium KRS ↗')]);
   };
 
   // ---------- pola ----------

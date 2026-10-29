@@ -1580,3 +1580,7 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 @media (max-width:600px){.wt{width:100vw}.wt-taskopts{grid-template-columns:1fr 1fr}.wt-taskopts label:first-child{grid-column:1/-1}.wt-replies{margin-left:12px}}
 @media (prefers-reduced-motion:reduce){.wt,.wt-back{transition:none}}
 .wt .chat-input{flex:1;resize:none;min-height:40px;max-height:160px;border-radius:20px;padding:9px 14px;font-size:13.5px;line-height:1.4;margin:0}
+.esf-rdf-krs{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--soft,#F3EEE6);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.esf-rdf-krs b{font-size:24px;letter-spacing:.08em;font-variant-numeric:tabular-nums;user-select:all}
+.esf-rdf-krs .small{width:100%}
+.esf-rdf ol{padding-left:18px;line-height:1.6}
