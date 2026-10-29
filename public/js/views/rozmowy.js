@@ -20,7 +20,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
 
 export async function renderRozmowy(main, params) {
   const me = state.me.id;
-  let filter = params?.get('f') || 'aktywnosc', q = '', mine = params?.get('moi') !== '0';
+  let filter = params?.get('f') || 'aktywnosc', q = '', mine = params?.get('moi') === '1';
   const since = new Date(Date.now() - 90 * 86400000).toISOString();
   const list = h('div', { class: 'rz-list' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const tilesBox = h('div', { class: 'tiles rz-tiles' });
