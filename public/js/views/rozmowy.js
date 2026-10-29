@@ -10,12 +10,13 @@ import { openThread } from '../watek.js';
 const HELP = `Rozmowy to jedno miejsce na wszystko, co dotyczy klienta:
 • uwagi, pytania i zadania (dawne zgłoszenia), odpowiedzi, załączniki, wysłane e-maile i zmiany kratek,
 • kliknij klienta – otworzy się jego rozmowa; zadanie tworzysz w rozmowie przełącznikiem „Zadanie” (osoba, termin, priorytet),
-• kafelki filtrują: nieprzeczytane, moje zadania, po terminie, czeka na klienta, otwarte pytania,
-• zadania bez klienta (wewnętrzne) są w osobnej sekcji na dole; zadania cykliczne i tabela wszystkich zadań – przyciski u góry.`;
+• rozmowa z klientem jest jedna – bez podziału na miesiące; to, co załatwione, odznaczasz „✓ Zrobione” / „✓ Wyjaśnione”,
+• podświetleni na górze są klienci z wpisami, których jeszcze nie przeczytałeś(-aś) – każdy ma własne „przeczytane”,
+• zadania bez klienta (wewnętrzne) są w osobnej sekcji na dole.`;
 const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000);
   if (m < 1) return 'teraz'; if (m < 60) return `${m} min temu`; const hh = Math.round(m / 60); if (hh < 24) return `${hh} godz. temu`;
   const d = Math.round(hh / 24); return d === 1 ? 'wczoraj' : d < 7 ? `${d} dni temu` : new Date(t).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }); };
-const who = id => id ? (memberById(id)?.short_name || 'ktoś') : 'wcześniej';
+const who = id => id ? (memberById(id)?.short_name || 'ktoś') : 'autor nieznany';
 const today = () => new Date().toLocaleDateString('sv-SE');
 
 export async function renderRozmowy(main, params) {
@@ -23,7 +24,6 @@ export async function renderRozmowy(main, params) {
   let filter = params?.get('f') || 'aktywnosc', q = '', mine = params?.get('moi') === '1';
   const since = new Date(Date.now() - 90 * 86400000).toISOString();
   const list = h('div', { class: 'rz-list' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
-  const tilesBox = h('div', { class: 'tiles rz-tiles' });
   const search = h('input', { class: 'input', type: 'search', placeholder: 'Szukaj klienta…' });
   search.addEventListener('input', () => { q = search.value.trim().toLowerCase(); draw(); });
   const mineCb = h('input', { type: 'checkbox', checked: mine });
@@ -38,7 +38,6 @@ export async function renderRozmowy(main, params) {
       h('div', { class: 'row-btns' },
         h('a', { class: 'btn btn-ghost btn-sm', href: '#/zgloszenia/cykliczne' }, 'Zadania cykliczne'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: () => newTask() }, icon('plus'), 'Nowe zadanie'))),
-    tilesBox,
     h('div', { class: 'rz-bar' }, search, h('label', { class: 'check' }, mineCb, 'Tylko moi klienci (księgowa / kadry) i moje zadania')),
     list);
 
@@ -76,16 +75,6 @@ export async function renderRozmowy(main, params) {
     const { clients, byC, tickets, unread } = D;
     const myT = tickets.filter(t => TK_OPEN.includes(t.status) && t.assignee_id === me);
     const openT = tickets.filter(t => TK_OPEN.includes(t.status) && (!mine || t.assignee_id === me || t.created_by === me || isMine(clients.find(c => c.id === t.client_id) || {})));
-    const counts = {
-      nieprzeczytane: unread.size, moje: myT.length,
-      po_terminie: openT.filter(t => t.due_date && t.due_date < today()).length, czeka: openT.filter(t => t.status === 'czeka').length,
-      pytania: [...byC.entries()].filter(([id, x]) => x.q && (!mine || isMine(clients.find(c => c.id === id) || {}))).length,
-    };
-    const tile = (key, label, n, alert) => h('button', { type: 'button', class: 'card tile tk-tile tile-btn' + (filter === key ? ' on dark' : '') + (alert && n ? ' dark alert' : ''), onclick: () => { filter = filter === key ? 'aktywnosc' : key; history.replaceState(null, '', `#/rozmowy?f=${filter}`); draw(); } },
-      h('span', { class: 'num' }, String(n)), h('span', { class: 'lbl' }, label));
-    tilesBox.replaceChildren(tile('nieprzeczytane', 'Nieprzeczytane', counts.nieprzeczytane, true), tile('moje', 'Moje zadania', counts.moje), tile('po_terminie', 'Zadania po terminie', counts.po_terminie, true),
-      tile('czeka', 'Czeka na klienta', counts.czeka), tile('pytania', 'Klienci z otwartymi pytaniami', counts.pytania));
-
     const cMatch = c => !q || c.name.toLowerCase().includes(q);
     // widoki zadań
     if (['moje', 'po_terminie', 'czeka', 'otwarte', 'nieprzypisane', 'zrobione'].includes(filter)) {
@@ -93,7 +82,7 @@ export async function renderRozmowy(main, params) {
       const src = filter === 'moje' ? myT : filter === 'otwarte' ? openT : filter === 'nieprzypisane' ? tickets.filter(t => TK_OPEN.includes(t.status) && !t.assignee_id)
         : filter === 'zrobione' ? tickets.filter(t => t.status === 'zrobione' && (t.updated_at || t.created_at) >= weekAgo)
         : openT.filter(t => filter === 'czeka' ? t.status === 'czeka' : t.due_date && t.due_date < today());
-      const extra = { otwarte: 'Wszystkie otwarte zadania', nieprzypisane: 'Zadania bez osoby odpowiedzialnej', zrobione: 'Zadania zamknięte w ostatnich 7 dniach' }[filter];
+      const extra = { moje: 'Moje zadania', po_terminie: 'Zadania po terminie', czeka: 'Czeka na klienta', otwarte: 'Wszystkie otwarte zadania', nieprzypisane: 'Zadania bez osoby odpowiedzialnej', zrobione: 'Zadania zamknięte w ostatnich 7 dniach' }[filter];
       const rows = src.filter(t => !q || (clients.find(c => c.id === t.client_id)?.name || '').toLowerCase().includes(q) || t.title.toLowerCase().includes(q))
         .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
       list.replaceChildren(...[extra ? h('div', { class: 'rz-view' }, h('b', {}, extra), h('button', { type: 'button', class: 'chat-a', onclick: () => { filter = 'aktywnosc'; history.replaceState(null, '', '#/rozmowy'); draw(); } }, '× pokaż rozmowy')) : null,

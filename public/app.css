@@ -1673,3 +1673,20 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 /* klawiatura otwarta: rozmowa dopasowana do widocznej części ekranu, bez zapasu na pasek gestów */
 .wt.kb .wt-compose{padding-bottom:8px}
 html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
+/* jedna rozmowa bez podziału na miesiące */
+.wt-sub{display:flex;align-items:center;gap:10px;margin-top:4px}
+.wt-only{border:1px solid var(--line-2);background:none;border-radius:99px;padding:3px 11px;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.wt-only.on{background:var(--dark);border-color:var(--dark);color:var(--gold)}
+.wt-per{border:1px solid var(--line-2);background:var(--card);border-radius:99px;padding:4px 8px;font:inherit;font-size:12.5px;color:var(--muted);max-width:150px}
+.chat-tag.wt-pertag{background:none;border:1px solid var(--line);color:var(--muted);text-transform:none;letter-spacing:0;font-weight:500}
+.chat-msg.mine .chat-tag.wt-pertag{border-color:rgba(255,249,239,.35);color:#FFF3E0}
+.wt-new{display:flex;align-items:center;gap:10px;margin:6px 0;color:var(--warn);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.wt-new::before,.wt-new::after{content:'';flex:1;height:1px;background:color-mix(in srgb,var(--warn) 45%,transparent)}
+.wt-older{align-self:center;margin-bottom:6px}
+.rz-row.unread{background:color-mix(in srgb,var(--gold) 22%,var(--card));box-shadow:inset 3px 0 0 var(--bronze)}
+.rz-row.unread .rz-name{font-weight:800}
+.wt-pertag,.wt-sub>span{white-space:nowrap}
+.wt .chat-kinds{flex-wrap:wrap;row-gap:6px}
+.wt-per{max-width:110px}
+.wt-only{white-space:nowrap}
+@media (max-width:480px){.wt .wt-qbtn{display:none}.wt .chat-kinds{flex-wrap:nowrap}}
