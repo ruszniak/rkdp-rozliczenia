@@ -55,14 +55,42 @@ const SMTP_USER = (Deno.env.get('SMTP_USER') || '').trim(), SMTP_PASS = (Deno.en
 let smtp: any = null;
 const smtpOn = () => !!(SMTP_USER && SMTP_PASS);
 const transport = () => smtp || (smtp = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: SMTP_USER, pass: SMTP_PASS } }));
-async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string) {
+// ---------- stopki mailowe zespołu z rkdp.pl/stopki (strona w repozytorium ruszniak/rkdp) ----------
+const FROM_NAME = 'RKDP | Kancelaria';
+let sigCache: { at: number; map: Map<string, string> } | null = null;
+const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase().replace(/\s+/g, ' ').trim();
+async function signatures() {
+  if (sigCache && Date.now() - sigCache.at < 10 * 60000) return sigCache.map;
+  const map = new Map<string, string>();
+  try {
+    const r = await fetch('https://rkdp.pl/stopki/', { headers: { 'User-Agent': 'rkdp-rozliczenia' } });
+    const html = r.ok ? await r.text() : '';
+    for (const m of html.matchAll(/<section class="person" id="p-([^"]+)">\s*<h2>([^<]+)<\/h2>([\s\S]*?)<\/section>/g)) {
+      const full = m[3].match(/<div class="preview" id="sig-[^"]+-full">([\s\S]*?)<\/div>\s*<div class="actions">/);
+      if (full) map.set(m[1] === 'kancelaria' ? '__kancelaria' : norm(m[2]), full[1].replace(/\sdata-abs="[^"]*"/g, '').trim());
+    }
+  } catch (e) { console.error('stopki', e); }
+  sigCache = { at: Date.now(), map };
+  return map;
+}
+const htmlToText = (h: string) => h.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|tr|p)>/gi, '\n').replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+  .split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const bodyHtml = (t: string) => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;">${escH(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#7A5A37;">$1</a>').replace(/\n/g, '<br>')}</div>`;
+
+async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string, html?: string) {
   if (smtpOn()) {
-    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, subject, text }); return; }
+    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, subject, text, ...(html ? { html } : {}) }); return; }
     catch (e) { const m = String((e as Error).message || e); if (/Invalid login|Username and Password|535|534/i.test(m)) throw new Error('not_authorized: SMTP – nieprawidłowe hasło aplikacji (' + m.slice(0, 120) + ')'); throw e; }
   }
   const token = await gmailToken(cfg.sub);
-  const mime = [`From: ${encWord(fromName)} <${cfg.from}>`, `Reply-To: ${cfg.from}`, `To: ${to}`, `Subject: ${encWord(subject)}`, 'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', b64(text).replace(/(.{76})/g, '$1\r\n')].join('\r\n');
+  const part = (type: string, c: string) => [`Content-Type: ${type}; charset=UTF-8`, 'Content-Transfer-Encoding: base64', '', b64(c).replace(/(.{76})/g, '$1\r\n')].join('\r\n');
+  const bnd = 'b' + crypto.randomUUID().replace(/-/g, '');
+  const head = [`From: ${encWord(fromName)} <${cfg.from}>`, `Reply-To: ${cfg.from}`, `To: ${to}`, `Subject: ${encWord(subject)}`, 'MIME-Version: 1.0'];
+  const mime = html
+    ? [...head, `Content-Type: multipart/alternative; boundary="${bnd}"`, '', `--${bnd}`, part('text/plain', text), `--${bnd}`, part('text/html', html), `--${bnd}--`, ''].join('\r\n')
+    : [...head, part('text/plain', text)].join('\r\n');
   const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: b64url(mime) }) });
   if (!r.ok) throw new Error('gmail ' + r.status + ': ' + (await r.text()).slice(0, 180));
@@ -108,17 +136,22 @@ Deno.serve(async (req: Request) => {
     // klienci widoczni dla osoby wysyłającej (RLS) – innych nie da się zaadresować
     const { data: clients } = await sb.from('clients').select('id,name,email').in('id', ids);
     const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
-    const signature = ['', '--', me?.full_name || '', me?.job_title || '', 'RKDP spółka doradztwa podatkowego sp. z o.o.', cfg.from, 'www.rkdp.pl'].filter((x, i) => i < 2 || x).join('\n');
-    const fromName = `${me?.full_name || 'RKDP'} – RKDP`;
+    // stopka osoby wysyłającej z rkdp.pl/stopki (po imieniu i nazwisku); brak – stopka ogólna kancelarii, a gdy strona niedostępna – tekstowa
+    const sigs = await signatures();
+    const sigHtml = sigs.get(norm(me?.full_name || '')) || sigs.get('__kancelaria') || '';
+    const signature = sigHtml ? '\n' + htmlToText(sigHtml)
+      : ['', 'Pozdrawiam serdecznie,', me?.full_name || '', me?.job_title || '', 'RKDP spółka doradztwa podatkowego sp. z o.o.', cfg.from, 'www.rkdp.pl'].filter((x, i) => i < 2 || x).join('\n');
+    const fromName = FROM_NAME;
     const results: any[] = [];
     for (const c of clients || []) {
       const to = String(c.email || '').split(/[;,\s]+/).find(emailOk) || '';
       const link = typeof body.links?.[c.id] === 'string' && body.links[c.id].startsWith('https://rozliczenia.rkdp.pl/wgraj.html#') ? body.links[c.id] : '';
       const fill = (t: string) => t.replaceAll('{klient}', c.name).replaceAll('{okres}', period ? periodLabel(period + '-01') : '').replaceAll('{link}', link);
       const subject = fill(subjectT), text = fill(bodyT) + '\n' + signature;
+      const html = sigHtml ? `${bodyHtml(fill(bodyT))}<br><br>${sigHtml}` : undefined;
       if (!to) { results.push({ client_id: c.id, ok: false, error: 'brak adresu e-mail' }); continue; }
       try {
-        await sendMail(cfg, fromName, to, subject, text);
+        await sendMail(cfg, fromName, to, subject, text, html);
         results.push({ client_id: c.id, ok: true, email: to });
         await admin.from('client_messages').insert({ client_id: c.id, kind, period: period ? period + '-01' : null, email: to, subject, status: 'wyslano', sent_by: memberId });
         if (body.mark_missing && period && MARK[kind]) await admin.from('checklist_entries').update({ status: 'reminded' })

@@ -15,9 +15,7 @@ w aplikacji SaldeoSMART widzimy faktury pobrane z Krajowego Systemu e-Faktur (KS
 
 Prosimy o niezwłoczne zalogowanie się do Saldeo i zatwierdzenie faktur – bez tego nie możemy ich zaksięgować ani terminowo rozliczyć podatków.
 
-Jeżeli któraś z faktur nie dotyczy Państwa działalności lub budzi wątpliwości, prosimy o informację w odpowiedzi na tę wiadomość.
-
-Z poważaniem,`,
+Jeżeli któraś z faktur nie dotyczy Państwa działalności lub budzi wątpliwości, prosimy o informację w odpowiedzi na tę wiadomość.`,
   },
   wyciag: {
     label: 'Wyciąg bankowy', task: 'wb',
@@ -32,9 +30,7 @@ Prosimy o przesłanie wyciągów ze wszystkich rachunków firmowych:
 
 – w odpowiedzi na tę wiadomość albo przez wgranie plików do aplikacji SaldeoSMART.
 
-Wyciąg jest nam potrzebny do zaksięgowania operacji i terminowego rozliczenia.
-
-Z poważaniem,`,
+Wyciąg jest nam potrzebny do zaksięgowania operacji i terminowego rozliczenia.`,
   },
   dokumenty: {
     label: 'Inne dokumenty', task: null,
@@ -45,9 +41,7 @@ do rozliczenia za {okres} potrzebujemy jeszcze następujących dokumentów:
 •
 
 Pliki można przesłać w odpowiedzi na tę wiadomość albo wgrać bez logowania – także zdjęciem z telefonu:
-{link}
-
-Z poważaniem,`,
+{link}`,
   },
 };
 const fmt = t => new Date(t).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' });
@@ -136,7 +130,7 @@ export async function openMessage({ clients = [], kind = 'ksef', period = defaul
   perSel.addEventListener('change', () => { st.period = perSel.value; loadPeriod(); });
 
   const me = state.me;
-  sig.textContent = `Podpis: ${me.full_name}${me.job_title ? ', ' + me.job_title : ''} · RKDP spółka doradztwa podatkowego sp. z o.o. · nadawca: kancelaria@rkdp.pl · {klient} i {okres} uzupełnią się dla każdego klienta.`;
+  sig.textContent = `Nadawca: RKDP | Kancelaria <kancelaria@rkdp.pl> · na końcu Twoja stopka z rkdp.pl/stopki (${me.full_name}) · {klient} i {okres} uzupełnią się dla każdego klienta.`;
 
   async function send(close) {
     const rows = [...chosen.values()].filter(emailOf);
