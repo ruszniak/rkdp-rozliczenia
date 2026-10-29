@@ -53,7 +53,7 @@ export async function renderDokumenty(main) {
     group('Narzędzia',
       tile('Kalkulator: JDG czy spółka z o.o.?', 'Porównanie obciążeń: JDG na skali, liniowym i ryczałcie, spółka na CIT i CIT estońskim. Wynik w PDF dla klienta.', '#/kalkulator', ['PDF'])),
     group('JPK',
-      tile('Podgląd JPK_CIT', 'Otwórz plik JPK_KR_PD (księgi rachunkowe) lub JPK_ST_KR (środki trwałe): konta, dziennik, znaczniki, sumy kontrolne. Plik zostaje na Twoim komputerze.', '#/jpk', ['Excel', 'PDF'])),
+      tile('Podgląd i weryfikacja JPK', 'JPK_CIT (JPK_KR_PD, JPK_ST_KR) oraz JPK_PKPIR (KPiR) i JPK_EWP (ryczałt): sumy kontrolne, kontrola wierszy, zestawienia, Excel i PDF. Plik zostaje na Twoim komputerze.', '#/jpk', ['Excel', 'PDF'])),
     group('Raporty i zestawienia',
       tile('Raport rozliczeń', 'Stan rozliczeń klientów za miesiąc – w zakładce Rozliczenia przycisk „Pobierz”.', '#/rozliczenia', ['PDF', 'Excel', 'CSV']),
       tile('Lista obecności', 'Ewidencja czasu pracy za miesiąc – Twoja albo zespołu.', '#/obecnosc', ['PDF', 'Excel']),

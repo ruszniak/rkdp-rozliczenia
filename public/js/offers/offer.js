@@ -64,12 +64,12 @@ export const PARTNER_FEATURES = [
   ['two', 'Stały kontakt z dwoma doradcami podatkowymi', 'bool'],
   ['discount', 'Rabat na sprawy klientów biura (interpretacje, kontrole, postępowania)', 'text'],
 ];
-const PARTNER_WHY = ['Każdą sprawą zajmuje się dwóch doradców podatkowych – zawsze ktoś odbierze.', 'Księgowa nie może być pełnomocnikiem w sporze z urzędem – doradca podatkowy tak. Przejmujemy kontakt z urzędem, biuro dalej prowadzi księgi.', 'Odpowiadamy konkretnie, z podstawą prawną – tak, żeby można było od razu zaksięgować albo odpowiedzieć klientowi.', 'Własne narzędzia: weryfikacja JPK CIT i sprawozdania finansowe do KRS generowane z JPK CIT.', 'Opinia doradcy podatkowego to podkładka dla biura; doradcy mają obowiązkowe ubezpieczenie OC.'];
+const PARTNER_WHY = ['Każdą sprawą zajmuje się dwóch doradców podatkowych – zawsze ktoś odbierze.', 'Księgowa nie może być pełnomocnikiem w sporze z urzędem – doradca podatkowy tak. Przejmujemy kontakt z urzędem, biuro dalej prowadzi księgi.', 'Odpowiadamy konkretnie, z podstawą prawną – tak, żeby można było od razu zaksięgować albo odpowiedzieć klientowi.', 'Własne narzędzia: weryfikacja JPK CIT, JPK_PKPIR i JPK_EWP oraz sprawozdania finansowe do KRS generowane z JPK CIT.', 'Opinia doradcy podatkowego to podkładka dla biura; doradcy mają obowiązkowe ubezpieczenie OC.'];
 // W każdym pakiecie – narzędzia i materiały
 export const PARTNER_COMMON = [
   'Baza wiedzy M2 TAX – omówienia przepisów, odpowiedzi na najczęstsze pytania biur, komunikaty o zmianach',
   'Wzory dokumentów – pisma do urzędów, odpowiedzi na wezwania, pełnomocnictwa, uchwały, komunikaty dla klientów biura',
-  'Aplikacja do weryfikacji plików JPK CIT (JPK_KR_PD, JPK_ST_KR) – kontrola struktury, sald, znaczników podatkowych i uzgodnienie z CIT-8, zanim zrobi to urząd',
+  'Aplikacja do weryfikacji plików JPK: JPK CIT (JPK_KR_PD, JPK_ST_KR) oraz JPK_PKPIR i JPK_EWP – sumy kontrolne, salda i znaczniki, numeracja, kolumny „razem”, stawki ryczałtu i dane kontrahentów, zanim zrobi to urząd',
   'Automatyczne generowanie sprawozdania finansowego do KRS na podstawie JPK CIT – gotowy plik e-sprawozdania (XML) z podglądem do sprawdzenia przed podpisem',
   'Działamy jako zaplecze biura – klienci zostają u Państwa, nie przejmujemy ich',
   'Bez umów na rok – miesięczny okres wypowiedzenia',

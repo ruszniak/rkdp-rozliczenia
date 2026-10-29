@@ -3,9 +3,11 @@
 import { h, toast, infoTip, printHtml, modal, icon } from '../ui.js';
 import { downloadXlsx } from '../xlsx.js';
 import { buildBilans, buildRzis, hasVariant, validateKr, WZORY, bilansSimple, rzisSimple, hierarchy, buildMapping } from './jpk-fin.js';
+import { parsePit, analyzePit, PKPIR_L, EWP_L, PKPIR_NUM, EWP_NUM } from './jpk-pit.js';
 
-const HELP = `Podgląd plików JPK (JPK_CIT):
-• Przeciągnij plik XML albo kliknij „Wybierz plik”. Obsługiwane: JPK_KR_PD (księgi rachunkowe), JPK_ST_KR (środki trwałe), a także inne pliki JPK – jako tabele.
+const HELP = `Podgląd i weryfikacja plików JPK:
+• Przeciągnij plik XML albo kliknij „Wybierz plik”. Obsługiwane: JPK_KR_PD (księgi rachunkowe – JPK_CIT), JPK_ST_KR (środki trwałe), JPK_PKPIR (księga przychodów i rozchodów), JPK_EWP (ewidencja przychodów – ryczałt), a także inne pliki JPK – jako tabele.
+• JPK_PKPIR i JPK_EWP: sumy kontrolne, ciągłość numeracji, daty w okresie, kolumny razem (K_9 = K_7 + K_8, K_14 = K_12 + K_13), stawki ryczałtu, NIP i numery KSeF kontrahentów, powtórzone dowody, dochód roczny (P_1–P_4) oraz zestawienia miesięczne.
 • Plik jest otwierany tylko na Twoim komputerze – nie trafia na serwer ani do bazy.
 • Podsumowanie pokazuje dane podmiotu, okres, sumy kontrolne i kontrolę bilansu (Wn = Ma).
 • Konta: kliknij konto, aby zobaczyć jego zapisy. Dziennik: kliknij zapis, aby zobaczyć dekretację.
@@ -82,8 +84,9 @@ export function parseJpk(text, fileName) {
   const pod = first(doc, 'Podmiot1');
   const subject = {};
   if (pod) {
-    const id = first(pod, 'IdentyfikatorPodmiotu') || pod;
+    const id = first(pod, 'IdentyfikatorPodmiotu') || first(pod, 'OsobaNiefizyczna') || first(pod, 'OsobaFizyczna') || pod;
     Object.assign(subject, leafObj(id));
+    if (!subject.PelnaNazwa && (subject.ImiePierwsze || subject.Nazwisko)) subject.PelnaNazwa = [subject.ImiePierwsze, subject.Nazwisko].filter(Boolean).join(' ');
     const adr = first(pod, 'AdresPol') || first(pod, 'AdresZagr');
     if (adr) {
       const a = leafObj(adr);
@@ -94,6 +97,7 @@ export function parseJpk(text, fileName) {
   const base = { fileName, code, header, subject };
   if (/KR_PD/i.test(code) || first(doc, 'ZOiS')) return { ...base, kind: 'kr_pd', ...parseKrPd(doc) };
   if (/ST_KR/i.test(code) || (first(doc, 'E_1') && first(doc, 'E_21'))) return { ...base, kind: 'st_kr', ...parseStKr(doc) };
+  if (/PKPIR|EWP/i.test(code) || first(doc, 'PKPIRWiersz') || first(doc, 'EWPWiersz')) return { ...base, ...parsePit(doc, code) };
   return { ...base, kind: 'generic', groups: parseGeneric(doc) };
 }
 
@@ -249,8 +253,8 @@ export async function renderJpk(main, params) {
       current = parseJpk(await readText(file), file.name);
       current.size = file.size; current.ms = Math.round(performance.now() - t0);
       draw();
-      if (current.kind === 'kr_pd') {
-        const iss = issuesOf(current), e = iss.filter(i => i.level === 'error').length;
+      if (current.kind === 'kr_pd' || current.kind === 'kpir' || current.kind === 'ewp') {
+        const iss = current.kind === 'kr_pd' ? issuesOf(current) : analyzePit(current).issues, e = iss.filter(i => i.level === 'error').length;
         if (e) toast(`Kontrola pliku: wykryto ${e} ${e === 1 ? 'błąd' : e < 5 ? 'błędy' : 'błędów'} – szczegóły nad zakładkami.`, true);
         else if (iss.length) toast(`Kontrola pliku: ${iss.length} ${iss.length === 1 ? 'ostrzeżenie' : 'ostrzeżenia'} – sprawdź znaczniki.`);
       }
@@ -258,7 +262,7 @@ export async function renderJpk(main, params) {
   };
   const input = h('input', { type: 'file', accept: '.xml,text/xml,application/xml', hidden: true, onchange: () => { loadFile(input.files[0]); input.value = ''; } });
   const zone = h('div', { class: 'tk-drop jpk-drop' },
-    h('div', {}, h('b', {}, 'Przeciągnij plik JPK (XML) tutaj'), h('span', { class: 'muted' }, ' · JPK_KR_PD, JPK_ST_KR i inne · plik zostaje na Twoim komputerze')),
+    h('div', {}, h('b', {}, 'Przeciągnij plik JPK (XML) tutaj'), h('span', { class: 'muted' }, ' · JPK_KR_PD, JPK_ST_KR, JPK_PKPIR, JPK_EWP i inne · plik zostaje na Twoim komputerze')),
     h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => input.click() }, icon('plus'), 'Wybierz plik'), input);
   ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('over'); }));
   ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('over'); }));
@@ -274,7 +278,7 @@ export async function renderJpk(main, params) {
   };
   const draw = () => {
     if (!current) { area.replaceChildren(h('div', { class: 'card empty' }, 'Otwórz plik, aby zobaczyć jego zawartość. Dane z pliku są tylko w tej karcie przeglądarki – „Wyczyść dane” usuwa je od razu, a zamknięcie karty lub wylogowanie także.')); return; }
-    area.replaceChildren(current.kind === 'kr_pd' ? viewKr(current) : current.kind === 'st_kr' ? viewSt(current) : viewGeneric(current));
+    area.replaceChildren(current.kind === 'kr_pd' ? viewKr(current) : current.kind === 'st_kr' ? viewSt(current) : (current.kind === 'kpir' || current.kind === 'ewp') ? viewPit(current) : viewGeneric(current));
   };
 
   main.replaceChildren(
@@ -282,7 +286,7 @@ export async function renderJpk(main, params) {
     h('div', { class: 'page-head', style: params?.back ? { marginTop: '10px' } : null },
       h('div', {}, h('p', { class: 'eyebrow' }, params?.mod === 'm2' ? 'Doradztwo podatkowe · M2 TAX' : 'RKDP'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Podgląd JPK', infoTip(HELP, 'Podgląd JPK – instrukcja')),
-        h('p', { class: 'sub' }, 'JPK_CIT: księgi rachunkowe (JPK_KR_PD) i środki trwałe (JPK_ST_KR) – podgląd, kontrola, Excel i PDF.'))),
+        h('p', { class: 'sub' }, 'JPK_CIT (JPK_KR_PD, JPK_ST_KR) oraz JPK_PIT: księga przychodów i rozchodów (JPK_PKPIR) i ewidencja przychodów (JPK_EWP) – podgląd, kontrola, Excel i PDF.'))),
     zone, area);
   draw();
 }
@@ -298,6 +302,7 @@ const metaCard = (m) => {
       row('Rok podatkowy', H.RokPdDataOd ? `${H.RokPdDataOd} – ${H.RokPdDataDo}` : ''), row('Cel złożenia', CEL[H.CelZlozenia] || H.CelZlozenia),
       row('Data wytworzenia', (H.DataWytworzeniaJPK || '').replace('T', ' ').slice(0, 19)), row('Waluta', H.DomyslnyKodWaluty), row('Formularz', H.KodFormularza),
       row('CIT estoński', S.Znacznik_EST ? 'tak' : ''), row('MSSF', S.Znacznik_MSSF ? 'tak' : ''),
+      row('Metoda kasowa (PIT)', m.flags?.Kasowy_PIT === '1' ? 'tak' : ''), row('Data urodzenia', S.DataUrodzenia), row('E-mail', S.Email),
       row('Plik', `${m.fileName} · ${m.size >= 1048576 ? (m.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(m.size / 1024)) + ' kB'}`)));
 };
 
@@ -315,10 +320,9 @@ function exportBar(m, extra = []) {
 
 // ----- kontrola pliku -----
 const issuesOf = m => m._iss || (m._iss = validateKr(m, m._a || (m._a = analyzeKr(m)), m._bil || (m._bil = buildBilans(m))));
-function issuesPanel(m, goTo) {
-  const list = issuesOf(m);
+function issuesPanel(m, goTo, list = issuesOf(m)) {
   const err = list.filter(i => i.level === 'error').length, warn = list.length - err;
-  if (!list.length) return h('div', { class: 'jpk-check ok' }, h('b', {}, '✓ Kontrola pliku: nie wykryto problemów'), h('span', { class: 'small' }, ' – sumy kontrolne, bilans Wn = Ma, salda kont, znaczniki oraz bilans i RZiS są spójne.'));
+  if (!list.length) return h('div', { class: 'jpk-check ok' }, h('b', {}, '✓ Kontrola pliku: nie wykryto problemów'), h('span', { class: 'small' }, m.kind === 'kr_pd' ? ' – sumy kontrolne, bilans Wn = Ma, salda kont, znaczniki oraz bilans i RZiS są spójne.' : ' – sumy kontrolne, numeracja, daty, kolumny „razem”, stawki i dane kontrahentów są poprawne.'));
   let open = err > 0;
   const body = h('div', { class: 'jpk-check-list' });
   const draw = () => {
@@ -542,6 +546,63 @@ function viewSt(m) {
   return el;
 }
 
+// ----- JPK_PKPIR i JPK_EWP (JPK_PIT) -----
+const pitL = m => m.kind === 'ewp' ? EWP_L : PKPIR_L;
+const pitNum = m => m.kind === 'ewp' ? EWP_NUM : PKPIR_NUM;
+const PKPIR_COLS = ['K_1', 'K_2', 'K_3A', 'K_3', 'K_3B', 'K_4A', 'K_4B', 'K_5A', 'K_4', 'K_5B', 'K_5', 'K_6', 'K_7', 'K_8', 'K_9', 'K_10', 'K_11', 'K_12', 'K_13', 'K_14', 'K_15', 'K_16A', 'K_16B', 'K_17', 'K_9A', 'K_14A'];
+const EWP_COLS = ['K_1', 'K_2', 'K_3', 'K_4', 'K_5', 'K_6', 'K_7', 'K_8', 'K_9', 'K_10'];
+const pitCols = m => (m.kind === 'ewp' ? EWP_COLS : PKPIR_COLS).filter(k => ['K_1', 'K_2'].includes(k) || m.rows.some(r => r[k]))
+  .map(k => ({ key: k, label: pitL(m)[k] || k, num: pitNum(m).has(k), dec: 2, w: ['K_6', 'K_5A', 'K_5B', 'K_17', 'K_10'].includes(k) && !(m.kind === 'ewp' && k === 'K_10') ? 200 : null, wrap: ['K_6', 'K_5B', 'K_17'].includes(k) || (m.kind === 'ewp' && k === 'K_10'), sum: k !== 'K_1' }));
+function viewPit(m) {
+  const A = analyzePit(m), ewp = m.kind === 'ewp';
+  const L = pitL(m);
+  let tab = 'sum'; const body = h('div'); let tabs = h('div');
+  let rowQuery = '';
+  const showRow = r => modal(`Wiersz ${r.K_1 || ''}`, h('div', { class: 'jpk-kvs' }, ...Object.keys(r).filter(k => !k.startsWith('_') && r[k] !== '').map(k => h('div', { class: 'jpk-kv' }, h('span', {}, `${L[k] || k} (${k})`), h('b', {}, pitNum(m).has(k) ? fmtN(num(r[k])) : r[k])))),
+    c => [h('button', { class: 'btn btn-primary btn-sm', onclick: c }, 'Zamknij')], { wide: true });
+  const monthCols = ewp
+    ? [{ key: 'label', label: 'Miesiąc' }, { key: 'n', label: 'Wierszy', num: true, dec: 0 }, { key: 'przychod', label: 'Przychód', num: true }, { key: 'ryczalt', label: 'Ryczałt wg stawek (przed odliczeniami)', num: true }, { key: 'narast', label: 'Przychód narastająco', num: true, sum: false }]
+    : [{ key: 'label', label: 'Miesiąc' }, { key: 'n', label: 'Wierszy', num: true, dec: 0 }, { key: 'K_7', label: 'Sprzedaż (7)', num: true }, { key: 'K_8', label: 'Pozostałe (8)', num: true }, { key: 'K_9', label: 'Przychód (9)', num: true },
+      { key: 'K_10', label: 'Zakup towarów (10)', num: true }, { key: 'K_11', label: 'Koszty uboczne (11)', num: true }, { key: 'K_12', label: 'Wynagrodzenia (12)', num: true }, { key: 'K_13', label: 'Pozostałe wydatki (13)', num: true },
+      { key: 'koszty', label: 'Koszty (10+11+14)', num: true }, { key: 'wynik', label: 'Wynik miesiąca', num: true }, { key: 'narastW', label: 'Wynik narastająco', num: true, sum: false }];
+  const cpCols = ewp ? [{ key: 'id', label: 'NIP / id kontrahenta' }, { key: 'n', label: 'Wierszy', num: true, dec: 0 }, { key: 'przychod', label: 'Przychód', num: true }]
+    : [{ key: 'name', label: 'Kontrahent', w: 240, wrap: true }, { key: 'id', label: 'NIP / id' }, { key: 'n', label: 'Wierszy', num: true, dec: 0 }, { key: 'przychod', label: 'Przychód (9)', num: true }, { key: 'wydatki', label: 'Koszty (10+11+14)', num: true }];
+  const render = () => {
+    tabs.replaceWith(tabs = tabsBar([['sum', 'Podsumowanie'], ['rows', ewp ? 'Ewidencja' : 'Księga', m.rows.length], ['mon', 'Miesiące'], ewp ? ['rates', 'Stawki'] : null, ['cp', 'Kontrahenci', A.contractors.length],
+      !ewp && (m.info || m.spis.length) ? ['info', 'Dochód i remanent'] : null], k => { tab = k; render(); }, tab));
+    if (tab === 'rows') { const t = dataTable({ cols: pitCols(m), rows: m.rows, onRow: showRow, initialQuery: rowQuery }); rowQuery = ''; return body.replaceChildren(h('p', { class: 'hint' }, 'Kliknij wiersz, aby zobaczyć wszystkie pola.'), t.el); }
+    if (tab === 'mon') return body.replaceChildren(h('p', { class: 'hint' }, ewp ? 'Przychody według miesiąca uzyskania przychodu (K_3). Ryczałt policzony według stawek z wierszy, przed odliczeniem składek i strat – pomocniczo.' : 'Zestawienie miesięczne jak w podsumowaniu KPiR. Koszty = zakup towarów (10) + koszty uboczne (11) + razem wydatki (14), bez remanentu – wynik pomocniczy.'), dataTable({ cols: monthCols, rows: A.months, pageSize: 500 }).el);
+    if (tab === 'rates') return body.replaceChildren(dataTable({ cols: [{ key: 'rate', label: 'Stawka (%)' }, { key: 'n', label: 'Wierszy', num: true, dec: 0 }, { key: 'przychod', label: 'Przychód', num: true }, { key: 'ryczalt', label: 'Ryczałt (przed odliczeniami)', num: true }], rows: A.rateRows, pageSize: 50, onRow: r => { rowQuery = ''; tab = 'rows'; render(); } }).el);
+    if (tab === 'cp') return body.replaceChildren(dataTable({ cols: cpCols, rows: A.contractors, pageSize: 200, onRow: c => { rowQuery = c.id || c.name || ''; tab = 'rows'; render(); } }).el);
+    if (tab === 'info') {
+      const I = m.info || {}, Rr = A.roczne;
+      return body.replaceChildren(h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Ustalenie dochodu (PKPIRInfo)')),
+        h('div', { class: 'jpk-scroll' }, h('table', { class: 'jpk-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Pole'), h('th', {}, 'Opis'), h('th', { class: 'n' }, 'W pliku'), h('th', { class: 'n' }, 'Wyliczone z księgi'))),
+          h('tbody', {}, ...['P_1', 'P_2', 'P_3', 'P_4'].map(k => h('tr', {}, h('td', {}, k), h('td', {}, L[k]), h('td', { class: 'n' }, I[k] !== undefined ? fmtN(num(I[k])) : '—'),
+            h('td', { class: 'n' }, Rr && k === 'P_3' ? fmtN(Rr.kosztyCalc) : Rr && k === 'P_4' ? fmtN(Rr.dochodCalc) : '—'))))))),
+        m.spis.length ? h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Spisy z natury w ciągu roku (PKPIRSpis)')),
+          dataTable({ cols: [{ key: 'P_5A', label: L.P_5A }, { key: 'P_5B', label: L.P_5B, num: true }], rows: m.spis }).el) : null);
+    }
+    // podsumowanie
+    const T = A.totals;
+    const tiles = ewp ? [['Wiersze', fmtInt(m.rows.length)], ['Przychód', fmtN(T.przychod)], ['Ryczałt wg stawek', fmtN(T.ryczalt)], ['Stawki', String(A.rateRows.length)]]
+      : [['Wiersze', fmtInt(m.rows.length)], ['Przychód (9)', fmtN(T.K_9)], ['Koszty (10+11+14)', fmtN(T.koszty)], ['Wynik (bez remanentu)', fmtN(T.wynik)]];
+    body.replaceChildren(
+      h('div', { class: 'jpk-tiles' }, ...tiles.map(([l, n]) => h('div', { class: 'card tile' }, h('span', { class: 'num', style: { fontSize: '22px' } }, n), h('span', { class: 'lbl' }, l)))),
+      h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Sumy kontrolne')),
+        h('div', { class: 'jpk-scroll' }, h('table', { class: 'jpk-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Pole'), h('th', { class: 'n' }, 'W pliku'), h('th', { class: 'n' }, 'Wyliczone z wierszy'), h('th', {}, 'Wynik'))),
+          h('tbody', {}, ...A.ctrlRows.map(r => h('tr', {}, h('td', {}, `${r.k} – ${L[r.k]}`), h('td', { class: 'n' }, r.file === undefined ? '—' : r.k === 'LiczbaWierszy' ? fmtInt(num(r.file)) : fmtN(num(r.file))),
+            h('td', { class: 'n' }, r.k === 'LiczbaWierszy' ? fmtInt(r.calc) : fmtN(r.calc)), h('td', {}, ok(r.ok)))))))),
+      !ewp ? h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Sumy kolumn księgi')),
+        h('div', { class: 'jpk-scroll' }, h('table', { class: 'jpk-table' }, h('tbody', {}, ...['K_7', 'K_8', 'K_9', 'K_10', 'K_11', 'K_12', 'K_13', 'K_14', 'K_15', 'K_16B'].filter(k => k !== 'K_15' || T.K_15).map(k => h('tr', {}, h('td', {}, L[k]), h('td', { class: 'n' }, fmtN(T[k])))))))) : null,
+      h('p', { class: 'small muted' }, `Plik odczytano w ${m.ms} ms. Dane są przetwarzane wyłącznie w tej karcie przeglądarki.`));
+  };
+  const goTo = (t, q) => { if (t === 'acc') { rowQuery = q || ''; tab = 'rows'; } else tab = t; render(); el.querySelector('.jpk-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const el = h('div', {}, metaCard(m), issuesPanel(m, goTo, A.issues), h('div', { class: 'jpk-bar' }, tabs, exportBar(m)), body);
+  render();
+  return el;
+}
+
 // ----- inne JPK -----
 function viewGeneric(m) {
   let tab = m.groups[0]?.name || 'sum'; const body = h('div'); let tabs = h('div');
@@ -605,6 +666,18 @@ function exportExcel(m) {
     if (m.rpd) sheets.push({ name: 'RPD', widths: [8, 60, 18], rows: [['Pole', 'Opis', 'Kwota'].map(v => ({ v, s: 'header' })), ...Object.keys(m.rpd).map(k => [k, lbl(k), { v: num(m.rpd[k]), s: 'money' }])] });
   } else if (m.kind === 'st_kr') {
     sheets.push(sheetFrom('Ewidencja ŚT i WNiP', C(ST_COLS.filter(k => m.assets.some(a => a[k]))), m.assets));
+  } else if (m.kind === 'kpir' || m.kind === 'ewp') {
+    const A = analyzePit(m), L = pitL(m), ewp = m.kind === 'ewp';
+    sheets[0].rows.push([], [{ v: 'Sumy kontrolne', s: 'header' }, { v: 'W pliku', s: 'header' }, { v: 'Wyliczone', s: 'header' }, { v: 'Wynik', s: 'header' }],
+      ...A.ctrlRows.map(r => [`${r.k} ${L[r.k]}`, r.file === undefined ? '' : num(r.file), r.calc, r.ok === null ? 'BRAK' : r.ok ? 'zgodne' : 'RÓŻNICA']));
+    sheets.push({ name: 'Kontrola', widths: [10, 60, 14, 50, 40], rows: [[{ v: 'Kontrola pliku', s: 'title' }], [], ['Poziom', 'Problem', 'Lp.', 'Wiersz', 'Szczegóły'].map(v => ({ v, s: 'header' })),
+      ...(A.issues.length ? A.issues.flatMap(i => [[{ v: i.level === 'error' ? 'BŁĄD' : 'uwaga', s: i.level === 'error' ? 'missing' : 'normal' }, { v: i.title, s: 'wrap' }, '', '', { v: i.text || '', s: 'wrap' }], ...i.accounts.map(a => ['', '', a.S_1, a.S_2 || '', a.info || ''])]) : [['', 'Nie wykryto problemów']])] });
+    sheets.push(sheetFrom(ewp ? 'Ewidencja przychodów' : 'Księga (KPiR)', pitCols(m).map(c => ({ ...c, label: `${c.label} (${c.key})` })), m.rows));
+    sheets.push(sheetFrom('Miesiące', ewp ? [{ key: 'label', label: 'Miesiąc' }, { key: 'n', label: 'Wierszy' }, { key: 'przychod', label: 'Przychód', num: true }, { key: 'ryczalt', label: 'Ryczałt wg stawek', num: true }, { key: 'narast', label: 'Przychód narastająco', num: true }]
+      : [{ key: 'label', label: 'Miesiąc' }, { key: 'n', label: 'Wierszy' }, ...['K_7', 'K_8', 'K_9', 'K_10', 'K_11', 'K_12', 'K_13', 'K_14'].map(k => ({ key: k, label: L[k], num: true })), { key: 'koszty', label: 'Koszty (10+11+14)', num: true }, { key: 'wynik', label: 'Wynik miesiąca', num: true }, { key: 'narastW', label: 'Wynik narastająco', num: true }], A.months));
+    if (ewp) sheets.push(sheetFrom('Stawki', [{ key: 'rate', label: 'Stawka (%)' }, { key: 'n', label: 'Wierszy' }, { key: 'przychod', label: 'Przychód', num: true }, { key: 'ryczalt', label: 'Ryczałt (przed odliczeniami)', num: true }], A.rateRows));
+    sheets.push(sheetFrom('Kontrahenci', [{ key: 'name', label: 'Kontrahent' }, { key: 'id', label: 'NIP / id' }, { key: 'n', label: 'Wierszy' }, { key: 'przychod', label: 'Przychód', num: true }, ...(ewp ? [] : [{ key: 'wydatki', label: 'Koszty', num: true }])], A.contractors));
+    if (m.info) sheets.push({ name: 'Dochód i remanent', widths: [8, 50, 18], rows: [['Pole', 'Opis', 'Kwota'].map(v => ({ v, s: 'header' })), ...['P_1', 'P_2', 'P_3', 'P_4'].map(k => [k, L[k], m.info[k] === undefined ? '' : { v: num(m.info[k]), s: 'money' }]), ...m.spis.map(x => ['P_5', `Spis z natury ${x.P_5A || ''}`, { v: num(x.P_5B), s: 'money' }])] });
   } else {
     for (const g of m.groups) sheets.push(sheetFrom(g.name, g.cols, g.rows));
   }
@@ -613,6 +686,11 @@ function exportExcel(m) {
 
 // ---------- eksport: PDF ----------
 function exportPdfDialog(m) {
+  if (m.kind === 'kpir' || m.kind === 'ewp') {
+    const i = h('input', { type: 'checkbox', checked: m.rows.length <= 1500 });
+    return modal('Raport PDF', h('div', {}, h('p', { class: 'small muted' }, 'Raport zawiera dane podatnika, kontrolę pliku, sumy kontrolne i zestawienie miesięczne.'), h('label', { class: 'check', style: { display: 'flex', gap: '8px', margin: '6px 0' } }, i, `Wszystkie wiersze ${m.kind === 'ewp' ? 'ewidencji' : 'księgi'} (${fmtInt(m.rows.length)})`)),
+      close => [h('button', { class: 'btn btn-outline btn-sm', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); printReport(m, { rows: i.checked }); } }, 'Utwórz PDF')]);
+  }
   if (m.kind !== 'kr_pd') return printReport(m, {});
   const cb = (label, checked) => { const i = h('input', { type: 'checkbox', checked }); return [i, h('label', { class: 'check', style: { display: 'flex', gap: '8px', alignItems: 'center', margin: '6px 0' } }, i, label)]; };
   const [zo, zoL] = cb('Zestawienie obrotów i sald (konta)', true);
@@ -665,6 +743,18 @@ function printReport(m, o) {
       parts.push('<h2 class="pb">Dziennik</h2>' + m.journal.map(j => `<div class="jr"><div class="jh"><b>${esc(j.D_1)}</b> · ${esc(j.D_8 || j.D_6 || '')} · ${esc(j.D_4 || '')} · ${esc(j.D_10 || '')}<span>${fmtN(num(j.D_11))}</span></div>` +
         tbl(['Konto', 'Nazwa konta', 'Opis', 'Wn', 'Ma'], j._z.map(i => m.postings[i]).map(z => [z.Z_3, nm.get(z.Z_3) || '', z.Z_2 || '', num(z.Z_4) ? fmtN(num(z.Z_4)) : '', num(z.Z_7) ? fmtN(num(z.Z_7)) : '']), [3, 4]) + '</div>').join(''));
     }
+  } else if (m.kind === 'kpir' || m.kind === 'ewp') {
+    const A = analyzePit(m), L = pitL(m), ewp = m.kind === 'ewp';
+    parts.push('<h2>Kontrola pliku</h2>' + (A.issues.length ? A.issues.map(i => `<div class="iss ${i.level}"><b>${i.level === 'error' ? 'Błąd' : 'Uwaga'}: ${esc(i.title)}</b><div>${esc(i.text || '')}</div>${i.accounts.length ? `<div class="acc">${i.accounts.slice(0, 20).map(a => `Lp. ${esc(a.S_1)} ${esc(a.S_2 || '')}${a.info ? ' – ' + esc(a.info) : ''}`).join('<br>')}${i.accounts.length > 20 ? `<br>… i ${i.accounts.length - 20} więcej` : ''}</div>` : ''}</div>`).join('') : '<p>✓ Nie wykryto problemów.</p>'));
+    parts.push('<h2>Sumy kontrolne</h2>' + tbl(['Pole', 'W pliku', 'Wyliczone', 'Wynik'], A.ctrlRows.map(r => [`${r.k} – ${L[r.k]}`, r.file === undefined ? '—' : fmtN(num(r.file), r.k === 'LiczbaWierszy' ? 0 : 2), fmtN(r.calc, r.k === 'LiczbaWierszy' ? 0 : 2), r.ok === null ? 'brak w pliku' : r.ok ? '✓ zgodne' : '✗ różnica']), [1, 2]));
+    if (ewp) {
+      parts.push('<h2>Przychody według stawek</h2>' + tbl(['Stawka (%)', 'Wierszy', 'Przychód', 'Ryczałt (przed odliczeniami)'], A.rateRows.map(r => [r.rate, r.n, fmtN(r.przychod), fmtN(r.ryczalt)]), [1, 2, 3]));
+      parts.push('<h2>Zestawienie miesięczne</h2>' + tbl(['Miesiąc', 'Wierszy', 'Przychód', 'Ryczałt wg stawek', 'Narastająco'], A.months.map(r => [r.label, r.n, fmtN(r.przychod), fmtN(r.ryczalt), fmtN(r.narast)]), [1, 2, 3, 4]));
+    } else {
+      parts.push('<h2>Zestawienie miesięczne</h2>' + tbl(['Miesiąc', 'Przychód (9)', 'Zakup tow. (10)', 'Koszty ub. (11)', 'Wynagr. (12)', 'Pozost. wyd. (13)', 'Koszty (10+11+14)', 'Wynik', 'Wynik narast.'], A.months.map(r => [r.label, fmtN(r.K_9), fmtN(r.K_10), fmtN(r.K_11), fmtN(r.K_12), fmtN(r.K_13), fmtN(r.koszty), fmtN(r.wynik), fmtN(r.narastW)]), [1, 2, 3, 4, 5, 6, 7, 8]));
+      if (m.info) parts.push('<h2>Ustalenie dochodu (PKPIRInfo)</h2>' + tbl(['Pole', 'Opis', 'W pliku', 'Wyliczone z księgi'], ['P_1', 'P_2', 'P_3', 'P_4'].map(k => [k, L[k], m.info[k] === undefined ? '—' : fmtN(num(m.info[k])), A.roczne && k === 'P_3' ? fmtN(A.roczne.kosztyCalc) : A.roczne && k === 'P_4' ? fmtN(A.roczne.dochodCalc) : '—']), [2, 3]));
+    }
+    if (o.rows) { const cols = pitCols(m); parts.push(`<h2 class="pb">${ewp ? 'Ewidencja przychodów' : 'Podatkowa księga przychodów i rozchodów'}</h2>` + tbl(cols.map(c => c.label), m.rows.map(r => cols.map(c => c.num ? (num(r[c.key]) ? fmtN(num(r[c.key])) : '') : (r[c.key] ?? ''))), cols.map((c, i) => c.num ? i : -1).filter(i => i >= 0))); }
   } else if (m.kind === 'st_kr') {
     const s = k => r2(m.assets.reduce((a, x) => a + num(x[k]), 0));
     parts.push('<h2>Zestawienie wartości</h2>' + tbl(['', 'Podatkowo', 'Bilansowo'], [['Wartość początkowa', fmtN(s('E_12')), fmtN(s('E_21'))], ['Amortyzacja w roku', fmtN(s('E_19')), fmtN(s('E_26'))], ['Umorzenie narastająco', fmtN(s('E_20')), fmtN(s('E_27'))]], [1, 2]));
