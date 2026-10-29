@@ -101,8 +101,12 @@ export async function renderEsf(main, params) {
         miejscowosc: title(a.miejscowosc || s.miejscowosc), ulica: title(String(a.ulica || '').replace(/^(UL\.|ULICA)\s*/i, '')),
         nrDomu: a.nrDomu || '', nrLokalu: a.nrLokalu || '', kod: a.kodPocztowy || '',
       });
-      const f = (r.filings || [])[0];
-      toast(f ? `Pobrano z KRS. Ostatnie sprawozdanie w KRS: ${f.period || ''}` : 'Pobrano dane z KRS');
+      // wzmianki o złożonych sprawozdaniach (dział 3 odpisu) – czy jest sprawozdanie za poprzedni rok
+      const fl = (r.filings || []).map(x => ({ ...x, y: +(String(x.period || '').match(/(\d{4})\s*$/) || [])[1] || 0 })).sort((a, b) => a.y - b.y);
+      const lastF = fl[fl.length - 1], prevF = fl.find(x => x.y === year - 1);
+      toast(!fl.length ? 'Pobrano dane z KRS. W KRS nie ma wzmianki o złożonych sprawozdaniach finansowych.'
+        : prevF ? `Pobrano z KRS. Sprawozdanie za ${year - 1} złożone ${prevF.filed || ''} – pobierz jego plik XML przyciskiem „Otwórz Repozytorium KRS” i wrzuć go poniżej.`
+        : `Pobrano z KRS. Uwaga: brak w KRS sprawozdania za ${year - 1} (ostatnie: ${lastF.period}, złożone ${lastF.filed || '—'}).`, !prevF && fl.length > 0);
       markDirty(); draw();
     } catch (e) { fail(e, 'Nie udało się pobrać danych z KRS'); } finally { btn.disabled = false; }
   }
