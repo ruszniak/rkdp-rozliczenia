@@ -11,7 +11,7 @@ import { paper, esc } from './papier.js';
 const QUICK = ['Brak wyciągu bankowego – prośba wysłana', 'Czekamy na zatwierdzenie faktur KSeF w Saldeo', 'Zaksięgowane', 'Do wyjaśnienia z klientem', 'Klient potwierdził telefonicznie'];
 const who = id => id ? (memberById(id)?.short_name || memberById(id)?.full_name || 'ktoś') : 'autor nieznany';
 // pełne imię i nazwisko autora w dymku rozmowy
-const fullWho = id => id ? (memberById(id)?.full_name || memberById(id)?.short_name || 'Były pracownik') : 'Autor nieznany (wpis sprzed rozmów)';
+const fullWho = (id, imported = false) => id ? (memberById(id)?.full_name || memberById(id)?.short_name || 'Były pracownik') : imported ? 'Import z arkusza Excel' : 'Autor nieznany (wpis sprzed rozmów)';
 const whoEmail = e => state.members.find(m => m.email === e)?.short_name || (e === 'system' ? 'system' : String(e || '').split('@')[0]);
 const tm = t => new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
 const dt = t => new Date(t).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -195,7 +195,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   }
 
   // ---------- rysowanie ----------
-  const avatar = id => h('span', { class: 'av chat-av' + (id ? '' : ' unknown'), 'data-tip': fullWho(id) }, id ? ava(memberById(id) || { full_name: '?' }) : '?');
+  const avatar = (id, imported = false) => h('span', { class: 'av chat-av' + (id ? '' : ' unknown'), 'data-tip': fullWho(id, imported) }, id ? ava(memberById(id) || { full_name: '?' }) : imported ? 'XLS' : '?');
   function bubble(x, { reply = false } = {}) {
     if (x.deleted_at) return h('div', { class: 'chat-sys wt-del' }, `Wiadomość usunięta${x.deleted_by && x.deleted_by !== x.author ? ` przez ${who(x.deleted_by)}` : ''} · ${who(x.author)}, ${tm(x.created_at)}`);
     const mine = x.author === me, q = x.kind === 'pytanie';
@@ -217,9 +217,9 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       mine ? h('button', { type: 'button', class: 'chat-a', onclick: () => { editing = x.id; draw(); } }, 'Edytuj') : null,
       mine || admin ? h('button', { type: 'button', class: 'chat-a', onclick: () => { if (confirm('Usunąć wpis? W historii zostanie ślad „wiadomość usunięta”.')) upd(x.id, { deleted_at: new Date().toISOString() }, 'Usunięto'); } }, 'Usuń') : null);
     return h('div', { class: 'chat-msg' + (mine ? ' mine' : '') + (q ? ' q' : '') + (x.resolved_at ? ' done' : '') + (reply ? ' wt-r' : ''), 'data-id': x.id },
-      avatar(x.author),
+      avatar(x.author, x.imported),
       h('div', { class: 'chat-bub' },
-        h('div', { class: 'chat-meta' }, h('b', { class: 'chat-who' }, fullWho(x.author) + (mine ? ' (Ty)' : '')), q ? h('span', { class: 'chat-tag' }, x.resolved_at ? 'pytanie · wyjaśnione' : 'pytanie') : null,
+        h('div', { class: 'chat-meta' }, h('b', { class: 'chat-who' }, fullWho(x.author, x.imported) + (mine ? ' (Ty)' : '')), q ? h('span', { class: 'chat-tag' }, x.resolved_at ? 'pytanie · wyjaśnione' : 'pytanie') : null,
           !q && x.resolved_at && !reply ? h('span', { class: 'chat-tag wt-done' }, `✓ zrobione${x.resolved_by ? ' · ' + who(x.resolved_by) : ''}, ${new Date(x.resolved_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}`) : null,
           x.pinned ? h('span', { class: 'chat-tag' }, '📌') : null, h('span', {}, tm(x.created_at))),
         h('div', { class: 'chat-txt' }, ...mentionHtml(x.body)), hist, acts));
