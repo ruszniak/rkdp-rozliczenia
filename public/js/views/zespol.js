@@ -224,6 +224,22 @@ export async function renderZespol(main) {
       'Niezależnie od tego co noc wykonywana jest automatyczna, zaszyfrowana kopia bazy w GitHubie. ',
       'Plik zawiera dane osobowe – trzymaj go na zaszyfrowanym dysku.')));
 
+  // ---------- poczta: wiadomości do klientów z kancelaria@rkdp.pl ----------
+  const mailSt = h('p', { class: 'small' }, '');
+  const mailCheck = async () => {
+    mailSt.textContent = 'Sprawdzam…';
+    try {
+      const { data, error } = await sb.functions.invoke('mail', { body: { action: 'status' } });
+      if (error) throw error;
+      mailSt.replaceChildren(data.ready ? h('b', { style: { color: 'var(--ok)' } }, `✓ Gotowe – wiadomości wychodzą z ${data.from}`)
+        : h('span', {}, h('b', { style: { color: 'var(--warn)' } }, 'Jeszcze nie działa. '), String(data.reason || '').replace(/^not_(configured|authorized): ?/, '')));
+    } catch (e) { mailSt.textContent = 'Nie udało się sprawdzić: ' + (e.message || e); }
+  };
+  main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
+    h('div', { class: 'section-head' }, h('h2', {}, 'Poczta – wiadomości do klientów'), h('button', { class: 'btn btn-outline btn-sm', onclick: mailCheck }, 'Sprawdź wysyłkę')),
+    h('p', { class: 'hint' }, 'Wiadomości z okna „Wiadomość” wychodzą z kancelaria@rkdp.pl (alias konta michal@ruszniak.io) przez Gmail, podpisane przez osobę wysyłającą. Kliknij „Sprawdź wysyłkę” po konfiguracji w Google Workspace.'),
+    mailSt));
+
   // ---------- ustawienia M2 TAX ----------
   const [{ data: settings }, { data: signers }] = await Promise.all([
     sb.from('app_settings').select('key,value'), sb.from('m2_signers').select('*').order('sort')]);
