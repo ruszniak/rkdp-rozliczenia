@@ -54,6 +54,12 @@ try {
     .replace('<script type="module" src="/js/main.js"></script>', `<script type="module" src="${entry}"></script>`);
   if (!html.includes(entry) || !html.includes(cssName)) throw new Error('nie udało się podmienić odwołań w index.html');
   writeFileSync('public/index.html', html);
+  // wersja demonstracyjna (/demo/?k=…) – ten sam pakiet aplikacji, dane fikcyjne w przeglądarce
+  let demo = readFileSync('public/demo/index.html', 'utf8');
+  demo = demo.replace('<meta name="app-entry" content="/js/main.js">', `<meta name="app-entry" content="${entry}">`)
+    .replace('<link rel="stylesheet" href="/app.css">', `<link rel="stylesheet" href="/assets/${cssName}">`);
+  if (!demo.includes(entry)) throw new Error('nie udało się podmienić odwołań w demo/index.html');
+  writeFileSync('public/demo/index.html', demo);
   const files = readdirSync('public/assets');
   const kb = files.reduce((s, f) => s + readFileSync('public/assets/' + f).length, 0) / 1024;
   console.log(`OK: pakiet ${entry} + ${files.length - 1} plików, razem ${kb.toFixed(0)} kB`);

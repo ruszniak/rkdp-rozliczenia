@@ -1715,3 +1715,5 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 .of-linkinfo:empty{display:none}
 .wt-task.wt-fresh{border-color:color-mix(in srgb,var(--warn) 55%,var(--line));box-shadow:0 0 0 2px color-mix(in srgb,var(--warn) 18%,transparent)}
 .wt-new.wt-new-in{margin:0 0 6px}
+/* wersja demonstracyjna */
+.demo-bar{position:fixed;left:50%;bottom:calc(10px + var(--tabbar,0px));transform:translateX(-50%);z-index:120;background:#A4462F;color:#fff;font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;box-shadow:0 6px 20px rgba(0,0,0,.25);white-space:nowrap;max-width:calc(100vw - 24px);overflow:hidden;text-overflow:ellipsis;pointer-events:none}
