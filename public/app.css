@@ -1584,3 +1584,6 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 .esf-rdf-krs b{font-size:24px;letter-spacing:.08em;font-variant-numeric:tabular-nums;user-select:all}
 .esf-rdf-krs .small{width:100%}
 .esf-rdf ol{padding-left:18px;line-height:1.6}
+.wt-mail{border:0;font:inherit;cursor:pointer;text-align:left;color:inherit}
+.wt-mail:hover{background:color-mix(in srgb,var(--gold) 22%,transparent)}
+.wt-mailbody{white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.55;background:var(--soft,#F7F3EC);border-radius:10px;padding:14px 16px;margin-top:10px;max-height:60vh;overflow:auto}

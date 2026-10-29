@@ -262,7 +262,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     const stream = [
       ...top.map(x => ({ t: x.created_at, el: () => h('div', { class: 'wt-item' }, bubble(x), replies('c' + x.id, rep(x.id), r => bubble(r, { reply: true }))) })),
       ...D.tickets.map(t => ({ t: t.created_at, el: () => taskCard(t) })),
-      ...D.mails.map(m => ({ t: m.sent_at, el: () => h('div', { class: 'chat-sys' + (m.status === 'blad' ? ' err' : '') }, icon('mail'),
+      ...D.mails.map(m => ({ t: m.sent_at, el: () => h('button', { type: 'button', class: 'chat-sys wt-mail' + (m.status === 'blad' ? ' err' : ''), 'data-tip': 'Pokaż treść wiadomości', onclick: () => showMail(m) }, icon('mail'),
         h('span', {}, h('b', {}, who(m.sent_by)), m.status === 'blad' ? ' – nie udało się wysłać: ' : ' wysłał(a) e-mail: ', m.subject, h('span', { class: 'muted' }, ` → ${m.email} · ${tm(m.sent_at)}`))) })),
       ...D.files.map(f => ({ t: f.created_at, el: () => { const fromClient = f.source === 'klient', mine = !fromClient && f.uploaded_by === me;
         return h('div', { class: 'chat-msg chat-file' + (mine ? ' mine' : '') + (fromClient ? ' client' : '') }, !mine ? avatar(fromClient ? null : f.uploaded_by) : null,
@@ -288,7 +288,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       soft(sb.from('period_comments').select('id,body,author,period').eq('client_id', client.id).eq('pinned', true).is('deleted_at', null).order('created_at')),
       soft(sb.from('period_comments').select('id,body,author,period').eq('client_id', client.id).eq('kind', 'pytanie').is('resolved_at', null).is('deleted_at', null).is('parent_id', null).lt('period', pdate).order('period', { ascending: false }).limit(20)),
       soft(sb.from('rkdp_tickets').select('*').eq('client_id', client.id).or(`period.eq.${pdate},and(period.is.null,created_at.gte.${pdate},created_at.lt.${nm})`).order('created_at')),
-      soft(sb.from('client_messages').select('kind,subject,sent_at,sent_by,status,email,period').eq('client_id', client.id).or(`period.eq.${pdate},and(period.is.null,sent_at.gte.${pdate},sent_at.lt.${nextMonth(shiftPeriod(per, 1))})`).order('sent_at')),
+      soft(sb.from('client_messages').select('id,kind,subject,sent_at,sent_by,status,email,period,body,error').eq('client_id', client.id).or(`period.eq.${pdate},and(period.is.null,sent_at.gte.${pdate},sent_at.lt.${nextMonth(shiftPeriod(per, 1))})`).order('sent_at')),
       soft(sb.from('period_files').select('*').eq('client_id', client.id).eq('period', pdate).order('created_at')),
       soft(sb.from('audit_log').select('at,actor,detail').eq('table_name', 'checklist_entries').eq('client_id', client.id).eq('period', pdate).order('at').limit(200)),
     ]);
@@ -296,6 +296,13 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     D = { cm, pins, carry, tickets, tcom, mails, files, audit: audit.filter(a => a.detail?.status && a.detail?.task_code) };
     if (!keep) thread.dataset.drawn = '';
     draw();
+  }
+  function showMail(m) {
+    modal(m.subject, h('div', { class: 'wt-mailv' },
+      h('div', { class: 'small muted' }, `Od: RKDP | Kancelaria <kancelaria@rkdp.pl> · wysłał(a): ${who(m.sent_by)}`), h('div', { class: 'small muted' }, `Do: ${m.email} · ${dt(m.sent_at)}`),
+      m.status === 'blad' ? h('p', { class: 'esf-err' }, 'Nie udało się wysłać: ' + (m.error || '')) : null,
+      m.body ? h('pre', { class: 'wt-mailbody' }, m.body) : h('p', { class: 'hint' }, 'Treść nie została zapisana – wiadomość wysłana przed włączeniem kopii w aplikacji.')),
+    c => [h('button', { class: 'btn btn-primary', onclick: c }, 'Zamknij')], { wide: true });
   }
   async function go(p, f = null) { per = p; focus = f; searching = false; searchIn.hidden = true; await reload(); }
   async function delFile(f) {
@@ -353,7 +360,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       ...cm.map(c => ({ t: c.created_at, per: c.period, k: c.parent_id ? 'odpowiedź' : c.kind, who: who(c.author), txt: c.deleted_at ? `[wpis usunięty ${dt(c.deleted_at)}${c.deleted_by ? ' przez ' + who(c.deleted_by) : ''}] ${c.body}` : c.body + (c.edited_at ? ` (edytowano ${dt(c.edited_at)})` : '') + (c.resolved_at ? ' ✓ wyjaśnione' : '') })),
       ...tk.map(t => ({ t: t.created_at, per: t.period || t.created_at.slice(0, 7) + '-01', k: `zadanie #${t.no}`, who: who(t.created_by), txt: `${t.title}${t.description ? ' – ' + t.description : ''} → ${t.assignee_id ? who(t.assignee_id) : 'nieprzypisane'}${t.due_date ? ', termin ' + t.due_date : ''} · status: ${TK_STATUS[t.status]}` })),
       ...tc.map(c => ({ t: c.created_at, per: tk.find(t => t.id === c.ticket_id)?.period || c.created_at.slice(0, 7) + '-01', k: `zadanie #${tk.find(t => t.id === c.ticket_id)?.no} · ${c.kind}`, who: who(c.author_id), txt: c.body })),
-      ...ml.map(m => ({ t: m.sent_at, per: m.period || m.sent_at.slice(0, 7) + '-01', k: 'e-mail', who: who(m.sent_by), txt: `${m.subject} → ${m.email}${m.status === 'blad' ? ' (błąd wysyłki)' : ''}` })),
+      ...ml.map(m => ({ t: m.sent_at, per: m.period || m.sent_at.slice(0, 7) + '-01', k: 'e-mail', who: who(m.sent_by), txt: `${m.subject} → ${m.email}${m.status === 'blad' ? ' (błąd wysyłki)' : ''}${m.body ? '\n\n' + m.body : ''}` })),
       ...fl.map(f => ({ t: f.created_at, per: f.period, k: 'załącznik', who: f.source === 'klient' ? 'klient (link)' : who(f.uploaded_by), txt: f.name })),
       ...au.filter(x => x.detail?.status).map(x => ({ t: x.at, per: x.period, k: 'kratka', who: whoEmail(x.actor), txt: `${taskLabel(x.detail.task_code)}: ${STATUS[x.detail.status?.z]?.label || '—'} → ${STATUS[x.detail.status?.na]?.label || '—'}` })),
     ].sort((x, y) => x.t.localeCompare(y.t));

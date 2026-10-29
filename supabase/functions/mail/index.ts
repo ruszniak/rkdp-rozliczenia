@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
       try {
         await sendMail(cfg, fromName, to, subject, text, html);
         results.push({ client_id: c.id, ok: true, email: to });
-        await admin.from('client_messages').insert({ client_id: c.id, kind, period: period ? period + '-01' : null, email: to, subject, status: 'wyslano', sent_by: memberId });
+        await admin.from('client_messages').insert({ client_id: c.id, kind, period: period ? period + '-01' : null, email: to, subject, body: text, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
         if (body.mark_missing && period && MARK[kind]) await admin.from('checklist_entries').update({ status: 'reminded' })
           .eq('client_id', c.id).eq('period', period + '-01').in('task_code', MARK[kind]).in('status', ['todo', 'in_progress', 'missing_docs']);
       } catch (e) {
