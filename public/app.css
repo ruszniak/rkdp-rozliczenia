@@ -1711,3 +1711,5 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 .rz-bulk .grow{flex:1}
 .rz-bulk .btn-outline{border-color:rgba(207,174,134,.55);color:#E6DED2}
 .rz-bulk .btn-primary{background:#CFAE86;color:#1D1A16}
+.of-linkinfo{margin:6px 0 0;text-align:center}
+.of-linkinfo:empty{display:none}

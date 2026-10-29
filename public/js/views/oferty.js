@@ -194,6 +194,24 @@ async function renderEditor(main, id, brand) {
     numEl.textContent = row.number;
     return true;
   }
+  // link do oferty (podgląd bez logowania) + informacja, czy klient ją otworzył
+  const linkInfo = h('p', { class: 'small muted of-linkinfo' });
+  async function loadLinkInfo() {
+    if (!row) return;
+    const { data } = await sb.from('shared_docs').select('views,last_view_at,revoked_at').eq('ref_id', row.id);
+    const act = (data || []).filter(x => !x.revoked_at), v = act.reduce((a, x) => a + (x.views || 0), 0);
+    const last = act.map(x => x.last_view_at).filter(Boolean).sort().pop();
+    linkInfo.textContent = !act.length ? '' : v ? `Klient otworzył ofertę ${v} ${v === 1 ? 'raz' : 'razy'} · ostatnio ${new Date(last).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'Link utworzony – oferta jeszcze nieotwarta';
+  }
+  async function shareOffer() {
+    if (dirty || !row) { if (!(await save())) return; }
+    const { shareDialog } = await import('../udostepnij.js');
+    shareDialog({ kind: 'oferta', brand, title: `Oferta ${row.number}`, refId: row.id, label: o.client.name || '', validDays: '', onCreate: async () => {
+      loadLinkInfo();
+      if (status === 'projekt') { status = 'wyslana'; statusSel.value = status; await sb.from('offers').update({ status }).eq('id', row.id); }
+    } });
+  }
+  loadLinkInfo();
   async function pdf() {
     if (dirty || !row) { if (!(await save())) return; }
     printHtml(offerHtml(o, brand, { number: row.number }));
@@ -220,9 +238,12 @@ async function renderEditor(main, id, brand) {
         h('img', { src: B.logo, alt: B.short, class: 'of-logo' }),
         estBox,
         h('button', { class: 'btn btn-primary', style: { width: '100%' }, onclick: () => pdf().catch(e => fail(e)) }, icon('download'), 'Podgląd / PDF'),
+        h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => shareOffer().catch(e => fail(e)), 'data-tip': 'Link do oferty dla klienta – podgląd bez logowania, zawsze aktualna wersja, z licznikiem otwarć' }, '🔗 Link do oferty'),
+        linkInfo,
         h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => save().then(ok => ok && toast('Zapisano ofertę')) }, 'Zapisz'),
         h('p', { class: 'hint', style: { marginTop: '10px' } }, 'W oknie drukowania wybierz „Zapisz jako PDF”. Okładka i tło drukują się w kolorze.')))),
     h('div', { class: 'savebar' }, info,
+      h('button', { class: 'btn btn-outline', onclick: () => shareOffer().catch(e => fail(e)) }, '🔗 Link'),
       h('button', { class: 'btn btn-outline', onclick: () => save().then(ok => ok && toast('Zapisano ofertę')) }, 'Zapisz'),
       h('button', { class: 'btn btn-primary', onclick: () => pdf().catch(e => fail(e)) }, icon('download'), 'PDF')));
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
