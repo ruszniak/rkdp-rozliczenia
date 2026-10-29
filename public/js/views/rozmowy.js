@@ -26,7 +26,49 @@ export async function renderRozmowy(main, params) {
   const list = h('div', { class: 'rz-list' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const search = h('input', { class: 'input', type: 'search', placeholder: 'Szukaj klienta…' });
   search.addEventListener('input', () => { q = search.value.trim().toLowerCase(); draw(); });
-  let showDone = false;
+  let showDone = false, shown = [];
+  const sel = new Set();
+  // pasek zbiorczych akcji (pojawia się po zaznaczeniu klientów)
+  const bulk = h('div', { class: 'rz-bulk', hidden: true });
+  function drawBulk() {
+    bulk.hidden = !sel.size;
+    if (!sel.size) return;
+    bulk.replaceChildren(h('b', {}, `Zaznaczono: ${sel.size}`),
+      h('button', { type: 'button', class: 'chat-a', onclick: () => { shown.forEach(r => sel.add(r.c.id)); draw(); } }, `zaznacz wszystkich widocznych (${shown.length})`),
+      h('button', { type: 'button', class: 'chat-a', onclick: () => { sel.clear(); draw(); } }, 'odznacz'),
+      h('span', { class: 'grow' }),
+      h('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: () => markRead([...sel]) }, 'Oznacz jako przeczytane'),
+      h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => closeDialog([...sel]) }, '✓ Zamknij rozmowy'));
+  }
+  async function markRead(ids, quiet) {
+    const at = new Date().toISOString();
+    const { error } = await sb.from('thread_reads').upsert(ids.map(id => ({ member_id: me, client_id: id, read_at: at })), { onConflict: 'member_id,client_id' });
+    if (error) return fail(error);
+    if (!quiet) { toast(`Oznaczono jako przeczytane: ${ids.length}`); sel.clear(); }
+    import('../watek.js').then(m => m.refreshUnread?.()).catch(() => {});
+    if (!quiet) await load();
+  }
+  function closeDialog(ids) {
+    const rows = shown.filter(r => ids.includes(r.c.id));
+    const nU = rows.reduce((a, r) => a + r.x.u, 0), nQ = rows.reduce((a, r) => a + r.x.q, 0), nT = rows.reduce((a, r) => a + r.x.openT.length, 0);
+    const tasksCb = h('input', { type: 'checkbox', checked: false });
+    modal(`Zamknąć rozmowy (${ids.length})?`, h('div', {},
+      h('p', { style: { marginTop: 0 } }, `U zaznaczonych klientów zostaną oznaczone jako załatwione: uwagi do zrobienia (${nU}) i otwarte pytania (${nQ}). Rozmowy zostaną też oznaczone jako przeczytane i znikną z listy.`),
+      nT ? h('label', { class: 'check' }, tasksCb, `Zamknij też otwarte zadania (${nT}) – status „Zrobione”`) : null,
+      h('p', { class: 'hint' }, 'Wpisy zostają w historii (przekreślone) – w każdej chwili można je otworzyć ponownie w rozmowie.')),
+    c => [h('button', { class: 'btn btn-ghost', onclick: c }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async e => {
+      e.currentTarget.disabled = true;
+      const at = new Date().toISOString();
+      const { error } = await sb.from('period_comments').update({ resolved_at: at }).in('client_id', ids).is('resolved_at', null).is('deleted_at', null).is('parent_id', null);
+      if (error) { c(); return fail(error); }
+      if (nT && tasksCb.checked) {
+        const { error: e2 } = await sb.from('rkdp_tickets').update({ status: 'zrobione' }).in('client_id', ids).eq('module', 'rkdp').in('status', TK_OPEN);
+        if (e2) { c(); return fail(e2); }
+      }
+      await markRead(ids, true);
+      c(); sel.clear(); toast(`Zamknięto rozmowy: ${ids.length}`); await load();
+    } }, '✓ Zamknij')]);
+  }
   const mineCb = h('input', { type: 'checkbox', checked: mine });
   mineCb.addEventListener('change', () => { mine = mineCb.checked; draw(); });
   let D = null;
@@ -40,6 +82,7 @@ export async function renderRozmowy(main, params) {
         h('a', { class: 'btn btn-ghost btn-sm', href: '#/zgloszenia/cykliczne' }, 'Zadania cykliczne'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: () => newTask() }, icon('plus'), 'Nowe zadanie'))),
     h('div', { class: 'rz-bar' }, search, h('label', { class: 'check' }, mineCb, 'Tylko moi klienci (księgowa / kadry) i moje zadania')),
+    bulk,
     list);
 
   let recurringDone = false;
@@ -98,17 +141,22 @@ export async function renderRozmowy(main, params) {
     if (filter === 'nieprzeczytane') rows = rows.filter(r => r.u);
     else if (filter === 'pytania') rows = rows.filter(r => r.x.q);
     if (mine && filter !== 'nieprzeczytane') rows = rows.filter(r => isMine(r.c) || r.x.openT.some(t => t.assignee_id === me || t.created_by === me));
-    rows = rows.filter(r => cMatch(r.c)).sort((a, b) => (b.u ? 1 : 0) - (a.u ? 1 : 0) || (b.x.last?.at || '').localeCompare(a.x.last?.at || ''));
+    shown = rows = rows.filter(r => cMatch(r.c)).sort((a, b) => (b.u ? 1 : 0) - (a.u ? 1 : 0) || (b.x.last?.at || '').localeCompare(a.x.last?.at || ''));
     const internal = tickets.filter(t => !t.client_id && TK_OPEN.includes(t.status) && (!mine || t.assignee_id === me || t.created_by === me));
     list.replaceChildren(...[
       ...(rows.length ? rows.slice(0, 200).map(clientRow) : [h('p', { class: 'hint rz-empty' }, q ? 'Brak klientów pasujących do wyszukiwania.' : filter === 'nieprzeczytane' ? 'Wszystko przeczytane. 👍' : 'Wszystko załatwione – nie ma otwartych uwag, pytań ani zadań. 👍')]),
       doneCount ? h('button', { type: 'button', class: 'chat-a rz-donebtn', onclick: () => { showDone = !showDone; draw(); } }, showDone ? 'Ukryj załatwione' : `Pokaż załatwione (${doneCount})`) : null,
       internal.length && filter === 'aktywnosc' ? h('div', { class: 'rz-internal' }, h('h2', {}, `Zadania wewnętrzne – bez klienta (${internal.length})`), ...internal.map(t => taskRow(t, null))) : null].filter(Boolean));
+    drawBulk();
   }
 
   function clientRow({ c, x, u }) {
     const l = x.last;
-    return h('button', { type: 'button', class: 'rz-row' + (u ? ' unread' : ''), onclick: () => openThread({ client: c, period: u ? String(u.period).slice(0, 7) : l?.per || defaultPeriod(), onChange: load, onClose: load }) },
+    const cb = h('input', { type: 'checkbox', checked: sel.has(c.id), 'aria-label': `Zaznacz: ${c.name}` });
+    cb.addEventListener('change', () => { if (cb.checked) sel.add(c.id); else sel.delete(c.id); wrap.classList.toggle('sel', cb.checked); drawBulk(); });
+    const wrap = h('div', { class: 'rz-rowwrap' + (u ? ' unread' : '') + (sel.has(c.id) ? ' sel' : '') }, h('label', { class: 'rz-cb' }, cb), rowBtn());
+    return wrap;
+    function rowBtn() { return h('button', { type: 'button', class: 'rz-row' + (u ? ' unread' : ''), onclick: () => openThread({ client: c, period: u ? String(u.period).slice(0, 7) : l?.per || defaultPeriod(), onChange: load, onClose: load }) },
       h('span', { class: 'av rz-av' }, initials(c.name)),
       h('span', { class: 'rz-main' },
         h('span', { class: 'rz-top' }, h('b', { class: 'rz-name' }, c.name), l ? h('span', { class: 'small muted' }, ago(l.at)) : null),
@@ -121,6 +169,7 @@ export async function renderRozmowy(main, params) {
           x.q ? h('span', { class: 'rz-b q' }, `${x.q} ${x.q === 1 ? 'pytanie' : 'pytania'}`) : null,
           x.u ? h('span', { class: 'rz-b' }, `${x.u} ${x.u === 1 ? 'uwaga' : x.u < 5 ? 'uwagi' : 'uwag'} do zrobienia`) : null,
           !x.q && !x.u && !x.openT.length && !u ? h('span', { class: 'rz-b ok' }, '✓ wszystko załatwione') : null)));
+  }
   }
   function taskRow(t, c) {
     const late = t.due_date && t.due_date < today();
