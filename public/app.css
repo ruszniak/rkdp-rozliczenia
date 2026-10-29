@@ -1587,3 +1587,7 @@ th.sortable{cursor:pointer;user-select:none}th.sortable.on{color:var(--ink)}th.s
 .wt-mail{border:0;font:inherit;cursor:pointer;text-align:left;color:inherit}
 .wt-mail:hover{background:color-mix(in srgb,var(--gold) 22%,transparent)}
 .wt-mailbody{white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.55;background:var(--soft,#F7F3EC);border-radius:10px;padding:14px 16px;margin-top:10px;max-height:60vh;overflow:auto}
+/* warstwy: okna (modal) i menu nad szufladą rozmowy klienta */
+.modal-back{z-index:75}
+.pop{z-index:76}
+.toast{z-index:90}
