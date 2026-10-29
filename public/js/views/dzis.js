@@ -145,7 +145,7 @@ export async function renderDzis(box, D) {
           : [h('p', { class: 'hint' }, 'Nie masz otwartych zgłoszeń.')])),
       sec('Terminy w 7 dni', h('a', { class: 'small', href: '#/terminy?kto=moi' }, 'Kalendarz →'),
         ...(obl7.length ? groupObl(obl7) : [h('p', { class: 'hint' }, 'Brak niezrobionych terminów u Twoich klientów w najbliższym tygodniu.')])),
-      myM2.length ? sec('Terminy spraw M2', h('a', { class: 'small', href: '#/doradztwo/kalendarz' }, 'Kalendarz M2 →'),
+      myM2.length ? sec('Terminy spraw M2', h('a', { class: 'small', href: '#/doradztwo' }, 'Pulpit M2 →'),
         ...myM2.map(d => h('a', { class: 'tk-mini', href: `#/doradztwo/sprawa/${d.matter_id}` }, h('span', {}, d.title), h('b', { class: d.due_date < today ? 'late-t' : '' }, fmtShort(d.due_date))))) : null,
       missing.length ? sec(`Braki dokumentów (${missing.length})`, null, ...missing.map(c => {
         const r = reqs.filter(x => x.client_id === c.id && !x.closed_at).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];

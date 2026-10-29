@@ -17,7 +17,7 @@ export function cacheableRoute(hash = location.hash) {
   const p = path.split('/').filter(Boolean);
   if (p.length === 0) return true;
   if (p.length === 1) return ['pulpit', 'rozliczenia', 'klienci', 'zgloszenia', 'dokumenty', 'doradztwo'].includes(p[0]);
-  return p.length === 2 && p[0] === 'doradztwo' && ['sprawy', 'klienci', 'kalendarz', 'zlecenia', 'zgloszenia', 'dokumenty'].includes(p[1]);
+  return p.length === 2 && p[0] === 'doradztwo' && ['sprawy', 'klienci', 'zlecenia', 'zgloszenia', 'dokumenty'].includes(p[1]);
 }
 // trasy, które po wykryciu zmian w bazie można przerysować bez ryzyka utraty wpisywanych danych
 export function autoRefreshRoute(hash = location.hash) {

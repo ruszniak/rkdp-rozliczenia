@@ -88,17 +88,9 @@ async function loadSettings() {
   return Object.fromEntries((data || []).map(r => [r.key, r.value]));
 }
 
-// ---------- Kalendarz Google: terminy z aplikacji trafiają do kalendarza M2 TAX ----------
-export function gcalSync(ids) {
-  if (!ids?.length) return;
-  sb.functions.invoke('gcal', { body: { action: 'sync', ids } }).then(({ data }) => {
-    if (data?.errors?.length) toast('Kalendarz Google: ' + data.errors[0], true);
-  }).catch(() => { /* kalendarz niepodłączony – bez komunikatu */ });
-}
-export function gcalDelete(ids) {
-  if (!ids?.length) return Promise.resolve();
-  return sb.functions.invoke('gcal', { body: { action: 'delete', ids } }).catch(() => {});
-}
+// Kalendarz Google M2 TAX wyłączony (rezygnacja z integracji) – funkcje zostają jako puste, żeby nie zmieniać miejsc wywołań.
+export function gcalSync() {}
+export function gcalDelete() { return Promise.resolve(); }
 
 // ---------- dodawanie terminu (z kalkulatorem) ----------
 export function deadlineDialog({ matter = null, clientId = null, date = null, onSaved }) {
@@ -230,10 +222,11 @@ async function newMatterDialog({ clientId = null } = {}) {
 
 // ================= PULPIT =================
 async function viewDashboard(main) {
-  const [matters, deadlines, orders] = await Promise.all([
+  const [matters, deadlines, orders, settings] = await Promise.all([
     fetchAll(() => sb.from('m2_matters').select('id,number,title,status,lead_id,second_id,assistant_id,client_id,m2_clients(name)').order('opened_at', { ascending: false })),
     fetchAll(() => sb.from('m2_deadlines').select('*').eq('done', false).lte('due_date', addDaysIso(30)).order('due_date')),
     fetchAll(() => sb.from('m2_orders').select('id,status')),
+    loadSettings(),
   ]);
   const mm = new Map(matters.map(m => [m.id, m]));
   const open = matters.filter(m => OPEN_STATUSES.includes(m.status));
@@ -252,13 +245,13 @@ async function viewDashboard(main) {
     [h('button', { class: 'btn btn-outline btn-sm', onclick: () => newMatterDialog() }, icon('plus'), 'Nowa sprawa'),
       h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewDashboard(main) }) }, icon('plus'), 'Nowy termin')]),
   h('div', { class: 'tiles' },
-    tile(late.length, 'Terminy po czasie', `${BASE}/kalendarz`, late.length > 0),
-    tile(week.length, 'Terminy w 7 dni', `${BASE}/kalendarz`),
+    tile(late.length, 'Terminy po czasie', `${BASE}/sprawy`, late.length > 0),
+    tile(week.length, 'Terminy w 7 dni', `${BASE}/sprawy`),
     tile(open.length, 'Otwarte sprawy', `${BASE}/sprawy`),
     tile(orders.filter(o => o.status === 'projekt' || o.status === 'wyslane').length, 'Zlecenia i umowy niepodpisane', `${BASE}/zlecenia`)),
   h('div', { class: 'two' },
     h('div', {}, h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list),
-    h('div', {}, obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'), h('div', { class: 'table-title' }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
+    h('div', {}, meetingsCard(settings), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'), h('div', { class: 'table-title' }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
       h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
         h('div', {}, h('b', {}, m.number), ' ', m.title, h('div', { class: 'small muted' }, m.m2_clients?.name || '')), statusPill(m.status)))
         : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')])))));
@@ -627,130 +620,19 @@ async function viewClient(main, id) {
     h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
-// ================= KALENDARZ =================
-async function viewCalendar(main, params) {
-  const now = new Date();
-  const ym = /^\d{4}-\d{2}$/.test(params.get('m') || '') ? params.get('m') : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const [y, mo] = ym.split('-').map(Number);
-  const first = new Date(y, mo - 1, 1), last = new Date(y, mo, 0);
-  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const start = new Date(first); start.setDate(first.getDate() - ((first.getDay() + 6) % 7));
-  const end = new Date(last); end.setDate(last.getDate() + (6 - ((last.getDay() + 6) % 7)));
-  const today0 = todayIso(), agTo = addDaysIso(13);
-  const gFrom = iso(start) < today0 ? iso(start) : today0, gTo = iso(end) > agTo ? iso(end) : agTo;
-  // wszystko równolegle; Kalendarz Google z limitem czasu, żeby nie blokował widoku
-  const gReq = Promise.race([
-    sb.functions.invoke('gcal', { body: { action: 'list', from: gFrom, to: gTo } }),
-    new Promise(r => setTimeout(() => r({ error: new Error('Kalendarz Google nie odpowiada – spróbuj odświeżyć za chwilę.') }), 8000)),
-  ]).catch(e => ({ error: e }));
-  const [deadlines, matters, settings, agDl, lateDl, gRes] = await Promise.all([
-    fetchAll(() => sb.from('m2_deadlines').select('*').gte('due_date', iso(start)).lte('due_date', iso(end)).order('due_date')),
-    fetchAll(() => sb.from('m2_matters').select('id,number,title')),
-    loadSettings(),
-    fetchAll(() => sb.from('m2_deadlines').select('*').gte('due_date', today0).lte('due_date', agTo).order('due_date')),
-    fetchAll(() => sb.from('m2_deadlines').select('*').eq('done', false).lt('due_date', today0).order('due_date')),
-    gReq,
-  ]);
-  const mm = new Map(matters.map(m => [m.id, m]));
-  const byDay = new Map(); deadlines.forEach(d => { if (!byDay.has(d.due_date)) byDay.set(d.due_date, []); byDay.get(d.due_date).push(d); });
-  // wydarzenia z Kalendarza Google M2 TAX (spotkania, Zoho itd.) – bez terminów, które aplikacja sama tam wysłała
-  const gByDay = new Map();
-  let gInfo = null, gEvents = [];
-  try {
-    const { data: gl, error: ge } = gRes || {};
-    if (ge) throw ge;
-    if (gl?.configured === false) gInfo = { off: true, reason: gl.reason };
-    else if (gl?.error) gInfo = { error: gl.error };
-    else (gEvents = gl?.events || []).forEach(e => {
-      const s0 = new Date(e.allDay ? e.start + 'T00:00:00' : e.start), e0 = new Date(e.allDay ? e.end + 'T00:00:00' : e.end);
-      if (e.allDay) e0.setDate(e0.getDate() - 1);
-      for (let d = new Date(s0.getFullYear(), s0.getMonth(), s0.getDate()); d <= e0; d.setDate(d.getDate() + 1)) {
-        const k = iso(d); if (!gByDay.has(k)) gByDay.set(k, []); gByDay.get(k).push(e);
-        if (!e.allDay) break;
-      }
-    });
-  } catch (e) { gInfo = { error: e.message || String(e) }; }
-  const gTime = e => e.allDay ? '' : new Date(e.start).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) + ' ';
-  const shift = (n) => { const d = new Date(y, mo - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-  const today = todayIso();
-  const grid = h('div', { class: 'cal' }, ...['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'].map(d => h('div', { class: 'cal-h' }, d)));
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const key = iso(d);
-    const items = byDay.get(key) || [];
-    grid.append(h('div', { class: 'cal-d' + (d.getMonth() !== mo - 1 ? ' out' : '') + (key === today ? ' today' : '') + (d.getDay() % 6 === 0 ? ' we' : ''),
-      ondblclick: () => deadlineDialog({ date: key, onSaved: () => viewCalendar(main, params) }) },
-    h('div', { class: 'cal-n' }, d.getDate()),
-    ...items.map(it => {
-      const k = DEADLINE_KIND[it.kind] || DEADLINE_KIND.wewnetrzny;
-      const m = it.matter_id ? mm.get(it.matter_id) : null;
-      return h(m ? 'a' : 'span', { class: 'cal-chip' + (it.done ? ' done' : ''), href: m ? `${BASE}/sprawa/${m.id}` : null,
-        style: { borderLeftColor: k.color }, 'data-tip': `${k.label}: ${it.title}${m ? `\n${m.number} · ${m.title}` : ''}${it.assignee_id ? `\nOdpowiada: ${who(it.assignee_id)}` : ''}` },
-      (it.due_time ? it.due_time.slice(0, 5) + ' ' : '') + it.title);
-    }),
-    ...(gByDay.get(key) || []).map(e => h('a', { class: 'cal-chip g', href: e.link || null, target: '_blank', rel: 'noopener',
-      'data-tip': `Kalendarz Google: ${gTime(e)}${e.title}${e.location ? `\n${e.location}` : ''}` }, gTime(e) + e.title))));
-  }
-  let gsrc = settings.m2_google_calendar_src || '';
-  const gid = /^https?:/.test(gsrc) ? (new URL(gsrc).searchParams.get('src') || '') : gsrc;
-  const gOpen = gid ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(gid)}` : null;
+// ================= SPOTKANIA Z KLIENTAMI (Zoho Bookings) – karta na pulpicie =================
+function meetingsCard(settings) {
   const zoho = settings.m2_zoho_bookings_url || '';
-
-  // ---- agenda: najbliższe 14 dni (terminy z aplikacji + Kalendarz Google) ----
-  const agG = gInfo ? [] : gEvents;
-  const agenda = new Map();
-  const put = (day, item) => { if (!agenda.has(day)) agenda.set(day, []); agenda.get(day).push(item); };
-  agDl.forEach(d => put(d.due_date, { t: d.due_time ? d.due_time.slice(0, 5) : '', dl: d }));
-  agG.forEach(e => { const day = e.allDay ? e.start : iso(new Date(e.start)); if (day >= today && day <= agTo) put(day, { t: e.allDay ? '' : gTime(e).trim(), g: e }); });
-  const dayName = k => { const d = new Date(k + 'T00:00:00'); const n = Math.round((d - new Date(today + 'T00:00:00')) / 86400000);
-    return (n === 0 ? 'Dziś' : n === 1 ? 'Jutro' : d.toLocaleDateString('pl-PL', { weekday: 'long' })) + ', ' + d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' }); };
-  const agItem = it => {
-    if (it.g) return h('a', { class: 'ag-item g', href: it.g.link || null, target: '_blank', rel: 'noopener' },
-      h('span', { class: 'ag-time' }, it.t || 'cały dzień'), h('span', { class: 'ag-dot', style: { background: '#4285F4' } }),
-      h('span', { class: 'ag-main' }, h('b', {}, it.g.title), h('span', { class: 'small muted' }, ['Kalendarz Google', it.g.location].filter(Boolean).join(' · '))),
-      it.g.meet ? h('span', { class: 'badge' }, 'Meet') : null);
-    const d = it.dl, k = DEADLINE_KIND[d.kind] || DEADLINE_KIND.wewnetrzny, m = d.matter_id ? mmAll.get(d.matter_id) : null;
-    return h(m ? 'a' : 'div', { class: 'ag-item' + (d.done ? ' done' : ''), href: m ? `${BASE}/sprawa/${m.id}` : null },
-      h('span', { class: 'ag-time' }, it.t || '—'), h('span', { class: 'ag-dot', style: { background: k.color } }),
-      h('span', { class: 'ag-main' }, h('b', {}, d.title), h('span', { class: 'small muted' }, [k.label, m ? `${m.number} · ${m.title}` : null, d.assignee_id ? who(d.assignee_id) : null].filter(Boolean).join(' · '))),
-      d.done ? h('span', { class: 'badge ok' }, 'wykonany') : null);
-  };
-  const mmAll = new Map(matters.map(m => [m.id, m]));
-  const agendaCard = h('section', { class: 'card section' },
-    h('div', { class: 'section-head' }, h('h2', {}, 'Najbliższe 14 dni'), h('span', { class: 'small muted' }, 'terminy i spotkania')),
-    lateDl.length ? h('div', { class: 'ag-day late' }, h('div', { class: 'ag-date' }, `Zaległe terminy (${lateDl.length})`),
-      ...lateDl.slice(0, 8).map(d => agItem({ t: fmtDate(d.due_date).slice(0, 5), dl: d }))) : null,
-    ...([...agenda.keys()].sort().map(k => h('div', { class: 'ag-day' + (k === today ? ' today' : '') }, h('div', { class: 'ag-date' }, dayName(k)),
-      ...agenda.get(k).sort((a, b) => (a.t || '00:00').localeCompare(b.t || '00:00')).map(agItem)))),
-    !agenda.size && !lateDl.length ? h('p', { class: 'hint' }, 'Brak terminów i spotkań w najbliższych dwóch tygodniach.') : null);
-
-  // ---- spotkania (Zoho Bookings) ----
   const bookDialog = () => uiModal('Umów spotkanie – Zoho Bookings', h('div', {},
-    h('iframe', { class: 'zoho', src: zoho, title: 'Zoho Bookings M2 TAX', loading: 'lazy' }),
-    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Rezerwacja trafi do kalendarza doradcy w Google (gdy Zoho jest połączone z Kalendarzem Google) i pokaże się tutaj na niebiesko.')),
+    h('iframe', { class: 'zoho', src: zoho, title: 'Zoho Bookings M2 TAX', loading: 'lazy' })),
   close => [h('a', { class: 'btn btn-ghost btn-sm', href: zoho, target: '_blank', rel: 'noopener' }, 'Otwórz w nowej karcie'), h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij')], { wide: true });
-  const meetCard = h('section', { class: 'card section meet-card' },
+  return h('section', { class: 'card section meet-card' },
     h('div', { class: 'section-head' }, h('h2', {}, 'Spotkania z klientami')),
     h('p', { class: 'small', style: { marginBottom: '12px' } }, 'Klienci umawiają się sami przez Zoho Bookings (link na stronie m2tax.pl). Spotkanie umówione telefonicznie wpisz tutaj w imieniu klienta.'),
     zoho ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
       h('button', { class: 'btn btn-primary btn-sm', onclick: bookDialog }, icon('plus'), 'Umów spotkanie'),
       h('button', { class: 'btn btn-outline btn-sm', onclick: () => { navigator.clipboard?.writeText(zoho).then(() => toast('Skopiowano link do rezerwacji')); } }, 'Kopiuj link dla klienta'))
-      : h('p', { class: 'hint' }, 'Brak adresu Zoho Bookings – ustaw go w Zespół i ustawienia.'),
-    h('div', { class: 'meet-sep' }),
-    h('p', { class: 'small', style: { marginBottom: '8px' } }, h('b', {}, 'Kalendarz Google M2 TAX')),
-    gInfo ? h('p', { class: 'hint' }, gInfo.off ? `Niepodłączony: ${gInfo.reason || ''} ${isAdmin() ? 'Instrukcja: Zespół i ustawienia → Kalendarz Google.' : ''}` : `Nie udało się pobrać wydarzeń: ${gInfo.error}`)
-      : h('p', { class: 'hint' }, 'Połączony – spotkania i wydarzenia z Google widać na niebiesko, a terminy z aplikacji trafiają do Google automatycznie.'),
-    gOpen ? h('a', { class: 'btn btn-ghost btn-sm', href: gOpen, target: '_blank', rel: 'noopener', style: { marginTop: '6px', paddingLeft: 0 } }, 'Otwórz Kalendarz Google →') : null);
-
-  main.replaceChildren(...header('kalendarz', 'Kalendarz i spotkania', 'Terminy spraw, spotkania z klientami i Kalendarz Google w jednym miejscu. Kliknij dwukrotnie dzień, aby dodać termin.',
-    [h('a', { class: 'icon-btn', href: `${BASE}/kalendarz?m=${shift(-1)}`, 'aria-label': 'Poprzedni miesiąc' }, icon('left')),
-      h('span', { class: 'month' }, h('span', { class: 'label' }, MONTHS[mo - 1][0].toUpperCase() + MONTHS[mo - 1].slice(1) + ' ' + y)),
-      h('a', { class: 'icon-btn', href: `${BASE}/kalendarz?m=${shift(1)}`, 'aria-label': 'Następny miesiąc' }, icon('right')),
-      zoho ? h('button', { class: 'btn btn-outline btn-sm', onclick: bookDialog }, 'Umów spotkanie') : null,
-      h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewCalendar(main, params) }) }, icon('plus'), 'Termin')].filter(Boolean)),
-  h('div', { class: 'legend' }, ...Object.values(DEADLINE_KIND).map(k => h('span', {}, h('span', { class: 'dot', style: { background: k.color } }), k.label)),
-    gInfo ? null : h('span', {}, h('span', { class: 'dot', style: { background: '#4285F4' } }), 'Kalendarz Google (spotkania, Zoho)')),
-  h('div', { class: 'cal-layout' }, h('div', { class: 'cal-wrap' }, grid), h('div', { class: 'cal-side' }, meetCard)),
-  agendaCard);
+      : h('p', { class: 'hint' }, 'Brak adresu Zoho Bookings – ustaw go w Zespół i ustawienia.'));
 }
 
 // ================= ZLECENIA I UMOWY =================
@@ -1237,10 +1119,9 @@ export async function renderM2(main, parts, params) {
   if (sub === 'sprawa') return viewMatter(main, parts[2], params);
   if (sub === 'klienci') return viewClients(main);
   if (sub === 'klient') return viewClient(main, parts[2]);
-  if (sub === 'kalendarz') return viewCalendar(main, params);
   if (sub === 'zlecenia') return viewOrders(main, params);
   if (sub === 'zlecenie') return viewOrder(main, parts[2], params);
-  if (sub === 'spotkania') { history.replaceState(null, '', `${BASE}/kalendarz`); return viewCalendar(main, params); }
+  if (sub === 'kalendarz' || sub === 'spotkania') { history.replaceState(null, '', BASE); return viewDashboard(main); }
   if (sub === 'dokumenty') return renderM2Dokumenty(main, params);
   if (sub === 'aml') return renderAml(main, 'm2');
   if (sub === 'zgloszenia') return renderZgloszenia(main, parts[2], params, 'm2');

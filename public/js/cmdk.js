@@ -83,7 +83,7 @@ function staticItems() {
       { group: 'Akcje', label: 'Nowe zgłoszenie', meta: 'albo: nowe zgłoszenie <klient>', icon: 'bolt', run: async () => { const z = await import('./views/zgloszenia.js'); z.newTicketDialog().catch(fail); } },
       go('Pulpit', '#/pulpit', 'RKDP'), go('Rozliczenia', '#/rozliczenia', 'RKDP'), go('Klienci', '#/klienci', 'RKDP'), go('Zgłoszenia', '#/zgloszenia', 'RKDP'), go('Dokumenty', '#/dokumenty', 'RKDP'),
       tool('Protokół ZZW – zatwierdzenie sprawozdania', '#/sprawozdania/nowy'), tool('Oferta na usługi', '#/oferty/nowa'), tool('Weryfikacja AML', '#/aml'));
-    if (hasModule('doradztwo')) out.push(go('Pulpit M2 TAX', '#/doradztwo', 'M2 TAX'), go('Sprawy', '#/doradztwo/sprawy', 'M2 TAX'), go('Klienci M2 TAX', '#/doradztwo/klienci', 'M2 TAX'), go('Kalendarz', '#/doradztwo/kalendarz', 'M2 TAX'),
+    if (hasModule('doradztwo')) out.push(go('Pulpit M2 TAX', '#/doradztwo', 'M2 TAX'), go('Sprawy', '#/doradztwo/sprawy', 'M2 TAX'), go('Klienci M2 TAX', '#/doradztwo/klienci', 'M2 TAX'),
       go('Dokumenty – wzory pism', '#/doradztwo/dokumenty', 'M2 TAX'), go('Zlecenia i umowy', '#/doradztwo/zlecenia', 'M2 TAX'), go('Zgłoszenia M2 TAX', '#/doradztwo/zgloszenia', 'M2 TAX'));
     out.push(tool('Kalkulator: JDG czy spółka z o.o.?', hasModule('rozliczenia') ? '#/kalkulator' : '#/doradztwo/kalkulator'), tool('Wzory umów i uchwał', hasModule('rozliczenia') ? '#/wzory' : '#/doradztwo/wzory'),
       tool('Podgląd JPK_CIT', hasModule('rozliczenia') ? '#/jpk' : '#/doradztwo/jpk'), go('Lista obecności', '#/obecnosc'), go('Mój profil i powiadomienia', '#/profil'), go('Regulamin', '#/regulamin'));
