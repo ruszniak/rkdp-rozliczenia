@@ -28,10 +28,10 @@ const taskLabel = code => state.taskTypes?.find(t => t.code === code)?.label || 
 const nextMonth = p => shiftPeriod(p, 1) + '-01';
 
 let open = null; // jeden wątek naraz
-export function closeThread() { open?.close(); }
+export function closeThread(mode) { open?.close(mode); }
 
 export async function openThread({ client, period = defaultPeriod(), focus = null, onChange = null }) {
-  closeThread();
+  closeThread('swap');
   if (!client?.name) { const { data } = await sb.from('clients').select('id,name,email,accountant_id,hr_id').eq('id', client.id || client).maybeSingle(); client = data; }
   if (!client) return toast('Nie znaleziono klienta', true);
   const me = state.me.id, admin = state.me.role === 'admin';
@@ -45,7 +45,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   const carryBox = h('div', { class: 'wt-carry-w' });
   const monthLbl = h('b', {});
   const searchIn = h('input', { class: 'input wt-search-in', type: 'search', placeholder: 'Szukaj w całej historii klienta…', hidden: true });
-  const ta = h('textarea', { class: 'chat-input', rows: 1, placeholder: 'Napisz… (@ oznacza osobę)' });
+  const ta = h('textarea', { class: 'chat-input', rows: 1, placeholder: 'Napisz… (@ = osoba)' });
   const sendBtn = h('button', { type: 'button', class: 'chat-send', 'aria-label': 'Wyślij', onclick: () => send() },
     h('span', { html: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>', style: { display: 'inline-flex' } }));
   const kinds = h('div', { class: 'chat-kinds', role: 'group', 'aria-label': 'Rodzaj wpisu' },
@@ -95,13 +95,19 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     drawer.style.top = kb ? vv.offsetTop + 'px' : '';
     drawer.style.height = kb ? vv.height + 'px' : '';
     drawer.style.bottom = kb ? 'auto' : '';
-    if (kb) window.scrollTo(0, 0);
+    if (kb) { window.scrollTo(0, 0); if (!kbWas) thread.scrollTop = thread.scrollHeight; }
+    kbWas = kb;
   };
+  let kbWas = false;
   vv?.addEventListener('resize', fitVV); vv?.addEventListener('scroll', fitVV);
 
   const onKey = e => { if (e.key === 'Escape' && !document.querySelector('.modal-back')) { if (!mentionPop.hidden) { mentionPop.hidden = true; return; } close(); } };
   document.addEventListener('keydown', onKey);
-  const onHash = () => close(); // przejście na inny ekran zamyka rozmowę
+  const onHash = () => close('nav'); // przejście na inny ekran zamyka rozmowę
+  // gest „wstecz” (przesunięcie palcem od lewej krawędzi) / przycisk wstecz zamyka rozmowę zamiast cofać stronę
+  if (history.state?.wt) history.replaceState({ ...history.state, wt: true }, ''); else history.pushState({ ...(history.state || {}), wt: true }, '');
+  const onPop = () => close('pop');
+  window.addEventListener('popstate', onPop);
   window.addEventListener('hashchange', onHash);
   ['dragenter', 'dragover'].forEach(ev => drawer.addEventListener(ev, e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); drawer.classList.add('dropping'); } }));
   drawer.addEventListener('dragleave', e => { if (!drawer.contains(e.relatedTarget)) drawer.classList.remove('dropping'); });
@@ -112,8 +118,10 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     .on('postgres_changes', { event: '*', schema: 'public', table: 'period_comments', filter: `client_id=eq.${client.id}` }, () => { if (!searching) reload(true); })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rkdp_ticket_comments' }, p => { if (D.tickets.some(t => t.id === p.new?.ticket_id)) reload(true); })
     .subscribe();
-  function close() {
+  function close(mode) {
     if (!drawer.isConnected) return;
+    window.removeEventListener('popstate', onPop);
+    if (!mode && history.state?.wt) history.back();
     sb.removeChannel(ch); document.removeEventListener('keydown', onKey); window.removeEventListener('hashchange', onHash); vv?.removeEventListener('resize', fitVV); vv?.removeEventListener('scroll', fitVV); document.documentElement.classList.remove('wt-lock');
     drawer.classList.remove('on'); back.classList.remove('on');
     setTimeout(() => { drawer.remove(); back.remove(); }, 220);
@@ -127,10 +135,12 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   function setKind(k) {
     kind = k; kinds.querySelectorAll('.chat-kind[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === k));
     taskOpts.hidden = k !== 'zadanie' || !!replyTo;
-    ta.placeholder = k === 'zadanie' ? 'Co trzeba zrobić? (pierwsza linia = tytuł zadania)' : k === 'pytanie' ? 'Np. jak ująć leasing? brak pełnomocnictwa…' : 'Napisz… (@ oznacza osobę)';
+    ta.placeholder = k === 'zadanie' ? 'Co trzeba zrobić? (pierwsza linia = tytuł zadania)' : k === 'pytanie' ? 'Np. jak ująć leasing? brak pełnomocnictwa…' : 'Napisz… (@ = osoba)';
     ta.focus();
   }
   const grow = () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'; };
+  // dotknięcie pola pisania: pokaż najnowsze wpisy (po wysunięciu klawiatury)
+  ta.addEventListener('focus', () => { [80, 350].forEach(ms => setTimeout(() => { thread.scrollTop = thread.scrollHeight; }, ms)); });
   ta.addEventListener('input', () => { grow(); mentionSuggest(); });
   ta.addEventListener('keydown', e => {
     if (!mentionPop.hidden && ['ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
