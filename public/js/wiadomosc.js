@@ -157,6 +157,26 @@ export async function openMessage({ clients = [], kind = 'ksef', period = defaul
     if (bad.length) alert('Nie wysłano do:\n' + bad.map(r => `• ${byId.get(r.client_id)?.name || r.client_id}: ${r.error}`).join('\n'));
     close();
   }
+  // wiadomość w nowym oknie Gmaila (wysyłasz ze swojej skrzynki – Gmail doda Twoją stopkę; nadawcę wybierasz w polu „Od”)
+  async function openGmail() {
+    const rows = [...chosen.values()].filter(c => emailOf(c));
+    if (!rows.length) return toast('Dodaj odbiorcę z adresem e-mail', true);
+    const one = rows.length === 1 ? rows[0] : null;
+    let link = '';
+    if (one && st.kind === 'dokumenty' && withLink.checked) {
+      const { data, error } = await sb.from('doc_requests').insert({ client_id: one.id, period: st.period + '-01', items: [{ label: 'Dokumenty wskazane w wiadomości' }], email: emailOf(one), sent_at: new Date().toISOString(), sent_via: 'gmail' }).select('token').single();
+      if (!error) link = uploadLink(data.token);
+    }
+    const fill = t => t.replaceAll('{okres}', periodLabel(st.period).toLowerCase()).replaceAll('{link}', link)
+      .replaceAll(one ? '{klient}' : ' – {klient}', one ? one.name : '').replaceAll('{klient}', one ? one.name : '');
+    const subject = fill(subj.value), text = fill(body.value);
+    const p = new URLSearchParams({ view: 'cm', fs: '1', tf: '1', su: subject, body: text });
+    if (one) p.set('to', emailOf(one)); else p.set('bcc', rows.map(emailOf).join(','));
+    window.open('https://mail.google.com/mail/?' + p.toString(), '_blank', 'noopener');
+    // ślad w historii klienta: wiadomość przygotowana do wysłania z Gmaila
+    await sb.from('client_messages').insert(rows.map(c => ({ client_id: c.id, kind: st.kind, period: st.period + '-01', email: emailOf(c), subject: one ? subject : fill(subj.value), body: text, sender_name: me.full_name, status: 'gmail', sent_by: me.id })));
+    toast(rows.length > 1 ? `Otwarto Gmaila – ${rows.length} adresatów w UDW (bez nazwy klienta w treści)` : 'Otwarto wiadomość w Gmailu – sprawdź nadawcę w polu „Od” i wyślij');
+  }
   // poczta biura jeszcze nieskonfigurowana – instrukcja i wysyłka z programu pocztowego (UDW, bez ujawniania adresów)
   function notConfigured(rows, detail) {
     const txt = body.value.replaceAll('{okres}', periodLabel(st.period)).replaceAll('{klient}', '').replaceAll('{link}', '') + `\n\n${me.full_name}${me.job_title ? '\n' + me.job_title : ''}\nRKDP spółka doradztwa podatkowego sp. z o.o.\nkancelaria@rkdp.pl`;
@@ -182,7 +202,10 @@ export async function openMessage({ clients = [], kind = 'ksef', period = defaul
       h('div', {},
         h('label', { class: 'lbl-sm' }, 'Temat'), subj,
         h('label', { class: 'lbl-sm' }, 'Treść'), body, sig, markLbl, linkLbl))),
-  close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), (sendBtn.onclick = () => send(close), sendBtn)], { wide: true });
+  close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'),
+    h('button', { class: 'btn btn-outline', 'data-tip': 'Otwiera gotową wiadomość w nowym oknie Gmaila – możesz ją jeszcze zmienić, dodać załącznik i wysłać ze swojej skrzynki', onclick: () => openGmail() },
+      h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>', style: { display: 'inline-flex' } }), 'Otwórz w Gmailu'),
+    (sendBtn.onclick = () => send(close), sendBtn)], { wide: true });
   drawList();
   loadPeriod();
 }
