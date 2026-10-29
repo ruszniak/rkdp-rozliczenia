@@ -6,6 +6,7 @@
 //  • { action: 'send', kind, period, subject, body, client_ids[], mark_missing?, links? } – {klient}, {okres}, {link} w temacie i treści
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6.9.16';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -47,7 +48,18 @@ async function gmailToken(sub: string) {
   tok = { v: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000, sub };
   return tok.v;
 }
+// Sposób 1 (prostszy): SMTP Gmaila z hasłem aplikacji – sekrety SMTP_USER (konto, np. michal@ruszniak.io) i SMTP_PASS
+// (hasło aplikacji Google). Nadawca = alias z „Wyślij jako” (kancelaria@rkdp.pl). Port 465 (TLS).
+// Sposób 2: Gmail API przez konto usługi z delegacją domeny (GOOGLE_SERVICE_ACCOUNT + zakres gmail.send).
+const SMTP_USER = (Deno.env.get('SMTP_USER') || '').trim(), SMTP_PASS = (Deno.env.get('SMTP_PASS') || '').replace(/\s+/g, '');
+let smtp: any = null;
+const smtpOn = () => !!(SMTP_USER && SMTP_PASS);
+const transport = () => smtp || (smtp = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: SMTP_USER, pass: SMTP_PASS } }));
 async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string) {
+  if (smtpOn()) {
+    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, subject, text }); return; }
+    catch (e) { const m = String((e as Error).message || e); if (/Invalid login|Username and Password|535|534/i.test(m)) throw new Error('not_authorized: SMTP – nieprawidłowe hasło aplikacji (' + m.slice(0, 120) + ')'); throw e; }
+  }
   const token = await gmailToken(cfg.sub);
   const mime = [`From: ${encWord(fromName)} <${cfg.from}>`, `Reply-To: ${cfg.from}`, `To: ${to}`, `Subject: ${encWord(subject)}`, 'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', b64(text).replace(/(.{76})/g, '$1\r\n')].join('\r\n');
@@ -77,6 +89,10 @@ Deno.serve(async (req: Request) => {
 
     if (body.action === 'status') {
       if (!cfg.sub || !cfg.from) return json({ ready: false, reason: 'Brak ustawienia nadawcy.' , from: cfg.from });
+      if (smtpOn()) {
+        try { await transport().verify(); return json({ ready: true, from: cfg.from, via: 'smtp' }); }
+        catch (e) { return json({ ready: false, from: cfg.from, via: 'smtp', reason: 'SMTP: ' + String((e as Error).message || e).slice(0, 200) }); }
+      }
       try { await gmailToken(cfg.sub); return json({ ready: true, from: cfg.from }); }
       catch (e) { return json({ ready: false, from: cfg.from, reason: String((e as Error).message) }); }
     }

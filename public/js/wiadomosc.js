@@ -168,11 +168,11 @@ export async function openMessage({ clients = [], kind = 'ksef', period = defaul
     const txt = body.value.replaceAll('{okres}', periodLabel(st.period)).replaceAll('{klient}', '').replaceAll('{link}', '') + `\n\n${me.full_name}${me.job_title ? '\n' + me.job_title : ''}\nRKDP spółka doradztwa podatkowego sp. z o.o.\nkancelaria@rkdp.pl`;
     const href = `mailto:?bcc=${encodeURIComponent(rows.map(emailOf).join(','))}&subject=${encodeURIComponent(subj.value.replaceAll('{okres}', periodLabel(st.period)).replaceAll(' – {klient}', '').replaceAll('{klient}', ''))}&body=${encodeURIComponent(txt)}`;
     modal('Wysyłka z kancelaria@rkdp.pl nie jest jeszcze włączona', h('div', {},
-      h('p', {}, 'Aplikacja wysyła pocztę przez Gmail w imieniu konta michal@ruszniak.io z aliasu kancelaria@rkdp.pl. Potrzebna jest jednorazowa zgoda w panelu Google Workspace (administrator):'),
+      h('p', {}, 'Aplikacja wysyła pocztę przez Gmail konta michal@ruszniak.io z adresu kancelaria@rkdp.pl (alias „Wyślij jako” jest już ustawiony). Brakuje tylko hasła aplikacji w Supabase – jednorazowo:'),
       h('ol', { class: 'small' },
-        h('li', {}, 'console.cloud.google.com → projekt z kontem usługi aplikacji → włącz „Gmail API”.'),
-        h('li', {}, 'admin.google.com → Zabezpieczenia → Dostęp i kontrola danych → Ustawienia interfejsu API → Zarządzaj przekazywaniem uprawnień w całej domenie → identyfikator klienta konta usługi + zakres https://www.googleapis.com/auth/gmail.send'),
-        h('li', {}, 'W Gmailu konta michal@ruszniak.io: Ustawienia → Konta → „Wysyłaj pocztę jako” – adres kancelaria@rkdp.pl musi być na liście.')),
+        h('li', {}, 'myaccount.google.com/apppasswords (konto michal@ruszniak.io) → utwórz hasło aplikacji, np. „RKDP aplikacja”.'),
+        h('li', {}, 'supabase.com → projekt → Edge Functions → Secrets: SMTP_USER = michal@ruszniak.io oraz SMTP_PASS = 16-znakowe hasło aplikacji.'),
+        h('li', {}, 'Zespół i ustawienia → „Sprawdź wysyłkę”.')),
       detail ? h('p', { class: 'muted small' }, `Szczegóły: ${detail}`) : null,
       h('p', {}, 'Na razie możesz wysłać jedną wiadomość z własnego programu pocztowego – wszyscy klienci w polu UDW (nie widzą się nawzajem), bez nazwy klienta w treści.')),
     c2 => [h('button', { class: 'btn btn-ghost', onclick: c2 }, 'Zamknij'), h('a', { class: 'btn btn-primary', href, onclick: () => c2() }, 'Otwórz w programie pocztowym')]);

@@ -237,7 +237,7 @@ export async function renderZespol(main) {
   };
   main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
     h('div', { class: 'section-head' }, h('h2', {}, 'Poczta – wiadomości do klientów'), h('button', { class: 'btn btn-outline btn-sm', onclick: mailCheck }, 'Sprawdź wysyłkę')),
-    h('p', { class: 'hint' }, 'Wiadomości z okna „Wiadomość” wychodzą z kancelaria@rkdp.pl (alias konta michal@ruszniak.io) przez Gmail, podpisane przez osobę wysyłającą. Kliknij „Sprawdź wysyłkę” po konfiguracji w Google Workspace.'),
+    h('p', { class: 'hint' }, 'Wiadomości z okna „Wiadomość” wychodzą z kancelaria@rkdp.pl (alias konta michal@ruszniak.io) przez serwer poczty Gmail, podpisane przez osobę wysyłającą. Wymaga sekretów SMTP_USER i SMTP_PASS (hasło aplikacji Google) w Supabase → Edge Functions → Secrets.'),
     mailSt));
 
   // ---------- ustawienia M2 TAX ----------
