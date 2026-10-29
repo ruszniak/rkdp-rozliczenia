@@ -3,7 +3,7 @@ import { h, toast, fail, icon, infoTip, printHtml } from '../ui.js';
 import { sb, state, isAdmin } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { lookupNip, validNip } from '../nip.js';
-import { OFFER_BRANDS, PEOPLE, BOOK_FORMS, offerDefaults, serviceDefaults, offerHtml, autoTitle, autoIntro, monthlyEstimate, money, activeServices } from '../offers/offer.js';
+import { OFFER_BRANDS, PEOPLE, BOOK_FORMS, PARTNER_FEATURES, offerDefaults, serviceDefaults, offerHtml, autoTitle, autoIntro, monthlyEstimate, money, activeServices } from '../offers/offer.js';
 
 const CFG = {
   rkdp: { base: '#/oferty', back: ['#/klienci', '← Klienci'], clientTable: 'clients', clientField: 'client_id', eyebrow: 'RKDP · Oferty' },
@@ -32,7 +32,9 @@ export async function renderOferty(main, id, brand = 'rkdp') {
       h('div', {}, h('p', { class: 'eyebrow' }, C.eyebrow),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Oferty', infoTip(HELP, 'Oferty – instrukcja')),
         h('p', { class: 'sub' }, 'Profesjonalne oferty na doradztwo podatkowe, księgowość i kadry – w PDF, z cennikiem z naszych umów.')),
-      h('a', { class: 'btn btn-primary', href: `${C.base}/nowa` }, icon('plus'), 'Nowa oferta')),
+      h('div', { class: 'row-btns' },
+        brand === 'm2' ? h('a', { class: 'btn btn-outline', href: `${C.base}/nowa?typ=partner` }, icon('plus'), 'Oferta dla biura rachunkowego') : null,
+        h('a', { class: 'btn btn-primary', href: `${C.base}/nowa` }, icon('plus'), 'Nowa oferta'))),
     h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
       h('thead', {}, h('tr', {}, ...['Numer', 'Klient', 'Usługi', 'Data', 'Koszt mies.', 'Status'].map(x => h('th', {}, x)))),
       h('tbody', {}, ...((rows || []).length ? rows.map(r => {
@@ -54,10 +56,11 @@ async function renderEditor(main, id, brand) {
     if (error) throw error;
     row = data;
   }
-  const preClient = !row && new URLSearchParams(location.hash.split('?')[1] || '').get('klient');
+  const qp = new URLSearchParams(location.hash.split('?')[1] || '');
+  const preClient = !row && qp.get('klient');
   let clientId = row ? (row[C.clientField] || '') : (preClient || '');
-  const o = row ? row.params : offerDefaults(brand, clients.find(c => c.id === clientId) || {});
-  for (const k of ['ksiegowosc', 'kadry', 'doradztwo']) if (!o.services[k]) o.services[k] = { ...serviceDefaults(k, brand), on: false };
+  const o = row ? row.params : offerDefaults(brand, clients.find(c => c.id === clientId) || {}, qp.get('typ') || '');
+  for (const k of ['ksiegowosc', 'kadry', 'doradztwo', ...(brand === 'm2' ? ['partner'] : [])]) if (!o.services[k]) o.services[k] = { ...serviceDefaults(k, brand), on: false };
   let status = row?.status || 'projekt';
   let dirty = false;
   const info = h('span', { class: 'small muted' }, row ? `${row.number} · zapisano ${dShort(row.updated_at)}` : 'Nowa oferta – niezapisana');
@@ -119,12 +122,27 @@ async function renderEditor(main, id, brand) {
     return box;
   };
   const svcBox = h('div');
-  const SV = [['doradztwo', 'Doradztwo podatkowe'], ['ksiegowosc', 'Księgowość'], ['kadry', 'Kadry i płace']];
+  const SV = [...(brand === 'm2' ? [['partner', 'Program Partner – doradztwo dla biura rachunkowego']] : []), ['doradztwo', 'Doradztwo podatkowe'], ['ksiegowosc', 'Księgowość'], ['kadry', 'Kadry i płace']];
+  // pakiety Programu Partner: nazwa, cena, opis, cechy (tabela porównawcza w ofercie) i pakiet proponowany
+  const packagesEditor = s => h('div', { class: 'pk-ed' }, ...(s.packages || []).map(pk => {
+    const radio = h('input', { type: 'radio', name: 'pk-chosen', checked: s.chosen === pk.key });
+    radio.addEventListener('change', () => { s.chosen = pk.key; mark(); drawServices(); });
+    return h('div', { class: 'pk-ed-card' + (s.chosen === pk.key ? ' on' : '') },
+      h('label', { class: 'check pk-ed-pick' }, radio, 'Proponujemy ten pakiet'),
+      h('div', { class: 'form-grid' }, inp(pk, 'name', 'Nazwa pakietu'), inp(pk, 'price', 'Cena (zł netto, puste = wycena indywidualna)', { num: true }),
+        inp(pk, 'unit', 'Jednostka'), inp(pk, 'tagline', 'Dla kogo (jedno zdanie)', { wide: true }),
+        ...PARTNER_FEATURES.map(([k, label, type]) => type === 'bool' ? h('div', { class: 'field' }, chk(pk.f, k, label)) : inp(pk.f, k, label))));
+  }));
   function drawServices() {
     svcBox.replaceChildren(...SV.map(([k, label]) => {
       const s = o.services[k];
       const head = h('div', { class: 'section-head' }, h('h2', {}, chk(s, 'on', label, drawServices)));
       if (!s.on) return h('section', { class: 'card section of-off' }, head);
+      if (k === 'partner') return h('section', { class: 'card section' }, head,
+        h('p', { class: 'hint' }, 'Oferta pokaże trzy pakiety obok siebie z tabelą porównawczą; zaznaczony pakiet jest wyróżniony i liczy się do kosztu miesięcznego. W najtańszym pakiecie odpowiedzi są tylko e-mailowe.'),
+        h('div', { class: 'form-grid' }, inp(s, 'scope', 'W każdym pakiecie – każdy punkt w osobnej linii', { area: true, rows: 7 })),
+        h('p', { class: 'field-label', style: { margin: '14px 0 6px' } }, 'Pakiety'), packagesEditor(s),
+        h('p', { class: 'field-label', style: { margin: '14px 0 6px' } }, 'Poza pakietem'), rowsEditor(s.rows));
       const formSel = k === 'ksiegowosc' ? (() => {
         const e = h('select', { class: 'select' }, ...Object.entries(BOOK_FORMS).map(([v, l]) => h('option', { value: v }, l)));
         e.value = s.form || 'kpir';

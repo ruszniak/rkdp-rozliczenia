@@ -1692,3 +1692,8 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 @media (max-width:480px){.wt .wt-qbtn{display:none}.wt .chat-kinds{flex-wrap:nowrap}}
 .rz-b.ok{background:var(--ok-bg);color:var(--ok)}
 .rz-donebtn{display:block;margin:12px 16px}
+/* oferta dla biura rachunkowego – edytor pakietów */
+.pk-ed{display:grid;gap:12px}
+.pk-ed-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
+.pk-ed-card.on{border-color:var(--gold);box-shadow:inset 3px 0 0 var(--bronze)}
+.pk-ed-pick{margin-bottom:8px;font-weight:600}

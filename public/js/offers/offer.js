@@ -50,7 +50,46 @@ const SCOPE_TAX = {
   rkdp: ['bieżące konsultacje z doradcą podatkowym', 'opinie podatkowe dotyczące planowanych transakcji', 'wybór formy opodatkowania i planowanie podatkowe', 'wnioski o interpretacje indywidualne', 'reprezentacja przed urzędem skarbowym i ZUS – czynności sprawdzające i kontrole', 'pisma, wyjaśnienia i odwołania w sprawach podatkowych'],
 };
 
+// ---------------- Program Partner M2 TAX – doradztwo podatkowe dla biur rachunkowych ----------------
+// Cechy porównywane między pakietami (wiersze tabeli w ofercie): [klucz, opis, 'bool' | 'text']
+export const PARTNER_FEATURES = [
+  ['hours', 'Pula godzin doradztwa w miesiącu (dla całego zespołu)', 'text'],
+  ['channels', 'Jak zadajecie pytania', 'text'],
+  ['response', 'Czas odpowiedzi', 'text'],
+  ['direct', 'Bezpośredni kontakt każdej księgowej z doradcą', 'bool'],
+  ['notes', 'Odpowiedź z podstawą prawną – do akt klienta', 'bool'],
+  ['rollover', 'Niewykorzystane godziny przechodzą na kolejny miesiąc', 'bool'],
+  ['training', 'Szkolenia dla zespołu biura', 'text'],
+  ['implement', 'Wsparcie wdrożeń (JPK CIT, KSeF) u klientów biura', 'text'],
+  ['two', 'Stały kontakt z dwoma doradcami podatkowymi', 'bool'],
+  ['discount', 'Rabat na sprawy klientów biura (interpretacje, kontrole, postępowania)', 'text'],
+];
+const PARTNER_WHY = ['Każdą sprawą zajmuje się dwóch doradców podatkowych – zawsze ktoś odbierze.', 'Księgowa nie może być pełnomocnikiem w sporze z urzędem – doradca podatkowy tak. Przejmujemy kontakt z urzędem, biuro dalej prowadzi księgi.', 'Odpowiadamy konkretnie, z podstawą prawną – tak, żeby można było od razu zaksięgować albo odpowiedzieć klientowi.', 'Własne narzędzia: weryfikacja JPK CIT i sprawozdania finansowe do KRS generowane z JPK CIT.', 'Opinia doradcy podatkowego to podkładka dla biura; doradcy mają obowiązkowe ubezpieczenie OC.'];
+// W każdym pakiecie – narzędzia i materiały
+export const PARTNER_COMMON = [
+  'Baza wiedzy M2 TAX – omówienia przepisów, odpowiedzi na najczęstsze pytania biur, komunikaty o zmianach',
+  'Wzory dokumentów – pisma do urzędów, odpowiedzi na wezwania, pełnomocnictwa, uchwały, komunikaty dla klientów biura',
+  'Aplikacja do weryfikacji plików JPK CIT (JPK_KR_PD, JPK_ST_KR) – kontrola struktury, sald, znaczników podatkowych i uzgodnienie z CIT-8, zanim zrobi to urząd',
+  'Automatyczne generowanie sprawozdania finansowego do KRS na podstawie JPK CIT – gotowy plik e-sprawozdania (XML) z podglądem do sprawdzenia przed podpisem',
+  'Działamy jako zaplecze biura – klienci zostają u Państwa, nie przejmujemy ich',
+  'Bez umów na rok – miesięczny okres wypowiedzenia',
+];
+export function partnerPackages() {
+  return [
+    { key: 'baza', name: 'Biuro Baza', tagline: 'Dla biur, którym wystarczą pisemne odpowiedzi doradcy.', price: '249', unit: 'zł netto / mies.',
+      f: { hours: '1 godzina', channels: 'tylko e-mail', response: 'do 2 dni roboczych', direct: true, notes: true, rollover: false, training: '—', implement: '—', two: false, discount: '10%' } },
+    { key: 'partner', name: 'Biuro Partner', tagline: 'Doradca podatkowy pod telefonem dla całego zespołu.', price: '419', unit: 'zł netto / mies.',
+      f: { hours: '2 godziny', channels: 'e-mail, telefon, wideo', response: '1 dzień roboczy', direct: true, notes: true, rollover: true, training: '1 krótkie szkolenie online na kwartał', implement: 'konsultacje wdrożeniowe', two: false, discount: '15%' } },
+    { key: 'plus', name: 'Biuro Plus', tagline: 'Dla większych biur i na czas wdrożeń JPK CIT i KSeF.', price: '790', unit: 'zł netto / mies. (od)',
+      f: { hours: '4 godziny (lub więcej – do ustalenia)', channels: 'e-mail, telefon, wideo, spotkania w biurze', response: 'priorytet – w ten sam dzień roboczy', direct: true, notes: true, rollover: true, training: 'szkolenie zespołu raz w miesiącu (w biurze lub online)', implement: 'plan kont, znaczniki, test plików, pierwsze wysyłki', two: true, discount: '20%' } },
+  ];
+}
+
 export function serviceDefaults(kind, brand, o = {}) {
+  if (kind === 'partner') return { on: true, scope: PARTNER_COMMON.join('\n'), packages: partnerPackages(), chosen: 'partner', rows: [
+    { label: 'Godzina doradztwa ponad pulę pakietu', desc: 'rozliczana co do 15 minut', price: '400', unit: 'zł netto / h', qty: 1, sum: false },
+    { label: 'Sprawy klientów biura: interpretacje, kontrole, postępowania, WSA i NSA', desc: 'wycena po zapoznaniu się ze sprawą – z rabatem z pakietu', price: '', unit: 'wycena indywidualna', qty: 1, sum: false },
+  ] };
   if (kind === 'ksiegowosc') {
     const f = o.form || 'kpir';
     return { on: true, form: f, scope: SCOPE_BOOK[f].join('\n'), rows: [
@@ -75,19 +114,32 @@ export function serviceDefaults(kind, brand, o = {}) {
   return null;
 }
 
-export function offerDefaults(brand, client = {}) {
+export function offerDefaults(brand, client = {}, kind = '') {
   const d = new Date(), valid = new Date(); valid.setDate(d.getDate() + 30);
   const iso = x => x.toISOString().slice(0, 10);
-  const services = brand === 'm2' ? { doradztwo: serviceDefaults('doradztwo', brand) } : { ksiegowosc: serviceDefaults('ksiegowosc', brand), kadry: { ...serviceDefaults('kadry', brand), on: false }, doradztwo: { ...serviceDefaults('doradztwo', brand), on: false } };
+  const partner = brand === 'm2' && kind === 'partner';
+  const services = partner ? { partner: serviceDefaults('partner', brand), doradztwo: { ...serviceDefaults('doradztwo', brand), on: false } }
+    : brand === 'm2' ? { doradztwo: serviceDefaults('doradztwo', brand) } : { ksiegowosc: serviceDefaults('ksiegowosc', brand), kadry: { ...serviceDefaults('kadry', brand), on: false }, doradztwo: { ...serviceDefaults('doradztwo', brand), on: false } };
   return {
     client: { name: client.name || '', nip: client.nip || '', address: client.address || '', person: client.contact_person || '', email: client.email || '' },
     offer_date: iso(d), valid_until: iso(valid),
     title: '', intro: '', greeting: 'Szanowni Państwo,',
     services, extras: [],
-    terms: defaultTerms(brand),
+    terms: partner ? partnerTerms() : defaultTerms(brand),
     signers: OFFER_BRANDS[brand].people.slice(),
     contact_person: '', show_team: true, show_why: true, show_steps: true,
   };
+}
+export function partnerTerms() {
+  return [
+    'Ceny podane są w kwotach netto – doliczamy do nich podatek VAT 23%.',
+    'Abonament płatny miesięcznie z góry, w terminie 7 dni od wystawienia faktury.',
+    'Umowa na czas nieokreślony z miesięcznym okresem wypowiedzenia; pakiet można zmienić od kolejnego miesiąca.',
+    'Czas pracy doradców liczymy w 15-minutowych odcinkach; godziny ponad pulę pakietu rozliczamy według stawki z cennika.',
+    'Dostęp do bazy wiedzy, wzorów dokumentów i aplikacji (weryfikacja JPK CIT, sprawozdania do KRS) otrzymują imienne konta pracowników biura.',
+    'Sprawy klientów biura prowadzone jako pełnomocnik (kontrole, postępowania, interpretacje) wyceniamy osobno, z rabatem z pakietu, na podstawie odrębnej umowy z klientem biura.',
+    'Odpowiedzialność za ewidencję i deklaracje klientów pozostaje po stronie biura; za udzielone porady odpowiadamy my – doradcy mają obowiązkowe ubezpieczenie OC.',
+  ].join('\n');
 }
 export function defaultTerms(brand) {
   return [
@@ -99,22 +151,26 @@ export function defaultTerms(brand) {
   ].join('\n');
 }
 
-const SERVICE_TITLE = { ksiegowosc: 'Księgowość', kadry: 'Kadry i płace', doradztwo: 'Doradztwo podatkowe' };
-const SERVICE_ORDER = ['doradztwo', 'ksiegowosc', 'kadry'];
+const SERVICE_TITLE = { partner: 'Program Partner dla biur rachunkowych', ksiegowosc: 'Księgowość', kadry: 'Kadry i płace', doradztwo: 'Doradztwo podatkowe' };
+const SERVICE_ORDER = ['partner', 'doradztwo', 'ksiegowosc', 'kadry'];
+export const chosenPackage = o => { const s = o.services?.partner; return s?.on ? (s.packages || []).find(p => p.key === s.chosen) || null : null; };
 export const activeServices = o => SERVICE_ORDER.filter(k => o.services?.[k]?.on);
 export function autoTitle(o) {
+  if (o.services?.partner?.on) return 'Doradca podatkowy dla Państwa biura rachunkowego';
   const a = activeServices(o).map(k => SERVICE_TITLE[k].toLowerCase());
   if (!a.length) return 'Oferta współpracy';
   const t = a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' oraz ' + a[a.length - 1];
   return t[0].toUpperCase() + t.slice(1);
 }
 export function autoIntro(o, brand) {
+  if (o.services?.partner?.on) return `Dziękujemy za rozmowę o współpracy w ramach Programu Partner M2 TAX. Państwo prowadzą księgi i są pierwszą linią kontaktu z klientem – my jesteśmy zapleczem doradczym biura: odpowiadamy na trudne pytania podatkowe zespołu, a gdy klient biura dostaje wezwanie albo kontrolę, stajemy za nim jako pełnomocnik.\n\nPoniżej przedstawiamy trzy pakiety do wyboru. W każdym z nich zespół biura ma dostęp do bazy wiedzy, wzorów dokumentów oraz naszych aplikacji: weryfikacji plików JPK CIT i automatycznego przygotowania sprawozdania finansowego do KRS na podstawie JPK CIT. Pakiet można zmienić z miesiąca na miesiąc.`;
   const a = activeServices(o).map(k => SERVICE_TITLE[k].toLowerCase());
   const what = a.length ? (a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' oraz ' + a[a.length - 1]) : 'obsługi Państwa firmy';
   return `Dziękujemy za zainteresowanie współpracą z ${brand === 'm2' ? 'M2 TAX Doradcy Podatkowi' : 'RKDP'}. Z przyjemnością przedstawiamy propozycję w zakresie: ${what}.\n\nW kolejnych częściach znajdą Państwo zakres usług, wynagrodzenie oraz zasady współpracy. Ofertę chętnie dopasujemy do specyfiki Państwa działalności – wystarczy krótka rozmowa.`;
 }
 export function monthlyEstimate(o) {
   let sum = 0, any = false;
+  const pk = chosenPackage(o); if (pk && num(pk.price) !== null) { sum += num(pk.price); any = true; }
   for (const k of activeServices(o)) for (const r of o.services[k].rows || []) if (r.sum && num(r.price) !== null) { sum += num(r.price) * (num(r.qty) || 1); any = true; }
   for (const r of o.extras || []) if (r.sum && num(r.price) !== null) { sum += num(r.price) * (num(r.qty) || 1); any = true; }
   return any ? Math.round(sum * 100) / 100 : null;
@@ -132,7 +188,8 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
   const priceCell = r => num(r.price) === null ? '<span class="tbd">do uzgodnienia</span>' : `<b>${esc(money(r.price))}</b>`;
   const unitCell = r => esc(String(r.unit || '').replace(/^zł netto\s*/, 'netto '));
   const rowHtml = r => `<tr><td><div class="pl">${esc(r.label)}${num(r.qty) > 1 ? ` <span class="qty">× ${esc(r.qty)}</span>` : ''}</div>${r.desc ? `<div class="pd">${esc(r.desc)}</div>` : ''}</td><td class="pr">${priceCell(r)}</td><td class="pu">${unitCell(r)}</td></tr>`;
-  const groups = [...services.map(k => [SERVICE_TITLE[k], o.services[k].rows || []]), ...(o.extras?.length ? [['Dodatkowo', o.extras]] : [])].filter(([, rows]) => rows.some(r => r.label));
+  const groups = [...services.map(k => [k === 'partner' ? 'Poza pakietem' : SERVICE_TITLE[k], o.services[k].rows || []]), ...(o.extras?.length ? [['Dodatkowo', o.extras]] : [])].filter(([, rows]) => rows.some(r => r.label));
+  const P = o.services?.partner?.on ? o.services.partner : null;
   const n2 = i => String(i + 1).padStart(2, '0');
 
   const cover = `
@@ -175,10 +232,25 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
 </section>`;
 
   let sec = 1;
-  const scope = services.length ? `
+  const fv = (pk, k, type) => { const v = pk.f?.[k]; return type === 'bool' ? (v ? `<i class="ok">${ICON_CHECK}</i>` : '<span class="no">—</span>') : esc(v || '—'); };
+  const partnerBlk = P ? `
+<section class="blk">
+  <div class="sec-h"><span class="sec-n">${n2(sec++)}</span><h2>W każdym pakiecie</h2></div>
+  <ul class="checks one">${lines(P.scope).map(x => `<li><i>${ICON_CHECK}</i>${esc(x)}</li>`).join('')}</ul>
+</section>
+<section class="blk">
+  <div class="sec-h"><span class="sec-n">${n2(sec++)}</span><h2>Pakiety dla biura</h2></div>
+  <div class="pk-cards">${(P.packages || []).map(pk => `<div class="pk${pk.key === P.chosen ? ' on' : ''}">${pk.key === P.chosen ? '<div class="pk-badge">Proponujemy</div>' : ''}<h3>${esc(pk.name)}</h3><p>${esc(pk.tagline || '')}</p><div class="pk-price">${num(pk.price) === null ? '<span class="tbd">wycena indywidualna</span>' : `<b>${esc(money(pk.price).replace(',00 zł', ' zł'))}</b>`}<em>${esc(String(pk.unit || '').replace(/^zł\s*/, ''))}</em></div></div>`).join('')}</div>
+  <table class="pk-cmp"><thead><tr><th></th>${(P.packages || []).map(pk => `<th class="${pk.key === P.chosen ? 'on' : ''}">${esc(pk.name)}</th>`).join('')}</tr></thead>
+  <tbody>${PARTNER_FEATURES.map(([k, label, type]) => `<tr><td class="lab">${esc(label)}</td>${(P.packages || []).map(pk => `<td class="${pk.key === P.chosen ? 'on' : ''}">${fv(pk, k, type)}</td>`).join('')}</tr>`).join('')}
+  <tr class="all"><td class="lab">Baza wiedzy, wzory dokumentów, aplikacja JPK CIT i sprawozdania do KRS</td>${(P.packages || []).map(pk => `<td class="${pk.key === P.chosen ? 'on' : ''}"><i class="ok">${ICON_CHECK}</i></td>`).join('')}</tr></tbody></table>
+  <p class="pk-note">Czas pracy liczymy w 15-minutowych odcinkach. W pakiecie Biuro Baza pytania przyjmujemy wyłącznie e-mailem i odpowiadamy na piśmie – bez konsultacji telefonicznych i spotkań online.</p>
+</section>` : '';
+  const scopeKinds = services.filter(k => k !== 'partner');
+  const scope = scopeKinds.length ? `
 <section class="blk">
   <div class="sec-h"><span class="sec-n">${n2(sec++)}</span><h2>Zakres usług</h2></div>
-  ${services.map(k => {
+  ${scopeKinds.map(k => {
     const s = o.services[k];
     const sub = k === 'ksiegowosc' ? BOOK_FORMS[s.form] : '';
     return `<div class="svc"><h3>${esc(SERVICE_TITLE[k])}${sub ? `<span>${esc(sub)}</span>` : ''}</h3><ul class="checks">${lines(s.scope).map(x => `<li><i>${ICON_CHECK}</i>${esc(x)}</li>`).join('')}</ul></div>`;
@@ -202,7 +274,7 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
   const why = o.show_why !== false ? `
 <section class="blk keep">
   <div class="sec-h"><span class="sec-n">${n2(sec++)}</span><h2>Dlaczego ${esc(B.short)}</h2></div>
-  <div class="why">${B.why.map((x, i) => `<div class="why-i"><span>${i + 1}</span><p>${esc(x)}</p></div>`).join('')}</div>
+  <div class="why">${(P ? PARTNER_WHY : B.why).map((x, i) => `<div class="why-i"><span>${i + 1}</span><p>${esc(x)}</p></div>`).join('')}</div>
 </section>` : '';
 
   const steps = o.show_steps !== false ? `
@@ -210,8 +282,8 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
   <div class="sec-h"><span class="sec-n">${n2(sec++)}</span><h2>Jak zaczynamy</h2></div>
   <div class="steps">
     <div class="step"><span>1</span><b>Akceptacja oferty</b><p>Wystarczy odpowiedź e-mailem lub telefon – ustalimy datę rozpoczęcia współpracy.</p></div>
-    <div class="step"><span>2</span><b>Umowa i pełnomocnictwa</b><p>Przygotujemy umowę oraz pełnomocnictwa (UPL-1, ZUS PEL${brandKey === 'm2' ? ', PPS-1' : ''}) do podpisu.</p></div>
-    <div class="step"><span>3</span><b>Start obsługi</b><p>${services.includes('ksiegowosc') ? 'Przekazują nam Państwo dokumenty, a my przejmujemy księgowość od pierwszego uzgodnionego miesiąca.' : 'Omawiamy sprawę i od razu przystępujemy do działania.'}</p></div>
+    <div class="step"><span>2</span><b>${P ? 'Umowa partnerska' : 'Umowa i pełnomocnictwa'}</b><p>${P ? 'Przygotujemy umowę o stałą obsługę doradczą biura; pełnomocnictwa podpisują klienci biura tylko w sprawach, które przejmiemy.' : `Przygotujemy umowę oraz pełnomocnictwa (UPL-1, ZUS PEL${brandKey === 'm2' ? ', PPS-1' : ''}) do podpisu.`}</p></div>
+    <div class="step"><span>3</span><b>Start obsługi</b><p>${P ? 'Zakładamy dostęp do bazy wiedzy i aplikacji dla zespołu biura – księgowe mogą od razu pisać i dzwonić do doradców.' : services.includes('ksiegowosc') ? 'Przekazują nam Państwo dokumenty, a my przejmujemy księgowość od pierwszego uzgodnionego miesiąca.' : 'Omawiamy sprawę i od razu przystępujemy do działania.'}</p></div>
   </div>
 </section>` : '';
 
@@ -227,7 +299,7 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
 <style>${OFFER_CSS.replace('__FOOT__', esc(B.foot).replace(/"/g, "'"))}</style></head>
 <body><div class="doc ${brandKey}">${cover}
 <table class="flow"><thead><tr><td><div class="run"><img src="${origin}${B.logo}" alt=""><span>Oferta${number ? ` ${esc(number)}` : ''} · ${esc(o.client?.name || '')}</span></div></td></tr></thead>
-<tbody><tr><td>${letter}${about}${scope}${prices}${terms}${why}${steps}${close}</td></tr></tbody></table></div></body></html>`;
+<tbody><tr><td>${letter}${about}${partnerBlk}${scope}${prices}${terms}${why}${steps}${close}</td></tr></tbody></table></div></body></html>`;
 }
 
 const OFFER_CSS = `
@@ -332,5 +404,25 @@ ul.dots li::before{content:"";position:absolute;left:1mm;top:2.1mm;width:1.8mm;h
 .contact{display:grid;grid-template-columns:repeat(4,auto);gap:6mm;background:#F8F5F0;border-radius:2.5mm;padding:4.5mm 5.5mm}
 .contact span{display:block;font-size:6.8pt;letter-spacing:.18em;text-transform:uppercase;color:#7A5A37;margin-bottom:.8mm}
 .contact b{font-size:8.6pt;font-weight:600;color:#1D1A16}
+ul.checks.one{columns:1}
+.pk-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin:0 0 6mm}
+.pk{position:relative;border:.7pt solid #E3D9CA;border-radius:3mm;padding:5mm 4.5mm 4.5mm;background:#fff;break-inside:avoid}
+.pk.on{border:1.2pt solid #C9A877;background:#FBF7F0;box-shadow:0 2mm 6mm rgba(122,90,55,.12)}
+.pk-badge{position:absolute;top:-2.6mm;left:4.5mm;background:#1D1A16;color:#E2C49A;font-size:6.5pt;letter-spacing:.16em;text-transform:uppercase;font-weight:700;padding:1mm 2.6mm;border-radius:10mm}
+.pk h3{font-size:12pt;margin:0 0 1.5mm}
+.pk p{font-size:8pt;color:#6A6157;min-height:9mm;margin:0 0 3mm}
+.pk-price b{font-family:'Plus Jakarta Sans',sans-serif;font-size:17pt;color:#1D1A16}
+.pk-price em{display:block;font-style:normal;font-size:7.6pt;color:#7A5A37}
+table.pk-cmp{width:100%;border-collapse:collapse;font-size:8.4pt}
+table.pk-cmp th{font-size:7.4pt;letter-spacing:.06em;text-transform:uppercase;color:#7A5A37;padding:0 2.5mm 2.5mm;border-bottom:.8pt solid #1D1A16;text-align:center}
+table.pk-cmp td{padding:2.4mm 2.5mm;border-bottom:.5pt solid #E3D9CA;text-align:center;vertical-align:middle}
+table.pk-cmp td.lab{text-align:left;color:#2B2722;font-weight:500;width:38%}
+table.pk-cmp .on{background:#FBF7F0}
+table.pk-cmp th.on{color:#1D1A16}
+table.pk-cmp tr{break-inside:avoid}
+table.pk-cmp tr.all td{background:#F8F5F0;font-weight:600}
+table.pk-cmp i.ok{display:inline-flex;width:4.6mm;height:4.6mm;border-radius:50%;background:#F3E6D2;color:#7A5A37;align-items:center;justify-content:center}
+table.pk-cmp .no{color:#B5AB9E}
+.pk-note{font-size:8pt;color:#6A6157;margin-top:3mm}
 @media screen{body{background:#E9E3D8}.doc{max-width:210mm;margin:0 auto;background:#fff}.flow{padding:0 17mm}}
 `;
