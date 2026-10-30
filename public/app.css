@@ -1742,3 +1742,14 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 .inf-count{margin:10px 0;padding:8px 12px;background:var(--panel);border-radius:8px;font-size:13px}
 .inf-actions{justify-content:flex-end}
 @media (max-width:600px){.inf-row{grid-template-columns:22px 1fr}.inf-mail{grid-column:2}}
+.inf-modes{display:inline-flex;gap:4px;padding:3px;background:var(--panel);border-radius:10px;margin-bottom:8px}
+.inf-mode{border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:8px;cursor:pointer;color:var(--muted)}
+.inf-mode.on{background:var(--card);color:inherit;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.inf-dropwrap{position:relative}
+.inf-drop{min-height:200px;border:2px dashed var(--line-2);border-radius:12px;padding:16px;outline:none;color:transparent;caret-color:var(--gold);background:var(--card)}
+.inf-drop:focus{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 6%,var(--card))}
+.inf-drophint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:20px;pointer-events:none;font-size:13.5px;color:var(--muted)}
+.inf-drophint b{color:inherit;font-size:14.5px}
+.inf-drophint b{color:var(--ink,inherit)}
+.inf-prevhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.inf-preview{width:100%;height:520px;border:1px solid var(--line);border-radius:10px;background:#fff}

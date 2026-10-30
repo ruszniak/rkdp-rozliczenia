@@ -80,7 +80,7 @@ async function signatures() {
   sigCache = { at: Date.now(), map };
   return map;
 }
-const htmlToText = (h: string) => h.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|tr|p)>/gi, '\n').replace(/<[^>]+>/g, '')
+const htmlToText = (h: string) => h.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(div|tr|p|li|h[1-6]|table)>/gi, '\n').replace(/<[^>]+>/g, '')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
   .split('\n').map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
 const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -118,20 +118,32 @@ async function signatureOf(me: any, cfg: { from: string }) {
 }
 
 // ---------- informacja zbiorcza: adresaci w UDW ----------
+// gotowy mail HTML (np. przygotowany wcześniej szablon) – bez skryptów, ramek, formularzy i zdarzeń JS
+function cleanHtml(h: string) {
+  return h.replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|iframe|object|embed|form|noscript|base|meta[^>]*http-equiv)[\s\S]*?(<\/\1>|>)/gi, '')
+    .replace(/<\/?(script|iframe|object|embed|form|input|button|textarea|select|link)\b[^>]*>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src)\s*=\s*(["'])\s*(javascript|vbscript|data:text)[^"']*\2/gi, '$1="#"');
+}
 async function broadcast(sb: any, body: any, cfg: { sub: string; from: string }, memberId: string) {
-  const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').slice(0, 20000);
+  const subject = String(body.subject || '').trim().slice(0, 200);
+  const rich = typeof body.html === 'string' && body.html.trim() ? cleanHtml(String(body.html).slice(0, 400000)) : '';
+  const text0 = rich ? htmlToText(rich.replace(/<(style|head|title)[\s\S]*?<\/\1>/gi, '')).replace(/\n{3,}/g, '\n\n').trim().slice(0, 20000) : String(body.body || '').slice(0, 20000);
   if (!subject || !text0.trim()) return json({ error: 'Pusty temat lub treść' }, 400);
   const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
   const sig = body.signature === false ? { sigHtml: '', text: '' } : await signatureOf(me, cfg);
   const text = text0 + (sig.text ? '\n' + sig.text : '');
-  const html = `${bodyHtml(text0)}${sig.sigHtml ? '<br><br>' + sig.sigHtml : sig.text ? '<br>' + bodyHtml(sig.text) : ''}`;
+  const sigBlock = sig.sigHtml ? '<br><br>' + sig.sigHtml : sig.text ? '<br>' + bodyHtml(sig.text) : '';
+  const html = rich ? (/<\/body>/i.test(rich) ? rich.replace(/<\/body>/i, `<div style="max-width:640px;margin:0 auto;padding:0 16px;">${sigBlock}</div></body>`) : rich + sigBlock)
+    : `${bodyHtml(text0)}${sigBlock}`;
   const groups = String(body.groups || '').slice(0, 300) || null;
   if (body.test) {
     const to = String(me?.email || '');
     if (!emailOk(to)) return json({ error: 'Brak Twojego adresu e-mail w zespole' }, 400);
     try { await sendMail(cfg, FROM_NAME, to, '[TEST] ' + subject, text, html); }
     catch (e) { const m = String((e as Error).message || e); return json(/^not_(configured|authorized)/.test(m) ? { error: 'not_configured', detail: m.slice(0, 300) } : { error: m.slice(0, 300) }, 200); }
-    await admin.from('mail_broadcasts').insert({ subject, body: text0, groups, recipients: 1, clients: 0, status: 'test', sent_by: memberId });
+    await admin.from('mail_broadcasts').insert({ subject, body: text0, html: rich || null, groups, recipients: 1, clients: 0, status: 'test', sent_by: memberId });
     return json({ test: true, email: to });
   }
   const ids = Array.isArray(body.client_ids) ? [...new Set(body.client_ids.map(String))].slice(0, 1000) : [];
@@ -148,7 +160,7 @@ async function broadcast(sb: any, body: any, cfg: { sub: string; from: string },
   }
   const all = [...owner.keys()];
   if (!all.length) return json({ error: 'Żaden z wybranych klientów nie ma adresu e-mail' }, 400);
-  const { data: rec } = await admin.from('mail_broadcasts').insert({ subject, body: text0, groups, recipients: all.length, clients: clients.length - noEmail.length, status: 'wyslano', sent_by: memberId }).select('id').single();
+  const { data: rec } = await admin.from('mail_broadcasts').insert({ subject, body: text0, html: rich || null, groups, recipients: all.length, clients: clients.length - noEmail.length, status: 'wyslano', sent_by: memberId }).select('id').single();
   let ok = 0, failed = 0; const errors: string[] = []; const okClients = new Set<string>();
   for (let i = 0; i < all.length; i += 90) {
     const batch = all.slice(i, i + 90);

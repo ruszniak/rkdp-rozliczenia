@@ -8,6 +8,7 @@ import { LEGAL_SHORT } from '../dict.js';
 const HELP = `Jedna wiadomość do wielu klientów naraz:
 • wybierz klientów grupami (np. wszystkie JDG, spółki z o.o., pracodawcy) albo zaznacz pojedynczo na liście,
 • wklej temat i treść – linki w treści będą klikalne, na końcu dołączy się Twoja stopka,
+• gotowy mail z grafiką (np. przygotowany w Claude): „Gotowy mail (HTML)” → wklej kod HTML albo wybierz plik .html – wyjdzie dokładnie z tym wyglądem,
 • wiadomość wychodzi z adresu kancelaria@rkdp.pl; klienci są w polu UDW (ukryta kopia), więc nikt nie widzi innych adresatów,
 • najpierw „Wyślij test do siebie”, żeby zobaczyć, jak wygląda wiadomość,
 • po wysłaniu informacja pojawia się w rozmowie każdego klienta, a wysyłka – w historii na dole strony.`;
@@ -37,6 +38,61 @@ export async function renderInformacje(main) {
   const subj = h('input', { class: 'input', placeholder: 'Temat wiadomości', maxlength: 200 });
   const body = h('textarea', { class: 'input inf-body', rows: 14, placeholder: 'Wklej treść informacji…\n\nLinki (https://…) będą klikalne. Na końcu dołączy się Twoja stopka.' });
   const sigCb = h('input', { type: 'checkbox', checked: true });
+  // tryb „Gotowy mail (HTML)” – szablon z grafiką, przyciskami i własną stopką (wklejony, upuszczony albo wgrany z pliku .html)
+  let mode = 'text', rich = '';
+  const looksHtml = t => /^\s*(<!--[\s\S]*?-->\s*)*<(!doctype|html|head|body|table|div|center|style|meta|p|h[1-6])\b/i.test(t);
+  const preview = h('iframe', { class: 'inf-preview', sandbox: '', title: 'Podgląd wiadomości' });
+  const fileIn = h('input', { type: 'file', accept: '.html,.htm,text/html', hidden: true });
+  const drop = h('div', { class: 'inf-drop', contenteditable: 'true', spellcheck: 'false', role: 'textbox', 'aria-label': 'Wklej gotowy mail' });
+  const htmlBox = h('div', { class: 'inf-htmlbox' });
+  const textBox = h('div', {});
+  const modeBtns = [['text', 'Zwykły tekst'], ['html', 'Gotowy mail (HTML)']].map(([k, l]) => h('button', { type: 'button', class: 'inf-mode', 'data-k': k, onclick: () => setMode(k) }, l));
+  function setMode(k) {
+    mode = k;
+    modeBtns.forEach(b => b.classList.toggle('on', b.dataset.k === k));
+    textBox.hidden = k !== 'text'; htmlBox.hidden = k !== 'html';
+    if (k === 'html') drawHtml();
+  }
+  function setRich(html, src) {
+    html = String(html || '').replace(/<script[\s\S]*?<\/script>/gi, '');
+    if (!html.trim()) return;
+    rich = html;
+    const t = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1];
+    if (t && !subj.value.trim()) subj.value = t.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    sigCb.checked = false;
+    setMode('html');
+    toast(src === 'file' ? 'Wczytano plik – sprawdź podgląd' : 'Wklejono mail – sprawdź podgląd');
+  }
+  function drawHtml() {
+    drop.textContent = '';
+    if (!rich) {
+      htmlBox.replaceChildren(
+        h('div', { class: 'inf-dropwrap' }, drop,
+          h('div', { class: 'inf-drophint' }, h('b', {}, 'Wklej tutaj gotowy mail (Ctrl+V / ⌘V)'),
+            h('span', {}, 'kod HTML skopiowany przyciskiem „Copy” albo cały mail zaznaczony w podglądzie (Ctrl+A, Ctrl+C) – albo przeciągnij plik .html'))),
+        h('div', { class: 'row-btns', style: { marginTop: '8px' } }, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => fileIn.click() }, 'Wybierz plik .html')), fileIn);
+      return;
+    }
+    preview.srcdoc = rich;
+    htmlBox.replaceChildren(
+      h('div', { class: 'inf-prevhead' }, h('span', { class: 'small muted' }, 'Podgląd – tak zobaczy to klient (Gmail może lekko uprościć wygląd)'),
+        h('div', { class: 'row-btns' },
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => fileIn.click() }, 'Zmień plik'),
+          h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { rich = ''; drawHtml(); } }, 'Usuń'))),
+      preview, fileIn);
+  }
+  drop.addEventListener('paste', e => {
+    e.preventDefault();
+    const cd = e.clipboardData, html = cd.getData('text/html'), plain = cd.getData('text/plain');
+    if (looksHtml(plain)) setRich(plain, 'code');
+    else if (html.trim()) setRich(html, 'paste');
+    else if (plain.trim()) { body.value = plain; setMode('text'); toast('To zwykły tekst – wstawiono do pola „Zwykły tekst”'); }
+  });
+  drop.addEventListener('beforeinput', e => { if (e.inputType !== 'insertFromPaste') e.preventDefault(); });
+  const readFile = f => { if (!f) return; if (f.size > 400000) return toast('Plik jest za duży (maks. 400 KB)', true); const r = new FileReader(); r.onload = () => setRich(r.result, 'file'); r.readAsText(f); };
+  fileIn.addEventListener('change', () => { readFile(fileIn.files[0]); fileIn.value = ''; });
+  drop.addEventListener('dragover', e => e.preventDefault());
+  drop.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) readFile(f); else { const html = e.dataTransfer.getData('text/html'); if (html) setRich(html, 'paste'); } });
   const sendBtn = h('button', { class: 'btn btn-primary', type: 'button', onclick: () => send() }, icon('mail'), 'Wyślij');
   const histBox = h('div', {}, h('p', { class: 'hint' }, 'Wczytywanie…'));
 
@@ -78,13 +134,13 @@ export async function renderInformacje(main) {
   statusSel.addEventListener('change', () => { status = statusSel.value; draw(); });
 
   const call = async payload => {
-    const { data, error } = await sb.functions.invoke('mail', { body: { action: 'broadcast', subject: subj.value.trim(), body: body.value, signature: sigCb.checked, ...payload } });
+    const { data, error } = await sb.functions.invoke('mail', { body: { action: 'broadcast', subject: subj.value.trim(), ...(mode === 'html' ? { html: rich } : { body: body.value }), signature: sigCb.checked, ...payload } });
     if (error) throw error;
     if (data?.error === 'not_configured') throw new Error('Wysyłka e-maili nie jest skonfigurowana: ' + (data.detail || ''));
     if (data?.error) throw new Error(data.error);
     return data;
   };
-  const valid = () => { if (!subj.value.trim()) { toast('Wpisz temat', true); subj.focus(); return false; } if (!body.value.trim()) { toast('Wklej treść', true); body.focus(); return false; } return true; };
+  const valid = () => { if (!subj.value.trim()) { toast('Wpisz temat', true); subj.focus(); return false; } if (mode === 'html' ? !rich : !body.value.trim()) { toast(mode === 'html' ? 'Wklej gotowy mail albo wybierz plik .html' : 'Wklej treść', true); return false; } return true; };
   async function test(btn) {
     if (!valid()) return;
     btn.disabled = true;
@@ -116,8 +172,8 @@ export async function renderInformacje(main) {
     const ST = { wyslano: 'wysłano', czesciowo: 'częściowo', blad: 'błąd', test: 'test do siebie' };
     histBox.replaceChildren(data.length ? h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
       h('thead', {}, h('tr', {}, ...['Data', 'Temat', 'Grupy', 'Klientów', 'Adresów', 'Status', 'Wysłał(a)'].map(x => h('th', {}, x)))),
-      h('tbody', {}, ...data.map(b => h('tr', { class: 'click', onclick: () => modal(b.subject, h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `${new Date(b.sent_at).toLocaleString('pl-PL')} · ${memberById(b.sent_by)?.full_name || ''} · ${b.groups || ''}`), h('pre', { class: 'wt-mailbody' }, b.body), b.error ? h('p', { class: 'jpk-warn' }, b.error) : null),
-        c => [h('button', { class: 'btn btn-outline', onclick: () => { c(); subj.value = b.subject; body.value = b.body; window.scrollTo({ top: 0, behavior: 'smooth' }); toast('Wczytano treść – wybierz odbiorców'); } }, 'Użyj ponownie'), h('button', { class: 'btn btn-primary', onclick: c }, 'Zamknij')], { wide: true }) },
+      h('tbody', {}, ...data.map(b => h('tr', { class: 'click', onclick: () => modal(b.subject, h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `${new Date(b.sent_at).toLocaleString('pl-PL')} · ${memberById(b.sent_by)?.full_name || ''} · ${b.groups || ''}`), b.html ? h('iframe', { class: 'inf-preview', sandbox: '', srcdoc: b.html, title: 'Podgląd' }) : h('pre', { class: 'wt-mailbody' }, b.body), b.error ? h('p', { class: 'jpk-warn' }, b.error) : null),
+        c => [h('button', { class: 'btn btn-outline', onclick: () => { c(); subj.value = b.subject; if (b.html) { rich = b.html; setMode('html'); } else { body.value = b.body; setMode('text'); } window.scrollTo({ top: 0, behavior: 'smooth' }); toast('Wczytano treść – wybierz odbiorców'); } }, 'Użyj ponownie'), h('button', { class: 'btn btn-primary', onclick: c }, 'Zamknij')], { wide: true }) },
         h('td', {}, new Date(b.sent_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })),
         h('td', {}, h('b', {}, b.subject)), h('td', { class: 'small' }, b.groups || ''), h('td', {}, String(b.clients)), h('td', {}, String(b.recipients)),
         h('td', {}, h('span', { class: 'pill ' + (b.status === 'wyslano' ? 'done' : b.status === 'test' ? 'unk' : 'no') }, ST[b.status] || b.status)), h('td', {}, memberById(b.sent_by)?.short_name || '')))))) : h('p', { class: 'hint' }, 'Nie wysłano jeszcze żadnej informacji.'));
@@ -138,7 +194,7 @@ export async function renderInformacje(main) {
       h('section', { class: 'card section inf-compose' },
         h('div', { class: 'section-head' }, h('h2', {}, '2. Wiadomość')),
         h('label', { class: 'field' }, h('span', {}, 'Temat'), subj),
-        h('label', { class: 'field' }, h('span', {}, 'Treść'), body),
+        h('div', { class: 'field' }, h('span', {}, 'Treść'), h('div', { class: 'inf-modes' }, ...modeBtns), textBox, htmlBox),
         h('label', { class: 'check' }, sigCb, 'Dołącz moją stopkę (z rkdp.pl/stopki)'),
         h('p', { class: 'small muted' }, 'Nadawca: RKDP | Kancelaria <kancelaria@rkdp.pl>. Klienci w UDW – nie widzą siebie nawzajem.'),
         h('div', { class: 'inf-count' }, countEl),
@@ -147,5 +203,7 @@ export async function renderInformacje(main) {
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: copyBcc, 'data-tip': 'Adresy wybranych klientów do wklejenia w pole UDW w Gmailu' }, 'Kopiuj adresy'),
           sendBtn))),
     h('section', { class: 'card section', style: { marginTop: '16px' } }, h('div', { class: 'section-head' }, h('h2', {}, 'Wysłane informacje')), histBox));
+  textBox.append(body);
+  setMode('text');
   draw(); loadHist();
 }
