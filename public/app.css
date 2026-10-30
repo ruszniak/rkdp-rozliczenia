@@ -1717,3 +1717,28 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 .wt-new.wt-new-in{margin:0 0 6px}
 /* wersja demonstracyjna */
 .demo-bar{position:fixed;left:50%;bottom:calc(10px + var(--tabbar,0px));transform:translateX(-50%);z-index:120;background:#A4462F;color:#fff;font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;box-shadow:0 6px 20px rgba(0,0,0,.25);white-space:nowrap;max-width:calc(100vw - 24px);overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+/* Informacja do klientów (e-mail zbiorczy) */
+.inf-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:980px){.inf-grid{grid-template-columns:1fr}.inf-compose{position:static}}
+.inf-gsec{margin-bottom:10px}
+.inf-gtitle{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px}
+.inf-chips{display:flex;flex-wrap:wrap;gap:6px}
+.inf-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-2);background:var(--card);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;color:inherit}
+.inf-chip span{font-size:11.5px;font-weight:700;color:var(--muted)}
+.inf-chip.part{border-color:var(--gold)}
+.inf-chip.on{background:var(--dark);border-color:var(--dark);color:var(--gold)}
+.inf-chip.on span{color:var(--gold)}
+.inf-search{margin:12px 0 8px}
+.inf-list{max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.inf-row{display:grid;grid-template-columns:22px 1fr minmax(0,1fr);gap:10px;align-items:center;padding:7px 12px;border-top:1px solid var(--line);cursor:pointer;font-size:13.5px}
+.inf-row:first-child{border-top:0}
+.inf-row.on{background:color-mix(in srgb,var(--gold) 14%,var(--card))}
+.inf-row.noemail .inf-mail{color:var(--warn)}
+.inf-name{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.inf-form{font-weight:500;color:var(--muted);font-size:11.5px;margin-left:6px}
+.inf-mail{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inf-compose{position:sticky;top:84px}
+.inf-body{min-height:260px;resize:vertical;font-family:inherit;line-height:1.5}
+.inf-count{margin:10px 0;padding:8px 12px;background:var(--panel);border-radius:8px;font-size:13px}
+.inf-actions{justify-content:flex-end}
+@media (max-width:600px){.inf-row{grid-template-columns:22px 1fr}.inf-mail{grid-column:2}}

@@ -11,6 +11,7 @@ const LIGHT_LOGO = src => src.replace('/m2tax-logo.png', '/m2tax-logo-light.png'
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
 const renderRozliczenia = lazy(() => import('./views/rozliczenia.js'), 'renderRozliczenia');
 const renderKlienci = lazy(() => import('./views/klienci.js'), 'renderKlienci');
+const renderInformacje = lazy(() => import('./views/informacje.js'), 'renderInformacje');
 const renderSprawozdania = lazy(() => import('./views/sprawozdania.js'), 'renderSprawozdania');
 const renderDokumenty = lazy(() => import('./views/dokumenty.js'), 'renderDokumenty');
 const renderProfil = lazy(() => import('./views/profil.js'), 'renderProfil');
@@ -229,6 +230,7 @@ async function route(opts = {}) {
     else if (!hasModule('rozliczenia') && view !== 'zespol') c = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'jpk') c = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
     else if (view === 'klienci') c = await renderKlienci(layout('klienci'), params);
+    else if (view === 'informacje') c = await renderInformacje(layout('klienci'));
     else if (view === 'klient') c = await renderKlient(layout('klienci'), parts[1]);
     else if (view === 'watek' && parts[1]) { c = await renderKlient(layout('klienci'), parts[1]); history.replaceState(null, '', `#/klient/${parts[1]}`); import('./watek.js').then(m => m.openThread({ client: { id: parts[1] }, period: params.get('okres') || undefined })); }
     else if (view === 'aml') c = await renderAml(layout('klienci'), 'rkdp');

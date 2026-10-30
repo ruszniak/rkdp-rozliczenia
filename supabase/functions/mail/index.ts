@@ -4,6 +4,8 @@
 // Wywołuje zalogowany członek zespołu z modułem Rozliczenia; klienci filtrowani uprawnieniami (RLS) tej osoby.
 //  • { action: 'status' } – czy wysyłka jest skonfigurowana
 //  • { action: 'send', kind, period, subject, body, client_ids[], mark_missing?, links? } – {klient}, {okres}, {link} w temacie i treści
+//  • { action: 'broadcast', subject, body, client_ids[], groups?, test?, signature? } – jedna informacja do wielu klientów:
+//    Do: adres kancelarii, klienci w UDW (paczki po 90 adresów); test = tylko do osoby wysyłającej
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
@@ -84,15 +86,15 @@ const htmlToText = (h: string) => h.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(d
 const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const bodyHtml = (t: string) => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;">${escH(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#7A5A37;">$1</a>').replace(/\n/g, '<br>')}</div>`;
 
-async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string, html?: string) {
+async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string, html?: string, bcc: string[] = []) {
   if (smtpOn()) {
-    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, subject, text, ...(html ? { html } : {}) }); return; }
+    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, ...(bcc.length ? { bcc } : {}), subject, text, ...(html ? { html } : {}) }); return; }
     catch (e) { const m = String((e as Error).message || e); if (/Invalid login|Username and Password|535|534/i.test(m)) throw new Error('not_authorized: SMTP – nieprawidłowe hasło aplikacji (' + m.slice(0, 120) + ')'); throw e; }
   }
   const token = await gmailToken(cfg.sub);
   const part = (type: string, c: string) => [`Content-Type: ${type}; charset=UTF-8`, 'Content-Transfer-Encoding: base64', '', b64(c).replace(/(.{76})/g, '$1\r\n')].join('\r\n');
   const bnd = 'b' + crypto.randomUUID().replace(/-/g, '');
-  const head = [`From: ${encWord(fromName)} <${cfg.from}>`, `Reply-To: ${cfg.from}`, `To: ${to}`, `Subject: ${encWord(subject)}`, 'MIME-Version: 1.0'];
+  const head = [`From: ${encWord(fromName)} <${cfg.from}>`, `Reply-To: ${cfg.from}`, `To: ${to}`, ...(bcc.length ? [`Bcc: ${bcc.join(', ')}`] : []), `Subject: ${encWord(subject)}`, 'MIME-Version: 1.0'];
   const mime = html
     ? [...head, `Content-Type: multipart/alternative; boundary="${bnd}"`, '', `--${bnd}`, part('text/plain', text), `--${bnd}`, part('text/html', html), `--${bnd}--`, ''].join('\r\n')
     : [...head, part('text/plain', text)].join('\r\n');
@@ -104,6 +106,67 @@ async function config() {
   const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_sender', 'mail_from']);
   const m = Object.fromEntries((data || []).map((x: any) => [x.key, (x.value || '').trim()]));
   return { sub: m.mail_sender || '', from: m.mail_from || m.mail_sender || '' };
+}
+
+// stopka osoby wysyłającej (HTML z rkdp.pl/stopki) albo tekstowa
+async function signatureOf(me: any, cfg: { from: string }) {
+  const sigs = await signatures();
+  const sigHtml = sigs.get(norm(me?.full_name || '')) || sigs.get('@' + String(me?.email || '').split('@')[0].toLowerCase()) || sigs.get('__kancelaria') || '';
+  const text = sigHtml ? '\n' + htmlToText(sigHtml)
+    : ['', 'Pozdrawiam serdecznie,', me?.full_name || '', me?.job_title || '', 'RKDP spółka doradztwa podatkowego sp. z o.o.', cfg.from, 'www.rkdp.pl'].filter((x, i) => i < 2 || x).join('\n');
+  return { sigHtml, text };
+}
+
+// ---------- informacja zbiorcza: adresaci w UDW ----------
+async function broadcast(sb: any, body: any, cfg: { sub: string; from: string }, memberId: string) {
+  const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').slice(0, 20000);
+  if (!subject || !text0.trim()) return json({ error: 'Pusty temat lub treść' }, 400);
+  const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
+  const sig = body.signature === false ? { sigHtml: '', text: '' } : await signatureOf(me, cfg);
+  const text = text0 + (sig.text ? '\n' + sig.text : '');
+  const html = `${bodyHtml(text0)}${sig.sigHtml ? '<br><br>' + sig.sigHtml : sig.text ? '<br>' + bodyHtml(sig.text) : ''}`;
+  const groups = String(body.groups || '').slice(0, 300) || null;
+  if (body.test) {
+    const to = String(me?.email || '');
+    if (!emailOk(to)) return json({ error: 'Brak Twojego adresu e-mail w zespole' }, 400);
+    try { await sendMail(cfg, FROM_NAME, to, '[TEST] ' + subject, text, html); }
+    catch (e) { const m = String((e as Error).message || e); return json(/^not_(configured|authorized)/.test(m) ? { error: 'not_configured', detail: m.slice(0, 300) } : { error: m.slice(0, 300) }, 200); }
+    await admin.from('mail_broadcasts').insert({ subject, body: text0, groups, recipients: 1, clients: 0, status: 'test', sent_by: memberId });
+    return json({ test: true, email: to });
+  }
+  const ids = Array.isArray(body.client_ids) ? [...new Set(body.client_ids.map(String))].slice(0, 1000) : [];
+  if (!ids.length) return json({ error: 'Nie wybrano klientów' }, 400);
+  // tylko klienci widoczni dla osoby wysyłającej (RLS)
+  const clients: any[] = [];
+  for (let i = 0; i < ids.length; i += 200) { const { data } = await sb.from('clients').select('id,name,email').in('id', ids.slice(i, i + 200)); clients.push(...(data || [])); }
+  const owner = new Map<string, string[]>(); // adres → klienci
+  const noEmail: string[] = [];
+  for (const c of clients) {
+    const em = [...new Set(String(c.email || '').split(/[;,\s]+/).map(x => x.trim().toLowerCase()).filter(emailOk))];
+    if (!em.length) { noEmail.push(c.name); continue; }
+    for (const e of em) owner.set(e, [...(owner.get(e) || []), c.id]);
+  }
+  const all = [...owner.keys()];
+  if (!all.length) return json({ error: 'Żaden z wybranych klientów nie ma adresu e-mail' }, 400);
+  const { data: rec } = await admin.from('mail_broadcasts').insert({ subject, body: text0, groups, recipients: all.length, clients: clients.length - noEmail.length, status: 'wyslano', sent_by: memberId }).select('id').single();
+  let ok = 0, failed = 0; const errors: string[] = []; const okClients = new Set<string>();
+  for (let i = 0; i < all.length; i += 90) {
+    const batch = all.slice(i, i + 90);
+    try {
+      await sendMail(cfg, FROM_NAME, cfg.from, subject, text, html, batch);
+      ok += batch.length; batch.forEach(e => (owner.get(e) || []).forEach(id => okClients.add(id)));
+    } catch (e) {
+      const m = String((e as Error).message || e);
+      if (/^not_(configured|authorized)/.test(m) && !ok) { if (rec) await admin.from('mail_broadcasts').update({ status: 'blad', failed: all.length, error: m.slice(0, 300) }).eq('id', rec.id); return json({ error: 'not_configured', detail: m.slice(0, 300) }, 200); }
+      failed += batch.length; errors.push(m.slice(0, 160));
+    }
+    await new Promise(r => setTimeout(r, 400));
+  }
+  // ślad w rozmowie każdego klienta
+  const rows = clients.filter(c => okClients.has(c.id)).map(c => ({ client_id: c.id, kind: 'informacja', period: null, email: [...owner.entries()].filter(([, v]) => v.includes(c.id)).map(([k]) => k).join(', ').slice(0, 300), subject, body: text, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId }));
+  for (let i = 0; i < rows.length; i += 200) await admin.from('client_messages').insert(rows.slice(i, i + 200));
+  if (rec) await admin.from('mail_broadcasts').update({ failed, status: failed ? (ok ? 'czesciowo' : 'blad') : 'wyslano', error: errors.join(' | ').slice(0, 500) || null }).eq('id', rec.id);
+  return json({ sent: ok, failed, clients: okClients.size, no_email: noEmail, errors });
 }
 
 Deno.serve(async (req: Request) => {
@@ -129,6 +192,7 @@ Deno.serve(async (req: Request) => {
       try { await gmailToken(cfg.sub); return json({ ready: true, from: cfg.from }); }
       catch (e) { return json({ ready: false, from: cfg.from, reason: String((e as Error).message) }); }
     }
+    if (body.action === 'broadcast') return await broadcast(sb, body, cfg, memberId);
     if (body.action !== 'send') return json({ error: 'Nieznana operacja' }, 400);
 
     const kind = String(body.kind || '');
@@ -142,10 +206,7 @@ Deno.serve(async (req: Request) => {
     const { data: clients } = await sb.from('clients').select('id,name,email').in('id', ids);
     const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
     // stopka osoby wysyłającej z rkdp.pl/stopki (po imieniu i nazwisku); brak – stopka ogólna kancelarii, a gdy strona niedostępna – tekstowa
-    const sigs = await signatures();
-    const sigHtml = sigs.get(norm(me?.full_name || '')) || sigs.get('@' + String(me?.email || '').split('@')[0].toLowerCase()) || sigs.get('__kancelaria') || '';
-    const signature = sigHtml ? '\n' + htmlToText(sigHtml)
-      : ['', 'Pozdrawiam serdecznie,', me?.full_name || '', me?.job_title || '', 'RKDP spółka doradztwa podatkowego sp. z o.o.', cfg.from, 'www.rkdp.pl'].filter((x, i) => i < 2 || x).join('\n');
+    const { sigHtml, text: signature } = await signatureOf(me, cfg);
     const fromName = FROM_NAME;
     const results: any[] = [];
     for (const c of clients || []) {

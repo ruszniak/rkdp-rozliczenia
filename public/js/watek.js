@@ -301,7 +301,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       ...D.tickets.filter(t => !onlyOpen || isOpenT(t)).map(t => ({ t: t.created_at, who: t.created_by, el: () => taskCard(t) })),
       ...(onlyOpen ? [] : [
       ...D.mails.map(m => ({ t: m.sent_at, who: m.sent_by, el: () => h('button', { type: 'button', class: 'chat-sys wt-mail' + (m.status === 'blad' ? ' err' : ''), 'data-tip': 'Pokaż treść wiadomości', onclick: () => showMail(m) }, icon('mail'),
-        h('span', {}, h('b', {}, who(m.sent_by)), m.status === 'blad' ? ' – nie udało się wysłać: ' : m.status === 'gmail' ? ' otworzył(a) e-mail w Gmailu: ' : ' wysłał(a) e-mail: ', m.subject, h('span', { class: 'muted' }, ` → ${m.email} · ${tm(m.sent_at)}`))) })),
+        h('span', {}, h('b', {}, who(m.sent_by)), m.status === 'blad' ? ' – nie udało się wysłać: ' : m.status === 'gmail' ? ' otworzył(a) e-mail w Gmailu: ' : m.kind === 'informacja' ? ' wysłał(a) informację do klientów: ' : ' wysłał(a) e-mail: ', m.subject, h('span', { class: 'muted' }, ` → ${m.email} · ${tm(m.sent_at)}`))) })),
       ...D.files.map(f => ({ t: f.created_at, who: f.source === 'klient' ? null : f.uploaded_by, el: () => { const fromClient = f.source === 'klient', mine = !fromClient && f.uploaded_by === me;
         return h('div', { class: 'chat-msg chat-file' + (mine ? ' mine' : '') + (fromClient ? ' client' : '') }, avatar(fromClient ? null : f.uploaded_by),
           h('div', { class: 'chat-bub' }, h('div', { class: 'chat-meta' }, h('b', { class: 'chat-who' }, fromClient ? 'Klient (przez link)' : fullWho(f.uploaded_by) + (mine ? ' (Ty)' : '')), h('span', { class: 'chat-tag' }, 'załącznik'), perTag(f.period), h('span', {}, tm(f.created_at))),
