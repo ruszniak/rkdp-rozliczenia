@@ -33,17 +33,13 @@ create index if not exists client_zus_idx on public.client_zus (client_id, valid
 create unique index if not exists client_zus_wakacje_rok on public.client_zus (client_id, (extract(year from valid_from))) where kind = 'wakacje';
 
 alter table public.client_zus enable row level security;
-drop policy if exists cz_select on public.client_zus;
 create policy cz_select on public.client_zus for select to authenticated
   using ((select public.has_full_access()) or client_id in (select public.visible_client_ids()));
-drop policy if exists cz_insert on public.client_zus;
 create policy cz_insert on public.client_zus for insert to authenticated
   with check ((select public.has_full_access()) or client_id in (select public.visible_client_ids()));
-drop policy if exists cz_update on public.client_zus;
 create policy cz_update on public.client_zus for update to authenticated
   using ((select public.has_full_access()) or client_id in (select public.visible_client_ids()))
   with check ((select public.has_full_access()) or client_id in (select public.visible_client_ids()));
-drop policy if exists cz_delete on public.client_zus;
 create policy cz_delete on public.client_zus for delete to authenticated
   using ((select public.has_full_access()) or client_id in (select public.visible_client_ids()));
 grant select, insert, update, delete on public.client_zus to authenticated;
