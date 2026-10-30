@@ -567,10 +567,9 @@ function attachmentsCard(t) {
     if (error) { list.replaceChildren(h('p', { class: 'hint' }, 'Załączniki niedostępne: ' + error.message)); return; }
     count.textContent = data.length ? `${data.length}` : '';
     list.replaceChildren(...(data.length ? data.map(f => fileTile(f, { onDelete: (f.uploaded_by === state.me.id || isAdmin()) ? async () => {
-      if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
+      if (!confirm(`Usunąć załącznik „${f.name}”? Trafi do kosza – administrator może go przywrócić przez 30 dni.`)) return;
       const { error: e1 } = await sb.from('rkdp_ticket_files').delete().eq('id', f.id);
       if (e1) return fail(e1);
-      await sb.storage.from(BUCKET).remove([f.path]);
       load();
     } : null })) : [h('p', { class: 'hint' }, 'Brak załączników.')]));
   }

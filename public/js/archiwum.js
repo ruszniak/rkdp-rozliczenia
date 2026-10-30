@@ -77,11 +77,10 @@ export function archiveCard(c) {
     load();
   }
   async function del(r) {
-    if (!confirm(`Usunąć „${r.name}” z archiwum klienta?`)) return;
+    if (!confirm(`Usunąć „${r.name}” z archiwum klienta? Trafi do kosza – administrator może go przywrócić przez 30 dni.`)) return;
     const { error } = await sb.from('client_files').delete().eq('id', r.id);
     if (error) return fail(error);
-    await sb.storage.from(BUCKET).remove([r.path]);
-    toast('Usunięto'); load();
+    toast('Przeniesiono do kosza (30 dni)'); load();
   }
 
   // ---------- skan telefonem: kolejne strony → jeden PDF albo osobne zdjęcia ----------

@@ -234,6 +234,40 @@ export async function renderZespol(main) {
       'Niezależnie od tego co noc wykonywana jest automatyczna, zaszyfrowana kopia bazy w GitHubie (bez plików – pliki pobieraj przyciskiem co jakiś czas). ',
       'Plik zawiera dane osobowe – trzymaj go na zaszyfrowanym dysku.')));
 
+  // ---------- kosz: usunięte pliki (30 dni) ----------
+  if (state.me?.role === 'admin') {
+    const trashBox = h('div', {}, h('p', { class: 'hint' }, 'Wczytywanie…'));
+    const SRC = { client_files: 'Archiwum klienta', period_files: 'Załącznik w rozmowie', rkdp_ticket_files: 'Załącznik zadania' };
+    const loadTrash = async () => {
+      const { data, error } = await sb.from('file_trash').select('*').order('deleted_at', { ascending: false }).limit(300);
+      if (error) { trashBox.replaceChildren(h('p', { class: 'hint' }, 'Kosz niedostępny.')); return; }
+      const cl = new Map(); const ids = [...new Set(data.map(r => r.client_id).filter(Boolean))];
+      if (ids.length) { const { data: cs } = await sb.from('clients').select('id,name').in('id', ids); (cs || []).forEach(c => cl.set(c.id, c.name)); }
+      const days = r => Math.max(0, Math.ceil((new Date(r.purge_after) - Date.now()) / 86400000));
+      trashBox.replaceChildren(data.length ? h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
+        h('thead', {}, h('tr', {}, ...['Plik', 'Skąd', 'Klient', 'Usunął(a)', 'Kiedy', 'Zniknie za', ''].map(x => h('th', {}, x)))),
+        h('tbody', {}, ...data.map(r => h('tr', {},
+          h('td', {}, h('b', {}, r.name || r.path.split('/').pop())), h('td', { class: 'small' }, SRC[r.source] || r.source), h('td', { class: 'small' }, cl.get(r.client_id) || '—'),
+          h('td', { class: 'small' }, state.members.find(m => m.id === r.deleted_by)?.short_name || '—'),
+          h('td', { class: 'small' }, new Date(r.deleted_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
+          h('td', { class: 'small' }, `${days(r)} dni`),
+          h('td', {}, h('div', { class: 'row-btns' },
+            h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { const { data: u, error: e } = await sb.storage.from(r.bucket).createSignedUrl(r.path, 120, { download: r.name || true }); if (e) return fail(e); location.href = u.signedUrl; } }, 'Pobierz'),
+            h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: async () => { const { error: e } = await sb.rpc('restore_file', { p_id: r.id }); if (e) return fail(e); toast('Przywrócono plik'); loadTrash(); } }, 'Przywróć'),
+            h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
+              if (!confirm(`Usunąć „${r.name}” na zawsze? Tego nie da się cofnąć.`)) return;
+              const { error: e1 } = await sb.storage.from(r.bucket).remove([r.path]); if (e1) return fail(e1);
+              const { error: e2 } = await sb.from('file_trash').delete().eq('id', r.id); if (e2) return fail(e2);
+              toast('Usunięto na zawsze'); loadTrash(); } }, 'Usuń na zawsze'))))))))
+        : h('p', { class: 'hint' }, 'Kosz jest pusty.'));
+    };
+    main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
+      h('div', { class: 'section-head' }, h('h2', {}, 'Kosz – usunięte pliki')),
+      h('p', { class: 'small muted', style: { margin: '0 0 10px' } }, 'Usunięte w aplikacji pliki (archiwum klienta, załączniki w rozmowach i zadaniach) leżą tu 30 dni – możesz je pobrać albo przywrócić na swoje miejsce. Po 30 dniach są usuwane na stałe. Widzi to tylko administrator.'),
+      trashBox));
+    loadTrash();
+  }
+
   // ---------- poczta: wiadomości do klientów z kancelaria@rkdp.pl ----------
   const mailSt = h('p', { class: 'small' }, '');
   const mailCheck = async () => {

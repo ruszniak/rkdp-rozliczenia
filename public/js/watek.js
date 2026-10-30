@@ -363,10 +363,10 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   }
   function jump(id) { focus = id; searching = false; searchIn.hidden = true; setView(showHist ? 'all' : 'msg'); }
   async function delFile(f) {
-    if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
+    if (!confirm(`Usunąć załącznik „${f.name}”? Trafi do kosza – administrator może go przywrócić przez 30 dni.`)) return;
     const { error } = await sb.from('period_files').delete().eq('id', f.id);
     if (error) return fail(error);
-    await sb.storage.from('rozliczenia').remove([f.path]); await reload(true); onChange?.();
+    await reload(true); onChange?.();
   }
 
   // ---------- wyszukiwarka ----------
