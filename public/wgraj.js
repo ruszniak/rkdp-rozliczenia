@@ -4,7 +4,7 @@
   var box = document.getElementById('box');
   var token = (location.hash || '').replace(/^#/, '').trim();
   try { if (token) sessionStorage.setItem('rkdp_upload', token); else token = sessionStorage.getItem('rkdp_upload') || ''; } catch (e) { /* */ }
-  var api = (window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl || '') + '/functions/v1/docs';
+  var api = (window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl || '') + '/functions/v1/docs?forceFunctionRegion=eu-west-1'; // funkcja uruchamiana w UE (Irlandia), w regionie bazy
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var fmtSize = function (n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' kB'; };
   var sent = 0;

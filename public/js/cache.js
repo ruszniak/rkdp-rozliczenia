@@ -39,7 +39,12 @@ async function grab(url, init) {
 }
 const toResponse = e => new Response(e.status === 204 ? null : e.body, { status: e.status, statusText: e.statusText, headers: e.headers });
 let staleTimer = null;
+// funkcje serwerowe (Edge Functions) uruchamiane zawsze w regionie bazy – Irlandia (UE), a nie w regionie najbliższym użytkownikowi
+export const FN_REGION = 'eu-west-1';
+const pinRegion = u => u.includes('/functions/v1/') && !u.includes('forceFunctionRegion=') ? u + (u.includes('?') ? '&' : '?') + 'forceFunctionRegion=' + FN_REGION : u;
 export async function cachedFetch(input, init = {}) {
+  if (typeof input === 'string') input = pinRegion(input);
+  else if (input instanceof URL) input = pinRegion(input.href);
   const url = typeof input === 'string' ? input : input.url;
   const method = (init.method || (typeof input === 'object' && input.method) || 'GET').toUpperCase();
   const isRest = url.includes('/rest/v1/'), isStorage = url.includes('/storage/v1/'), isFn = url.includes('/functions/v1/');
