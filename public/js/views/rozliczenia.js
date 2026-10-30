@@ -74,6 +74,10 @@ export async function renderRozliczenia(main, params) {
     if (cid) q = q.eq('client_id', cid);
     return q.then(({ data }) => { if (cid) taskCount.delete(cid); else taskCount.clear(); (data || []).forEach(r => taskCount.set(r.client_id, (taskCount.get(r.client_id) || 0) + 1)); }, () => {}); };
   loadTaskCount().then(() => taskCount.forEach((_, id) => { try { refreshRow(id); } catch { /* */ } }));
+  // wakacje składkowe w tym miesiącu (karta klienta → ZUS) – znaczek przy nazwie klienta
+  const zusHoliday = new Set();
+  sb.from('client_zus').select('client_id').eq('kind', 'wakacje').eq('valid_from', pdate)
+    .then(({ data }) => { (data || []).forEach(r => { zusHoliday.add(r.client_id); try { refreshRow(r.client_id); } catch { /* */ } }); }, () => {});
 
   const tasksAll = state.taskTypes.filter(t => t.active);
   // trend rozliczeń z 6 miesięcy (dociągany w tle – nie opóźnia tabeli)
@@ -425,7 +429,8 @@ export async function renderRozliczenia(main, params) {
       h('td', { class: 'c-name' }, h('div', { class: 'cname' },
         h('a', { href: `#/klient/${c.id}`, 'data-panel': c.id }, c.name),
         h('div', { class: 'meta' }, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?'),
-          c.status !== 'aktywny' ? h('span', { class: 'badge warn' }, c.status === 'zawieszony' ? 'zawieszony' : 'zakończony') : null))),
+          c.status !== 'aktywny' ? h('span', { class: 'badge warn' }, c.status === 'zawieszony' ? 'zawieszony' : 'zakończony') : null,
+          zusHoliday.has(c.id) ? h('span', { class: 'badge zus-hol', 'data-tip': 'Wakacje składkowe w tym miesiącu – bez składek społecznych właściciela (zdrowotna płatna)' }, 'wakacje ZUS') : null))),
       h('td', { class: 'c-person' }, personCell(c, area)),
       area === 'kadry' ? h('td', {}, employeesCell(c)) : null,
       cols.map(col => h('td', { class: 'c-task' }, (col.applies_to && col.applies_to !== 'all' && col.applies_to !== sectionOf(c))

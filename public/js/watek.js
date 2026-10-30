@@ -39,7 +39,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   const me = state.me.id, admin = state.me.role === 'admin';
   let per = period, kind = 'uwaga', replyTo = null, editing = null, searching = false;
   let D = { cm: [], pins: [], tickets: [], tcom: [], mails: [], files: [], audit: [] };
-  let onlyOpen = false, readAt = null, newMark = true; // „Tylko otwarte”, mój ostatni odczyt (znacznik „Nowe”)
+  let onlyOpen = false, showHist = false, readAt = null, newMark = true; // „Tylko otwarte”, mój ostatni odczyt (znacznik „Nowe”)
   const expanded = new Set();
 
   // ---------- szkielet ----------
@@ -50,7 +50,15 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   const perSel = h('select', { class: 'wt-per', 'aria-label': 'Miesiąc rozliczeniowy nowego wpisu', 'data-tip': 'Którego miesiąca rozliczeń dotyczy nowy wpis (pokaże się przy kliencie w tabeli rozliczeń za ten miesiąc)' },
     ...perOpts().map(p => h('option', { value: p, selected: p === per }, perShort(p))));
   perSel.addEventListener('change', () => { per = perSel.value; });
-  const openBtn = h('button', { type: 'button', class: 'wt-only', 'aria-pressed': 'false', onclick: () => { onlyOpen = !onlyOpen; openBtn.classList.toggle('on', onlyOpen); openBtn.setAttribute('aria-pressed', String(onlyOpen)); draw(); } }, 'Tylko otwarte');
+  // widok rozmowy: same wiadomości zespołu (domyślnie) | cała historia (zmiany kratek, e-maile) | tylko otwarte sprawy
+  const VIEWS = [['msg', 'Wiadomości', 'Uwagi, pytania, zadania i załączniki – to, co piszemy'], ['all', 'Historia', 'Wiadomości + zmiany statusów w rozliczeniach i wysłane e-maile'], ['open', 'Tylko otwarte', 'Niezałatwione uwagi, pytania i zadania']];
+  const viewBtns = VIEWS.map(([k, l, tip]) => h('button', { type: 'button', class: 'wt-only' + (k === 'msg' ? ' on' : ''), 'data-k': k, 'aria-pressed': String(k === 'msg'), 'data-tip': tip, onclick: () => setView(k) }, l));
+  const openBtn = h('div', { class: 'wt-views', role: 'group', 'aria-label': 'Co pokazać' }, ...viewBtns);
+  function setView(k) {
+    onlyOpen = k === 'open'; showHist = k === 'all';
+    viewBtns.forEach(b => { const on = b.dataset.k === k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+    draw();
+  }
   const searchIn = h('input', { class: 'input wt-search-in', type: 'search', placeholder: 'Szukaj w całej historii klienta…', hidden: true });
   const ta = h('textarea', { class: 'chat-input', rows: 1, placeholder: 'Napisz… (@ = osoba)' });
   const sendBtn = h('button', { type: 'button', class: 'chat-send', 'aria-label': 'Wyślij', onclick: () => send() },
@@ -74,7 +82,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   const drawer = h('aside', { class: 'wt', role: 'dialog', 'aria-label': `Rozmowa – ${client.name}` },
     h('div', { class: 'wt-head' },
       h('div', { class: 'wt-title' }, h('b', {}, client.name),
-        h('div', { class: 'wt-sub' }, h('span', { class: 'muted small' }, 'Cała historia'), openBtn)),
+        h('div', { class: 'wt-sub' }, openBtn)),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Szukaj', 'data-tip': 'Szukaj w historii', onclick: toggleSearch }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>', style: { display: 'inline-flex' } })),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Eksport historii do PDF', 'data-tip': 'Historia do PDF', onclick: exportDialog }, icon('download')),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Wiadomość e-mail do klienta', 'data-tip': 'E-mail do klienta (kancelaria@rkdp.pl)', onclick: () => import('./wiadomosc.js').then(m => m.openMessage({ clients: [client], kind: 'dokumenty', period: per })) }, icon('mail')),
@@ -299,14 +307,13 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     const stream = [
       ...top.map(x => ({ t: x.created_at, who: x.author, el: () => h('div', { class: 'wt-item' }, bubble(x), replies('c' + x.id, rep(x.id), r => bubble(r, { reply: true }))) })),
       ...D.tickets.filter(t => !onlyOpen || isOpenT(t)).map(t => ({ t: t.created_at, who: t.created_by, el: () => taskCard(t) })),
-      ...(onlyOpen ? [] : [
-      ...D.mails.map(m => ({ t: m.sent_at, who: m.sent_by, el: () => h('button', { type: 'button', class: 'chat-sys wt-mail' + (m.status === 'blad' ? ' err' : ''), 'data-tip': 'Pokaż treść wiadomości', onclick: () => showMail(m) }, icon('mail'),
-        h('span', {}, h('b', {}, who(m.sent_by)), m.status === 'blad' ? ' – nie udało się wysłać: ' : m.status === 'gmail' ? ' otworzył(a) e-mail w Gmailu: ' : m.kind === 'informacja' ? ' wysłał(a) informację do klientów: ' : ' wysłał(a) e-mail: ', m.subject, h('span', { class: 'muted' }, ` → ${m.email} · ${tm(m.sent_at)}`))) })),
-      ...D.files.map(f => ({ t: f.created_at, who: f.source === 'klient' ? null : f.uploaded_by, el: () => { const fromClient = f.source === 'klient', mine = !fromClient && f.uploaded_by === me;
+      ...(onlyOpen || !showHist ? [] : D.mails.map(m => ({ t: m.sent_at, who: m.sent_by, el: () => h('button', { type: 'button', class: 'chat-sys wt-mail' + (m.status === 'blad' ? ' err' : ''), 'data-tip': 'Pokaż treść wiadomości', onclick: () => showMail(m) }, icon('mail'),
+        h('span', {}, h('b', {}, who(m.sent_by)), m.status === 'blad' ? ' – nie udało się wysłać: ' : m.status === 'gmail' ? ' otworzył(a) e-mail w Gmailu: ' : m.kind === 'informacja' ? ' wysłał(a) informację do klientów: ' : ' wysłał(a) e-mail: ', m.subject, h('span', { class: 'muted' }, ` → ${m.email} · ${tm(m.sent_at)}`))) }))),
+      ...(onlyOpen ? [] : D.files.map(f => ({ t: f.created_at, who: f.source === 'klient' ? null : f.uploaded_by, el: () => { const fromClient = f.source === 'klient', mine = !fromClient && f.uploaded_by === me;
         return h('div', { class: 'chat-msg chat-file' + (mine ? ' mine' : '') + (fromClient ? ' client' : '') }, avatar(fromClient ? null : f.uploaded_by),
           h('div', { class: 'chat-bub' }, h('div', { class: 'chat-meta' }, h('b', { class: 'chat-who' }, fromClient ? 'Klient (przez link)' : fullWho(f.uploaded_by) + (mine ? ' (Ty)' : '')), h('span', { class: 'chat-tag' }, 'załącznik'), perTag(f.period), h('span', {}, tm(f.created_at))),
-            fileTile({ ...f, bucket: 'rozliczenia' }, { onDelete: mine || admin || fromClient ? () => delFile(f) : null }))); } })),
-      ...D.audit.map(a => ({ t: a.at, sys: true, el: () => h('div', { class: 'chat-sys wt-small' }, `${whoEmail(a.actor)} · ${taskLabel(a.detail.task_code)} (${periodLabel(String(a.period).slice(0, 7)).toLowerCase()}): ${STATUS[a.detail.status?.z]?.label || '—'} → `, h('b', {}, STATUS[a.detail.status?.na]?.label || '—'), ` · ${tm(a.at)}`) }))]),
+            fileTile({ ...f, bucket: 'rozliczenia' }, { onDelete: mine || admin || fromClient ? () => delFile(f) : null }))); } }))),
+      ...(onlyOpen || !showHist ? [] : D.audit.map(a => ({ t: a.at, sys: true, el: () => h('div', { class: 'chat-sys wt-small' }, `${whoEmail(a.actor)} · ${taskLabel(a.detail.task_code)} (${periodLabel(String(a.period).slice(0, 7)).toLowerCase()}): ${STATUS[a.detail.status?.z]?.label || '—'} → `, h('b', {}, STATUS[a.detail.status?.na]?.label || '—'), ` · ${tm(a.at)}`) }))),
     ].sort((a, b) => a.t.localeCompare(b.t));
     const out = []; let last = '', marked = false, markEl = null;
     for (const s of stream) {
@@ -314,8 +321,8 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       if (newMark && !marked && readAt && !s.sys && s.who !== me && s.t > readAt) { markEl = h('div', { class: 'wt-new' }, h('span', {}, 'Nowe')); out.push(markEl); marked = true; }
       out.push(s.el());
     }
-    if (D.more) out.unshift(h('button', { type: 'button', class: 'chat-a wt-older', onclick: () => { months += 12; reload(true); } }, 'Pokaż starsze zmiany kratek i e-maile'));
-    if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, onlyOpen ? 'Nie ma otwartych uwag, pytań ani zadań. 👍' : 'Brak wpisów. Napisz uwagę, zadaj pytanie albo utwórz zadanie.'));
+    if (D.more && showHist) out.unshift(h('button', { type: 'button', class: 'chat-a wt-older', onclick: () => { months += 12; reload(true); } }, 'Pokaż starsze zmiany kratek i e-maile'));
+    if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, onlyOpen ? 'Nie ma otwartych uwag, pytań ani zadań. 👍' : !showHist && (D.mails.length || D.audit.length) ? 'Brak wiadomości – zmiany statusów i e-maile są w zakładce „Historia”. Napisz uwagę, zadaj pytanie albo utwórz zadanie.' : 'Brak wpisów. Napisz uwagę, zadaj pytanie albo utwórz zadanie.'));
     const atBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
     thread.replaceChildren(...out);
     if (focus) { const el = thread.querySelector(`[data-id="${focus}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('wt-flash'); } focus = null; }
@@ -354,7 +361,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       m.body ? h('pre', { class: 'wt-mailbody' }, m.body) : h('p', { class: 'hint' }, 'Treść nie została zapisana – wiadomość wysłana przed włączeniem kopii w aplikacji.')),
     c => [h('button', { class: 'btn btn-primary', onclick: c }, 'Zamknij')], { wide: true });
   }
-  function jump(id) { focus = id; searching = false; searchIn.hidden = true; onlyOpen = false; openBtn.classList.remove('on'); draw(); }
+  function jump(id) { focus = id; searching = false; searchIn.hidden = true; setView(showHist ? 'all' : 'msg'); }
   async function delFile(f) {
     if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
     const { error } = await sb.from('period_files').delete().eq('id', f.id);
