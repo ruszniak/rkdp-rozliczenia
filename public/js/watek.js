@@ -2,7 +2,6 @@
 // uwagi, pytania, zadania (zgłoszenia) z odpowiedziami, załączniki, wysłane e-maile i zmiany kratek.
 // Przypięte ustalenia na górze, otwarte pytania z wcześniejszych miesięcy, @wzmianki, edycja z historią,
 // usuwanie ze śladem, wyszukiwarka i eksport historii do PDF. Licznik „Nieprzeczytane” w górnym pasku.
-import { timerButton } from './czas.js';
 import { h, icon, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPeriod, initials, printHtml, modal, ava } from './ui.js';
 import { sb, state, memberById } from './store.js';
 import { STATUS } from './dict.js';
@@ -84,7 +83,6 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
     h('div', { class: 'wt-head' },
       h('div', { class: 'wt-title' }, h('b', {}, client.name),
         h('div', { class: 'wt-sub' }, openBtn)),
-      client.name ? timerButton({ module: 'rkdp', clientId: client.id, name: client.name }) : null,
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Szukaj', 'data-tip': 'Szukaj w historii', onclick: toggleSearch }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>', style: { display: 'inline-flex' } })),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Eksport historii do PDF', 'data-tip': 'Historia do PDF', onclick: exportDialog }, icon('download')),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Wiadomość e-mail do klienta', 'data-tip': 'E-mail do klienta (kancelaria@rkdp.pl)', onclick: () => import('./wiadomosc.js').then(m => m.openMessage({ clients: [client], kind: 'dokumenty', period: per })) }, icon('mail')),

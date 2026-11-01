@@ -68,10 +68,11 @@ const MODULES = {
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
     more: [['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/zlecenia', 'Zlecenia', 'zlecenia'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
-      ['#/czas', 'Czas pracy i rentowność', 'czas', 'admin'], ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin']] },
+      ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
-      ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']] },
+      ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']],
+    more: [['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'RKDP · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -151,7 +152,7 @@ function layout(active) {
         switcher),
       h('nav', { class: 'nav-links' },
         ...M.tabs.map(link),
-        M.more ? moreMenu(M.more.filter(x => x[3] !== 'admin' || me.role === 'admin'), active) : me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
+        (() => { const more = (M.more || []).filter(x => x[3] !== 'admin' || me.role === 'admin'); return more.length ? moreMenu(more, active) : null; })()),
       h('div', { class: 'nav-user' },
         jpkOnly ? null : timerPillEl(),
         (() => { const b = h('button', { type: 'button', class: 'hdr-search', onclick: () => openCmdk(), 'aria-label': 'Szukaj (Ctrl K)', 'data-tip': 'Szukaj klienta, sprawy, zgłoszenia, narzędzia' });
@@ -260,7 +261,7 @@ async function route(opts = {}) {
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
     else if (view === 'moje') c = await renderMoje(layout('moje'), params);
     else if (view === 'zlecenia') c = await renderZlecenia(layout('zlecenia'), parts[1]);
-    else if (view === 'czas' && state.me.role === 'admin') c = await renderCzas(layout('czas'), params);
+    else if (view === 'czas' && state.me.role === 'admin' && hasModule('doradztwo')) c = await renderCzas(layout('m2:czas'), params);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('terminy'), params);
     else if (view === 'zamkniecie-roku') c = await renderRok(layout('rok'), params);

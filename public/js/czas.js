@@ -1,4 +1,4 @@
-// Czas pracy przy kliencie (RKDP i M2 TAX): licznik start/stop (jeden naraz), wpisy ręczne, pakiet godzin i rentowność.
+// Czas pracy przy kliencie (tylko M2 TAX): licznik start/stop (jeden naraz), wpisy ręczne, pakiet godzin i rentowność.
 import { h, toast, fail, modal } from './ui.js';
 import { sb, state, memberById } from './store.js';
 // bez „null” w treści: puste elementy (null/false) są pomijane
@@ -160,7 +160,7 @@ export async function renderCzas(main, params) {
     put(box, h('div', { class: 'spinner' }, 'Wczytywanie…'));
     const [a, b] = monthRange(ym);
     const [{ data: rows, error }, { data: cs }, { data: m2 }, { data: st }] = await Promise.all([
-      sb.from('time_entries').select('*').gte('started_at', a).lt('started_at', b).limit(5000),
+      sb.from('time_entries').select('*').eq('module', 'm2').gte('started_at', a).lt('started_at', b).limit(5000),
       sb.from('clients').select('id,name,monthly_fee,package_hours'),
       sb.from('m2_clients').select('id,name,monthly_fee,package_hours'),
       sb.from('app_settings').select('value').eq('key', 'target_hourly_rate').maybeSingle(),
@@ -198,7 +198,7 @@ export async function renderCzas(main, params) {
   sb.from('app_settings').select('value').eq('key', 'target_hourly_rate').maybeSingle().then(({ data }) => { targetIn.value = data?.value || '250'; });
   monIn.addEventListener('change', () => { if (monIn.value) { ym = monIn.value; history.replaceState(null, '', '#/czas?m=' + ym); draw(); } });
   put(main, 
-    h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP · M2 TAX'), h('h1', { style: { marginTop: '6px' } }, 'Czas pracy i rentowność'), h('p', { class: 'sub' }, 'Ile czasu zajmują klienci, wykorzystanie pakietów godzin i stawka efektywna.')),
+    h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'M2 TAX'), h('h1', { style: { marginTop: '6px' } }, 'Czas pracy i rentowność'), h('p', { class: 'sub' }, 'Ile czasu zajmują klienci, wykorzystanie pakietów godzin i stawka efektywna.')),
       h('div', { class: 'row-btns' }, monIn, targetIn, h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { const v = parseFloat(targetIn.value.replace(',', '.')); if (!(v > 0)) return toast('Podaj stawkę', true); const { error } = await sb.from('app_settings').upsert({ key: 'target_hourly_rate', value: String(v) }); if (error) return fail(error); toast('Zapisano próg'); draw(); } }, 'Zapisz próg zł/h'))),
     box);
   draw();
