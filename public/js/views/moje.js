@@ -1,7 +1,7 @@
 // „Moje sprawy” – jedno miejsce na wszystko, co czeka na mnie: zlecenia od Michała, zadania przy klientach,
 // pytania w rozmowach moich klientów i terminy (sprawy M2 TAX, pełnomocnictwa). Pracownik nie musi wiedzieć, skąd zadanie przyszło.
 import { h, fail, infoTip, icon } from '../ui.js';
-import { sb, state, hasModule } from '../store.js';
+import { sb, state, hasModule, memberById } from '../store.js';
 import { TK_OPEN } from './zgloszenia.js';
 // bez „null” w treści: puste elementy (null/false) są pomijane
 const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
@@ -11,7 +11,7 @@ const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.t
 const fmtD = d => d ? d.slice(0, 10).split('-').reverse().join('.') : '';
 const KINDS = { zlecenie: ['Zlecenie', 'mj-zl'], zadanie: ['Zadanie', 'mj-tk'], pytanie: ['Pytanie', 'mj-q'], termin: ['Termin', 'mj-dl'] };
 const HELP = `Wszystko, co czeka na Ciebie, w jednym miejscu:
-• Zlecenia – dodatkowe zadania od Michała (po wykonaniu kliknij „Zrobione – zgłaszam”),
+• Zlecenia – dodatkowe zadania od Michała (po wykonaniu kliknij „Zrobione – zgłaszam”); zlecający widzi tu wszystkie swoje aktywne zlecenia i ich etap,
 • Zadania – zadania przy klientach z rozmów,
 • Pytania – nierozwiązane pytania w rozmowach Twoich klientów albo takie, w których Cię oznaczono,
 • Terminy – terminy spraw M2 TAX i wygasające pełnomocnictwa (14 dni).
@@ -21,16 +21,18 @@ async function collect() {
   const me = state.me.id, admin = state.me.role === 'admin', out = [];
   const soft = async q => { const { data, error } = await q; return error ? [] : (data || []); };
   const [zl, tk, cs] = await Promise.all([
-    soft(sb.from('zlecenia').select('id,no,title,status,due_date,priority,assignee_id,created_at').in('status', ['nowe', 'w_toku', 'pytanie', 'zgloszone'])),
+    soft(sb.from('zlecenia').select('id,no,title,status,due_date,priority,assignee_id,created_by,created_at').in('status', ['nowe', 'w_toku', 'pytanie', 'zgloszone'])),
     soft(sb.from('rkdp_tickets').select('id,no,title,status,due_date,priority,client_id,m2_client_id,module,created_at').eq('assignee_id', me).in('status', TK_OPEN)),
     soft(sb.from('clients').select('id,name,accountant_id,hr_id').eq('status', 'aktywny')),
   ]);
   const cname = new Map(cs.map(c => [c.id, c.name]));
   const myClients = new Set(cs.filter(c => c.accountant_id === me || c.hr_id === me).map(c => c.id));
-  // zlecenia: pracownik – swoje do zrobienia; administrator – czekające na niego (zgłoszone, pytania)
-  zl.filter(z => z.assignee_id === me ? ['nowe', 'w_toku', 'pytanie'].includes(z.status) : admin && ['zgloszone', 'pytanie'].includes(z.status)).forEach(z => out.push({
-    kind: 'zlecenie', id: z.id, title: z.title, due: z.due_date, hot: z.priority === 'pilne', created: z.created_at,
-    sub: z.assignee_id === me ? (z.status === 'pytanie' ? 'czeka na odpowiedź Michała' : z.status === 'nowe' ? 'nowe – od Michała' : 'w trakcie') : (z.status === 'zgloszone' ? 'do sprawdzenia' : 'pytanie od pracownika'),
+  // zlecenia: pracownik – swoje do zrobienia; zlecający (administrator) – wszystkie aktywne, które zlecił (u kogo i na jakim etapie)
+  const who = id => memberById(id)?.full_name || memberById(id)?.short_name || 'pracownik';
+  const ZS = { nowe: 'nowe – jeszcze nie rozpoczęte', w_toku: 'w trakcie', pytanie: 'pytanie od pracownika – odpowiedz', zgloszone: 'zgłoszone – do sprawdzenia' };
+  zl.filter(z => z.assignee_id === me ? ['nowe', 'w_toku', 'pytanie'].includes(z.status) : (z.created_by === me || admin)).forEach(z => out.push({
+    kind: 'zlecenie', id: z.id, title: z.title, due: z.due_date, hot: z.priority === 'pilne' || (z.assignee_id !== me && ['zgloszone', 'pytanie'].includes(z.status)), created: z.created_at,
+    sub: z.assignee_id === me ? (z.status === 'pytanie' ? 'czeka na odpowiedź Michała' : z.status === 'nowe' ? 'nowe – od Michała' : 'w trakcie') : `zlecone: ${who(z.assignee_id)} · ${ZS[z.status] || z.status}`,
     open: () => import('./zlecenia.js').then(m => m.openZlecenie(z.id, reload)) }));
   tk.forEach(t => out.push({ kind: 'zadanie', id: t.id, title: t.title, due: t.due_date, hot: ['pilny', 'wysoki'].includes(t.priority), created: t.created_at,
     sub: [t.client_id ? cname.get(t.client_id) : t.module === 'm2' ? 'M2 TAX' : '', t.status === 'czeka' ? 'czeka' : ''].filter(Boolean).join(' · '),
@@ -56,7 +58,7 @@ export async function renderMoje(main, params) {
   const chips = h('div', { class: 'zl-chips' }), list = h('div', { class: 'mj-list' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const order = it => { const d = it.due; return d && d < today() ? 0 : d === today() ? 1 : it.hot ? 2 : d && d <= plus(3) ? 3 : 4; };
   function draw() {
-    const F = [['all', 'Wszystko'], ['zlecenie', 'Zlecenia od Michała'], ['zadanie', 'Zadania przy klientach'], ['pytanie', 'Pytania'], ['termin', 'Terminy']];
+    const F = [['all', 'Wszystko'], ['zlecenie', state.me.role === 'admin' ? 'Zlecenia' : 'Zlecenia od Michała'], ['zadanie', 'Zadania przy klientach'], ['pytanie', 'Pytania'], ['termin', 'Terminy']];
     put(chips, ...F.map(([k, l]) => { const n = k === 'all' ? items.length : items.filter(i => i.kind === k).length; if (k !== 'all' && k !== filter && !n) return null;
       return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : ''), onclick: () => { filter = k; history.replaceState(null, '', '#/moje' + (k === 'all' ? '' : '?f=' + k)); draw(); } }, l, h('span', {}, String(n))); }).filter(Boolean));
     const rows = items.filter(i => filter === 'all' || i.kind === filter).sort((a, b) => order(a) - order(b) || (a.due || '9999').localeCompare(b.due || '9999') || (b.created || '').localeCompare(a.created || ''));
