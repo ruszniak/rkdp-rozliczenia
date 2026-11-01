@@ -1,4 +1,5 @@
 // Moduł Doradztwo podatkowe (M2 TAX)
+import { timeCard } from '../czas.js';
 import { todayWidget as obTodayWidget, teamTodayCard, canSeeTeam } from './obecnosc.js';
 import { h, toast, fail, icon, initials, MONTHS, printHtml, ava } from '../ui.js';
 import { sb, state, memberById, isAdmin } from '../store.js';
@@ -618,7 +619,7 @@ async function viewClient(main, id) {
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · ')),
-    h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
+    h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
 // ================= SPOTKANIA Z KLIENTAMI (Zoho Bookings) – karta na pulpicie =================

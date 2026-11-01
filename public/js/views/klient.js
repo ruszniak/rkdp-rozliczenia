@@ -12,6 +12,7 @@ import { threadCard } from '../watek.js';
 import { zusCard, showsZus } from '../zus.js';
 import { revenueCard } from '../limity.js';
 import { poaCard } from '../pelnomocnictwa.js';
+import { timeCard, timerButton } from '../czas.js';
 import { amlCard } from '../aml/aml.js';
 import { archiveCard } from '../archiwum.js';
 
@@ -307,6 +308,7 @@ export async function renderKlient(main, id) {
       h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         editable ? null : h('span', { class: 'badge' }, 'Tylko podgląd'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../watek.js').then(m => m.openThread({ client: c })) }, 'Rozmowa i zadania'),
+        timerButton({ module: 'rkdp', clientId: c.id, name: c.name }),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, defaultPeriod(), []) }, icon('mail'), 'Wyślij wiadomość'),
         h('a', { class: 'btn btn-outline btn-sm', href: `#/oferty/nowa?klient=${c.id}` }, 'Oferta'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => dokumentyDialog({ client: { ...c, ...draft } }).catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'))),
@@ -314,7 +316,7 @@ export async function renderKlient(main, id) {
       h('div', {}, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null,
         sectionsBox, partnersBox,
         editable ? h('div', { class: 'savebar' }, saveInfo, saveBtn) : null),
-      h('div', {}, threadCard(c), revenueCard(c, { editable }), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
+      h('div', {}, threadCard(c), revenueCard(c, { editable }), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), timeCard({ module: 'rkdp', client: c }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);

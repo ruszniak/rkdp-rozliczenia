@@ -21,6 +21,7 @@ const renderZgloszenia = lazy(() => import('./views/zgloszenia.js'), 'renderZglo
 const renderRozmowy = lazy(() => import('./views/rozmowy.js'), 'renderRozmowy');
 const renderPulpit = lazy(() => import('./views/pulpit.js'), 'renderPulpit');
 const renderZlecenia = lazy(() => import('./views/zlecenia.js'), 'renderZlecenia');
+const renderCzas = lazy(() => import('./czas.js'), 'renderCzas');
 const renderOferty = lazy(() => import('./views/oferty.js'), 'renderOferty');
 const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
@@ -99,6 +100,8 @@ const TAB_SHORT = { 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: '
 
 let themeOff = null;
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
+let timerMod = null;
+function timerPillEl() { const box = h('span', { class: 'tm-slot' }); (timerMod ||= import('./czas.js')).then(m => box.replaceChildren(m.timerPill())).catch(() => {}); return box; }
 function layout(active) {
   const me = state.me;
   const jpkOnly = isJpkOnly();
@@ -133,6 +136,7 @@ function layout(active) {
         ...M.tabs.map(link),
         me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
       h('div', { class: 'nav-user' },
+        jpkOnly ? null : timerPillEl(),
         (() => { const b = h('button', { type: 'button', class: 'hdr-search', onclick: () => openCmdk(), 'aria-label': 'Szukaj (Ctrl K)', 'data-tip': 'Szukaj klienta, sprawy, zgłoszenia, narzędzia' });
           b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Szukaj…</span><kbd>' + (/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl') + ' K</kbd>'; return b; })(),
         (() => { const b = h('button', { type: 'button', class: 'hdr-icon', onclick: () => toggleTheme() });
@@ -238,6 +242,7 @@ async function route(opts = {}) {
     else if (view === 'oferty') c = await renderOferty(layout('klienci'), parts[1], 'rkdp');
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
     else if (view === 'zlecenia') c = await renderZlecenia(layout('pulpit'), parts[1]);
+    else if (view === 'czas' && state.me.role === 'admin') c = await renderCzas(layout('pulpit'), params);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('rozliczenia'), params);
     else if (view === 'zamkniecie-roku') c = await renderRok(layout('rozliczenia'), params);
