@@ -55,7 +55,23 @@ function appSection() {
       h('div', { class: 'pw-row' }, h('span', {}, h('b', {}, on ? 'Powiadomienia są włączone na tym urządzeniu.' : 'Powiadomienia są wyłączone na tym urządzeniu.'), h('br'),
         h('span', { class: 'small muted' }, Notification.permission === 'denied' ? 'Przeglądarka blokuje powiadomienia dla tej strony – odblokuj je w ustawieniach witryny (ikona kłódki przy adresie).' : 'Każde urządzenie (komputer, telefon) włączasz osobno.')),
         h('span', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 'none' } }, test, btn)),
-      h('div', { style: { display: 'flex', flexDirection: 'column', marginTop: '8px' } }, ...checks));
+      h('div', { style: { display: 'flex', flexDirection: 'column', marginTop: '8px' } }, ...checks),
+      await mailToggle(on));
+  }
+  // e-maile o zleceniach: można je wyłączyć, gdy działają powiadomienia (bez działających powiadomień mail i tak przyjdzie)
+  async function mailToggle(on) {
+    const { data } = await sb.from('member_profiles').select('zl_email').eq('member_id', state.me.id).maybeSingle();
+    const cur = data?.zl_email !== false;
+    const cb = h('input', { type: 'checkbox', checked: cur });
+    cb.addEventListener('change', async () => {
+      const { error } = await sb.rpc('set_zl_email', { p_on: cb.checked });
+      if (error) { cb.checked = !cb.checked; return fail(error); }
+      toast(cb.checked ? 'E-maile o zleceniach włączone' : 'E-maile o zleceniach wyłączone – zostają powiadomienia');
+    });
+    return h('div', { class: 'pw-mail' }, h('label', { class: 'check', style: { margin: '4px 0' } }, cb, h('span', {}, h('b', {}, 'Wysyłaj mi też e-maile o zleceniach'), h('br'),
+      h('span', { class: 'small muted' }, on
+        ? 'Odznacz, jeśli wystarczą Ci powiadomienia. Gdy na żadnym urządzeniu nie masz włączonych powiadomień (albo przestaną działać), e-mail i tak przyjdzie – nic nie przepadnie.'
+        : 'Najpierw włącz powiadomienia na tym urządzeniu. Bez działających powiadomień e-maile o zleceniach przychodzą zawsze.'))));
   }
   drawPush();
   return h('section', { class: 'card section' },

@@ -194,6 +194,12 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
   const m = new Map((ms || []).map((x: any) => [x.id, x]));
   const to = m.get(toId), from = m.get(toId === z.assignee_id ? z.created_by : z.assignee_id);
   if (!to?.email || !emailOk(String(to.email))) return { sent: 0, reason: 'brak adresu' };
+  // odbiorca wyłączył e-maile o zleceniach (Mój profil) – wystarczy powiadomienie push, o ile ma choć jedno działające
+  const { data: pr } = await admin.from('member_profiles').select('zl_email').eq('member_id', to.id).maybeSingle();
+  if (pr?.zl_email === false) {
+    const { data: subs } = await admin.from('push_subscriptions').select('prefs, fail_count').eq('member_id', to.id);
+    if ((subs || []).some((x: any) => (x.fail_count || 0) < 3 && (x.prefs?.zgloszenia ?? true) !== false)) return { sent: 0, reason: 'push' };
+  }
   const { data: last } = await admin.from('zlecenia_wpisy').select('body, kind').eq('zlecenie_id', z.id).order('created_at', { ascending: false }).limit(1);
   const note = ev !== 'nowe' ? (last?.[0]?.body || '') : '';
   const client = z.client_id ? (await admin.from('clients').select('name').eq('id', z.client_id).maybeSingle()).data?.name || '' : '';
