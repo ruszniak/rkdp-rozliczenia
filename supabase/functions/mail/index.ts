@@ -210,6 +210,7 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
     ev === 'nowe' && z.body ? '\n' + z.body : '', ev === 'nowe' && steps.length ? '\nKroki:\n' + steps.join('\n') : '',
     note ? `\n${ev === 'poprawka' ? 'Do poprawy' : ev === 'pytanie' ? 'Pytanie' : 'Wiadomość'}: ${note}` : '',
     '', ev === 'zgloszone' ? 'Sprawdź i zaakceptuj albo odeślij do poprawy:' : ev === 'pytanie' ? 'Odpowiedz w aplikacji:' : 'Otwórz zlecenie w aplikacji:', link,
+    '', 'Nie odpowiadaj na tego maila – odpowiedzi nie trafiają do aplikacji. Odpowiadaj w zleceniu w aplikacji.',
   ].filter((x, i, arr) => !(x === '' && arr[i - 1] === ''));
   const text = lines.join('\n');
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;max-width:560px">`
@@ -221,7 +222,7 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
     + (ev === 'nowe' && steps.length ? `<p style="white-space:pre-wrap">${escH(steps.join('\n'))}</p>` : '')
     + (note ? `<p style="white-space:pre-wrap;background:#F5E7CF;padding:10px 12px;border-radius:8px">${escH(note)}</p>` : '')
     + `<p style="margin:18px 0"><a href="${link}" style="background:#806341;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">Otwórz zlecenie</a></p>`
-    + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z aplikacji RKDP.</p></div>`;
+    + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z aplikacji RKDP. <b>Nie odpowiadaj na tego maila</b> – odpowiedzi nie trafiają do aplikacji. Pytania, komentarze i zgłoszenie wykonania wpisuj w zleceniu w aplikacji (przycisk wyżej).</p></div>`;
   try { await sendMail(cfg, 'RKDP | Zlecenia', String(to.email), subject, text, html); return { sent: 1 }; }
   catch (e) { console.error('zlecenie mail', e); return { sent: 0, error: String((e as Error).message || e).slice(0, 200) }; }
 }

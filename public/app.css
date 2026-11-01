@@ -1948,3 +1948,10 @@ a.lim-a:hover{border-color:var(--gold)}
 .grid tr.partner-row .cname{padding-left:14px}
 .grid tr.partner-row .pr-name{font-size:13.5px;font-weight:600;color:var(--ink-2,inherit)}
 .grid tr.partner-row .badge{font-size:10.5px}
+
+/* zachęta: zainstaluj aplikację / włącz powiadomienia */
+.push-nudge{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid var(--gold);background:color-mix(in srgb,var(--gold) 12%,var(--card));border-radius:14px;padding:12px 16px;margin-bottom:14px}
+.push-nudge[hidden]{display:none}
+.push-nudge .pn-ico{font-size:22px;flex:none}
+.push-nudge .pn-txt{flex:1 1 320px;min-width:0;line-height:1.45}
+.push-nudge .pn-act{display:flex;gap:8px;flex-wrap:wrap;flex:none}

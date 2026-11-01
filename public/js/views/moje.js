@@ -3,6 +3,7 @@
 import { h, fail, infoTip, icon, ava } from '../ui.js';
 import { sb, state, hasModule, memberById } from '../store.js';
 import { TK_OPEN } from './zgloszenia.js';
+import { pushNudge } from '../pushnudge.js';
 // bez „null” w treści: puste elementy (null/false) są pomijane
 const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
@@ -78,6 +79,7 @@ export async function renderMoje(main, params) {
       h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Moje sprawy', infoTip(HELP, 'Moje sprawy')),
       h('p', { class: 'sub' }, 'Zlecenia, zadania, pytania i terminy – wszystko, co czeka na Ciebie.')),
       state.me.role === 'admin' ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => import('./zlecenia.js').then(m => m.newZlecenie(reload)) }, icon('plus'), 'Zlecenie') : null),
+    pushNudge(),
     h('section', { class: 'card section' }, chips, list));
   await reload();
 }
