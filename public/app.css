@@ -1942,3 +1942,9 @@ a.lim-a:hover{border-color:var(--gold)}
 .mj-av{width:30px;height:30px;font-size:12px;flex:none}
 .mj-who-n{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:600px){.mj-row{grid-template-columns:minmax(0,1fr) auto auto}.mj-who-n{display:none}}
+
+/* Rozliczenia – wiersz wspólnika spółki osobowej (osobne kratki PIT i ZUS) */
+.grid tr.partner-row td{background:color-mix(in srgb,var(--panel) 55%,transparent);padding-top:6px;padding-bottom:6px}
+.grid tr.partner-row .cname{padding-left:14px}
+.grid tr.partner-row .pr-name{font-size:13.5px;font-weight:600;color:var(--ink-2,inherit)}
+.grid tr.partner-row .badge{font-size:10.5px}

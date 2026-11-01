@@ -170,7 +170,7 @@ export async function renderKlient(main, id) {
     partnersBox.replaceChildren(h('section', { class: 'card section' },
       h('div', { class: 'section-head' }, h('h2', {}, 'Wspólnicy'),
         editable ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => { partnerList.push({ client_id: id, full_name: '', settled_by_us: true }); markDirty(); renderPartners(); } }, '+ Dodaj wspólnika') : null),
-      partnerList.length ? null : h('p', { class: 'hint' }, 'Dodaj wspólników, aby rozliczać ich PIT i ZUS.'),
+      partnerList.length ? null : h('p', { class: 'hint' }, 'Dodaj wspólników, aby rozliczać ich PIT i ZUS – każdy wspólnik dostanie w Rozliczeniach własne kratki PIT (Księgowość) i ZUS (Kadry).'),
       partnerList.map((p, idx) => h('div', { class: 'partner' },
         h('div', { class: 'form-grid' }, pFields.map(([key, label, type, opts]) => {
           const el = inputFor(type, opts, p[key], !editable);
@@ -286,6 +286,8 @@ export async function renderKlient(main, id) {
         if (p.id) { const { error: e } = await sb.from('client_partners').update(row).eq('id', p.id); if (e) throw e; }
         else { const { data, error: e } = await sb.from('client_partners').insert(row).select('id').single(); if (e) throw e; p.id = data.id; }
       }
+      // kratki PIT/ZUS wspólników w otwartych miesiącach Rozliczeń (brak funkcji w bazie = pomijamy)
+      if (partnerList.length || isPartnership(draft.legal_form)) await sb.rpc('sync_partner_entries', { p_client: id }).then(() => {}, () => {});
       dirty = false; saveInfo.textContent = 'Zapisano'; toast('Zapisano zmiany');
       titleEl.textContent = draft.name; renderComp();
     } catch (e) {

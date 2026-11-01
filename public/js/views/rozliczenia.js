@@ -58,12 +58,24 @@ export async function renderRozliczenia(main, params) {
   const editClients = canEditClients();
 
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie rozliczeń…'));
-  const [clients, entries, notes] = await Promise.all([
+  const [clients, entries, notes, pEntries, partners] = await Promise.all([
     fetchAll(() => sb.from('clients')
       .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id,email').order('name')),
     fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at,amount,due_date').eq('period', pdate)),
     fetchAll(() => sb.from('period_notes').select('client_id,notes,questions').eq('period', pdate)),
+    // kratki wspólników spółek osobowych (PIT, ZUS każdego wspólnika) – tabela może jeszcze nie istnieć
+    sb.from('partner_entries').select('id,partner_id,client_id,task_code,status,updated_by,updated_at').eq('period', pdate).then(r => r.data || [], () => []),
+    sb.from('client_partners').select('id,client_id,full_name').eq('settled_by_us', true).order('created_at').then(r => r.data || [], () => []),
   ]);
+  // wspólnik → jego kratki (task_code → kratka); klient → lista wspólników z kratkami w tym miesiącu
+  const partnerById = new Map(partners.map(p => [p.id, p]));
+  const byPartner = new Map();
+  for (const e of pEntries) {
+    e._pe = true;
+    if (!byPartner.has(e.partner_id)) byPartner.set(e.partner_id, new Map());
+    byPartner.get(e.partner_id).set(e.task_code, e);
+  }
+  const partnersOf = cid => partners.filter(p => p.client_id === cid && byPartner.has(p.id));
   // załączniki do uwag (tabela może jeszcze nie istnieć – wtedy po prostu brak plików)
   const fileCount = new Map();
   sb.from('period_files').select('client_id').eq('period', pdate).then(({ data }) => {
@@ -111,7 +123,9 @@ export async function renderRozliczenia(main, params) {
     let v = cellsCache.get(k);
     if (!v) {
       const m = byClient.get(c.id);
-      v = !m ? [] : (area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', sectionOf(c))).map(t => m.get(t.code)).filter(Boolean);
+      const ts = area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', sectionOf(c));
+      v = !m ? [] : ts.map(t => m.get(t.code)).filter(Boolean);
+      for (const p of partnersOf(c.id)) v.push(...ts.map(t => byPartner.get(p.id).get(t.code)).filter(Boolean));
       cellsCache.set(k, v);
     }
     return v;
@@ -359,10 +373,10 @@ export async function renderRozliczenia(main, params) {
     const who = entry.updated_by && entry.updated_by !== 'system'
       ? (state.members.find(m => m.email === entry.updated_by)?.short_name || entry.updated_by) : null;
     const tip = `${headerLabel}: ${st.label}` + (entry.amount != null ? `\nKwota: ${(+entry.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2 })} zł${entry.due_date ? ', termin ' + entry.due_date.split('-').reverse().join('.') : ''}` : '') + (who ? `\nZmienił(a): ${who}, ${new Date(entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
-    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry.id,
+    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry._pe ? null : entry.id,
       onclick: (ev) => {
-        if (ev.shiftKey && anchorId) return selectRange(ev.currentTarget);
-        if (ev.ctrlKey || ev.metaKey || selectMode) return toggleSel(entry.id, ev.currentTarget);
+        if (!entry._pe && ev.shiftKey && anchorId) return selectRange(ev.currentTarget);
+        if (!entry._pe && (ev.ctrlKey || ev.metaKey || selectMode)) return toggleSel(entry.id, ev.currentTarget);
         // telefon: jedno dotknięcie = „Zrobione” (z „Cofnij”); przytrzymanie albo dotknięcie zrobionej kratki = wszystkie statusy
         if (PHONE() && !['done', 'na'].includes(entry.status)) return setStatus(entry, 'done');
         statusMenu(ev.currentTarget, entry, headerLabel);
@@ -447,6 +461,21 @@ export async function renderRozliczenia(main, params) {
       h('td', {}, noteCell(c)));
   }
 
+  // wiersz wspólnika pod spółką: tylko jego kratki (PIT w księgowości, ZUS w kadrach)
+  function partnerRow(c, p, area, cols) {
+    const m = byPartner.get(p.id) || new Map();
+    const cells = cols.map(col => m.get(col.code)).filter(Boolean);
+    if (!cells.length) return null;
+    const done = cells.every(e => e.status === 'done' || e.status === 'na');
+    return h('tr', { class: 'partner-row' + (done ? ' settled' : ''), 'data-client': c.id, 'data-partner': p.id, 'data-area': area },
+      h('td', { class: 'c-name' }, h('div', { class: 'cname' }, h('span', { class: 'pr-name' }, '↳ ', p.full_name || 'wspólnik'), h('div', { class: 'meta' }, h('span', { class: 'badge' }, 'wspólnik')))),
+      h('td', { class: 'c-person' }),
+      area === 'kadry' ? h('td', {}) : null,
+      cols.map(col => { const e = m.get(col.code); return h('td', { class: 'c-task', 'data-label': col.label }, e ? checkbox(e, col, `${col.label} – ${p.full_name}`) : h('span', { class: 'muted small' }, '')); }),
+      h('td', { class: 'c-sum' }), h('td', {}));
+  }
+  const rowsWithPartners = (c, area, cols) => [rowFor(c, area, cols), ...partnersOf(c.id).map(p => partnerRow(c, p, area, cols))].filter(Boolean);
+
   // telefon: zdjęcie dokumentu prosto do klienta i miesiąca (załącznik w rozmowie klienta)
   function photoDoc(c) {
     const inp = h('input', { type: 'file', accept: 'image/*,application/pdf', capture: 'environment', multiple: true, hidden: true });
@@ -484,7 +513,7 @@ export async function renderRozliczenia(main, params) {
           h('span', { class: 'colbar' + (st.pct === 100 ? ' full' : ''), 'aria-hidden': 'true' }, h('i', { style: { width: st.pct + '%' } }))]; })())),
       h('th', { class: 'c-sum', 'data-tip': 'Rozliczony = wszystkie kratki „Zrobione” albo „Nie dotyczy”' }, 'Klient rozliczony'),
       h('th', { 'data-tip': 'Rozmowa o kliencie: uwagi, pytania i zadania. Liczba = otwarte zadania + otwarte pytania w tym miesiącu' }, 'Rozmowa')));
-    const tbody = h('tbody', {}, t.rows.map(c => rowFor(c, area, cols)));
+    const tbody = h('tbody', {}, t.rows.flatMap(c => rowsWithPartners(c, area, cols)));
     const table = h('table', { class: 'grid' }, thead, tbody);
     table._cols = cols;
     return h('div', { class: 'grid-wrap' + (t.inactiveOnly ? ' inactive' : '') }, table);
@@ -520,6 +549,7 @@ export async function renderRozliczenia(main, params) {
     const c = clientMap.get(clientId);
     body.querySelectorAll(`tr[data-client="${clientId}"]`).forEach(tr => {
       const area = tr.dataset.area;
+      if (tr.dataset.partner) { const pr = partnerRow(c, partnerById.get(tr.dataset.partner), area, tr.closest('table')._cols); if (pr) tr.replaceWith(pr); return; }
       const nr = rowFor(c, area, tr.closest('table')._cols);
       if (!tr.classList.contains('settled') && nr.classList.contains('settled')) nr.classList.add('flash');
       tr.replaceWith(nr);
@@ -549,9 +579,9 @@ export async function renderRozliczenia(main, params) {
     const before = entry.status, wasAll = allSettled();
     entry.status = status; entry.updated_by = state.me.email; entry.updated_at = new Date().toISOString();
     refreshRow(entry.client_id);
-    const { error } = await sb.from('checklist_entries').update({ status }).eq('id', entry.id);
+    const { error } = await sb.from(entry._pe ? 'partner_entries' : 'checklist_entries').update({ status }).eq('id', entry.id);
     if (error) { entry.status = before; refreshRow(entry.client_id); return fail(error, 'Nie zapisano'); }
-    if (!silent) toastAction(`${clientMap.get(entry.client_id)?.name || ''} · ${taskLabel(entry.task_code)}: ${STATUS[status].label}`, 'Cofnij', () => setStatus(entry, before, { silent: true }));
+    if (!silent) toastAction(`${entry._pe ? (partnerById.get(entry.partner_id)?.full_name || 'wspólnik') : (clientMap.get(entry.client_id)?.name || '')} · ${taskLabel(entry.task_code)}: ${STATUS[status].label}`, 'Cofnij', () => setStatus(entry, before, { silent: true }));
     if (!wasAll && allSettled()) celebrate(`Wszyscy klienci rozliczeni – ${AREAS[prefs.area].label.toLowerCase()}, ${periodLabel(period).toLowerCase()}!`);
   }
   // zmiana wielu kratek naraz (jedno „Cofnij” dla całej operacji)
@@ -674,7 +704,7 @@ export async function renderRozliczenia(main, params) {
         onclick: () => { closePop(); if (entry.status !== s) setStatus(entry, s); } },
       h('span', { class: `cb cb-${s}`, style: { width: '22px', height: '22px', fontSize: '12px' } }, STATUS[s].mark),
       s === 'todo' ? 'Wyczyść (do zrobienia)' : STATUS[s].label)),
-      AMOUNT_CODES.includes(entry.task_code) ? h('button', { class: 'opt', role: 'menuitem', onclick: () => { closePop(); openAmounts({ client: clientMap.get(entry.client_id), period, entries: byClient.get(entry.client_id) || new Map(), onDone: () => refreshRow(entry.client_id) }); } },
+      AMOUNT_CODES.includes(entry.task_code) && !entry._pe ? h('button', { class: 'opt', role: 'menuitem', onclick: () => { closePop(); openAmounts({ client: clientMap.get(entry.client_id), period, entries: byClient.get(entry.client_id) || new Map(), onDone: () => refreshRow(entry.client_id) }); } },
         h('span', { class: 'cb', style: { width: '22px', height: '22px', fontSize: '12px' } }, 'zł'), entry.amount != null ? `Kwoty do zapłaty (${(+entry.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2 })} zł)…` : 'Kwoty do zapłaty – wyślij klientowi…') : null]);
   }
 
