@@ -19,6 +19,8 @@ const isJdg = c => c.legal_form === 'jdg';
 const always = () => true;
 
 // [klucz, etykieta, typ, opcje, kiedy pokazać, szerokie?]
+// podatnik CIT: spółki kapitałowe i spółka komandytowa (CIT od 2021 r.)
+const citPayer = c => isCompany(c.legal_form) || c.legal_form === 'spolka_komandytowa';
 const SECTIONS = [
   { title: 'Dane podstawowe', fields: [
     ['name', 'Nazwa / imię i nazwisko', 'text', null, always, true],
@@ -41,9 +43,9 @@ const SECTIONS = [
     ['pit_form', 'Forma opodatkowania PIT', 'select', PIT_FORM, isJdg],
     ['ryczalt_rates', 'Stawki ryczałtu', 'text', null, c => isJdg(c) && c.pit_form === 'ryczalt'],
     ['pit_advances', 'Zaliczki PIT', 'select', ADVANCES, isJdg],
-    ['cit_type', 'Rodzaj CIT', 'select', CIT_TYPE, c => isCompany(c.legal_form)],
-    ['cit_advances', 'Zaliczki CIT', 'select', CIT_ADVANCES, c => isCompany(c.legal_form) && c.cit_type !== 'estonski'],
-    ['fiscal_year', 'Rok podatkowy', 'text', null, c => isCompany(c.legal_form)],
+    ['cit_type', 'Rodzaj CIT', 'select', CIT_TYPE, citPayer],
+    ['cit_advances', 'Zaliczki CIT', 'select', CIT_ADVANCES, c => citPayer(c) && c.cit_type !== 'estonski'],
+    ['fiscal_year', 'Rok podatkowy', 'text', null, citPayer],
   ] },
   { title: 'ZUS i kadry', fields: [
     ['zus_type', 'Składki ZUS właściciela', 'select', ZUS_TYPE, isJdg],

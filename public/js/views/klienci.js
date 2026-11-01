@@ -28,7 +28,7 @@ export function taxSummary(c) {
   const out = [];
   if (c.service_scope === 'doradztwo') out.push('Tylko DP' + (c.has_employees ? ' + kadry' : ''));
   if (c.legal_form === 'jdg' && c.pit_form) out.push(PIT_SHORT[c.pit_form] + (c.pit_advances === 'kwartalne' ? ' (kw.)' : ''));
-  if (isCompany(c.legal_form) && c.cit_type) out.push(CIT_SHORT[c.cit_type] + (c.cit_advances === 'kwartalne' ? ' (kw.)' : ''));
+  if ((isCompany(c.legal_form) || c.legal_form === 'spolka_komandytowa') && c.cit_type) out.push(CIT_SHORT[c.cit_type] + (c.cit_advances === 'kwartalne' ? ' (kw.)' : ''));
   if (c.vat_status) out.push(VAT_SHORT[c.vat_status]);
   if (c.legal_form === 'jdg' && c.zus_type) out.push('ZUS: ' + ZUS_SHORT[c.zus_type]);
   if (c.has_employees) out.push('Pracownicy');
