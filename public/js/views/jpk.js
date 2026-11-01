@@ -613,7 +613,6 @@ function viewPit(m) {
       : [['Wiersze', fmtInt(m.rows.length)], ['Przychód (9)', fmtN(T.K_9)], ['Koszty (10+11+14)', fmtN(T.koszty)], ['Wynik (bez remanentu)', fmtN(T.wynik)]];
     body.replaceChildren(
       h('div', { class: 'jpk-tiles' }, ...tiles.map(([l, n]) => h('div', { class: 'card tile' }, h('span', { class: 'num', style: { fontSize: '22px' } }, n), h('span', { class: 'lbl' }, l)))),
-      revenueSaveBar(m, ewp ? T.przychod : T.K_9),
       h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Sumy kontrolne')),
         h('div', { class: 'jpk-scroll' }, h('table', { class: 'jpk-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Pole'), h('th', { class: 'n' }, 'W pliku'), h('th', { class: 'n' }, 'Wyliczone z wierszy'), h('th', {}, 'Wynik'))),
           h('tbody', {}, ...A.ctrlRows.map(r => h('tr', {}, h('td', {}, `${r.k} – ${L[r.k]}`), h('td', { class: 'n' }, r.file === undefined ? '—' : r.k === 'LiczbaWierszy' ? fmtInt(num(r.file)) : fmtN(num(r.file))),

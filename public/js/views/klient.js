@@ -10,7 +10,6 @@ import { nipLookupBar, mergeNipData } from '../nip.js';
 import { dokumentyDialog } from '../rkdp/docs.js';
 import { threadCard } from '../watek.js';
 import { zusCard, showsZus } from '../zus.js';
-import { revenueCard } from '../limity.js';
 import { poaCard } from '../pelnomocnictwa.js';
 import { amlCard } from '../aml/aml.js';
 import { archiveCard } from '../archiwum.js';
@@ -314,7 +313,7 @@ export async function renderKlient(main, id) {
       h('div', {}, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null,
         sectionsBox, partnersBox,
         editable ? h('div', { class: 'savebar' }, saveInfo, saveBtn) : null),
-      h('div', {}, threadCard(c), revenueCard(c, { editable }), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
+      h('div', {}, threadCard(c), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);
