@@ -274,6 +274,7 @@ export async function renderRozliczenia(main, params) {
 
   const legend = h('div', { class: 'legend' },
     ['done', 'na', 'missing_docs', 'reminded', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
+    h('span', {}, h('span', { class: 'cb cb-todo cb-amt' }, 'zł'), 'Kwota wpisana, niepodana klientowi'),
     h('span', { class: 'muted' }, '· kliknij kratkę, aby zmienić · najedź na nagłówek, aby zobaczyć opis'));
 
   function renderTabs() {
@@ -373,7 +374,10 @@ export async function renderRozliczenia(main, params) {
     const who = entry.updated_by && entry.updated_by !== 'system'
       ? (state.members.find(m => m.email === entry.updated_by)?.short_name || entry.updated_by) : null;
     const tip = `${headerLabel}: ${st.label}` + (entry.amount != null ? `\nKwota: ${(+entry.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2 })} zł${entry.due_date ? ', termin ' + entry.due_date.split('-').reverse().join('.') : ''}` : '') + (who ? `\nZmienił(a): ${who}, ${new Date(entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
-    return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry._pe ? null : entry.id,
+    // kwota przy kratce (VAT, PIT/CIT, ZUS, PIT-4): wpisana, a jeszcze nie podana klientowi = złota kratka „zł”; podana = zwykłe „Zrobione”; kwota pod kratką
+    const amt = entry.amount != null && AMOUNT_CODES.includes(entry.task_code) && entry.status !== 'na';
+    const pending = amt && !['done'].includes(entry.status);
+    const btn = h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (pending && ['todo', 'in_progress'].includes(entry.status) ? ' cb-amt' : '') + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry._pe ? null : entry.id,
       onclick: (ev) => {
         if (!entry._pe && ev.shiftKey && anchorId) return selectRange(ev.currentTarget);
         if (!entry._pe && (ev.ctrlKey || ev.metaKey || selectMode)) return toggleSel(entry.id, ev.currentTarget);
@@ -381,7 +385,9 @@ export async function renderRozliczenia(main, params) {
         if (PHONE() && !['done', 'na'].includes(entry.status)) return setStatus(entry, 'done');
         statusMenu(ev.currentTarget, entry, headerLabel);
       },
-      oncontextmenu: (ev) => { if (!PHONE()) return; ev.preventDefault(); statusMenu(ev.currentTarget, entry, headerLabel); } }, st.mark);
+      oncontextmenu: (ev) => { if (!PHONE()) return; ev.preventDefault(); statusMenu(ev.currentTarget, entry, headerLabel); } }, pending && ['todo', 'in_progress'].includes(entry.status) ? 'zł' : st.mark);
+    if (!amt) return btn;
+    return h('span', { class: 'cb-amtwrap' }, btn, h('span', { class: 'cb-sum' + (entry.status === 'done' ? ' sent' : '') }, (+entry.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })));
   }
 
   function personCell(c, area) {
