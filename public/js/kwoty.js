@@ -56,6 +56,8 @@ export async function openAmounts({ client, period, entries, onDone }) {
   inputs.forEach(i => { i.amt.addEventListener('input', recalc); i.on.addEventListener('change', recalc); });
   recalc();
   const periodLbl = `${MON[+period.slice(5, 7) - 1]} ${period.slice(0, 4)}`;
+  // rozgrzanie funkcji wysyłki i stopki z rkdp.pl/stopki – podgląd po kliknięciu „Wyślij klientowi…” pojawi się od razu
+  sb.functions.invoke('mail', { body: { action: 'preview_kwoty', period, items: [] } }).catch(() => {});
   const items = chosen => chosen.map(i => { const l = L[i.code], a = l.account === 'zus' ? c.acc_zus : c.acc_tax;
     return { label: l.label, amount: parseAmt(i.amt.value), due: i.due.value, account: acc(a), acctype: l.account, title: l.title }; });
 
@@ -111,10 +113,11 @@ export async function openAmounts({ client, period, entries, onDone }) {
       const its = items(chosen);
       // podgląd w szacie graficznej RKDP (z logo i stopką osoby wysyłającej) – gdy się nie uda, wersja tekstowa
       const frame = h('iframe', { class: 'kw-frame', sandbox: '', title: 'Podgląd wiadomości' });
-      const pv = h('div', { class: 'kw-preview' }, h('p', { class: 'hint' }, 'Przygotowuję podgląd…'));
+      // od razu wersja tekstowa, po chwili podmiana na wygląd maila (logo, tabela, stopka)
+      const pv = h('div', { class: 'kw-preview' }, h('pre', { class: 'wt-mailbody' }, body));
       sb.functions.invoke('mail', { body: { action: 'preview_kwoty', period, items: its } }).then(({ data }) => {
-        if (data?.html) { frame.srcdoc = data.html; pv.replaceChildren(frame); } else pv.replaceChildren(h('pre', { class: 'wt-mailbody' }, body));
-      }, () => pv.replaceChildren(h('pre', { class: 'wt-mailbody' }, body)));
+        if (data?.html) { frame.srcdoc = data.html; pv.replaceChildren(frame); }
+      }, () => {});
       modal('Podgląd wiadomości', h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `Do: ${c.email} · Temat: Kwoty do zapłaty – ${periodLbl}`), pv),
         c2 => [h('button', { class: 'btn btn-ghost', onclick: c2 }, 'Wróć'), h('button', { class: 'btn btn-primary', onclick: async ev => {
           const sendBtn = ev.currentTarget; sendBtn.disabled = true; sendBtn.textContent = 'Wysyłam…'; btn.disabled = true;
