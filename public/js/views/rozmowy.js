@@ -7,7 +7,11 @@ import { fetchAll } from './rozliczenia.js';
 import { TK_STATUS, TK_OPEN, newTicketDialog, generateRecurring } from './zgloszenia.js';
 import { openThread } from '../watek.js';
 
-const HELP = `Rozmowy to jedno miejsce na wszystko, co dotyczy klienta:
+const HELP = `Rozmowy dotyczą bieżących rozliczeń klienta (nie dodatkowych zleceń od Michała – te są w „Zleceniach”).
+Piszemy tu np.: czegoś nie da się zaksięgować, plik nie chce się zaimportować, klient zapomniał dosłać dokument, brakuje sprzedaży – czekamy.
+Ważne, stałe tematy klienta (żeby nie umknęły) zapisuj w karcie klienta (Klienci → klient → „Notatki stałe”).
+
+W rozmowie:
 • uwagi, pytania i zadania (dawne zgłoszenia), odpowiedzi, załączniki, wysłane e-maile i zmiany kratek,
 • kliknij klienta – otworzy się jego rozmowa; zadanie tworzysz w rozmowie przełącznikiem „Zadanie” (osoba, termin, priorytet),
 • rozmowa z klientem jest jedna – bez podziału na miesiące; to, co załatwione, odznaczasz „✓ Zrobione” / „✓ Wyjaśnione”,

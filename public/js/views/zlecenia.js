@@ -53,7 +53,8 @@ const HELP = `Zlecenia to dodatkowe zadania od Michała.
 • Kliknij „Zaczynam”, odhaczaj kroki, a gdy skończysz – „Zrobione – zgłaszam” (możesz dopisać komentarz).
 • Gdy coś jest niejasne – „Mam pytanie”. Odpowiedź przyjdzie powiadomieniem.
 • Michał akceptuje wykonanie albo odsyła do poprawy z uwagą.
-Każda osoba widzi tylko swoje zlecenia.`;
+Każda osoba widzi tylko swoje zlecenia.
+Nie odpowiadaj na maile o zleceniach – odpowiadaj tutaj. Sprawy bieżących rozliczeń klienta (braki dokumentów, problemy z księgowaniem) prowadź w „Rozmowach”.`;
 
 async function loadAll() {
   const { data, error } = await sb.from('zlecenia').select('*').order('created_at', { ascending: false }).limit(500);
