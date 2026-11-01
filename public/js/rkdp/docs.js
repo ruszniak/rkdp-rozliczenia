@@ -60,7 +60,7 @@ function contractDefaults(c) {
     company: (c?.name || '').replace(/\s*(sp\.?\s*z\s*o\.?\s*o\.?|spółka z ograniczoną odpowiedzialnością)\s*$/i, '').trim(),
     seat_loc: a.city ? `${a.city}` : '', street: [a.street, a.house + (a.flat ? '/' + a.flat : '')].filter(Boolean).join(' '), zip: a.zip, city: a.city,
     krs: c?.krs || '', regon: c?.regon || '', rep: c?.contact_person || '',
-    fee: c?.monthly_fee ?? '', docs_limit: '', fee_extra: '', fee_year: '', fee_hr: '',
+    fee: c?.monthly_fee ?? '', docs_limit: c?.fee_docs ?? '', fee_extra: c?.fee_extra_doc ?? '', fee_year: '', fee_hr: c?.fee_employee ?? '',
   };
 }
 function contractReplacements(v) {

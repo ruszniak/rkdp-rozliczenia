@@ -85,7 +85,7 @@ export const FIELD_LABELS = {
   employees_count: 'Liczba pracowników', ppk: 'PPK', cit_type: 'CIT', cit_advances: 'Zaliczki CIT',
   fiscal_year: 'Rok podatkowy', vat_status: 'VAT', vat_ue: 'VAT-UE', cash_register: 'Kasa fiskalna',
   ksef_access: 'Uprawnienia KSeF', contract_signed: 'Umowa', contract_date: 'Data umowy',
-  monthly_fee: 'Wynagrodzenie biura', upl1: 'UPL-1', zus_pel: 'ZUS PEL', crbr_reported: 'CRBR', notes: 'Notatki',
+  monthly_fee: 'Abonament', fee_docs: 'Dokumentów w abonamencie', fee_extra_doc: 'Dokument nadwyżkowy', fee_employee: 'Obsługa pracownika', fee_extras: 'Usługi dodatkowe', upl1: 'UPL-1', zus_pel: 'ZUS PEL', crbr_reported: 'CRBR', notes: 'Notatki',
   status_entry: 'Status', notes_p: 'Uwagi', questions: 'Pytania', assignee_id: 'Osoba', full_name: 'Wspólnik',
 };
 

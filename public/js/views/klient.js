@@ -60,10 +60,16 @@ const SECTIONS = [
   { title: 'Umowa i pełnomocnictwa', fields: [
     ['contract_signed', 'Umowa podpisana', 'bool', null, always],
     ['contract_date', 'Data umowy', 'date', null, c => c.contract_signed === true],
-    ['monthly_fee', 'Wynagrodzenie biura (netto / mies.)', 'number', null, () => canEditClients()],
     ['upl1', 'Pełnomocnictwo UPL-1 (US)', 'bool', null, always],
     ['zus_pel', 'Pełnomocnictwo ZUS PEL', 'bool', null, always],
     ['crbr_reported', 'Zgłoszenie do CRBR', 'bool', null, c => isCompany(c.legal_form) || isPartnership(c.legal_form)],
+  ] },
+  { title: 'Stawki', fields: [
+    ['monthly_fee', 'Abonament (zł netto / mies.)', 'number', null, () => canEditClients()],
+    ['fee_docs', 'Dokumentów w abonamencie', 'number', null, () => canEditClients()],
+    ['fee_extra_doc', 'Dokument nadwyżkowy (zł netto / szt.)', 'number', null, () => canEditClients()],
+    ['fee_employee', 'Obsługa pracownika (zł netto / os.)', 'number', null, () => canEditClients()],
+    ['fee_extras', 'Usługi dodatkowe', 'text', null, () => canEditClients(), true],
   ] },
 ];
 
