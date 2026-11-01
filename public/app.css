@@ -1972,3 +1972,10 @@ a.lim-a:hover{border-color:var(--gold)}
 }
 .grid td.c-task:has(.cb-amtwrap){height:auto;padding-top:4px;padding-bottom:4px}
 @media (max-width:820px){ table.grid td.c-task:has(.cb-amtwrap){height:auto!important;padding:0!important} }
+
+/* kwota w kratce: zapisana / wysłana */
+.cb.cb-pill{width:auto;min-width:64px;padding:0 9px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;border-radius:999px}
+.cb.cb-pill-saved{background:var(--card);border:1.5px solid #B7862F;color:var(--ink,#1D1A16)}
+.cb.cb-pill-sent{color:#FFF9EF}
+.legend .cb.cb-pill{width:auto;min-width:0;height:20px;font-size:10.5px;padding:0 7px}
+@media (max-width:820px){ table.grid td.c-task .cb.cb-pill{width:auto;min-width:56px;height:34px;font-size:11px;padding:0 6px} table.grid td.c-task:has(.cb-pill){width:auto!important;min-width:58px} }
