@@ -210,41 +210,84 @@ export async function openZlecenie(id, onChange) {
     ava(memberById(w.author_id) || { full_name: '?' }),
     h('div', {}, h('div', { class: 'small muted' }, h('b', {}, who(w.author_id)), KIND[w.kind] ? ` · ${KIND[w.kind]}` : '', ' · ', new Date(w.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
       w.body ? h('div', { class: 'zl-wbody' }, w.body) : null, tiles((files || []).filter(f => f.wpis_id === w.id))))));
-  const comment = h('textarea', { class: 'input', rows: 2, maxlength: 3000, placeholder: 'Komentarz…' });
+  // ---- komentarz: pole + małe przyciski „plik” i „zdjęcie” (przeciąganie i wklejanie zrzutu też działa) ----
+  const comment = h('textarea', { class: 'input zl-ctext', rows: 2, maxlength: 3000, placeholder: 'Napisz komentarz albo dołącz plik…' });
   const cAtt = [];
+  const cList = h('div', { class: 'zl-pend' });
+  const drawAtt = () => put(cList, ...cAtt.map((f, i) => h('span', { class: 'zl-pfile' }, f.type?.startsWith('image/') ? h('img', { src: URL.createObjectURL(f), alt: '' }) : null,
+    h('span', {}, `${f.name} · ${fmtSize(f.size)}`), h('button', { type: 'button', 'aria-label': 'Usuń', onclick: () => { cAtt.splice(i, 1); drawAtt(); } }, '✕'))));
+  const addAtt = fs => { fs.map(named).forEach(f => cAtt.push(f)); drawAtt(); };
+  const fileIn = h('input', { type: 'file', multiple: true, hidden: true, onchange: () => { if (fileIn.files.length) addAtt([...fileIn.files]); fileIn.value = ''; } });
+  const camIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: () => { if (camIn.files.length) addAtt([...camIn.files]); camIn.value = ''; } });
   const sendC = async ev => {
-    const v = comment.value.trim(); if (!v && !cAtt.length) return toast('Wpisz komentarz albo dodaj plik', true);
+    const v = comment.value.trim(); if (!v && !cAtt.length) { comment.focus(); return toast('Wpisz komentarz albo dodaj plik', true); }
     const btn = ev.currentTarget; btn.disabled = true;
     const { data: w, error: e } = await sb.from('zlecenia_wpisy').insert({ zlecenie_id: id, kind: 'komentarz', body: v || `📎 ${cAtt.length === 1 ? 'załącznik' : `załączniki (${cAtt.length})`}`, author_id: state.me.id }).select('id').single();
     if (e) { btn.disabled = false; return fail(e); }
     if (cAtt.length) await uploadZl(id, cAtt, w.id);
-    toast('Dodano'); refresh();
+    toast('Dodano komentarz'); refresh();
   };
-  const topAtt = [];
-  const addTop = async fs => { topAtt.push(...fs); const n = await uploadZl(id, topAtt.splice(0)); if (n) { toast(n === 1 ? 'Dodano załącznik' : `Dodano załączniki: ${n}`); refresh(); } };
+  const composer = (mine || admin) && z.status !== 'anulowane' ? h('div', { class: 'zl-composer' }, comment, cList,
+    h('div', { class: 'zl-ctools' },
+      h('button', { type: 'button', class: 'zl-tool', title: 'Dołącz plik', onclick: () => fileIn.click() }, '📎', h('span', {}, 'Plik')),
+      h('button', { type: 'button', class: 'zl-tool', title: 'Zrób zdjęcie', onclick: () => camIn.click() }, '📷', h('span', {}, 'Zdjęcie')),
+      h('span', { class: 'zl-ctools-sp' }),
+      h('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: sendC }, 'Wyślij komentarz')), fileIn, camIn) : null;
+  if (composer) {
+    ['dragenter', 'dragover'].forEach(t => composer.addEventListener(t, e => { e.preventDefault(); composer.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(t => composer.addEventListener(t, e => { e.preventDefault(); composer.classList.remove('over'); }));
+    composer.addEventListener('drop', e => { const fs = [...(e.dataTransfer?.files || [])]; if (fs.length) addAtt(fs); });
+    composer.addEventListener('paste', e => { const fs = pastedFiles(e); if (fs.length) { e.preventDefault(); addAtt(fs); } });
+  }
+  // plik do samego zlecenia (zlecający)
+  const topIn = h('input', { type: 'file', multiple: true, hidden: true, onchange: async () => { const fs = [...topIn.files]; topIn.value = ''; if (!fs.length) return; const n = await uploadZl(id, fs); if (n) { toast(n === 1 ? 'Dodano załącznik' : `Dodano załączniki: ${n}`); refresh(); } } });
 
+  // ---- „Co teraz?” – jeden wyraźny krok dla osoby, która patrzy ----
   const B = (cls, label, fn) => h('button', { class: 'btn ' + cls, type: 'button', onclick: fn }, label);
-  const actions = [];
-  if (mine && ['nowe', 'pytanie'].includes(z.status)) actions.push(B('btn-outline', 'Zaczynam', () => act('start')));
-  if (mine && ['nowe', 'w_toku'].includes(z.status)) actions.push(B('btn-ghost', 'Mam pytanie', () => ask('Pytanie do zlecenia', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie')));
-  if (mine && ['nowe', 'w_toku', 'pytanie'].includes(z.status)) actions.push(B('btn-primary', '✓ Zrobione – zgłaszam', () => ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie')));
-  if (admin && z.status === 'zgloszone') actions.push(B('btn-ghost', 'Popraw', () => ask('Odeślij do poprawy', 'Co trzeba poprawić?', 'popraw', true, 'Odeślij')), B('btn-primary', '✓ Akceptuję', () => act('akceptuj')));
-  if (admin && ['nowe', 'w_toku', 'pytanie'].includes(z.status)) actions.push(B('btn-outline', '✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zlecenie jako wykonane?')) act('zakoncz'); }));
-  if (admin && z.status === 'pytanie') actions.push(B('btn-primary', 'Odpowiedz', () => ask('Odpowiedź', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź')));
-  if (admin && OPEN.includes(z.status)) actions.push(B('btn-ghost', 'Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }), B('btn-ghost', 'Anuluj zlecenie', () => { if (confirm('Anulować to zlecenie?')) act('anuluj'); }));
-  if (admin && !OPEN.includes(z.status)) actions.push(B('btn-ghost', 'Wznów', () => act('wznow')));
+  const first = (who(z.assignee_id) || '').split(' ')[0] || 'Pracownik';
+  let hint = '', main = [], extra = [];
+  const closed = !OPEN.includes(z.status);
+  if (closed) {
+    hint = z.status === 'anulowane' ? 'Zlecenie anulowane.' : `Zlecenie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''}. 👍`;
+    if (admin) extra.push(B('btn-ghost btn-sm', 'Wznów zlecenie', () => act('wznow')));
+  } else if (mine) {
+    hint = { nowe: 'Kliknij „Zaczynam”, gdy się za to weźmiesz. Po wykonaniu – „Zrobione – zgłaszam”.', w_toku: 'Gdy skończysz, kliknij „Zrobione – zgłaszam”. Coś niejasne? „Mam pytanie”.',
+      pytanie: 'Czekasz na odpowiedź – dostaniesz powiadomienie. Możesz dalej pracować.', zgloszone: 'Zgłoszone – czeka na sprawdzenie i akceptację.' }[z.status];
+    if (['nowe', 'pytanie'].includes(z.status)) main.push(B('btn-outline', 'Zaczynam', () => act('start')));
+    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) main.push(B('btn-primary', '✓ Zrobione – zgłaszam', () => ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie')));
+    if (['nowe', 'w_toku'].includes(z.status)) extra.push(B('btn-ghost btn-sm', '? Mam pytanie', () => ask('Pytanie do zlecenia', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie')));
+  }
+  if (!closed && admin && !mine) {
+    hint = { nowe: `Czeka, aż ${first} zacznie.`, w_toku: `${first} pracuje nad zleceniem.`, pytanie: `${first} ma pytanie – odpowiedz.`,
+      zgloszone: `${first} zgłosił(a) wykonanie – sprawdź i zaakceptuj albo odeślij do poprawy.` }[z.status];
+  }
+  if (!closed && admin) {
+    if (z.status === 'zgloszone') main.push(B('btn-outline', 'Do poprawy', () => ask('Odeślij do poprawy', 'Co trzeba poprawić?', 'popraw', true, 'Odeślij')), B('btn-primary', '✓ Akceptuję – zakończ', () => act('akceptuj')));
+    if (z.status === 'pytanie') main.push(B('btn-primary', 'Odpowiedz', () => ask('Odpowiedź', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź')));
+    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) main.push(B(z.status === 'pytanie' ? 'btn-outline' : 'btn-primary', '✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zlecenie jako wykonane?')) act('zakoncz'); }));
+    extra.push(B('btn-ghost btn-sm', 'Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }),
+      B('btn-ghost btn-sm zl-danger', 'Anuluj zlecenie', () => { if (confirm('Anulować to zlecenie?')) act('anuluj'); }));
+  }
+  if (admin) extra.unshift(B('btn-ghost btn-sm', '📎 Plik do zlecenia', () => topIn.click()));
+  const STEPS = [['Zlecone', ['nowe']], ['W trakcie', ['w_toku', 'pytanie']], ['Zgłoszone', ['zgloszone']], ['Zakończone', ['zaakceptowane']]];
+  const cur = STEPS.findIndex(([, ss]) => ss.includes(z.status));
+  const stepper = z.status === 'anulowane' ? null : h('ol', { class: 'zl-stepper' }, ...STEPS.map(([l], i) => h('li', { class: i < cur ? 'done' : i === cur ? 'cur' : '' }, h('span', { class: 'dot' }, i < cur ? '✓' : String(i + 1)), h('span', { class: 'lbl' }, l + (i === 1 && z.status === 'pytanie' ? ' · pytanie' : '')))));
+  const next = h('div', { class: 'zl-next' + (closed ? ' closed' : '') },
+    hint ? h('p', { class: 'zl-next-hint' }, hint) : null,
+    main.length ? h('div', { class: 'zl-next-main' }, ...main) : null,
+    extra.length ? h('div', { class: 'zl-next-extra' }, ...extra) : null, topIn);
 
   closeFn = modal(`Zlecenie #${z.no}`, h('div', { class: 'zl-detail' },
     h('div', { class: 'zl-dhead' }, h('h3', {}, z.title, z.priority === 'pilne' ? h('span', { class: 'zl-hot' }, 'pilne') : null), pill(z)),
     h('div', { class: 'zl-dmeta' },
       h('span', {}, 'Dla: ', h('b', {}, who(z.assignee_id))), h('span', {}, 'Zlecił(a): ', who(z.created_by)), dueEl(z),
-      cl?.name ? h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name) : null,
-      h('span', { class: 'muted' }, 'utworzono ' + new Date(z.created_at).toLocaleDateString('pl-PL'))),
+      cl?.name ? h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name) : null),
     z.body ? h('div', { class: 'zl-body' }, z.body) : null,
+    stepper,
+    next,
     tiles((files || []).filter(f => !f.wpis_id)),
-    admin && OPEN.includes(z.status) ? h('div', { class: 'zl-addtop' }, dropZone(addTop, 'dołącz plik do zlecenia')) : null,
     stepsBox,
-    (wp || []).length ? h('h4', { class: 'zl-h4' }, 'Przebieg') : null, timeline,
-    (mine || admin) && z.status !== 'anulowane' ? h('div', { class: 'zl-comment' }, comment, pendingBox(cAtt), h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: sendC }, 'Dodaj komentarz')) : null),
-  c => [...actions, B('btn-ghost', 'Zamknij okno', c)], { wide: true });
+    h('h4', { class: 'zl-h4' }, 'Komentarze i przebieg'), timeline,
+    composer),
+  c => [B('btn-ghost', 'Zamknij okno', c)], { wide: true });
 }
