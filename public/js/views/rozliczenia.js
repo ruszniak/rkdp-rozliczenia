@@ -48,6 +48,8 @@ const SECTIONS = {
 };
 const ICON_NOTE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
+const PHONE = () => window.matchMedia('(max-width: 700px)').matches;
+
 export async function renderRozliczenia(main, params) {
   const period = /^\d{4}-\d{2}$/.test(params.get('okres') || '') ? params.get('okres') : defaultPeriod();
   const pdate = period + '-01';
@@ -361,8 +363,11 @@ export async function renderRozliczenia(main, params) {
       onclick: (ev) => {
         if (ev.shiftKey && anchorId) return selectRange(ev.currentTarget);
         if (ev.ctrlKey || ev.metaKey || selectMode) return toggleSel(entry.id, ev.currentTarget);
+        // telefon: jedno dotknięcie = „Zrobione” (z „Cofnij”); przytrzymanie albo dotknięcie zrobionej kratki = wszystkie statusy
+        if (PHONE() && !['done', 'na'].includes(entry.status)) return setStatus(entry, 'done');
         statusMenu(ev.currentTarget, entry, headerLabel);
-      } }, st.mark);
+      },
+      oncontextmenu: (ev) => { if (!PHONE()) return; ev.preventDefault(); statusMenu(ev.currentTarget, entry, headerLabel); } }, st.mark);
   }
 
   function personCell(c, area) {
@@ -431,14 +436,36 @@ export async function renderRozliczenia(main, params) {
         h('a', { href: `#/klient/${c.id}`, 'data-panel': c.id }, c.name),
         h('div', { class: 'meta' }, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?'),
           c.status !== 'aktywny' ? h('span', { class: 'badge warn' }, c.status === 'zawieszony' ? 'zawieszony' : 'zakończony') : null,
+          h('button', { type: 'button', class: 'ph-cam', 'aria-label': `Zdjęcie dokumentu – ${c.name}`, onclick: () => photoDoc(c) }, '📷'),
           zusHoliday.has(c.id) ? h('span', { class: 'badge zus-hol', 'data-tip': 'Wakacje składkowe w tym miesiącu – bez składek społecznych właściciela (zdrowotna płatna)' }, 'wakacje ZUS') : null))),
       h('td', { class: 'c-person' }, personCell(c, area)),
       area === 'kadry' ? h('td', {}, employeesCell(c)) : null,
-      cols.map(col => h('td', { class: 'c-task' }, (col.applies_to && col.applies_to !== 'all' && col.applies_to !== sectionOf(c))
+      cols.map(col => h('td', { class: 'c-task', 'data-label': col.label }, (col.applies_to && col.applies_to !== 'all' && col.applies_to !== sectionOf(c))
         ? h('span', { class: 'muted small', 'data-tip': 'Nie dotyczy tej formy' }, '·')
         : checkbox(byClient.get(c.id)?.get(col.code), col, col.label))),
       h('td', { class: 'c-sum' }, sumCell(c, area)),
       h('td', {}, noteCell(c)));
+  }
+
+  // telefon: zdjęcie dokumentu prosto do klienta i miesiąca (załącznik w rozmowie klienta)
+  function photoDoc(c) {
+    const inp = h('input', { type: 'file', accept: 'image/*,application/pdf', capture: 'environment', multiple: true, hidden: true });
+    inp.addEventListener('change', async () => {
+      const files = [...inp.files]; inp.remove(); if (!files.length) return;
+      let ok = 0;
+      for (const f of files) {
+        if (f.size > 25 * 1048576) { toast(`„${f.name}” jest większy niż 25 MB`, true); continue; }
+        const name = /^image\.(jpe?g|png|heic)$/i.test(f.name) || !f.name ? `zdjecie-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.${(f.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}` : f.name;
+        const path = `${c.id}/${period}/${crypto.randomUUID().slice(0, 8)}-${name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.\-]+/g, '_').slice(-80)}`;
+        const { error } = await sb.storage.from('rozliczenia').upload(path, f, { contentType: f.type || 'application/octet-stream' });
+        if (error) { fail(error); continue; }
+        const { error: e2 } = await sb.from('period_files').insert({ client_id: c.id, period: pdate, path, name, mime: f.type || null, size: f.size, uploaded_by: state.me.id });
+        if (e2) { await sb.storage.from('rozliczenia').remove([path]); fail(e2); continue; }
+        ok++;
+      }
+      if (ok) { toast(`Dodano ${ok === 1 ? 'zdjęcie' : `pliki (${ok})`} – ${c.name}, ${periodLabel(period).toLowerCase()}`); fileCount.set(c.id, (fileCount.get(c.id) || 0) + ok); refreshRow(c.id); }
+    });
+    document.body.append(inp); inp.click();
   }
 
   function tableFor(area, t) {

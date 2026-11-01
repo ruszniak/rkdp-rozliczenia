@@ -1916,3 +1916,21 @@ a.lim-a:hover{border-color:var(--gold)}
   .site-header .more-btn.active{color:var(--bronze-dark);background:none}
   .site-header .nav-links .more-menu a{font-size:15px;padding:13px 14px}
 }
+/* Rozliczenia na telefonie: karty klientów zamiast szerokiej tabeli; dotknięcie kratki = Zrobione */
+.ph-cam{display:none}
+@media (max-width:700px){
+  .grid-wrap{overflow:visible!important;border:0!important;background:none!important;box-shadow:none!important}
+  table.grid,table.grid tbody{display:block;width:100%;min-width:0!important}
+  table.grid thead{display:none}
+  table.grid tr{display:flex;flex-wrap:wrap;align-items:center;gap:8px 6px;padding:12px;margin-bottom:10px;background:var(--card);border:1px solid var(--line);border-radius:14px}
+  table.grid td{display:block;border:0!important;padding:0!important;position:static!important;background:none!important;box-shadow:none!important;width:auto!important;min-width:0!important}
+  table.grid td.c-name{flex:1 1 55%;min-width:0!important}
+  table.grid td.c-sum{flex:0 0 auto}
+  table.grid td.c-person{flex:1 1 100%;order:3}
+  table.grid td:last-child{order:2}
+  table.grid td.c-task{order:4;display:flex;flex-direction:column;align-items:center;gap:3px;width:58px!important}
+  table.grid td.c-task::before{content:attr(data-label);font-size:10.5px;font-weight:600;color:var(--muted);text-align:center;line-height:1.15;max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  table.grid td.c-task .cb{width:44px;height:44px;font-size:18px}
+  table.grid tr{gap:8px 4px}
+  .ph-cam{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line-2);background:var(--card);border-radius:99px;width:30px;height:26px;font-size:14px;cursor:pointer;padding:0}
+}
