@@ -10,6 +10,7 @@ import { settledHistory, lastPeriods, loadMemberPrefs, saveMemberPrefs, fetchSof
 import { sparkline, delta } from '../wykres.js';
 import { renderDzis } from './dzis.js';
 import { obligationsCard } from './terminy.js';
+import { zleceniaCard } from './zlecenia.js';
 
 const PREF = 'rkdp-pulpit-widok';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -271,6 +272,7 @@ export async function renderPulpit(main, params) {
     const key = 'pulpit_' + view;
     body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.')] : []),
       ...arrange(view, dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
+    if (!editing) body.prepend(zleceniaCard());
   };
   const title = h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } });
   main.replaceChildren(

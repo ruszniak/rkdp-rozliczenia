@@ -114,6 +114,30 @@ async function onMonitor(b: any) {
   return notify(ids, 'terminy', { title: 'Monitoring klienta: zmiana', body: short(String(b.summary || ''), 140), url: b.module === 'm2' ? `/#/doradztwo/klient/${b.m2_client_id}` : `/#/klient/${b.client_id}`, tag: `mon-${b.client_id || b.m2_client_id}` });
 }
 
+// zlecenia od administratora: nowe / poprawka / odpowiedź / akceptacja → pracownik; pytanie / zgłoszenie → zlecający; komentarz → druga strona
+const ZL_TITLE: Record<string, string> = {
+  nowe: 'Nowe zlecenie', poprawka: 'Zlecenie do poprawy', odpowiedz: 'Odpowiedź na pytanie', zaakceptowane: 'Zlecenie zaakceptowane ✓',
+  pytanie: 'Pytanie do zlecenia', zgloszone: 'Zlecenie wykonane – do sprawdzenia', komentarz: 'Komentarz w zleceniu',
+};
+async function onZlecenie(b: any) {
+  const { data: z } = await db.from('zlecenia').select('id, no, title, assignee_id, created_by, due_date').eq('id', b.id).maybeSingle();
+  if (!z) return 0;
+  const ev = String(b.ev || '');
+  let to: (string | null)[] = [];
+  if (['nowe', 'poprawka', 'odpowiedz', 'zaakceptowane'].includes(ev)) to = [z.assignee_id];
+  else if (['pytanie', 'zgloszone'].includes(ev)) to = [z.created_by];
+  else if (ev === 'komentarz') to = [z.assignee_id, z.created_by].filter(x => x !== b.actor);
+  if (!to.length) return 0;
+  const { data: a } = b.actor ? await db.from('team_members').select('full_name').eq('id', b.actor).maybeSingle() : { data: null };
+  let extra = '';
+  if (ev === 'komentarz' && b.wpis) extra = (await db.from('zlecenia_wpisy').select('body').eq('id', b.wpis).maybeSingle()).data?.body || '';
+  return notify(to, 'zgloszenia', {
+    title: `${ZL_TITLE[ev] || 'Zlecenie'} #${z.no}`,
+    body: [short(z.title), a?.full_name && ev !== 'nowe' ? a.full_name : '', extra ? short(extra, 100) : '', ev === 'nowe' && z.due_date ? `termin ${z.due_date.split('-').reverse().join('.')}` : ''].filter(Boolean).join(' · '),
+    url: `/#/zlecenia/${z.id}`, tag: `zl-${z.id}`,
+  });
+}
+
 // poranny przegląd: zgłoszenia na dziś / po terminie oraz terminy spraw M2 na dziś i jutro
 async function daily() {
   const d0 = today(), d1 = plusDays(1);
@@ -122,6 +146,7 @@ async function daily() {
     db.from('m2_deadlines').select('id, assignee_id, due_date, matter_id, title, done').eq('done', false).gte('due_date', d0).lte('due_date', d1),
     db.from('team_members').select('id, active').eq('active', true),
   ]);
+  const { data: zl } = await db.from('zlecenia').select('id, assignee_id, due_date, status').in('status', ['nowe', 'w_toku', 'pytanie']).not('due_date', 'is', null).lte('due_date', d1);
   const matterIds = [...new Set((dls || []).map(x => x.matter_id).filter(Boolean))];
   const { data: matters } = matterIds.length ? await db.from('m2_matters').select('id, lead_id, second_id').in('id', matterIds) : { data: [] as any[] };
   const mMap = new Map((matters || []).map(m => [m.id, m]));
@@ -131,7 +156,9 @@ async function daily() {
     const late = mine.filter(t => t.due_date < d0).length, now = mine.length - late;
     const myDl = (dls || []).filter(x => x.assignee_id === m.id || (!x.assignee_id && [mMap.get(x.matter_id)?.lead_id, mMap.get(x.matter_id)?.second_id].includes(m.id)));
     const dToday = myDl.filter(x => x.due_date === d0).length, dTom = myDl.length - dToday;
-    const parts = [now ? `${now} zgłosz. na dziś` : '', late ? `${late} po terminie` : '', dToday ? `${dToday} termin(y) M2 dziś` : '', dTom ? `${dTom} termin(y) M2 jutro` : ''].filter(Boolean);
+    const myZl = (zl || []).filter(x => x.assignee_id === m.id);
+    const zlLate = myZl.filter(x => x.due_date < d0).length, zlSoon = myZl.length - zlLate;
+    const parts = [zlLate ? `${zlLate} zlec. po terminie` : '', zlSoon ? `${zlSoon} zlec. z terminem dziś/jutro` : '', now ? `${now} zgłosz. na dziś` : '', late ? `${late} po terminie` : '', dToday ? `${dToday} termin(y) M2 dziś` : '', dTom ? `${dTom} termin(y) M2 jutro` : ''].filter(Boolean);
     if (!parts.length) continue;
     sent += await notify([m.id], 'terminy', { title: 'Plan na dziś', body: parts.join(' · '), url: '/#/pulpit?widok=dzis', tag: `daily-${d0}` });
   }
@@ -155,6 +182,7 @@ Deno.serve(async (req) => {
       if (body.event === 'daily') return json({ sent: await daily() });
       if (body.event === 'docs_uploaded' || body.event === 'docs_remind') return json({ sent: await onDocs(String(body.request_id || ''), body.event === 'docs_remind', +body.count || 0) });
       if (body.event === 'monitor_alert') return json({ sent: await onMonitor(body) });
+      if (body.event === 'zlecenie') return json({ sent: await onZlecenie(body) });
       return json({ error: 'Nieznane zdarzenie' }, 400);
     }
     // zalogowany użytkownik: tylko powiadomienie testowe na własne urządzenia

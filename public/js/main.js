@@ -20,6 +20,7 @@ const renderAml = lazy(() => import('./aml/aml.js'), 'renderAml');
 const renderZgloszenia = lazy(() => import('./views/zgloszenia.js'), 'renderZgloszenia');
 const renderRozmowy = lazy(() => import('./views/rozmowy.js'), 'renderRozmowy');
 const renderPulpit = lazy(() => import('./views/pulpit.js'), 'renderPulpit');
+const renderZlecenia = lazy(() => import('./views/zlecenia.js'), 'renderZlecenia');
 const renderOferty = lazy(() => import('./views/oferty.js'), 'renderOferty');
 const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
@@ -236,6 +237,7 @@ async function route(opts = {}) {
     else if (view === 'aml') c = await renderAml(layout('klienci'), 'rkdp');
     else if (view === 'oferty') c = await renderOferty(layout('klienci'), parts[1], 'rkdp');
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
+    else if (view === 'zlecenia') c = await renderZlecenia(layout('pulpit'), parts[1]);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('rozliczenia'), params);
     else if (view === 'zamkniecie-roku') c = await renderRok(layout('rozliczenia'), params);

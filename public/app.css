@@ -1765,3 +1765,53 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 .zus-hist li>button{grid-column:2;grid-row:1/span 2;align-self:center}
 .zus-code{margin-left:8px;font-family:var(--mono,monospace);font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
 .badge.zus-hol{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+/* Zlecenia – dodatkowe zadania od administratora */
+.zl-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.zl-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-2);background:var(--card);border-radius:99px;padding:6px 13px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;color:inherit}
+.zl-chip span{font-size:12px;color:var(--muted)}
+.zl-chip.hot span{color:var(--warn);font-weight:800}
+.zl-chip.on{background:var(--dark);border-color:var(--dark);color:var(--gold)}
+.zl-chip.on span{color:var(--gold)}
+.zl-person{margin-bottom:16px}
+.zl-phead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.zl-list{display:flex;flex-direction:column;gap:6px}
+.zl-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 14px;font:inherit;color:inherit;cursor:pointer;min-height:48px}
+.zl-row:hover{border-color:var(--gold)}
+.zl-row.attn{background:color-mix(in srgb,var(--gold) 16%,var(--card))}
+.zl-row.late{border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}
+.zl-no{font-size:12px;color:var(--muted);font-weight:700}
+.zl-main{display:flex;flex-direction:column;min-width:0}
+.zl-main b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.zl-meta{font-size:12.5px;color:var(--muted)}
+.zl-hot{margin-left:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--warn);background:var(--warn-bg);padding:1px 7px;border-radius:99px;vertical-align:1px}
+.zl-due{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.zl-due.today{color:var(--bronze);font-weight:700}
+.zl-due.late{color:var(--warn);font-weight:700}
+.zl-pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:99px;font-size:12px;font-weight:700;white-space:nowrap}
+.zl-new{background:var(--gold-soft);color:var(--bronze-dark)}
+.zl-prog{background:var(--panel);color:var(--text)}
+.zl-q{background:var(--warn-bg);color:var(--warn)}
+.zl-rep{background:var(--dark);color:var(--gold)}
+.zl-ok{background:var(--ok-bg);color:var(--ok)}
+.zl-off{background:none;border:1px dashed var(--line-2);color:var(--muted)}
+.zl-sum{display:flex;flex-wrap:wrap;gap:14px;font-size:13.5px;color:var(--muted);margin-bottom:10px}
+.zl-sum .hot{color:var(--warn);font-weight:700}
+.zl-people{display:flex;flex-wrap:wrap;gap:8px}
+.zl-person-pick{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-2);border-radius:99px;padding:4px 12px 4px 6px;cursor:pointer;font-size:14px}
+.zl-person-pick input{accent-color:var(--bronze)}
+.zl-form{display:flex;flex-direction:column;gap:12px}
+.zl-dhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.zl-dhead h3{font-size:20px}
+.zl-dmeta{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13.5px;color:var(--text);margin:8px 0 12px}
+.zl-body{white-space:pre-wrap;background:var(--panel);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14.5px}
+.zl-steps{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.zl-step{min-height:32px}
+.zl-h4{margin:14px 0 8px;font-size:14px}
+.zl-tl{display:flex;flex-direction:column;gap:10px}
+.zl-w{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start}
+.zl-wbody{white-space:pre-wrap;font-size:14.5px;margin-top:2px}
+.zl-w-zgloszenie .zl-wbody,.zl-w-akceptacja .zl-wbody{background:var(--ok-bg);padding:8px 10px;border-radius:8px}
+.zl-w-poprawka .zl-wbody,.zl-w-pytanie .zl-wbody{background:var(--warn-bg);padding:8px 10px;border-radius:8px}
+.zl-comment{display:flex;flex-direction:column;gap:8px;margin-top:14px;align-items:flex-end}
+.zl-comment textarea{width:100%}
+@media (max-width:600px){.zl-row{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.zl-no{display:none}.zl-due{grid-column:1}.zl-row .zl-pill{grid-row:1;grid-column:2}}

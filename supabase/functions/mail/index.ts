@@ -181,10 +181,64 @@ async function broadcast(sb: any, body: any, cfg: { sub: string; from: string },
   return json({ sent: ok, failed, clients: okClients.size, no_email: noEmail, errors });
 }
 
+// ---------- zlecenia: e-mail do pracownika (nowe, poprawka, odpowiedź, akceptacja) albo do zlecającego (pytanie, wykonanie) ----------
+const APP_URL = 'https://rozliczenia.rkdp.pl';
+async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
+  const { data: z } = await admin.from('zlecenia').select('id, no, title, body, assignee_id, created_by, due_date, priority, steps, client_id').eq('id', String(b.id || '')).maybeSingle();
+  if (!z) return { sent: 0 };
+  const ev = String(b.ev || '');
+  const toId = ['pytanie', 'zgloszone'].includes(ev) ? z.created_by : z.assignee_id;
+  const ids = [z.assignee_id, z.created_by].filter(Boolean);
+  const { data: ms } = await admin.from('team_members').select('id, full_name, email').in('id', ids);
+  const m = new Map((ms || []).map((x: any) => [x.id, x]));
+  const to = m.get(toId), from = m.get(toId === z.assignee_id ? z.created_by : z.assignee_id);
+  if (!to?.email || !emailOk(String(to.email))) return { sent: 0, reason: 'brak adresu' };
+  const { data: last } = await admin.from('zlecenia_wpisy').select('body, kind').eq('zlecenie_id', z.id).order('created_at', { ascending: false }).limit(1);
+  const note = ev !== 'nowe' ? (last?.[0]?.body || '') : '';
+  const client = z.client_id ? (await admin.from('clients').select('name').eq('id', z.client_id).maybeSingle()).data?.name || '' : '';
+  const due = z.due_date ? z.due_date.split('-').reverse().join('.') : '';
+  const HEAD: Record<string, string> = {
+    nowe: `${from?.full_name || 'Michał'} zlecił(a) Ci zadanie`, poprawka: 'Zlecenie wróciło do poprawy', odpowiedz: 'Odpowiedź na Twoje pytanie',
+    zaakceptowane: 'Zlecenie zaakceptowane – dziękuję!', pytanie: `${from?.full_name || 'Pracownik'} ma pytanie do zlecenia`, zgloszone: `${from?.full_name || 'Pracownik'} zgłosił(a) wykonanie zlecenia`,
+  };
+  const subject = `${ev === 'nowe' ? (z.priority === 'pilne' ? 'PILNE – zlecenie' : 'Zlecenie') : (HEAD[ev] || 'Zlecenie')} #${z.no}: ${z.title}`.slice(0, 200);
+  const steps = Array.isArray(z.steps) ? z.steps.map((s: any) => `${s.done ? '☑' : '☐'} ${s.t}`) : [];
+  const link = `${APP_URL}/#/zlecenia/${z.id}`;
+  const lines = [
+    HEAD[ev] || 'Zlecenie', '', `„${z.title}”`, client ? `Klient: ${client}` : '', due ? `Termin: ${due}` : '', z.priority === 'pilne' ? 'Priorytet: PILNE' : '',
+    ev === 'nowe' && z.body ? '\n' + z.body : '', ev === 'nowe' && steps.length ? '\nKroki:\n' + steps.join('\n') : '',
+    note ? `\n${ev === 'poprawka' ? 'Do poprawy' : ev === 'pytanie' ? 'Pytanie' : 'Wiadomość'}: ${note}` : '',
+    '', ev === 'zgloszone' ? 'Sprawdź i zaakceptuj albo odeślij do poprawy:' : ev === 'pytanie' ? 'Odpowiedz w aplikacji:' : 'Otwórz zlecenie w aplikacji:', link,
+  ].filter((x, i, arr) => !(x === '' && arr[i - 1] === ''));
+  const text = lines.join('\n');
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;max-width:560px">`
+    + `<p style="margin:0 0 6px;color:#806341;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Zlecenie #${z.no}</p>`
+    + `<h2 style="margin:0 0 12px;font-size:19px">${escH(HEAD[ev] || 'Zlecenie')}</h2>`
+    + `<p style="margin:0 0 6px;font-size:16px"><b>${escH(z.title)}</b></p>`
+    + [client ? `Klient: ${escH(client)}` : '', due ? `Termin: <b>${due}</b>` : '', z.priority === 'pilne' ? '<b style="color:#A4462F">PILNE</b>' : ''].filter(Boolean).map(x => `<div>${x}</div>`).join('')
+    + (ev === 'nowe' && z.body ? `<p style="white-space:pre-wrap;background:#F8F5F0;padding:10px 12px;border-radius:8px">${escH(z.body)}</p>` : '')
+    + (ev === 'nowe' && steps.length ? `<p style="white-space:pre-wrap">${escH(steps.join('\n'))}</p>` : '')
+    + (note ? `<p style="white-space:pre-wrap;background:#F5E7CF;padding:10px 12px;border-radius:8px">${escH(note)}</p>` : '')
+    + `<p style="margin:18px 0"><a href="${link}" style="background:#806341;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">Otwórz zlecenie</a></p>`
+    + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z aplikacji RKDP.</p></div>`;
+  try { await sendMail(cfg, 'RKDP | Zlecenia', String(to.email), subject, text, html); return { sent: 1 }; }
+  catch (e) { console.error('zlecenie mail', e); return { sent: 0, error: String((e as Error).message || e).slice(0, 200) }; }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Metoda niedozwolona' }, 405);
   try {
+    // wywołanie z bazy (harmonogram / wyzwalacze) – sekret z Vault zamiast logowania
+    const hook = req.headers.get('x-push-secret') || '';
+    if (hook) {
+      const { data: pc } = await admin.rpc('push_get_config');
+      const sec = pc?.push_hook_secret || '';
+      if (!sec || hook.length !== sec.length || hook !== sec) return json({ error: 'Brak dostępu' }, 401);
+      const body = await req.json().catch(() => ({}));
+      if (body.action === 'zlecenie') return json(await zlecenieMail(body, await config()));
+      return json({ error: 'Nieznana operacja' }, 400);
+    }
     const auth = req.headers.get('Authorization') || '';
     if (!auth.startsWith('Bearer ')) return json({ error: 'Brak dostępu' }, 401);
     const sb = createClient(URL_, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: auth } } });
