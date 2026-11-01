@@ -39,6 +39,7 @@ export const sectionOf = c => FORM_GROUP[c.legal_form] === 'kapitalowe' ? 'kapit
 export const isCompany = f => FORM_GROUP[f] === 'kapitalowe';
 
 export const CLIENT_STATUS = { aktywny: 'Aktywny', zawieszony: 'Zawieszony', zakonczony: 'Współpraca zakończona' };
+export const SERVICE_SCOPE = { ksiegowosc: 'Księgowość (pełna obsługa)', doradztwo: 'Tylko doradztwo podatkowe (bez księgowości)' };
 export const BOOKKEEPING = { kpir: 'KPiR', ryczalt: 'Ewidencja przychodów (ryczałt)', pelna: 'Pełna księgowość (KH)' };
 export const PIT_FORM = { skala: 'Skala podatkowa (12/32%)', liniowy: 'Podatek liniowy 19%', ryczalt: 'Ryczałt od przychodów ewidencjonowanych', karta: 'Karta podatkowa' };
 export const PIT_SHORT = { skala: 'Skala', liniowy: 'Liniowy', ryczalt: 'Ryczałt', karta: 'Karta' };
@@ -85,7 +86,7 @@ export const FIELD_LABELS = {
   employees_count: 'Liczba pracowników', ppk: 'PPK', cit_type: 'CIT', cit_advances: 'Zaliczki CIT',
   fiscal_year: 'Rok podatkowy', vat_status: 'VAT', vat_ue: 'VAT-UE', cash_register: 'Kasa fiskalna',
   ksef_access: 'Uprawnienia KSeF', contract_signed: 'Umowa', contract_date: 'Data umowy',
-  monthly_fee: 'Abonament', fee_docs: 'Dokumentów w abonamencie', fee_extra_doc: 'Dokument nadwyżkowy', fee_employee: 'Obsługa pracownika', fee_extras: 'Usługi dodatkowe', upl1: 'UPL-1', zus_pel: 'ZUS PEL', crbr_reported: 'CRBR', notes: 'Notatki',
+  service_scope: 'Zakres usług', monthly_fee: 'Abonament', fee_docs: 'Dokumentów w abonamencie', fee_extra_doc: 'Dokument nadwyżkowy', fee_employee: 'Obsługa pracownika', fee_extras: 'Usługi dodatkowe', upl1: 'UPL-1', zus_pel: 'ZUS PEL', crbr_reported: 'CRBR', notes: 'Notatki',
   status_entry: 'Status', notes_p: 'Uwagi', questions: 'Pytania', assignee_id: 'Osoba', full_name: 'Wspólnik',
 };
 

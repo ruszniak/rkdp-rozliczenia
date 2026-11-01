@@ -3,7 +3,7 @@ import { rememberRecent } from '../cmdk.js';
 import { openDocRequest } from '../prosba.js';
 import { h, icon, toast, fail, fmtDateTime, periodLabel, shiftPeriod, defaultPeriod } from '../ui.js';
 import { sb, state, memberById, canEditClients, isAdmin, activeTasks, hasModule } from '../store.js';
-import { LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, CIT_ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS, CLIENT_STATUS,
+import { LEGAL_FORM, BOOKKEEPING, SERVICE_SCOPE, PIT_FORM, ADVANCES, CIT_ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS, CLIENT_STATUS,
   STATUS, FIELD_LABELS, isCompany, isPartnership } from '../dict.js';
 import { completeness } from './klienci.js';
 import { nipLookupBar, mergeNipData } from '../nip.js';
@@ -24,7 +24,8 @@ const SECTIONS = [
     ['name', 'Nazwa / imię i nazwisko', 'text', null, always, true],
     ['status', 'Status współpracy', 'select', CLIENT_STATUS, always],
     ['legal_form', 'Forma prawna', 'select', LEGAL_FORM, always],
-    ['bookkeeping', 'Rodzaj księgowości', 'select', BOOKKEEPING, always],
+    ['service_scope', 'Zakres usług', 'select', SERVICE_SCOPE, always],
+    ['bookkeeping', 'Rodzaj księgowości', 'select', BOOKKEEPING, c => c.service_scope !== 'doradztwo'],
     ['nip', 'NIP', 'text', null, always],
     ['regon', 'REGON', 'text', null, always],
     ['krs', 'KRS', 'text', null, c => isCompany(c.legal_form) || isPartnership(c.legal_form) || c.legal_form === 'fundacja_stowarzyszenie'],
@@ -99,7 +100,7 @@ function describeValue(field, v) {
   if (v === false) return 'nie';
   const dicts = { status: { ...CLIENT_STATUS, ...Object.fromEntries(Object.entries(STATUS).map(([k, s]) => [k, s.label])) },
     legal_form: LEGAL_FORM, bookkeeping: BOOKKEEPING, pit_form: PIT_FORM, pit_advances: ADVANCES, cit_advances: CIT_ADVANCES,
-    zus_type: ZUS_TYPE, cit_type: CIT_TYPE, vat_status: VAT_STATUS };
+    zus_type: ZUS_TYPE, cit_type: CIT_TYPE, vat_status: VAT_STATUS, service_scope: SERVICE_SCOPE };
   if (field === 'assignee_id') return memberById(v)?.short_name || '?';
   return dicts[field]?.[v] || String(v);
 }
@@ -141,7 +142,7 @@ export async function renderKlient(main, id) {
           const el = inputFor(type, options, draft[key], !editable);
           el.addEventListener(type === 'select' || type === 'bool' ? 'change' : 'input', () => {
             draft[key] = readInput(type, el); markDirty();
-            if (['legal_form', 'pit_form', 'cit_type', 'zus_type', 'has_employees', 'vat_status', 'contract_signed'].includes(key)) {
+            if (['legal_form', 'pit_form', 'cit_type', 'zus_type', 'has_employees', 'vat_status', 'contract_signed', 'service_scope'].includes(key)) {
               renderSections(); renderPartners();
             }
           });
@@ -261,6 +262,7 @@ export async function renderKlient(main, id) {
   async function save() {
     if (!draft.name?.trim()) { toast('Nazwa jest wymagana', true); return; }
     saveBtn.disabled = true; saveInfo.textContent = 'Zapisywanie…';
+    if (!draft.service_scope) draft.service_scope = 'ksiegowosc';
     const patch = {};
     const locked = canEditClients() ? [] : ['accountant_id', 'hr_id'];
     for (const k of Object.keys(draft)) if (!['id', 'created_at', 'updated_at', ...locked].includes(k) && draft[k] !== c[k]) patch[k] = draft[k];

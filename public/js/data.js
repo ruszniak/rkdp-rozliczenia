@@ -15,7 +15,7 @@ export async function fetchSoft(build) {
   try { return await fetchAll(build); } catch (e) { console.warn(e); return []; }
 }
 
-export const CLIENT_COLS = 'id,name,status,legal_form,bookkeeping,nip,krs,email,phone,contact_person,pit_form,pit_advances,zus_type,has_employees,cit_type,cit_advances,vat_status,vat_ue,monthly_fee,accountant_id,hr_id';
+export const CLIENT_COLS = 'id,name,status,legal_form,bookkeeping,nip,krs,email,phone,contact_person,pit_form,pit_advances,zus_type,has_employees,cit_type,cit_advances,vat_status,vat_ue,monthly_fee,service_scope,accountant_id,hr_id';
 export const loadClients = () => fetchAll(() => sb.from('clients').select(CLIENT_COLS).order('name'));
 
 export const todayIso = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });

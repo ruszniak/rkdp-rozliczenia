@@ -62,12 +62,13 @@ export function obligationsInMonth(c, y, m) {
   const per = `${prevY}-${String(prevM).padStart(2, '0')}`;
   const add = (kind, d, extra = {}) => out.push({ kind, client: c, date: d.date, moved: d.moved, period: per, ...extra });
   const q = [3, 6, 9, 12].includes(prevM);
+  const dp = c.service_scope === 'doradztwo'; // tylko doradztwo podatkowe – bez obowiązków księgowych (kadry zostają)
   // VAT
-  if (c.vat_status === 'czynny_miesieczny') add('vat', due(y, m - 1, 25), { label: 'JPK_V7M – ewidencja i deklaracja' });
+  if (dp) { /* bez VAT i podatku dochodowego */ } else if (c.vat_status === 'czynny_miesieczny') add('vat', due(y, m - 1, 25), { label: 'JPK_V7M – ewidencja i deklaracja' });
   else if (c.vat_status === 'czynny_kwartalny') add('vat', due(y, m - 1, 25), { label: q ? 'JPK_V7K – ewidencja i deklaracja za kwartał' : 'JPK_V7K – ewidencja' });
-  if (c.vat_ue && vatActive(c)) add('vat_ue', due(y, m - 1, 25), { label: 'VAT-UE (gdy były transakcje)', opt: true });
+  if (!dp && c.vat_ue && vatActive(c)) add('vat_ue', due(y, m - 1, 25), { label: 'VAT-UE (gdy były transakcje)', opt: true });
   // podatek dochodowy
-  if (isCitPayer(c)) {
+  if (dp) { /* — */ } else if (isCitPayer(c)) {
     if (c.cit_type !== 'estonski' && c.cit_advances !== 'brak') {
       if (c.cit_advances === 'kwartalne') { if (q) add('cit', due(y, m - 1, 20), { label: 'Zaliczka CIT za kwartał' }); }
       else add('cit', due(y, m - 1, 20), { label: 'Zaliczka CIT' });
@@ -81,7 +82,7 @@ export function obligationsInMonth(c, y, m) {
   if (hasZusOwner(c) || c.has_employees) add('zus', due(y, m - 1, isCitPayer(c) && !hasZusOwner(c) ? 15 : 20), { label: hasZusOwner(c) ? 'ZUS – składki właściciela' + (c.has_employees ? ' i pracowników' : '') : 'ZUS – składki pracowników' });
   if (c.has_employees) add('pit4', due(y, m - 1, 20), { label: 'PIT-4 – zaliczki od wynagrodzeń' });
   // roczne (za rok y-1 albo bieżący) z terminem w tym miesiącu
-  for (const yy of [y - 1, y]) {
+  for (const yy of dp ? [] : [y - 1, y]) {
     for (const t of yearTasksFor(c, yy)) {
       if (!yearApplies(t, c, yy)) continue;
       const d = t.due(yy);
