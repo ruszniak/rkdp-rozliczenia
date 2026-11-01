@@ -2,7 +2,7 @@ import { h, initials, toast, initTooltips, initMobileTables, ava } from './ui.js
 import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
 import { renderLogin } from './views/login.js';
 import { TERMS_VERSION } from './regulamin.js';
-import { registerSW } from './push.js';
+import { registerSW, isStandalone, isIOS } from './push.js';
 import { openCmdk, initShortcuts } from './cmdk.js';
 import { getTheme, toggleTheme, onThemeChange, ICON_MOON, ICON_SUN } from './motyw.js';
 import { initPanelLinks, closePanel } from './panel.js';
@@ -331,6 +331,9 @@ async function start() {
     renderLogin(app, 'Ten adres nie ma dostępu do aplikacji.');
     return;
   }
+  // aplikacja zainstalowana na telefonie: bez wylogowania po bezczynności (do 30 dni) – telefon ma własną blokadę, a powiadomienia i otwieranie z nich mają działać od razu
+  const phoneApp = isStandalone() && (isIOS() || /Android/i.test(navigator.userAgent));
+  if (idleMinutes && phoneApp) { const { data: ok } = await sb.rpc('auth_app_session').then(r => r, () => ({})); if (ok) idleMinutes = 30 * 24 * 60; }
   if (idleMinutes) { sb.rpc('auth_touch'); startIdleWatch(idleMinutes); }
   // regulamin: przy pierwszym logowaniu, co 30 dni i po zmianie wersji – bez akceptacji brak dostępu
   if (!tsRes?.error && tsRes?.data?.needs) {
