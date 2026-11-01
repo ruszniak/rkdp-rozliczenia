@@ -191,7 +191,7 @@ export async function openZlecenie(id, onChange) {
       const { data: lw } = await sb.from('zlecenia_wpisy').select('id').eq('zlecenie_id', id).eq('author_id', state.me.id).order('created_at', { ascending: false }).limit(1);
       await uploadZl(id, att, lw?.[0]?.id || null);
     }
-    toast({ start: 'Powodzenia!', pytanie: 'Wysłano pytanie do Michała', zglos: 'Zgłoszono wykonanie – Michał dostał powiadomienie', akceptuj: 'Zaakceptowano', popraw: 'Odesłano do poprawy', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zlecenie', wznow: 'Wznowiono' }[akcja] || 'Zapisano');
+    toast({ start: 'Powodzenia!', pytanie: 'Wysłano pytanie do Michała', zglos: 'Zgłoszono wykonanie – Michał dostał powiadomienie', akceptuj: 'Zaakceptowano', zakoncz: 'Zlecenie zamknięte jako wykonane', popraw: 'Odesłano do poprawy', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zlecenie', wznow: 'Wznowiono' }[akcja] || 'Zapisano');
     refresh();
   };
   const ask = (title, label, akcja, required, btn) => { const att = []; return modal(title, h('div', { class: 'zl-form' }, h('label', { class: 'field' }, h('span', {}, label), h('textarea', { class: 'input', rows: 4, maxlength: 3000, id: 'zl-ask' })),
@@ -229,6 +229,7 @@ export async function openZlecenie(id, onChange) {
   if (mine && ['nowe', 'w_toku'].includes(z.status)) actions.push(B('btn-ghost', 'Mam pytanie', () => ask('Pytanie do zlecenia', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie')));
   if (mine && ['nowe', 'w_toku', 'pytanie'].includes(z.status)) actions.push(B('btn-primary', '✓ Zrobione – zgłaszam', () => ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie')));
   if (admin && z.status === 'zgloszone') actions.push(B('btn-ghost', 'Popraw', () => ask('Odeślij do poprawy', 'Co trzeba poprawić?', 'popraw', true, 'Odeślij')), B('btn-primary', '✓ Akceptuję', () => act('akceptuj')));
+  if (admin && ['nowe', 'w_toku', 'pytanie'].includes(z.status)) actions.push(B('btn-outline', '✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zlecenie jako wykonane?')) act('zakoncz'); }));
   if (admin && z.status === 'pytanie') actions.push(B('btn-primary', 'Odpowiedz', () => ask('Odpowiedź', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź')));
   if (admin && OPEN.includes(z.status)) actions.push(B('btn-ghost', 'Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }), B('btn-ghost', 'Anuluj zlecenie', () => { if (confirm('Anulować to zlecenie?')) act('anuluj'); }));
   if (admin && !OPEN.includes(z.status)) actions.push(B('btn-ghost', 'Wznów', () => act('wznow')));
@@ -245,5 +246,5 @@ export async function openZlecenie(id, onChange) {
     stepsBox,
     (wp || []).length ? h('h4', { class: 'zl-h4' }, 'Przebieg') : null, timeline,
     (mine || admin) && z.status !== 'anulowane' ? h('div', { class: 'zl-comment' }, comment, pendingBox(cAtt), h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: sendC }, 'Dodaj komentarz')) : null),
-  c => [...actions, B('btn-ghost', 'Zamknij', c)], { wide: true });
+  c => [...actions, B('btn-ghost', 'Zamknij okno', c)], { wide: true });
 }

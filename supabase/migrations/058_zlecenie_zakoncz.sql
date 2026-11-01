@@ -1,0 +1,1 @@
+-- Zlecenia: zlecający może zamknąć otwarte zlecenie jako wykonane (akcja 'zakoncz') – pełna definicja w bazie (zlecenie_akcja)
