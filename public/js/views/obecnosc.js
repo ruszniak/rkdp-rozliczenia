@@ -234,6 +234,20 @@ const HELP = `Lista obecności (ewidencja czasu pracy):
 • Pobierz PDF (do podpisu) albo Excel za wybrany miesiąc.`;
 
 // ---------- widok ----------
+// czas pracy przy klientach (licznik „Licz czas” i wpisy w sprawach M2 TAX) – dzień → [{ name, min }]
+async function loadClientTime(memberId, m) {
+  const [y, mo] = m.split('-').map(Number), a = `${m}-01`, b = new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 10);
+  const out = new Map(), add = (day, name, min) => { const l = out.get(day) || []; const x = l.find(z => z.name === name); if (x) x.min += min; else l.push({ name, min }); out.set(day, l); };
+  const [te, mt] = await Promise.all([
+    sb.from('time_entries').select('started_at,minutes,module,m2_clients(name),clients(name)').eq('member_id', memberId).not('ended_at', 'is', null).gte('started_at', a).lt('started_at', b + 'T00:00:00'),
+    sb.from('m2_time').select('work_date,minutes,m2_matters(number,m2_clients(name))').eq('member_id', memberId).gte('work_date', a).lt('work_date', b),
+  ]);
+  (te.data || []).forEach(r => add(new Date(r.started_at).toLocaleDateString('sv-SE'), (r.module === 'm2' ? r.m2_clients?.name : r.clients?.name) || 'klient', r.minutes || 0));
+  (mt.data || []).forEach(r => add(r.work_date, r.m2_matters?.m2_clients?.name || r.m2_matters?.number || 'sprawa', r.minutes || 0));
+  return out;
+}
+const clientCell = list => list?.length ? h('div', { class: 'ob-cl' }, ...list.sort((x, y) => y.min - x.min).map(x => h('div', {}, h('span', {}, x.name), ' ', h('b', {}, fmtH(x.min))))) : '';
+
 export async function renderObecnosc(main, sub, params) {
   if (sub === 'zespol') return renderTeam(main, params);
   const vis = visibleMembers();
@@ -246,6 +260,8 @@ export async function renderObecnosc(main, sub, params) {
   let m = /^\d{4}-\d{2}$/.test(params.get('m') || '') ? params.get('m') : curMonth();
   const editable = canEdit(member.id);
   const rows = await loadMonth([member.id], m);
+  const ct = await loadClientTime(member.id, m).catch(() => new Map());
+  const ctTotal = [...ct.values()].flat().reduce((n, x) => n + x.min, 0);
   const by = new Map(rows.map(r => [r.day, r]));
   const go = (p = {}) => {
     const q = new URLSearchParams({ ...(member.id !== state.me.id ? { osoba: member.id } : {}), m, ...p }), hash = `#/obecnosc?${q}`;
@@ -258,7 +274,7 @@ export async function renderObecnosc(main, sub, params) {
     const tile = (n, l, dark) => h('div', { class: 'card tile' + (dark ? ' dark alert' : '') }, h('span', { class: 'lbl' }, l), h('span', { class: 'num' }, n));
     const leave = Object.keys(KINDS).filter(k => !KINDS[k].work).reduce((a, k) => a + (s.kinds[k] || 0), 0);
     sumBox.replaceChildren(tile(String(s.workDays), s.remote ? `Dni pracy (zdalnie: ${s.remote})` : 'Dni pracy'), tile(fmtH(s.workMin), `Godziny / wymiar ${fmtH(s.norm)}`),
-      tile(String(leave), 'Urlopy i nieobecności'), tile(String(s.missing), 'Dni robocze bez wpisu', s.missing > 0 && m <= curMonth()));
+      tile(String(leave), 'Urlopy i nieobecności'), tile(String(s.missing), 'Dni robocze bez wpisu', s.missing > 0 && m <= curMonth()), ...(ctTotal ? [tile(fmtH(ctTotal), 'Czas przy klientach')] : []));
   };
 
   async function saveDay(day, patch, tr) {
@@ -284,7 +300,7 @@ export async function renderObecnosc(main, sub, params) {
     if (!editable) {
       tr.append(dateCell, h('td', { 'data-label': 'Rodzaj' }, r ? KINDS[r.kind]?.label || r.kind : ''), h('td', { 'data-label': 'Od' }, work ? hhmm(r.start_time) : ''),
         h('td', { 'data-label': 'Do' }, work ? hhmm(r.end_time) : ''), h('td', { 'data-label': 'Przerwa' }, work && r.break_min ? `${r.break_min} min` : ''),
-        h('td', { 'data-label': 'Godziny' }, work && workMin(r) ? fmtH(workMin(r)) : ''), h('td', { 'data-label': 'Uwagi' }, r?.note || ''));
+        h('td', { 'data-label': 'Godziny' }, work && workMin(r) ? fmtH(workMin(r)) : ''), h('td', { 'data-label': 'Klienci' }, clientCell(ct.get(d.day))), h('td', { 'data-label': 'Uwagi' }, r?.note || ''));
       return tr;
     }
     const sel = h('select', { class: 'input ob-kind' }, h('option', { value: '' }, '—'), ...Object.entries(KINDS).map(([k, v]) => h('option', { value: k, selected: r?.kind === k }, v.label)));
@@ -296,7 +312,7 @@ export async function renderObecnosc(main, sub, params) {
     const note = h('input', { class: 'input ob-note', value: r?.note || '', placeholder: '' });
     note.addEventListener('change', () => { if (!r && !note.value.trim()) return; saveDay(d.day, { note: note.value.trim() || null }, tr); });
     tr.append(dateCell, h('td', { 'data-label': 'Rodzaj' }, sel), h('td', { 'data-label': 'Od' }, time('start_time')), h('td', { 'data-label': 'Do' }, time('end_time')),
-      h('td', { 'data-label': 'Przerwa (min)' }, brk), h('td', { 'data-label': 'Godziny', class: 'ob-h' }, work && workMin(r) ? fmtH(workMin(r)) : ''), h('td', { 'data-label': 'Uwagi' }, note));
+      h('td', { 'data-label': 'Przerwa (min)' }, brk), h('td', { 'data-label': 'Godziny', class: 'ob-h' }, work && workMin(r) ? fmtH(workMin(r)) : ''), h('td', { 'data-label': 'Klienci' }, clientCell(ct.get(d.day))), h('td', { 'data-label': 'Uwagi' }, note));
     return tr;
   }
 
@@ -340,7 +356,7 @@ export async function renderObecnosc(main, sub, params) {
       editable ? h('button', { class: 'btn btn-ghost btn-sm', onclick: fillDialog }, 'Wypełnij dni robocze') : null),
     sumBox,
     h('div', { class: 'card list-wrap', style: { marginTop: '14px' } }, h('table', { class: 'list ob-table' },
-      h('thead', {}, h('tr', {}, ...['Data', 'Rodzaj', 'Od', 'Do', 'Przerwa (min)', 'Godziny', 'Uwagi'].map(x => h('th', {}, x)))), tbody)));
+      h('thead', {}, h('tr', {}, ...['Data', 'Rodzaj', 'Od', 'Do', 'Przerwa (min)', 'Godziny', 'Klienci (czas)', 'Uwagi'].map(x => h('th', {}, x)))), tbody)));
 }
 
 async function renderTeam(main, params) {

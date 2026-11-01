@@ -1935,3 +1935,4 @@ a.lim-a:hover{border-color:var(--gold)}
   .ph-cam{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line-2);background:var(--card);border-radius:99px;width:30px;height:26px;font-size:14px;cursor:pointer;padding:0}
 }
 .page-head .tm-btn.on{background:var(--gold);border-color:var(--gold);color:var(--dark)}
+.ob-cl{display:flex;flex-direction:column;gap:2px;font-size:12.5px;min-width:140px}.ob-cl b{font-weight:700}
