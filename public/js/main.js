@@ -22,6 +22,7 @@ const renderRozmowy = lazy(() => import('./views/rozmowy.js'), 'renderRozmowy');
 const renderPulpit = lazy(() => import('./views/pulpit.js'), 'renderPulpit');
 const renderZlecenia = lazy(() => import('./views/zlecenia.js'), 'renderZlecenia');
 const renderCzas = lazy(() => import('./czas.js'), 'renderCzas');
+const renderMoje = lazy(() => import('./views/moje.js'), 'renderMoje');
 const renderOferty = lazy(() => import('./views/oferty.js'), 'renderOferty');
 const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
@@ -63,7 +64,11 @@ function parseHash() {
 
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
-    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozmowy', 'Rozmowy', 'rozmowy'], ['#/dokumenty', 'Dokumenty', 'sprawozdania']] },
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/moje', 'Moje sprawy', 'moje'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozmowy', 'Rozmowy', 'rozmowy']],
+    // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
+    more: [['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/zlecenia', 'Zlecenia', 'zlecenia'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
+      ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
+      ['#/czas', 'Czas pracy i rentowność', 'czas', 'admin'], ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']] },
@@ -76,6 +81,8 @@ const remember = m => { try { localStorage.setItem('rkdp_module', m); } catch { 
 
 // ikony zakładek (dolny pasek na telefonie)
 const TAB_ICONS = {
+  'moje': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>',
+  'more': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
   'rozmowy': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 14h4.5"/></svg>',
   'pulpit': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
   'rozliczenia': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
@@ -96,10 +103,20 @@ const TAB_ICONS = {
   'default': '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg>',
 };
 TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
-const TAB_SHORT = { 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
+const TAB_SHORT = { moje: 'Sprawy', 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
 
 let themeOff = null;
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
+// menu „Więcej” w pasku zakładek
+function moreMenu(items, active) {
+  const ico = h('span', { class: 'tab-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS.more;
+  const on = items.some(x => x[2] === active);
+  const menu = h('div', { class: 'more-menu', role: 'menu', hidden: true }, ...items.map(([href, label, key]) => h('a', { href, role: 'menuitem', class: key === active ? 'on' : null, onclick: () => { menu.hidden = true; } }, label)));
+  const btn = h('button', { type: 'button', class: 'more-btn' + (on ? ' active' : ''), 'aria-haspopup': 'menu', 'aria-expanded': 'false',
+    onclick: e => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); if (!menu.hidden) setTimeout(() => document.addEventListener('click', function off(ev) { if (!menu.contains(ev.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); } document.removeEventListener('click', off); }), 0); } },
+    ico, h('span', { class: 'tab-full' }, 'Więcej'), h('span', { class: 'tab-short' }, 'Więcej'));
+  return h('div', { class: 'more-wrap' }, btn, menu);
+}
 let timerMod = null;
 function timerPillEl() { const box = h('span', { class: 'tm-slot' }); (timerMod ||= import('./czas.js')).then(m => box.replaceChildren(m.timerPill())).catch(() => {}); return box; }
 function layout(active) {
@@ -134,7 +151,7 @@ function layout(active) {
         switcher),
       h('nav', { class: 'nav-links' },
         ...M.tabs.map(link),
-        me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
+        M.more ? moreMenu(M.more.filter(x => x[3] !== 'admin' || me.role === 'admin'), active) : me.role === 'admin' ? link(['#/zespol', 'Zespół i ustawienia', 'zespol']) : null),
       h('div', { class: 'nav-user' },
         jpkOnly ? null : timerPillEl(),
         (() => { const b = h('button', { type: 'button', class: 'hdr-search', onclick: () => openCmdk(), 'aria-label': 'Szukaj (Ctrl K)', 'data-tip': 'Szukaj klienta, sprawy, zgłoszenia, narzędzia' });
@@ -235,18 +252,19 @@ async function route(opts = {}) {
     else if (!hasModule('rozliczenia') && view !== 'zespol') c = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'jpk') c = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
     else if (view === 'klienci') c = await renderKlienci(layout('klienci'), params);
-    else if (view === 'informacje') c = await renderInformacje(layout('klienci'));
+    else if (view === 'informacje') c = await renderInformacje(layout('informacje'));
     else if (view === 'klient') c = await renderKlient(layout('klienci'), parts[1]);
     else if (view === 'watek' && parts[1]) { c = await renderKlient(layout('klienci'), parts[1]); history.replaceState(null, '', `#/klient/${parts[1]}`); import('./watek.js').then(m => m.openThread({ client: { id: parts[1] }, period: params.get('okres') || undefined })); }
-    else if (view === 'aml') c = await renderAml(layout('klienci'), 'rkdp');
-    else if (view === 'oferty') c = await renderOferty(layout('klienci'), parts[1], 'rkdp');
+    else if (view === 'aml') c = await renderAml(layout('aml'), 'rkdp');
+    else if (view === 'oferty') c = await renderOferty(layout('oferty'), parts[1], 'rkdp');
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
-    else if (view === 'zlecenia') c = await renderZlecenia(layout('pulpit'), parts[1]);
-    else if (view === 'czas' && state.me.role === 'admin') c = await renderCzas(layout('pulpit'), params);
+    else if (view === 'moje') c = await renderMoje(layout('moje'), params);
+    else if (view === 'zlecenia') c = await renderZlecenia(layout('zlecenia'), parts[1]);
+    else if (view === 'czas' && state.me.role === 'admin') c = await renderCzas(layout('czas'), params);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
-    else if (view === 'terminy') c = await renderTerminy(layout('rozliczenia'), params);
-    else if (view === 'zamkniecie-roku') c = await renderRok(layout('rozliczenia'), params);
-    else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('pulpit'), params);
+    else if (view === 'terminy') c = await renderTerminy(layout('terminy'), params);
+    else if (view === 'zamkniecie-roku') c = await renderRok(layout('rok'), params);
+    else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('raport'), params);
     else if (view === 'rozmowy') c = await renderRozmowy(layout('rozmowy'), params);
     else if (view === 'zgloszenia' && parts[1] && parts[1] !== 'cykliczne' && !params.has('pelne') && (tkRes = await openTicketInThread(parts[1]))) c = tkRes.c;
     else if (view === 'zgloszenia' && !parts[1]) { const f = params.get('f'); history.replaceState(null, '', '#/rozmowy' + (f ? '?f=' + f : '')); c = await renderRozmowy(layout('rozmowy'), new URLSearchParams(f ? { f } : {})); }

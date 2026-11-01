@@ -11,6 +11,15 @@ const nextMonthDay = (period, day) => { const [y, m] = period.split('-').map(Num
 const acc = s => String(s || '').replace(/\s+/g, '').replace(/^PL/i, '');
 const accFmt = s => { const a = acc(s); return a ? a.replace(/^(\d{2})(\d{4})(\d{4})(\d{4})(\d{4})(\d{4})(\d{4})$/, '$1 $2 $3 $4 $5 $6 $7') : ''; };
 const accOk = s => /^\d{26}$/.test(acc(s));
+// mikrorachunek podatkowy z NIP (podatki.gov.pl): KK + 10100071 + 222 + „2” (NIP) + NIP + 00; KK jak w IBAN (mod 97, „PL” = 2521)
+export function mikrorachunek(nip) {
+  const n = String(nip || '').replace(/\D/g, '');
+  if (!/^\d{10}$/.test(n)) return '';
+  const bban = '10100071' + '222' + '2' + n + '00';
+  const s = bban + '252100';
+  let r = 0; for (const ch of s) r = (r * 10 + +ch) % 97;
+  return String(98 - r).padStart(2, '0') + bban;
+}
 const parseAmt = v => { const n = parseFloat(String(v).replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? Math.round(n * 100) / 100 : null; };
 
 function lines(c, period) {
@@ -27,12 +36,14 @@ function lines(c, period) {
 
 // entries: kratki klienta w miesiącu (task_code → entry); onDone(): odśwież widok
 export async function openAmounts({ client, period, entries, onDone }) {
-  const { data: c, error } = await sb.from('clients').select('id,name,email,legal_form,pit_form,cit_type,acc_tax,acc_zus').eq('id', client.id).single();
+  const { data: c, error } = await sb.from('clients').select('id,name,email,nip,legal_form,pit_form,cit_type,acc_tax,acc_zus').eq('id', client.id).single();
   if (error) return fail(error);
+  const autoTax = !c.acc_tax && mikrorachunek(c.nip);
+  if (autoTax) c.acc_tax_auto = autoTax;
   const L = lines(c, period);
   const rows = AMOUNT_CODES.map(code => ({ code, e: entries.get(code) })).filter(r => r.e && r.e.status !== 'na');
   if (!rows.length) return toast('Ten klient nie ma w tym miesiącu kratek z kwotami (VAT, PIT/CIT, ZUS, PIT-4)', true);
-  const accTax = h('input', { class: 'input', inputmode: 'numeric', placeholder: 'mikrorachunek podatkowy (26 cyfr)', value: accFmt(c.acc_tax) });
+  const accTax = h('input', { class: 'input', inputmode: 'numeric', placeholder: 'mikrorachunek podatkowy (26 cyfr)', value: accFmt(c.acc_tax || c.acc_tax_auto) });
   const accZus = h('input', { class: 'input', inputmode: 'numeric', placeholder: 'rachunek składkowy ZUS (26 cyfr)', value: accFmt(c.acc_zus) });
   const inputs = rows.map(r => {
     const amt = h('input', { class: 'input kw-amt', inputmode: 'decimal', placeholder: '0,00', value: r.e.amount != null ? String(r.e.amount).replace('.', ',') : '' });
@@ -83,7 +94,7 @@ export async function openAmounts({ client, period, entries, onDone }) {
     h('div', { class: 'form-grid' },
       h('label', { class: 'field' }, h('span', {}, 'Mikrorachunek podatkowy (VAT, PIT/CIT, PIT-4)'), accTax),
       h('label', { class: 'field' }, h('span', {}, 'Rachunek składkowy ZUS'), accZus)),
-    h('p', { class: 'small muted' }, 'Mikrorachunek klienta wygenerujesz na podatki.gov.pl (generator mikrorachunku) – wpisz go raz, zapamięta się w karcie klienta.')),
+    h('p', { class: 'small muted' }, c.acc_tax_auto ? 'Mikrorachunek wyliczony automatycznie z NIP klienta (zapisze się w karcie). Rachunek ZUS (NRS) nadaje ZUS – skopiuj go raz z PUE/eZUS albo z pisma ZUS.' : 'Rachunek ZUS (NRS) nadaje ZUS – skopiuj go raz z PUE/eZUS albo z pisma ZUS; zapamięta się w karcie klienta.')),
   close => [
     h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'),
     h('button', { class: 'btn btn-outline', onclick: async () => { if (await saveAll()) { close(); toast('Zapisano kwoty'); onDone?.(); } } }, 'Zapisz'),
