@@ -101,13 +101,13 @@ export async function openAmounts({ client, period, entries, onDone }) {
     h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'),
     h('button', { class: 'btn btn-outline', onclick: async () => { if (await saveAll()) { close(); toast('Zapisano kwoty'); onDone?.(); } } }, 'Zapisz'),
     h('button', { class: 'btn btn-primary', onclick: async e => {
+      const btn = e.currentTarget; // przed „await” – potem currentTarget jest już pusty
       const chosen = inputs.filter(i => i.on.checked && parseAmt(i.amt.value) != null && i.amt.value.trim());
       if (!chosen.length) return toast('Wpisz co najmniej jedną kwotę', true);
       if ([accTax, accZus].some(x => x.value.trim() && !accOk(x.value))) return toast('Numer rachunku powinien mieć 26 cyfr', true);
       if (!c.email) return toast('Klient nie ma adresu e-mail w karcie', true);
       if (!(await saveAll())) return;
       const body = mailText(chosen);
-      const btn = e.currentTarget;
       const its = items(chosen);
       // podgląd w szacie graficznej RKDP (z logo i stopką osoby wysyłającej) – gdy się nie uda, wersja tekstowa
       const frame = h('iframe', { class: 'kw-frame', sandbox: '', title: 'Podgląd wiadomości' });
@@ -117,7 +117,7 @@ export async function openAmounts({ client, period, entries, onDone }) {
       }, () => pv.replaceChildren(h('pre', { class: 'wt-mailbody' }, body)));
       modal('Podgląd wiadomości', h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `Do: ${c.email} · Temat: Kwoty do zapłaty – ${periodLbl}`), pv),
         c2 => [h('button', { class: 'btn btn-ghost', onclick: c2 }, 'Wróć'), h('button', { class: 'btn btn-primary', onclick: async ev => {
-          ev.currentTarget.disabled = true; btn.disabled = true;
+          const sendBtn = ev.currentTarget; sendBtn.disabled = true; sendBtn.textContent = 'Wysyłam…'; btn.disabled = true;
           const { data, error: er } = await sb.functions.invoke('mail', { body: { action: 'send', kind: 'kwoty', period, client_ids: [c.id], subject: `Kwoty do zapłaty – ${periodLbl}`, body, items: its, mark_done: { [c.id]: chosen.map(i => i.code) } } });
           c2();
           if (er) { btn.disabled = false; return fail(er); }
