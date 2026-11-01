@@ -1,6 +1,8 @@
 // Pełnomocnictwa klienta z terminami: UPL-1, PEL (ZUS), PPO-1, PPS-1, KSeF – kto je ma, zakres, ważność, alert przed wygaśnięciem.
 import { h, toast, fail, modal } from './ui.js';
 import { sb, state, memberById } from './store.js';
+// bez „null” w treści: puste elementy (null/false) są pomijane
+const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
 export const POA = {
   'UPL-1': 'UPL-1 – podpisywanie deklaracji (e-Deklaracje / e-US)',
@@ -30,10 +32,10 @@ export function poaCard(c, { editable = true } = {}) {
   const box = h('section', { class: 'card section poa-card' }, h('div', { class: 'section-head' }, h('h2', {}, 'Pełnomocnictwa')), h('p', { class: 'hint' }, 'Wczytywanie…'));
   async function draw() {
     const { data, error } = await sb.from('client_poa').select('*').eq('client_id', c.id).order('valid_to', { ascending: true, nullsFirst: false });
-    if (error) { box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, 'Pełnomocnictwa')), h('p', { class: 'hint' }, 'Niedostępne.')); return; }
+    if (error) { put(box, h('div', { class: 'section-head' }, h('h2', {}, 'Pełnomocnictwa')), h('p', { class: 'hint' }, 'Niedostępne.')); return; }
     const rows = [...data].sort((a, b) => ({ expired: 0, soon: 1, ok: 2, revoked: 3 })[poaState(a)] - ({ expired: 0, soon: 1, ok: 2, revoked: 3 })[poaState(b)]);
     const ST = { ok: ['ważne', 'ok'], soon: ['wygasa wkrótce', 'soon'], expired: ['wygasło', 'exp'], revoked: ['odwołane', 'rev'] };
-    box.replaceChildren(
+    put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, 'Pełnomocnictwa'), editable ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => edit({}) }, '+ Dodaj') : null),
       rows.length ? h('div', { class: 'poa-list' }, ...rows.map(p => { const s = poaState(p);
         return h('button', { type: 'button', class: 'poa-row', onclick: () => editable && edit(p) },

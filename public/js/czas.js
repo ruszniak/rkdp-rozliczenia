@@ -1,6 +1,8 @@
 // Czas pracy przy kliencie (RKDP i M2 TAX): licznik start/stop (jeden naraz), wpisy ręczne, pakiet godzin i rentowność.
 import { h, toast, fail, modal } from './ui.js';
 import { sb, state, memberById } from './store.js';
+// bez „null” w treści: puste elementy (null/false) są pomijane
+const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
 let running = null, loaded = null;
 const EV = 'rkdp-timer';
@@ -83,7 +85,7 @@ export function timerPill() {
   const draw = () => {
     if (!running) { el.hidden = true; return; }
     el.hidden = false;
-    el.replaceChildren(
+    put(el, 
       h('a', { href: running.module === 'm2' ? `#/doradztwo/klient/${running.m2_client_id}` : `#/klient/${running.client_id}`, 'data-tip': 'Licznik czasu pracy' }, '⏱ ', h('span', { class: 'tm-name' }, running.name), ' ', h('b', {}, hm(elapsed(running)))),
       h('button', { type: 'button', 'aria-label': 'Zatrzymaj licznik', onclick: () => stopTimer() }, '■'));
   };
@@ -104,14 +106,14 @@ export function timeCard({ module, client }) {
       sb.from('time_entries').select('*').eq(col, client.id).gte('started_at', new Date(Date.now() - 92 * 86400000).toISOString()).order('started_at', { ascending: false }).limit(200),
       sb.from(table).select('monthly_fee,package_hours').eq('id', client.id).maybeSingle(),
     ]);
-    if (error) { box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, 'Czas pracy')), h('p', { class: 'hint' }, 'Niedostępne.')); return; }
+    if (error) { put(box, h('div', { class: 'section-head' }, h('h2', {}, 'Czas pracy')), h('p', { class: 'hint' }, 'Niedostępne.')); return; }
     const month = rows.filter(r => r.started_at >= a && r.started_at < b);
     const min = month.reduce((s, r) => s + entryMin(r), 0);
     const pkg = cl?.package_hours != null ? +cl.package_hours : null, fee = cl?.monthly_fee != null ? +cl.monthly_fee : null;
     const pct = pkg ? Math.min(100, Math.round((min / 60) / pkg * 100)) : null;
     const over = pkg != null && min / 60 > pkg;
     const pkgIn = h('input', { class: 'input', inputmode: 'decimal', placeholder: 'np. 2', value: pkg != null ? String(pkg).replace('.', ',') : '', style: { maxWidth: '90px' } });
-    box.replaceChildren(
+    put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, 'Czas pracy'), h('div', { class: 'row-btns' }, timerButton({ module, clientId: client.id, name: client.name }), h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: manual }, '+ Wpisz'))),
       h('div', { class: 'tm-sum' },
         h('div', {}, h('span', { class: 'small muted' }, 'W tym miesiącu'), h('b', { class: over ? 'late-t' : '' }, `${hm(min)} h`)),
@@ -155,7 +157,7 @@ export async function renderCzas(main, params) {
   let ym = /^\d{4}-\d{2}$/.test(params?.get('m') || '') ? params.get('m') : thisMonth();
   const box = h('div', {});
   async function draw() {
-    box.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
+    put(box, h('div', { class: 'spinner' }, 'Wczytywanie…'));
     const [a, b] = monthRange(ym);
     const [{ data: rows, error }, { data: cs }, { data: m2 }, { data: st }] = await Promise.all([
       sb.from('time_entries').select('*').gte('started_at', a).lt('started_at', b).limit(5000),
@@ -163,7 +165,7 @@ export async function renderCzas(main, params) {
       sb.from('m2_clients').select('id,name,monthly_fee,package_hours'),
       sb.from('app_settings').select('value').eq('key', 'target_hourly_rate').maybeSingle(),
     ]);
-    if (error) { box.replaceChildren(h('p', { class: 'hint' }, 'Raport niedostępny.')); return; }
+    if (error) { put(box, h('p', { class: 'hint' }, 'Raport niedostępny.')); return; }
     const target = parseFloat(st?.value || '250') || 250;
     const C = new Map([...(cs || []).map(c => ['rkdp:' + c.id, { ...c, mod: 'RKDP', href: `#/klient/${c.id}` }]), ...(m2 || []).map(c => ['m2:' + c.id, { ...c, mod: 'M2 TAX', href: `#/doradztwo/klient/${c.id}` }])]);
     const agg = new Map(), per = new Map();
@@ -175,7 +177,7 @@ export async function renderCzas(main, params) {
       const rate = fee != null && min ? fee / (min / 60) : null; return { c, min, fee, pkg, over: pkg != null ? Math.max(0, min - pkg * 60) : 0, rate }; })
       .sort((x, y) => (x.rate ?? 1e9) - (y.rate ?? 1e9));
     const total = list.reduce((s, x) => s + x.min, 0);
-    box.replaceChildren(
+    put(box, 
       h('div', { class: 'tiles' }, h('div', { class: 'card tile' }, h('span', { class: 'num' }, hm(total)), h('span', { class: 'lbl' }, 'godzin łącznie')),
         h('div', { class: 'card tile' }, h('span', { class: 'num' }, String(list.length)), h('span', { class: 'lbl' }, 'klientów z czasem')),
         h('div', { class: 'card tile' + (list.filter(x => x.rate != null && x.rate < target).length ? ' dark' : '') }, h('span', { class: 'num' }, String(list.filter(x => x.rate != null && x.rate < target).length)), h('span', { class: 'lbl' }, `poniżej ${target} zł/h`)),
@@ -195,7 +197,7 @@ export async function renderCzas(main, params) {
   const targetIn = h('input', { class: 'input', inputmode: 'decimal', placeholder: 'próg zł/h', style: { maxWidth: '110px' } });
   sb.from('app_settings').select('value').eq('key', 'target_hourly_rate').maybeSingle().then(({ data }) => { targetIn.value = data?.value || '250'; });
   monIn.addEventListener('change', () => { if (monIn.value) { ym = monIn.value; history.replaceState(null, '', '#/czas?m=' + ym); draw(); } });
-  main.replaceChildren(
+  put(main, 
     h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP · M2 TAX'), h('h1', { style: { marginTop: '6px' } }, 'Czas pracy i rentowność'), h('p', { class: 'sub' }, 'Ile czasu zajmują klienci, wykorzystanie pakietów godzin i stawka efektywna.')),
       h('div', { class: 'row-btns' }, monIn, targetIn, h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { const v = parseFloat(targetIn.value.replace(',', '.')); if (!(v > 0)) return toast('Podaj stawkę', true); const { error } = await sb.from('app_settings').upsert({ key: 'target_hourly_rate', value: String(v) }); if (error) return fail(error); toast('Zapisano próg'); draw(); } }, 'Zapisz próg zł/h'))),
     box);

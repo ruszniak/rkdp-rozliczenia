@@ -4,6 +4,8 @@
 import { h, toast, fail, modal, icon, ava, infoTip } from '../ui.js';
 import { sb, state, memberById } from '../store.js';
 import { fileTile, dropZone, pastedFiles, safeName, named, fmtSize } from './zgloszenia.js';
+// bez „null” w treści: puste elementy (null/false) są pomijane
+const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
 // ---------- załączniki (schowek „zlecenia”, folder = id zlecenia) ----------
 const ZL_BUCKET = 'zlecenia', MAX_MB = 25;
@@ -24,7 +26,7 @@ async function uploadZl(zid, files, wpisId = null) {
 // pole „dodaj pliki / zdjęcia” z listą oczekujących (wysyłane razem z zapisem)
 function pendingBox(pending, hint = 'zdjęcia, PDF, dokumenty · zrzut ekranu: Ctrl+V / ⌘V') {
   const list = h('div', { class: 'zl-pend' });
-  const draw = () => list.replaceChildren(...pending.map((f, i) => h('span', { class: 'zl-pfile' }, f.type?.startsWith('image/') ? h('img', { src: URL.createObjectURL(f), alt: '' }) : null,
+  const draw = () => put(list, ...pending.map((f, i) => h('span', { class: 'zl-pfile' }, f.type?.startsWith('image/') ? h('img', { src: URL.createObjectURL(f), alt: '' }) : null,
     h('span', {}, `${f.name} · ${fmtSize(f.size)}`), h('button', { type: 'button', 'aria-label': 'Usuń', onclick: () => { pending.splice(i, 1); draw(); } }, '✕'))));
   const add = fs => { fs.map(named).forEach(f => pending.push(f)); draw(); };
   const cam = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: () => { if (cam.files.length) add([...cam.files]); cam.value = ''; } });
@@ -74,7 +76,7 @@ export async function renderZlecenia(main, id) {
   let all = [], filter = admin ? 'aktywne' : 'aktywne';
   const listBox = h('div', {}, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const chips = h('div', { class: 'zl-chips' });
-  const reload = async () => { try { all = await loadAll(); } catch (e) { listBox.replaceChildren(h('p', { class: 'hint' }, 'Zlecenia są niedostępne.')); return; } draw(); };
+  const reload = async () => { try { all = await loadAll(); } catch (e) { put(listBox, h('p', { class: 'hint' }, 'Zlecenia są niedostępne.')); return; } draw(); };
   const open = z => openZlecenie(z.id, reload);
 
   function draw() {
@@ -85,18 +87,18 @@ export async function renderZlecenia(main, id) {
       ['po', 'Po terminie', late],
       ['koniec', 'Zakończone', z => !OPEN.includes(z.status)],
     ] : [['aktywne', 'Do zrobienia', z => OPEN.includes(z.status)], ['koniec', 'Zakończone', z => !OPEN.includes(z.status)]];
-    chips.replaceChildren(...F.map(([k, l, f]) => { const n = all.filter(f).length; return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : '') + ((k === 'sprawdz' || k === 'pytania' || k === 'po') && n ? ' hot' : ''), onclick: () => { filter = k; draw(); } }, l, h('span', {}, String(n))); }));
+    put(chips, ...F.map(([k, l, f]) => { const n = all.filter(f).length; return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : '') + ((k === 'sprawdz' || k === 'pytania' || k === 'po') && n ? ' hot' : ''), onclick: () => { filter = k; draw(); } }, l, h('span', {}, String(n))); }));
     const f = F.find(x => x[0] === filter)[2];
     const rows = all.filter(f).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
-    if (!rows.length) { listBox.replaceChildren(h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zleceń. Kliknij „+ Zlecenie”, aby zlecić zadanie.' : 'Nie masz zleceń do zrobienia. 👍') : 'Brak zleceń.')); return; }
-    if (!admin) { listBox.replaceChildren(h('div', { class: 'zl-list' }, ...rows.map(z => row(z, open)))); return; }
+    if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zleceń. Kliknij „+ Zlecenie”, aby zlecić zadanie.' : 'Nie masz zleceń do zrobienia. 👍') : 'Brak zleceń.')); return; }
+    if (!admin) { put(listBox, h('div', { class: 'zl-list' }, ...rows.map(z => row(z, open)))); return; }
     const by = new Map(); rows.forEach(z => by.set(z.assignee_id, [...(by.get(z.assignee_id) || []), z]));
-    listBox.replaceChildren(...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
+    put(listBox, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
       h('section', { class: 'zl-person' }, h('div', { class: 'zl-phead' }, ava(memberById(mid) || { full_name: '?' }), h('b', {}, who(mid)), h('span', { class: 'small muted' }, `${zs.length}`)),
         h('div', { class: 'zl-list' }, ...zs.map(z => row(z, open))))));
   }
 
-  main.replaceChildren(
+  put(main, 
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, admin ? 'Zlecenia dla zespołu' : 'Moje zlecenia', infoTip(HELP, 'Zlecenia – jak to działa')),
@@ -116,7 +118,7 @@ export function zleceniaCard() {
     if (!admin && !act.length) { box.remove(); return; }
     const rep = act.filter(z => z.status === 'zgloszone'), q = act.filter(z => z.status === 'pytanie'), lt = act.filter(late);
     const show = (admin ? [...rep, ...q, ...lt.filter(z => !rep.includes(z) && !q.includes(z))] : act.sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))).slice(0, 6);
-    box.replaceChildren(
+    put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, admin ? `Zlecenia (${act.length} aktywnych)` : `Zlecenia od Michała (${act.length})`),
         h('div', { class: 'row-btns' }, admin ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newZlecenie(() => { location.hash = '#/zlecenia'; }) }, icon('plus'), 'Zlecenie') : null,
           h('a', { class: 'btn btn-ghost btn-sm', href: '#/zlecenia' }, 'Wszystkie →'))),

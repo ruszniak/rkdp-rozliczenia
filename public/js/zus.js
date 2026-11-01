@@ -3,6 +3,8 @@
 import { h, toast, fail, modal } from './ui.js';
 import { sb } from './store.js';
 import { ZUS_TYPE, ZUS_SHORT } from './dict.js';
+// bez „null” w treści: puste elementy (null/false) są pomijane
+const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
 const CODE = { pelny: '05 10 00', preferencyjny: '05 70 00', maly_zus_plus: '05 90 00' };
 const MON = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
@@ -24,7 +26,7 @@ export function zusCard(c, { editable = true, onTypeChange } = {}) {
 
   async function load() {
     const { data, error } = await sb.from('client_zus').select('*').eq('client_id', c.id).order('valid_from');
-    if (error) { box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, 'ZUS: składki i wakacje')), h('p', { class: 'hint' }, 'Historia ZUS będzie dostępna po aktualizacji bazy.')); return; }
+    if (error) { put(box, h('div', { class: 'section-head' }, h('h2', {}, 'ZUS: składki i wakacje')), h('p', { class: 'hint' }, 'Historia ZUS będzie dostępna po aktualizacji bazy.')); return; }
     rows = data || []; draw();
   }
 
@@ -59,7 +61,7 @@ export function zusCard(c, { editable = true, onTypeChange } = {}) {
     const del = r => editable ? h('button', { type: 'button', class: 'chat-a', 'aria-label': 'Usuń wpis', onclick: async () => {
       if (!confirm('Usunąć ten wpis z historii ZUS?')) return;
       const { error } = await sb.from('client_zus').delete().eq('id', r.id); if (error) return fail(error); toast('Usunięto'); load(); } }, 'usuń') : null;
-    box.replaceChildren(
+    put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, 'ZUS: składki i wakacje'),
         editable ? h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: addHoliday }, '+ Wakacje'), h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: addPeriod }, '+ Zmiana składek')) : null),
       h('div', { class: 'zus-hol-box' + (holY ? ' on' : '') },

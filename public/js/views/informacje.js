@@ -4,6 +4,8 @@ import { h, toast, fail, modal, infoTip, icon } from '../ui.js';
 import { sb, state, memberById } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { LEGAL_SHORT } from '../dict.js';
+// bez „null” w treści: puste elementy (null/false) są pomijane
+const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
 const HELP = `Jedna wiadomość do wielu klientów naraz:
 • wybierz klientów grupami (np. wszystkie JDG, spółki z o.o., pracodawcy) albo zaznacz pojedynczo na liście,
@@ -66,7 +68,7 @@ export async function renderInformacje(main) {
   function drawHtml() {
     drop.textContent = '';
     if (!rich) {
-      htmlBox.replaceChildren(
+      put(htmlBox, 
         h('div', { class: 'inf-dropwrap' }, drop,
           h('div', { class: 'inf-drophint' }, h('b', {}, 'Wklej tutaj gotowy mail (Ctrl+V / ⌘V)'),
             h('span', {}, 'kod HTML skopiowany przyciskiem „Copy” albo cały mail zaznaczony w podglądzie (Ctrl+A, Ctrl+C) – albo przeciągnij plik .html'))),
@@ -74,7 +76,7 @@ export async function renderInformacje(main) {
       return;
     }
     preview.srcdoc = rich;
-    htmlBox.replaceChildren(
+    put(htmlBox, 
       h('div', { class: 'inf-prevhead' }, h('span', { class: 'small muted' }, 'Podgląd – tak zobaczy to klient (Gmail może lekko uprościć wygląd)'),
         h('div', { class: 'row-btns' },
           h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => fileIn.click() }, 'Zmień plik'),
@@ -102,7 +104,7 @@ export async function renderInformacje(main) {
   const groupDesc = () => GROUPS.flatMap(([, gs]) => gs).filter(([, f]) => { const m = pool().filter(f); return m.length && m.every(c => sel.has(c.id)); }).map(([l]) => l).join(', ');
 
   function drawGroups() {
-    groupsBox.replaceChildren(...GROUPS.filter(([, gs]) => gs.length).map(([title, gs]) => h('div', { class: 'inf-gsec' }, h('span', { class: 'inf-gtitle' }, title),
+    put(groupsBox, ...GROUPS.filter(([, gs]) => gs.length).map(([title, gs]) => h('div', { class: 'inf-gsec' }, h('span', { class: 'inf-gtitle' }, title),
       h('div', { class: 'inf-chips' }, ...gs.map(([label, f]) => {
         const m = pool().filter(f); if (!m.length) return null;
         const n = m.filter(c => sel.has(c.id)).length, full = n === m.length;
@@ -112,7 +114,7 @@ export async function renderInformacje(main) {
   }
   function drawList() {
     const v = visible();
-    list.replaceChildren(...(v.length ? v.map(c => {
+    put(list, ...(v.length ? v.map(c => {
       const em = emails(c);
       const cb = h('input', { type: 'checkbox', checked: sel.has(c.id) });
       cb.addEventListener('change', () => { if (cb.checked) sel.add(c.id); else sel.delete(c.id); draw(); });
@@ -125,7 +127,7 @@ export async function renderInformacje(main) {
     drawGroups(); drawList();
     const ch = chosen(), noMail = ch.filter(c => !emails(c).length).length;
     countEl.textContent = `Wybrano klientów: ${ch.length} · adresów e-mail: ${addrCount()}${noMail ? ` · bez e-maila: ${noMail}` : ''}`;
-    sendBtn.replaceChildren(icon('mail'), `Wyślij do ${addrCount()} ${addrCount() === 1 ? 'adresu' : 'adresów'}`);
+    put(sendBtn, icon('mail'), `Wyślij do ${addrCount()} ${addrCount() === 1 ? 'adresu' : 'adresów'}`);
     sendBtn.disabled = !addrCount();
   }
   const search = h('input', { class: 'input', type: 'search', placeholder: 'Szukaj klienta lub e-maila…' });
@@ -168,9 +170,9 @@ export async function renderInformacje(main) {
 
   async function loadHist() {
     const { data, error } = await sb.from('mail_broadcasts').select('*').order('sent_at', { ascending: false }).limit(30);
-    if (error) { histBox.replaceChildren(h('p', { class: 'hint' }, 'Historia niedostępna.')); return; }
+    if (error) { put(histBox, h('p', { class: 'hint' }, 'Historia niedostępna.')); return; }
     const ST = { wyslano: 'wysłano', czesciowo: 'częściowo', blad: 'błąd', test: 'test do siebie' };
-    histBox.replaceChildren(data.length ? h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
+    put(histBox, data.length ? h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
       h('thead', {}, h('tr', {}, ...['Data', 'Temat', 'Grupy', 'Klientów', 'Adresów', 'Status', 'Wysłał(a)'].map(x => h('th', {}, x)))),
       h('tbody', {}, ...data.map(b => h('tr', { class: 'click', onclick: () => modal(b.subject, h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `${new Date(b.sent_at).toLocaleString('pl-PL')} · ${memberById(b.sent_by)?.full_name || ''} · ${b.groups || ''}`), b.html ? h('iframe', { class: 'inf-preview', sandbox: '', srcdoc: b.html, title: 'Podgląd' }) : h('pre', { class: 'wt-mailbody' }, b.body), b.error ? h('p', { class: 'jpk-warn' }, b.error) : null),
         c => [h('button', { class: 'btn btn-outline', onclick: () => { c(); subj.value = b.subject; if (b.html) { rich = b.html; setMode('html'); } else { body.value = b.body; setMode('text'); } window.scrollTo({ top: 0, behavior: 'smooth' }); toast('Wczytano treść – wybierz odbiorców'); } }, 'Użyj ponownie'), h('button', { class: 'btn btn-primary', onclick: c }, 'Zamknij')], { wide: true }) },
@@ -179,7 +181,7 @@ export async function renderInformacje(main) {
         h('td', {}, h('span', { class: 'pill ' + (b.status === 'wyslano' ? 'done' : b.status === 'test' ? 'unk' : 'no') }, ST[b.status] || b.status)), h('td', {}, memberById(b.sent_by)?.short_name || '')))))) : h('p', { class: 'hint' }, 'Nie wysłano jeszcze żadnej informacji.'));
   }
 
-  main.replaceChildren(
+  put(main, 
     h('a', { href: '#/klienci', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Klienci'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP · Klienci'),

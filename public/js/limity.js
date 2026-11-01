@@ -2,6 +2,8 @@
 // Kwoty na dany rok: limity w euro przeliczane po kursie NBP z pierwszego dnia roboczego października roku poprzedniego.
 import { h, toast, fail, modal } from './ui.js';
 import { sb, state } from './store.js';
+// bez „null” w treści: puste elementy (null/false) są pomijane
+const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
 export const LIMITS = {
   2026: { eur: 4.2586, vatZw: 240000, ryczalt: 8517200, malyPod: 8517000, pelneKsiegi: 10646500, mzp: 120000, estEtaty: 3 },
@@ -84,7 +86,7 @@ export function revenueCard(c, { editable = true } = {}) {
   const box = h('section', { class: 'card section lim-card' }, h('div', { class: 'section-head' }, h('h2', {}, 'Przychody i limity')), h('p', { class: 'hint' }, 'Wczytywanie…'));
   const num = v => { const n = parseFloat(String(v).replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : null; };
   async function draw() {
-    let r; try { r = (await loadRevenue([c.id], year)).get(c.id) || {}; } catch { box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, 'Przychody i limity')), h('p', { class: 'hint' }, 'Niedostępne.')); return; }
+    let r; try { r = (await loadRevenue([c.id], year)).get(c.id) || {}; } catch { put(box, h('div', { class: 'section-head' }, h('h2', {}, 'Przychody i limity')), h('p', { class: 'hint' }, 'Niedostępne.')); return; }
     const al = checkLimits(c, r.prev?.amount ?? null, r.ytd || null, year);
     const prevIn = h('input', { class: 'input', inputmode: 'decimal', placeholder: 'np. 180000', value: r.prev ? String(r.prev.amount).replace('.', ',') : '', disabled: !editable });
     const ytdIn = h('input', { class: 'input', inputmode: 'decimal', placeholder: 'narastająco', value: r.ytd ? String(r.ytd.amount).replace('.', ',') : '', disabled: !editable });
@@ -100,7 +102,7 @@ export function revenueCard(c, { editable = true } = {}) {
       const e = res.find(x => x.error)?.error; save.disabled = false;
       if (e) return fail(e); toast('Zapisano'); draw();
     } }, 'Zapisz');
-    box.replaceChildren(
+    put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, 'Przychody i limity')),
       h('div', { class: 'lim-form' },
         h('label', { class: 'field' }, h('span', {}, `Przychód ${year - 1} (cały rok)`), prevIn),
@@ -131,11 +133,11 @@ export function warningsCard() {
       poaAlerts(poa || [], id => byId.get(id)?.name || '').forEach(a => items.push(a));
       const noData = mine.filter(c => !rev.has(c.id)).length;
       if (!items.length) {
-        box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, 'Limity i pełnomocnictwa')), h('p', { class: 'small muted' }, `Bez ostrzeżeń.${noData ? ` Przychody nieuzupełnione u ${noData} klientów – limity sprawdzane są tylko tam, gdzie je wpisano.` : ''}`));
+        put(box, h('div', { class: 'section-head' }, h('h2', {}, 'Limity i pełnomocnictwa')), h('p', { class: 'small muted' }, `Bez ostrzeżeń.${noData ? ` Przychody nieuzupełnione u ${noData} klientów – limity sprawdzane są tylko tam, gdzie je wpisano.` : ''}`));
         return;
       }
       const sorted = sortAlerts(items);
-      box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, `Ostrzeżenia (${items.length})`)),
+      put(box, h('div', { class: 'section-head' }, h('h2', {}, `Ostrzeżenia (${items.length})`)),
         h('div', { class: 'lim-list' }, ...sorted.slice(0, 12).map(a => h('a', { class: 'lim-a lim-' + a.level, href: `#/klient/${a.client_id}`, 'data-panel': a.client_id },
           h('b', {}, `${byId.get(a.client_id)?.name || ''} – ${a.title}`), h('span', {}, a.text)))),
         sorted.length > 12 ? h('p', { class: 'small muted' }, `… i ${sorted.length - 12} więcej`) : null,

@@ -3,6 +3,8 @@
 import { h, fail, infoTip, icon } from '../ui.js';
 import { sb, state, hasModule } from '../store.js';
 import { TK_OPEN } from './zgloszenia.js';
+// bez „null” w treści: puste elementy (null/false) są pomijane
+const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
 
 const today = () => new Date().toLocaleDateString('sv-SE');
 const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
@@ -55,11 +57,11 @@ export async function renderMoje(main, params) {
   const order = it => { const d = it.due; return d && d < today() ? 0 : d === today() ? 1 : it.hot ? 2 : d && d <= plus(3) ? 3 : 4; };
   function draw() {
     const F = [['all', 'Wszystko'], ['zlecenie', 'Zlecenia od Michała'], ['zadanie', 'Zadania przy klientach'], ['pytanie', 'Pytania'], ['termin', 'Terminy']];
-    chips.replaceChildren(...F.map(([k, l]) => { const n = k === 'all' ? items.length : items.filter(i => i.kind === k).length; if (k !== 'all' && k !== filter && !n) return null;
+    put(chips, ...F.map(([k, l]) => { const n = k === 'all' ? items.length : items.filter(i => i.kind === k).length; if (k !== 'all' && k !== filter && !n) return null;
       return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : ''), onclick: () => { filter = k; history.replaceState(null, '', '#/moje' + (k === 'all' ? '' : '?f=' + k)); draw(); } }, l, h('span', {}, String(n))); }).filter(Boolean));
     const rows = items.filter(i => filter === 'all' || i.kind === filter).sort((a, b) => order(a) - order(b) || (a.due || '9999').localeCompare(b.due || '9999') || (b.created || '').localeCompare(a.created || ''));
-    if (!rows.length) { list.replaceChildren(h('p', { class: 'hint', style: { padding: '18px 0' } }, 'Nic na Ciebie nie czeka. 👍')); return; }
-    list.replaceChildren(...rows.map(it => {
+    if (!rows.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, 'Nic na Ciebie nie czeka. 👍')); return; }
+    put(list, ...rows.map(it => {
       const late = it.due && it.due < today(), td = it.due === today();
       const inner = [h('span', { class: 'mj-kind ' + KINDS[it.kind][1] }, KINDS[it.kind][0]),
         h('span', { class: 'mj-main' }, h('b', {}, it.title, it.hot ? h('span', { class: 'zl-hot' }, 'pilne') : null), it.sub ? h('span', { class: 'small muted' }, it.sub) : null),
@@ -68,7 +70,7 @@ export async function renderMoje(main, params) {
     }));
   }
   reload = async () => { try { items = await collect(); } catch (e) { fail(e); items = []; } draw(); };
-  main.replaceChildren(
+  put(main, 
     h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
       h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Moje sprawy', infoTip(HELP, 'Moje sprawy')),
       h('p', { class: 'sub' }, 'Zlecenia, zadania, pytania i terminy – wszystko, co czeka na Ciebie.')),
