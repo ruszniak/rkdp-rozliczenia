@@ -1848,3 +1848,10 @@ a.lim-a:hover{border-color:var(--gold)}
 .poa-rev{border:1px dashed var(--line-2);color:var(--muted)}
 @media (max-width:600px){.poa-row{grid-template-columns:auto minmax(0,1fr) auto}.poa-row>.small{grid-column:2}}
 .jpk-revbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px;margin:0 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:14px}.jpk-revbar:empty{display:none}
+/* kwoty do zapłaty */
+.kw-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.kw-row{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr 1fr;gap:10px;align-items:end;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.kw-name{font-weight:600;align-self:center}
+.kw-amt{text-align:right}
+.kw-sum{text-align:right;margin:4px 0 14px;font-size:15px}
+@media (max-width:600px){.kw-row{grid-template-columns:1fr 1fr}.kw-name{grid-column:1/-1}}

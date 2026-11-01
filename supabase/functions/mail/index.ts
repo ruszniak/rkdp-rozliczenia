@@ -3,7 +3,7 @@
 // Każdy klient dostaje osobną wiadomość (bez ujawniania innych adresatów), podpisaną przez osobę wysyłającą.
 // Wywołuje zalogowany członek zespołu z modułem Rozliczenia; klienci filtrowani uprawnieniami (RLS) tej osoby.
 //  • { action: 'status' } – czy wysyłka jest skonfigurowana
-//  • { action: 'send', kind, period, subject, body, client_ids[], mark_missing?, links? } – {klient}, {okres}, {link} w temacie i treści
+//  • { action: 'send', kind, period, subject, body, client_ids[], mark_missing?, links?, mark_done? } – {klient}, {okres}, {link} w temacie i treści; kind 'kwoty' + mark_done: { client_id: [kody] } odhacza kratki
 //  • { action: 'broadcast', subject, body, client_ids[], groups?, test?, signature? } – jedna informacja do wielu klientów:
 //    Do: adres kancelarii, klienci w UDW (paczki po 90 adresów); test = tylko do osoby wysyłającej
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -20,7 +20,8 @@ const URL_ = Deno.env.get('SUPABASE_URL')!;
 const admin = createClient(URL_, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
 const MONTHS = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 const periodLabel = (p: string) => `${MONTHS[+p.slice(5, 7) - 1]} ${p.slice(0, 4)}`;
-const KINDS = new Set(['ksef', 'wyciag', 'dokumenty']);
+const KINDS = new Set(['ksef', 'wyciag', 'dokumenty', 'kwoty']);
+const DONE_CODES = new Set(['vat', 'pit_cit', 'zus_podany', 'pit4']);
 const MARK: Record<string, string[]> = { ksef: ['saldeo'], wyciag: ['wb'] };
 const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(e);
 
@@ -288,6 +289,9 @@ Deno.serve(async (req: Request) => {
         await admin.from('client_messages').insert({ client_id: c.id, kind, period: period ? period + '-01' : null, email: to, subject, body: text, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
         if (body.mark_missing && period && MARK[kind]) await admin.from('checklist_entries').update({ status: 'reminded' })
           .eq('client_id', c.id).eq('period', period + '-01').in('task_code', MARK[kind]).in('status', ['todo', 'in_progress', 'missing_docs']);
+        // kwoty do zapłaty: wysłane kwoty → kratki „podany” odhaczone (tylko te z listy, tylko tego klienta i miesiąca)
+        const codes = kind === 'kwoty' && period && Array.isArray(body.mark_done?.[c.id]) ? body.mark_done[c.id].filter((x: string) => DONE_CODES.has(x)) : [];
+        if (codes.length) await sb.from('checklist_entries').update({ status: 'done' }).eq('client_id', c.id).eq('period', period + '-01').in('task_code', codes);
       } catch (e) {
         const msg = String((e as Error).message || e);
         if (/^not_(configured|authorized)/.test(msg)) return json({ error: 'not_configured', detail: msg.slice(0, 300), results }, 200);

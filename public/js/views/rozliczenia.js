@@ -1,3 +1,4 @@
+import { AMOUNT_CODES, openAmounts } from '../kwoty.js';
 import { h, icon, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials, printHtml, ava } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
@@ -58,7 +59,7 @@ export async function renderRozliczenia(main, params) {
   const [clients, entries, notes] = await Promise.all([
     fetchAll(() => sb.from('clients')
       .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id,email').order('name')),
-    fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at').eq('period', pdate)),
+    fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at,amount,due_date').eq('period', pdate)),
     fetchAll(() => sb.from('period_notes').select('client_id,notes,questions').eq('period', pdate)),
   ]);
   // załączniki do uwag (tabela może jeszcze nie istnieć – wtedy po prostu brak plików)
@@ -355,7 +356,7 @@ export async function renderRozliczenia(main, params) {
     const st = STATUS[entry.status];
     const who = entry.updated_by && entry.updated_by !== 'system'
       ? (state.members.find(m => m.email === entry.updated_by)?.short_name || entry.updated_by) : null;
-    const tip = `${headerLabel}: ${st.label}` + (who ? `\nZmienił(a): ${who}, ${new Date(entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
+    const tip = `${headerLabel}: ${st.label}` + (entry.amount != null ? `\nKwota: ${(+entry.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2 })} zł${entry.due_date ? ', termin ' + entry.due_date.split('-').reverse().join('.') : ''}` : '') + (who ? `\nZmienił(a): ${who}, ${new Date(entry.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '');
     return h('button', { class: `cb cb-${entry.status === 'in_progress' ? 'todo' : entry.status}` + (selected.has(entry.id) ? ' sel' : ''), 'data-tip': tip, 'aria-label': tip, 'data-eid': entry.id,
       onclick: (ev) => {
         if (ev.shiftKey && anchorId) return selectRange(ev.currentTarget);
@@ -645,7 +646,9 @@ export async function renderRozliczenia(main, params) {
       STATUS_ORDER.map(s => h('button', { class: 'opt' + (entry.status === s ? ' cur' : ''), role: 'menuitem',
         onclick: () => { closePop(); if (entry.status !== s) setStatus(entry, s); } },
       h('span', { class: `cb cb-${s}`, style: { width: '22px', height: '22px', fontSize: '12px' } }, STATUS[s].mark),
-      s === 'todo' ? 'Wyczyść (do zrobienia)' : STATUS[s].label))]);
+      s === 'todo' ? 'Wyczyść (do zrobienia)' : STATUS[s].label)),
+      AMOUNT_CODES.includes(entry.task_code) ? h('button', { class: 'opt', role: 'menuitem', onclick: () => { closePop(); openAmounts({ client: clientMap.get(entry.client_id), period, entries: byClient.get(entry.client_id) || new Map(), onDone: () => refreshRow(entry.client_id) }); } },
+        h('span', { class: 'cb', style: { width: '22px', height: '22px', fontSize: '12px' } }, 'zł'), entry.amount != null ? `Kwoty do zapłaty (${(+entry.amount).toLocaleString('pl-PL', { minimumFractionDigits: 2 })} zł)…` : 'Kwoty do zapłaty – wyślij klientowi…') : null]);
   }
 
   function personMenu(anchor, c, field) {
