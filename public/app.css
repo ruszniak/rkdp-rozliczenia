@@ -1934,3 +1934,4 @@ a.lim-a:hover{border-color:var(--gold)}
   table.grid tr{gap:8px 4px}
   .ph-cam{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line-2);background:var(--card);border-radius:99px;width:30px;height:26px;font-size:14px;cursor:pointer;padding:0}
 }
+.page-head .tm-btn.on{background:var(--gold);border-color:var(--gold);color:var(--dark)}

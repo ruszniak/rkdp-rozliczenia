@@ -1,5 +1,5 @@
 // Moduł Doradztwo podatkowe (M2 TAX)
-import { timeCard } from '../czas.js';
+import { timeCard, timerButton } from '../czas.js';
 import { todayWidget as obTodayWidget, teamTodayCard, canSeeTeam } from './obecnosc.js';
 import { h, toast, fail, icon, initials, MONTHS, printHtml, ava } from '../ui.js';
 import { sb, state, memberById, isAdmin } from '../store.js';
@@ -507,7 +507,7 @@ async function viewMatter(main, id, params) {
     ]);
   } }, icon('download'), 'Raport PDF');
   main.replaceChildren(...header('sprawy', `${m.number} · ${m.title}`, null,
-    [statusPill(m.status), h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/dokumenty?sprawa=${m.id}` }, 'Pismo'), reportBtn, poaBtn, delMatter].filter(Boolean)),
+    [statusPill(m.status), timerButton({ module: 'm2', clientId: m.client_id, matterId: m.id, name: `${client?.name || 'klient'} · ${m.number}`, onSaved: reload }), h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/dokumenty?sprawa=${m.id}` }, 'Pismo'), reportBtn, poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
   h('div', { class: 'two' }, h('div', {}, formCard), h('div', {}, dlCard, journalCard, ordersCard, timeCard, historyCard({ matter: m.id }))));
@@ -618,7 +618,7 @@ async function viewClient(main, id) {
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=zlecenie&klient=${id}` }, '+ Zlecenie'),
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
-  main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · ')),
+  main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
     h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 

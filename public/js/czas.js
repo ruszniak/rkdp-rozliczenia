@@ -22,21 +22,22 @@ export async function loadRunning(force = false) {
     if (data) {
       const t = data.module === 'm2' ? await sb.from('m2_clients').select('name').eq('id', data.m2_client_id).maybeSingle() : await sb.from('clients').select('name').eq('id', data.client_id).maybeSingle();
       data.name = t.data?.name || 'klient';
+      if (data.m2_matter_id) { const mt = await sb.from('m2_matters').select('number').eq('id', data.m2_matter_id).maybeSingle(); if (mt.data?.number) data.name += ` · ${mt.data.number}`; }
     }
     running = data || null; emit(); return running;
   })();
   return loaded;
 }
 
-export async function startTimer({ module, clientId, name }) {
+export async function startTimer({ module, clientId, matterId = null, name }) {
   await loadRunning();
   if (running) {
-    const same = running.module === module && (running.client_id || running.m2_client_id) === clientId;
+    const same = running.module === module && (running.client_id || running.m2_client_id) === clientId && (running.m2_matter_id || null) === matterId;
     if (same) return;
     if (!confirm(`Trwa licznik dla „${running.name}” (${hm(elapsed(running))}). Zatrzymać go i zacząć nowy?`)) return;
     await stopTimer({ silent: true });
   }
-  const { data, error } = await sb.from('time_entries').insert({ member_id: state.me.id, module, client_id: module === 'rkdp' ? clientId : null, m2_client_id: module === 'm2' ? clientId : null }).select('*').single();
+  const { data, error } = await sb.from('time_entries').insert({ member_id: state.me.id, module, client_id: module === 'rkdp' ? clientId : null, m2_client_id: module === 'm2' ? clientId : null, m2_matter_id: matterId }).select('*').single();
   if (error) return fail(error);
   running = { ...data, started_at: data.started_at || new Date().toISOString(), name }; loaded = Promise.resolve(running); emit();
   toast(`Liczę czas: ${name}`);
@@ -47,9 +48,16 @@ export async function stopTimer({ silent = false } = {}) {
   if (!running) return;
   const r = running, mins = Math.max(1, Math.round(elapsed(r)));
   const save = async (minutes, note) => {
-    const { error } = await sb.from('time_entries').update({ ended_at: new Date().toISOString(), minutes, note: note || null }).eq('id', r.id);
-    if (error) return fail(error);
-    running = null; loaded = Promise.resolve(null); emit();
+    if (r.m2_matter_id) {
+      // licznik przy sprawie M2 → wpis w „Czas pracy” sprawy (m2_time), licznik usuwany
+      const { error } = await sb.from('m2_time').insert({ matter_id: r.m2_matter_id, member_id: state.me.id, work_date: new Date().toLocaleDateString('sv-SE'), minutes, description: note || null, billable: true });
+      if (error) return fail(error);
+      await sb.from('time_entries').delete().eq('id', r.id);
+    } else {
+      const { error } = await sb.from('time_entries').update({ ended_at: new Date().toISOString(), minutes, note: note || null }).eq('id', r.id);
+      if (error) return fail(error);
+    }
+    running = null; loaded = Promise.resolve(null); emit(); window.dispatchEvent(new CustomEvent('rkdp-timer-saved', { detail: { matterId: r.m2_matter_id, clientId: r.client_id || r.m2_client_id } }));
     if (!silent) toast(`Zapisano ${hm(minutes)} h – ${r.name}`);
   };
   if (silent) return save(mins, null);
@@ -63,18 +71,20 @@ export async function stopTimer({ silent = false } = {}) {
 }
 
 // przycisk przy kliencie: „⏱ Start” / „■ Stop 0:23”
-export function timerButton({ module, clientId, name }) {
+export function timerButton({ module, clientId, matterId = null, name, onSaved }) {
   const b = h('button', { type: 'button', class: 'btn btn-outline btn-sm tm-btn' });
   let tick;
   const draw = () => {
-    const mine = running && running.module === module && (running.client_id || running.m2_client_id) === clientId;
+    const mine = running && running.module === module && (running.client_id || running.m2_client_id) === clientId && (running.m2_matter_id || null) === matterId;
     b.classList.toggle('on', !!mine);
     b.textContent = mine ? `■ Stop ${hm(elapsed(running))}` : '⏱ Licz czas';
     b.setAttribute('data-tip', mine ? 'Zatrzymaj licznik i zapisz czas pracy' : 'Włącz licznik czasu pracy dla tego klienta');
-    b.onclick = () => mine ? stopTimer() : startTimer({ module, clientId, name });
+    b.onclick = () => mine ? stopTimer() : startTimer({ module, clientId, matterId, name });
   };
   const off = onTimer(draw);
-  tick = setInterval(() => { if (!b.isConnected) { clearInterval(tick); off(); return; } draw(); }, 20000);
+  const onS = e => { if (b.isConnected && onSaved && e.detail?.matterId === matterId && e.detail?.clientId === clientId) onSaved(); };
+  window.addEventListener('rkdp-timer-saved', onS);
+  tick = setInterval(() => { if (!b.isConnected) { clearInterval(tick); off(); window.removeEventListener('rkdp-timer-saved', onS); return; } draw(); }, 20000);
   loadRunning().then(draw); draw();
   return b;
 }
@@ -86,7 +96,7 @@ export function timerPill() {
     if (!running) { el.hidden = true; return; }
     el.hidden = false;
     put(el, 
-      h('a', { href: running.module === 'm2' ? `#/doradztwo/klient/${running.m2_client_id}` : `#/klient/${running.client_id}`, 'data-tip': 'Licznik czasu pracy' }, '⏱ ', h('span', { class: 'tm-name' }, running.name), ' ', h('b', {}, hm(elapsed(running)))),
+      h('a', { href: running.m2_matter_id ? `#/doradztwo/sprawa/${running.m2_matter_id}` : running.module === 'm2' ? `#/doradztwo/klient/${running.m2_client_id}` : `#/klient/${running.client_id}`, 'data-tip': 'Licznik czasu pracy' }, '⏱ ', h('span', { class: 'tm-name' }, running.name), ' ', h('b', {}, hm(elapsed(running)))),
       h('button', { type: 'button', 'aria-label': 'Zatrzymaj licznik', onclick: () => stopTimer() }, '■'));
   };
   const off = onTimer(draw);
@@ -107,6 +117,11 @@ export function timeCard({ module, client }) {
       sb.from(table).select('monthly_fee,package_hours').eq('id', client.id).maybeSingle(),
     ]);
     if (error) { put(box, h('div', { class: 'section-head' }, h('h2', {}, 'Czas pracy')), h('p', { class: 'hint' }, 'Niedostępne.')); return; }
+    if (module === 'm2') {
+      const { data: mt } = await sb.from('m2_time').select('id,minutes,work_date,description,member_id,m2_matters!inner(client_id,number)').eq('m2_matters.client_id', client.id).gte('work_date', new Date(Date.now() - 92 * 86400000).toLocaleDateString('sv-SE')).limit(500);
+      (mt || []).forEach(t => rows.push({ id: 'm2t-' + t.id, m2time: true, member_id: t.member_id, started_at: new Date(t.work_date + 'T12:00:00').toISOString(), ended_at: t.work_date, minutes: t.minutes, note: [t.m2_matters?.number, t.description].filter(Boolean).join(' · ') }));
+      rows.sort((x, y) => y.started_at.localeCompare(x.started_at));
+    }
     const month = rows.filter(r => r.started_at >= a && r.started_at < b);
     const min = month.reduce((s, r) => s + entryMin(r), 0);
     const pkg = cl?.package_hours != null ? +cl.package_hours : null, fee = cl?.monthly_fee != null ? +cl.monthly_fee : null;
@@ -131,7 +146,7 @@ export function timeCard({ module, client }) {
         h('span', { class: 'small muted' }, memberById(r.member_id)?.short_name || ''),
         h('span', { class: 'tm-note' }, r.ended_at ? (r.note || '—') : 'trwa…'),
         h('b', { class: 'small' }, hm(entryMin(r))),
-        (r.member_id === state.me.id || admin) && r.ended_at ? h('button', { type: 'button', class: 'chat-a', 'aria-label': 'Usuń wpis', onclick: async () => { if (!confirm('Usunąć wpis czasu?')) return; const { error: e } = await sb.from('time_entries').delete().eq('id', r.id); if (e) return fail(e); draw(); } }, '✕') : h('span')))) : h('p', { class: 'small muted' }, 'Brak wpisów z ostatnich 3 miesięcy. Włącz licznik przy rozmowie z klientem albo wpisz czas ręcznie.'));
+        (r.member_id === state.me.id || admin) && r.ended_at && !r.m2time ? h('button', { type: 'button', class: 'chat-a', 'aria-label': 'Usuń wpis', onclick: async () => { if (!confirm('Usunąć wpis czasu?')) return; const { error: e } = await sb.from('time_entries').delete().eq('id', r.id); if (e) return fail(e); draw(); } }, '✕') : h('span')))) : h('p', { class: 'small muted' }, 'Brak wpisów z ostatnich 3 miesięcy. Włącz licznik przy rozmowie z klientem albo wpisz czas ręcznie.'));
   }
   function manual() {
     const day = h('input', { class: 'input', type: 'date', value: new Date().toLocaleDateString('sv-SE') });
@@ -167,6 +182,8 @@ export async function renderCzas(main, params) {
     ]);
     if (error) { put(box, h('p', { class: 'hint' }, 'Raport niedostępny.')); return; }
     const target = parseFloat(st?.value || '250') || 250;
+    const { data: mt } = await sb.from('m2_time').select('minutes,member_id,work_date,m2_matters!inner(client_id)').gte('work_date', a.slice(0, 10)).lt('work_date', b.slice(0, 10)).limit(5000);
+    (mt || []).forEach(t => rows.push({ module: 'm2', m2_client_id: t.m2_matters?.client_id, member_id: t.member_id, minutes: t.minutes, started_at: t.work_date }));
     const C = new Map([...(cs || []).map(c => ['rkdp:' + c.id, { ...c, mod: 'RKDP', href: `#/klient/${c.id}` }]), ...(m2 || []).map(c => ['m2:' + c.id, { ...c, mod: 'M2 TAX', href: `#/doradztwo/klient/${c.id}` }])]);
     const agg = new Map(), per = new Map();
     for (const r of rows) {
