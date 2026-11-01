@@ -1,6 +1,6 @@
 // „Moje sprawy” – jedno miejsce na wszystko, co czeka na mnie: zlecenia od Michała, zadania przy klientach,
 // pytania w rozmowach moich klientów i terminy (sprawy M2 TAX, pełnomocnictwa). Pracownik nie musi wiedzieć, skąd zadanie przyszło.
-import { h, fail, infoTip, icon } from '../ui.js';
+import { h, fail, infoTip, icon, ava } from '../ui.js';
 import { sb, state, hasModule, memberById } from '../store.js';
 import { TK_OPEN } from './zgloszenia.js';
 // bez „null” w treści: puste elementy (null/false) są pomijane
@@ -28,11 +28,11 @@ async function collect() {
   const cname = new Map(cs.map(c => [c.id, c.name]));
   const myClients = new Set(cs.filter(c => c.accountant_id === me || c.hr_id === me).map(c => c.id));
   // zlecenia: pracownik – swoje do zrobienia; zlecający (administrator) – wszystkie aktywne, które zlecił (u kogo i na jakim etapie)
-  const who = id => memberById(id)?.full_name || memberById(id)?.short_name || 'pracownik';
   const ZS = { nowe: 'nowe – jeszcze nie rozpoczęte', w_toku: 'w trakcie', pytanie: 'pytanie od pracownika – odpowiedz', zgloszone: 'zgłoszone – do sprawdzenia' };
   zl.filter(z => z.assignee_id === me ? ['nowe', 'w_toku', 'pytanie'].includes(z.status) : (z.created_by === me || admin)).forEach(z => out.push({
     kind: 'zlecenie', id: z.id, title: z.title, due: z.due_date, hot: z.priority === 'pilne' || (z.assignee_id !== me && ['zgloszone', 'pytanie'].includes(z.status)), created: z.created_at,
-    sub: z.assignee_id === me ? (z.status === 'pytanie' ? 'czeka na odpowiedź Michała' : z.status === 'nowe' ? 'nowe – od Michała' : 'w trakcie') : `zlecone: ${who(z.assignee_id)} · ${ZS[z.status] || z.status}`,
+    sub: z.assignee_id === me ? (z.status === 'pytanie' ? 'czeka na odpowiedź Michała' : z.status === 'nowe' ? 'nowe – od Michała' : 'w trakcie') : (ZS[z.status] || z.status),
+    person: z.assignee_id === me ? memberById(z.created_by) : memberById(z.assignee_id), personRole: z.assignee_id === me ? 'zleca' : 'wykonuje',
     open: () => import('./zlecenia.js').then(m => m.openZlecenie(z.id, reload)) }));
   tk.forEach(t => out.push({ kind: 'zadanie', id: t.id, title: t.title, due: t.due_date, hot: ['pilny', 'wysoki'].includes(t.priority), created: t.created_at,
     sub: [t.client_id ? cname.get(t.client_id) : t.module === 'm2' ? 'M2 TAX' : '', t.status === 'czeka' ? 'czeka' : ''].filter(Boolean).join(' · '),
@@ -67,7 +67,8 @@ export async function renderMoje(main, params) {
       const late = it.due && it.due < today(), td = it.due === today();
       const inner = [h('span', { class: 'mj-kind ' + KINDS[it.kind][1] }, KINDS[it.kind][0]),
         h('span', { class: 'mj-main' }, h('b', {}, it.title, it.hot ? h('span', { class: 'zl-hot' }, 'pilne') : null), it.sub ? h('span', { class: 'small muted' }, it.sub) : null),
-        it.due ? h('span', { class: 'zl-due' + (late ? ' late' : td ? ' today' : '') }, late ? `po terminie · ${fmtD(it.due)}` : td ? 'dziś' : fmtD(it.due)) : h('span')];
+        it.due ? h('span', { class: 'zl-due' + (late ? ' late' : td ? ' today' : '') }, late ? `po terminie · ${fmtD(it.due)}` : td ? 'dziś' : fmtD(it.due)) : h('span'),
+        it.person ? h('span', { class: 'mj-who', title: `${it.personRole}: ${it.person.full_name}` }, h('span', { class: 'avatar mj-av' }, ava(it.person)), h('span', { class: 'mj-who-n' }, (it.person.full_name || '').split(' ')[0])) : h('span')];
       return it.href ? h('a', { class: 'mj-row', href: it.href }, ...inner) : h('button', { type: 'button', class: 'mj-row', onclick: it.open }, ...inner);
     }));
   }

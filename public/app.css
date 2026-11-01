@@ -1896,7 +1896,7 @@ a.lim-a:hover{border-color:var(--gold)}
   .more-menu a{padding:13px 14px;font-size:15px}
 }
 .mj-list{display:flex;flex-direction:column;gap:6px}
-.mj-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 14px;font:inherit;color:inherit;cursor:pointer;text-decoration:none;min-height:52px}
+.mj-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto 128px;gap:12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 14px;font:inherit;color:inherit;cursor:pointer;text-decoration:none;min-height:52px}
 .mj-row:hover{border-color:var(--gold)}
 .mj-main{display:flex;flex-direction:column;min-width:0}
 .mj-main b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
@@ -1936,3 +1936,9 @@ a.lim-a:hover{border-color:var(--gold)}
 }
 .page-head .tm-btn.on{background:var(--gold);border-color:var(--gold);color:var(--dark)}
 .ob-cl{display:flex;flex-direction:column;gap:2px;font-size:12.5px;min-width:140px}.ob-cl b{font-weight:700}
+
+/* Moje sprawy – osoba, której dotyczy zlecenie (wykonawca albo zlecający) */
+.mj-who{display:inline-flex;align-items:center;gap:8px;justify-self:end;min-width:0}
+.mj-av{width:30px;height:30px;font-size:12px;flex:none}
+.mj-who-n{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:600px){.mj-row{grid-template-columns:minmax(0,1fr) auto auto}.mj-who-n{display:none}}
