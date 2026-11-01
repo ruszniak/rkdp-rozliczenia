@@ -24,6 +24,9 @@ async function get(url: string, init: RequestInit = {}, ms = 25000) {
   try { return await fetch(url, { ...init, signal: ctl.signal }); } finally { clearTimeout(tm); }
 }
 
+const decodeNonAscii = (t: string) => t.replace(/&(?:amp;)?#(x[0-9a-f]+|\d+);/gi, (m, n) => { const c = n[0].toLowerCase() === 'x' ? parseInt(n.slice(1), 16) : +n; return c >= 128 && c <= 0x10ffff ? String.fromCodePoint(c) : m; });
+const decodeDeep = (v: any): any => typeof v === 'string' ? decodeNonAscii(v) : Array.isArray(v) ? v.map(decodeDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, decodeDeep(x)])) : v;
+
 // ---------------- CRBR ----------------
 const CRBR_V = '2022/12/01';
 const CRBR_NS = `http://www.mf.gov.pl/uslugiBiznesowe/uslugiESB/AP/ApiPrzegladoweCRBR/${CRBR_V}`;
@@ -35,7 +38,8 @@ async function crbr(nip: string) {
   }, 30000);
   const raw = await r.text();
   if (!r.ok) throw new Error(`CRBR odpowiedział błędem (${r.status}).`);
-  const doc = xml.parse(raw);
+  // CRBR koduje polskie litery jako encje (np. &#321; = Ł) – dekodujemy je w odczytanych wartościach (surowa odpowiedź zostaje bez zmian)
+  const doc = decodeDeep(xml.parse(decodeNonAscii(raw)));
   const d = doc?.Envelope?.Body?.PobierzInformacjeOSpolkachIBeneficjentachOdpowiedz?.PobierzInformacjeOSpolkachIBeneficjentachOdpowiedzDane || {};
   const person = (p: any) => ({
     first: [p.PierwszeImie, p.KolejneImiona].filter(Boolean).join(' '), last: p.Nazwisko || '', pesel: p.PESEL || null, birth: p.DataUrodzenia || null,
