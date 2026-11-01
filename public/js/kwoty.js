@@ -25,7 +25,7 @@ const parseAmt = v => { const n = parseFloat(String(v).replace(/\s/g, '').replac
 function lines(c, period) {
   const yy = period.slice(2, 4), mm = period.slice(5, 7);
   const pitSym = { skala: 'PIT-36', liniowy: 'PIT-36L', ryczalt: 'PIT-28' }[c.pit_form] || 'PIT-36';
-  const company = ['spzoo', 'spolka_akcyjna'].includes(c.legal_form);
+  const company = ['spzoo', 'spolka_akcyjna', 'fundacja_rodzinna'].includes(c.legal_form);
   return {
     vat: { label: 'VAT', due: nextMonthDay(period, 25), account: 'tax', title: `VAT-7 ${yy}M${mm}` },
     pit_cit: { label: company ? 'CIT – zaliczka' : 'PIT – zaliczka', due: nextMonthDay(period, 20), account: 'tax', title: company ? `${c.cit_type === 'estonski' ? 'CIT-8E' : 'CIT-8'} ${yy}M${mm}` : `${pitSym} ${yy}M${mm}` },

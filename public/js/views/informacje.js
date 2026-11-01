@@ -26,7 +26,7 @@ export async function renderInformacje(main) {
     ['Formy prawne', [
       ['JDG', c => c.legal_form === 'jdg'], ['Spółki z o.o.', c => SPZOO.includes(c.legal_form)], ['Spółki osobowe (s.c., sp.j., sp.p., sp.k.)', c => OSOB.includes(c.legal_form)],
       ['Spółki cywilne', c => c.legal_form === 'spolka_cywilna'], ['Spółki partnerskie', c => c.legal_form === 'spolka_partnerska'], ['Spółki komandytowe', c => c.legal_form === 'spolka_komandytowa'],
-      ['S.A. / PSA', c => c.legal_form === 'spolka_akcyjna'], ['Fundacje i stowarzyszenia', c => c.legal_form === 'fundacja_stowarzyszenie'], ['Wspólnoty mieszkaniowe', c => c.legal_form === 'wspolnota']]],
+      ['S.A. / PSA', c => c.legal_form === 'spolka_akcyjna'], ['Fundacje rodzinne', c => c.legal_form === 'fundacja_rodzinna'], ['Fundacje i stowarzyszenia', c => c.legal_form === 'fundacja_stowarzyszenie'], ['Wspólnoty mieszkaniowe', c => c.legal_form === 'wspolnota']]],
     ['Księgowość i podatki', [
       ['KPiR', c => c.bookkeeping === 'kpir'], ['Ryczałt', c => c.bookkeeping === 'ryczalt'], ['Pełna księgowość', c => c.bookkeeping === 'pelna'],
       ['Czynni VAT', c => String(c.vat_status || '').startsWith('czynny')], ['Zwolnieni z VAT', c => String(c.vat_status || '').startsWith('zwolniony')],

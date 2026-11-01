@@ -18,18 +18,19 @@ export const LEGAL_FORM = {
   spolka_komandytowa: 'Spółka komandytowa',
   spzoo: 'Sp. z o.o.',
   spolka_akcyjna: 'Spółka akcyjna / PSA',
+  fundacja_rodzinna: 'Fundacja rodzinna',
   fundacja_stowarzyszenie: 'Fundacja / stowarzyszenie',
   wspolnota: 'Wspólnota mieszkaniowa',
   inna: 'Inna',
 };
 export const LEGAL_SHORT = {
   jdg: 'JDG', spolka_cywilna: 'S.C.', spolka_jawna: 'Sp. j.', spolka_partnerska: 'Sp. p.',
-  spolka_komandytowa: 'Sp. k.', spzoo: 'Sp. z o.o.', spolka_akcyjna: 'S.A./PSA',
+  spolka_komandytowa: 'Sp. k.', spzoo: 'Sp. z o.o.', spolka_akcyjna: 'S.A./PSA', fundacja_rodzinna: 'Fund. rodz.',
   fundacja_stowarzyszenie: 'Fund./Stow.', wspolnota: 'Wspólnota', inna: 'Inna',
 };
 export const FORM_GROUP = {
   jdg: 'jdg', spolka_cywilna: 'osobowe', spolka_jawna: 'osobowe', spolka_partnerska: 'osobowe',
-  spolka_komandytowa: 'osobowe', spzoo: 'kapitalowe', spolka_akcyjna: 'kapitalowe',
+  spolka_komandytowa: 'osobowe', spzoo: 'kapitalowe', spolka_akcyjna: 'kapitalowe', fundacja_rodzinna: 'kapitalowe',
 };
 export const isPartnership = f => FORM_GROUP[f] === 'osobowe';
 // do której tabeli księgowej trafia klient (tak samo jak client_section w bazie)
