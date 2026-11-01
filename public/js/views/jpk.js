@@ -2,6 +2,7 @@
 // Plik jest czytany wyłącznie w przeglądarce – nic nie jest wysyłane na serwer ani zapisywane w bazie.
 import { h, toast, infoTip, printHtml, modal, icon } from '../ui.js';
 import { downloadXlsx } from '../xlsx.js';
+import { sb } from '../store.js';
 import { buildBilans, buildRzis, hasVariant, validateKr, WZORY, bilansSimple, rzisSimple, hierarchy, buildMapping } from './jpk-fin.js';
 import { parsePit, analyzePit, PKPIR_L, EWP_L, PKPIR_NUM, EWP_NUM } from './jpk-pit.js';
 
@@ -553,6 +554,29 @@ const PKPIR_COLS = ['K_1', 'K_2', 'K_3A', 'K_3', 'K_3B', 'K_4A', 'K_4B', 'K_5A',
 const EWP_COLS = ['K_1', 'K_2', 'K_3', 'K_4', 'K_5', 'K_6', 'K_7', 'K_8', 'K_9', 'K_10'];
 const pitCols = m => (m.kind === 'ewp' ? EWP_COLS : PKPIR_COLS).filter(k => ['K_1', 'K_2'].includes(k) || m.rows.some(r => r[k]))
   .map(k => ({ key: k, label: pitL(m)[k] || k, num: pitNum(m).has(k), dec: 2, w: ['K_6', 'K_5A', 'K_5B', 'K_17', 'K_10'].includes(k) && !(m.kind === 'ewp' && k === 'K_10') ? 200 : null, wrap: ['K_6', 'K_5B', 'K_17'].includes(k) || (m.kind === 'ewp' && k === 'K_10'), sum: k !== 'K_1' }));
+// przychód narastająco z JPK_PKPIR / JPK_EWP → karta klienta (limity); zapisywana jest tylko jedna kwota, plik nie opuszcza przeglądarki
+function revenueSaveBar(m, amount) {
+  const H = m.header || {}, nip = String(m.subject?.NIP || '').replace(/\D/g, '');
+  const from = H.DataOd || '', to = H.DataDo || '';
+  if (!nip || !/^\d{4}-01-01$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from.slice(0, 4) !== to.slice(0, 4)) return null;
+  const bar = h('div', { class: 'jpk-revbar' });
+  (async () => {
+    const { data } = await sb.from('clients').select('id,name,nip').ilike('nip', `%${nip.slice(-6)}%`);
+    const c = (data || []).find(x => String(x.nip || '').replace(/\D/g, '') === nip);
+    if (!c) return;
+    const year = +to.slice(0, 4), month = +to.slice(5, 7);
+    bar.replaceChildren(h('span', {}, `Klient w aplikacji: `, h('b', {}, c.name), ` · przychód ${year} do końca ${month}. miesiąca: `, h('b', {}, fmtN(amount) + ' zł')),
+      h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: async e => {
+        e.currentTarget.disabled = true;
+        const { saveRevenue } = await import('../limity.js');
+        const { error } = await saveRevenue(c.id, year, Math.round(amount * 100) / 100, month, 'jpk');
+        if (error) { e.currentTarget.disabled = false; return toast('Nie udało się zapisać: ' + error.message, true); }
+        toast('Zapisano przychód w karcie klienta – limity sprawdzone');
+      } }, 'Zapisz w karcie klienta (limity)'));
+  })();
+  return bar;
+}
+
 function viewPit(m) {
   const A = analyzePit(m), ewp = m.kind === 'ewp';
   const L = pitL(m);
@@ -589,6 +613,7 @@ function viewPit(m) {
       : [['Wiersze', fmtInt(m.rows.length)], ['Przychód (9)', fmtN(T.K_9)], ['Koszty (10+11+14)', fmtN(T.koszty)], ['Wynik (bez remanentu)', fmtN(T.wynik)]];
     body.replaceChildren(
       h('div', { class: 'jpk-tiles' }, ...tiles.map(([l, n]) => h('div', { class: 'card tile' }, h('span', { class: 'num', style: { fontSize: '22px' } }, n), h('span', { class: 'lbl' }, l)))),
+      revenueSaveBar(m, ewp ? T.przychod : T.K_9),
       h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Sumy kontrolne')),
         h('div', { class: 'jpk-scroll' }, h('table', { class: 'jpk-table' }, h('thead', {}, h('tr', {}, h('th', {}, 'Pole'), h('th', { class: 'n' }, 'W pliku'), h('th', { class: 'n' }, 'Wyliczone z wierszy'), h('th', {}, 'Wynik'))),
           h('tbody', {}, ...A.ctrlRows.map(r => h('tr', {}, h('td', {}, `${r.k} – ${L[r.k]}`), h('td', { class: 'n' }, r.file === undefined ? '—' : r.k === 'LiczbaWierszy' ? fmtInt(num(r.file)) : fmtN(num(r.file))),
