@@ -1815,3 +1815,13 @@ html.wt-lock,html.wt-lock body{overflow:hidden;overscroll-behavior:none}
 .zl-comment{display:flex;flex-direction:column;gap:8px;margin-top:14px;align-items:flex-end}
 .zl-comment textarea{width:100%}
 @media (max-width:600px){.zl-row{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px}.zl-no{display:none}.zl-due{grid-column:1}.zl-row .zl-pill{grid-row:1;grid-column:2}}
+.zl-att{display:flex;flex-direction:column;gap:6px}
+.zl-att .zl-cam{align-self:flex-start}
+@media (hover:hover) and (pointer:fine){.zl-att .zl-cam{display:none}}
+.zl-pend{display:flex;flex-wrap:wrap;gap:6px}
+.zl-pfile{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:3px 6px 3px 3px;font-size:12.5px;background:var(--card)}
+.zl-pfile img{width:28px;height:28px;object-fit:cover;border-radius:5px}
+.zl-pfile button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px}
+.zl-files{margin:6px 0 10px}
+.zl-addtop{margin-bottom:12px}
+.zl-comment .zl-att{width:100%}

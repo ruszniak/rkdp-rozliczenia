@@ -237,7 +237,7 @@ export async function renderZespol(main) {
   // ---------- kosz: usunięte pliki (30 dni) ----------
   if (state.me?.role === 'admin') {
     const trashBox = h('div', {}, h('p', { class: 'hint' }, 'Wczytywanie…'));
-    const SRC = { client_files: 'Archiwum klienta', period_files: 'Załącznik w rozmowie', rkdp_ticket_files: 'Załącznik zadania' };
+    const SRC = { client_files: 'Archiwum klienta', period_files: 'Załącznik w rozmowie', rkdp_ticket_files: 'Załącznik zadania', zlecenia_pliki: 'Załącznik zlecenia' };
     const loadTrash = async () => {
       const { data, error } = await sb.from('file_trash').select('*').order('deleted_at', { ascending: false }).limit(300);
       if (error) { trashBox.replaceChildren(h('p', { class: 'hint' }, 'Kosz niedostępny.')); return; }

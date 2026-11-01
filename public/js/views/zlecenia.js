@@ -3,6 +3,35 @@
 // Każde zlecenie i każda zmiana stanu: powiadomienie na telefon i e-mail (robi to baza – wyzwalacze → funkcje push i mail).
 import { h, toast, fail, modal, icon, ava, infoTip } from '../ui.js';
 import { sb, state, memberById } from '../store.js';
+import { fileTile, dropZone, pastedFiles, safeName, named, fmtSize } from './zgloszenia.js';
+
+// ---------- załączniki (schowek „zlecenia”, folder = id zlecenia) ----------
+const ZL_BUCKET = 'zlecenia', MAX_MB = 25;
+async function uploadZl(zid, files, wpisId = null) {
+  let ok = 0;
+  for (const raw of files) {
+    const f = named(raw);
+    if (f.size > MAX_MB * 1048576) { toast(`„${f.name}” jest większy niż ${MAX_MB} MB`, true); continue; }
+    const path = `${zid}/${crypto.randomUUID().slice(0, 8)}-${safeName(f.name)}`;
+    const { error } = await sb.storage.from(ZL_BUCKET).upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+    if (error) { fail(error, `Nie udało się wysłać „${f.name}”`); continue; }
+    const { error: e2 } = await sb.from('zlecenia_pliki').insert({ zlecenie_id: zid, wpis_id: wpisId, path, name: f.name, mime: f.type || null, size: f.size, uploaded_by: state.me.id });
+    if (e2) { await sb.storage.from(ZL_BUCKET).remove([path]); fail(e2); continue; }
+    ok++;
+  }
+  return ok;
+}
+// pole „dodaj pliki / zdjęcia” z listą oczekujących (wysyłane razem z zapisem)
+function pendingBox(pending, hint = 'zdjęcia, PDF, dokumenty · zrzut ekranu: Ctrl+V / ⌘V') {
+  const list = h('div', { class: 'zl-pend' });
+  const draw = () => list.replaceChildren(...pending.map((f, i) => h('span', { class: 'zl-pfile' }, f.type?.startsWith('image/') ? h('img', { src: URL.createObjectURL(f), alt: '' }) : null,
+    h('span', {}, `${f.name} · ${fmtSize(f.size)}`), h('button', { type: 'button', 'aria-label': 'Usuń', onclick: () => { pending.splice(i, 1); draw(); } }, '✕'))));
+  const add = fs => { fs.map(named).forEach(f => pending.push(f)); draw(); };
+  const cam = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: () => { if (cam.files.length) add([...cam.files]); cam.value = ''; } });
+  const box = h('div', { class: 'zl-att' }, dropZone(add, hint), h('button', { type: 'button', class: 'btn btn-ghost btn-sm zl-cam', onclick: () => cam.click() }, 'Zrób zdjęcie'), cam, list);
+  setTimeout(() => box.closest('.modal')?.addEventListener('paste', e => { const fs = pastedFiles(e); if (fs.length) { e.preventDefault(); add(fs); } }), 0);
+  return box;
+}
 
 export const ZL_ST = {
   nowe: ['Nowe', 'zl-new'], w_toku: ['W trakcie', 'zl-prog'], pytanie: ['Pytanie', 'zl-q'], zgloszone: ['Do sprawdzenia', 'zl-rep'],
@@ -110,6 +139,7 @@ export async function newZlecenie(onDone, preset = {}) {
   const { data: cl } = await sb.from('clients').select('id,name').eq('status', 'aktywny').order('name');
   const client = h('select', { class: 'select' }, h('option', { value: '' }, '— bez klienta —'), ...(cl || []).map(c => h('option', { value: c.id, selected: c.id === preset.client_id }, c.name)));
   const editing = !!preset.id;
+  const pending = [];
   modal(editing ? `Edytuj zlecenie #${preset.no}` : 'Nowe zlecenie', h('div', { class: 'zl-form' },
     editing ? null : h('div', { class: 'field' }, h('span', {}, 'Dla kogo'), people),
     h('label', { class: 'field' }, h('span', {}, 'Zadanie'), title),
@@ -117,6 +147,7 @@ export async function newZlecenie(onDone, preset = {}) {
     h('div', { class: 'form-grid' }, h('label', { class: 'field' }, h('span', {}, 'Termin'), due), h('label', { class: 'field' }, h('span', {}, 'Klient (opcjonalnie)'), client)),
     h('label', { class: 'field' }, h('span', {}, 'Kroki do odhaczenia'), steps),
     h('label', { class: 'check' }, hot, 'Pilne'),
+    editing ? null : h('div', { class: 'field' }, h('span', {}, 'Załączniki (opcjonalnie)'), pendingBox(pending)),
     editing ? null : h('p', { class: 'small muted' }, 'Każda wybrana osoba dostanie osobne zlecenie oraz powiadomienie na telefon i e-mail.')),
   close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async e => {
     if (!editing && !pick.size) return toast('Wybierz osobę', true);
@@ -125,9 +156,11 @@ export async function newZlecenie(onDone, preset = {}) {
     const st = steps.value.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 30).map(t => ({ t: t.slice(0, 300), done: !!old.find(o => o.t === t)?.done }));
     const rec = { title: title.value.trim(), body: body.value.trim() || null, due_date: due.value || null, priority: hot.checked ? 'pilne' : 'normalny', steps: st, client_id: client.value || null };
     e.currentTarget.disabled = true;
-    const { error } = editing ? await sb.from('zlecenia').update(rec).eq('id', preset.id)
-      : await sb.from('zlecenia').insert([...pick].map(a => ({ ...rec, assignee_id: a })));
-    if (error) { e.currentTarget.disabled = false; return fail(error); }
+    const btn = e.currentTarget;
+    const { data: made, error } = editing ? await sb.from('zlecenia').update(rec).eq('id', preset.id).select('id')
+      : await sb.from('zlecenia').insert([...pick].map(a => ({ ...rec, assignee_id: a }))).select('id');
+    if (error) { btn.disabled = false; return fail(error); }
+    if (!editing && pending.length) { btn.textContent = 'Wysyłanie plików…'; for (const r of made || []) await uploadZl(r.id, pending); }
     close(); toast(editing ? 'Zapisano zmiany' : pick.size > 1 ? `Zlecono ${pick.size} osobom – wysłano powiadomienia` : `Zlecono: ${who([...pick][0])} – wysłano powiadomienie`);
     onDone?.();
   } }, editing ? 'Zapisz' : 'Zleć')], { wide: true });
@@ -140,19 +173,27 @@ export async function openZlecenie(id, onChange) {
     sb.from('zlecenia').select('*').eq('id', id).maybeSingle(),
     sb.from('zlecenia_wpisy').select('*').eq('zlecenie_id', id).order('created_at'),
   ]);
+  const { data: files } = await sb.from('zlecenia_pliki').select('*').eq('zlecenie_id', id).order('created_at');
+  const tiles = list => list.length ? h('div', { class: 'tk-files zl-files' }, ...list.map(f => fileTile({ ...f, bucket: ZL_BUCKET }, {
+    onDelete: f.uploaded_by === state.me.id || isAdmin() ? async () => { if (!confirm(`Usunąć „${f.name}”? Trafi do kosza na 30 dni.`)) return; const { error: e } = await sb.from('zlecenia_pliki').delete().eq('id', f.id); if (e) return fail(e); toast('Usunięto'); refresh(); } : null }))) : null;
   if (error || !z) return toast('Nie znaleziono zlecenia (albo nie masz do niego dostępu)', true);
   const mine = z.assignee_id === state.me.id;
   const { data: cl } = z.client_id ? await sb.from('clients').select('name').eq('id', z.client_id).maybeSingle() : { data: null };
   let closeFn = () => {};
   const refresh = () => { closeFn(); onChange?.(); openZlecenie(id, onChange); };
-  const act = async (akcja, tekst) => {
+  const act = async (akcja, tekst, att = []) => {
     const { error: e } = await sb.rpc('zlecenie_akcja', { p_id: id, p_akcja: akcja, p_tekst: tekst || null });
     if (e) return fail(e);
+    if (att.length) {
+      const { data: lw } = await sb.from('zlecenia_wpisy').select('id').eq('zlecenie_id', id).eq('author_id', state.me.id).order('created_at', { ascending: false }).limit(1);
+      await uploadZl(id, att, lw?.[0]?.id || null);
+    }
     toast({ start: 'Powodzenia!', pytanie: 'Wysłano pytanie do Michała', zglos: 'Zgłoszono wykonanie – Michał dostał powiadomienie', akceptuj: 'Zaakceptowano', popraw: 'Odesłano do poprawy', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zlecenie', wznow: 'Wznowiono' }[akcja] || 'Zapisano');
     refresh();
   };
-  const ask = (title, label, akcja, required, btn) => modal(title, h('div', {}, h('label', { class: 'field' }, h('span', {}, label), h('textarea', { class: 'input', rows: 4, maxlength: 3000, id: 'zl-ask' }))),
-    c => [h('button', { class: 'btn btn-ghost', onclick: c }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: () => { const v = document.getElementById('zl-ask').value.trim(); if (required && !v) return toast('Wpisz treść', true); c(); act(akcja, v); } }, btn)]);
+  const ask = (title, label, akcja, required, btn) => { const att = []; return modal(title, h('div', { class: 'zl-form' }, h('label', { class: 'field' }, h('span', {}, label), h('textarea', { class: 'input', rows: 4, maxlength: 3000, id: 'zl-ask' })),
+      h('div', { class: 'field' }, h('span', {}, 'Załączniki (opcjonalnie)'), pendingBox(att))),
+    c => [h('button', { class: 'btn btn-ghost', onclick: c }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: e => { const v = document.getElementById('zl-ask').value.trim(); if (required && !v && !att.length) return toast('Wpisz treść', true); e.currentTarget.disabled = true; c(); act(akcja, v || (att.length ? '📎 w załączniku' : ''), att); } }, btn)]); };
 
   const st = stepsOf(z);
   const stepsBox = st.length ? h('div', { class: 'zl-steps' }, ...st.map((s, i) => {
@@ -165,9 +206,19 @@ export async function openZlecenie(id, onChange) {
   const timeline = h('div', { class: 'zl-tl' }, ...(wp || []).map(w => h('div', { class: 'zl-w zl-w-' + w.kind + (w.author_id === state.me.id ? ' mine' : '') },
     ava(memberById(w.author_id) || { full_name: '?' }),
     h('div', {}, h('div', { class: 'small muted' }, h('b', {}, who(w.author_id)), KIND[w.kind] ? ` · ${KIND[w.kind]}` : '', ' · ', new Date(w.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
-      w.body ? h('div', { class: 'zl-wbody' }, w.body) : null))));
+      w.body ? h('div', { class: 'zl-wbody' }, w.body) : null, tiles((files || []).filter(f => f.wpis_id === w.id))))));
   const comment = h('textarea', { class: 'input', rows: 2, maxlength: 3000, placeholder: 'Komentarz…' });
-  const sendC = async () => { const v = comment.value.trim(); if (!v) return; const { error: e } = await sb.from('zlecenia_wpisy').insert({ zlecenie_id: id, kind: 'komentarz', body: v, author_id: state.me.id }); if (e) return fail(e); toast('Dodano komentarz'); refresh(); };
+  const cAtt = [];
+  const sendC = async ev => {
+    const v = comment.value.trim(); if (!v && !cAtt.length) return toast('Wpisz komentarz albo dodaj plik', true);
+    const btn = ev.currentTarget; btn.disabled = true;
+    const { data: w, error: e } = await sb.from('zlecenia_wpisy').insert({ zlecenie_id: id, kind: 'komentarz', body: v || `📎 ${cAtt.length === 1 ? 'załącznik' : `załączniki (${cAtt.length})`}`, author_id: state.me.id }).select('id').single();
+    if (e) { btn.disabled = false; return fail(e); }
+    if (cAtt.length) await uploadZl(id, cAtt, w.id);
+    toast('Dodano'); refresh();
+  };
+  const topAtt = [];
+  const addTop = async fs => { topAtt.push(...fs); const n = await uploadZl(id, topAtt.splice(0)); if (n) { toast(n === 1 ? 'Dodano załącznik' : `Dodano załączniki: ${n}`); refresh(); } };
 
   const B = (cls, label, fn) => h('button', { class: 'btn ' + cls, type: 'button', onclick: fn }, label);
   const actions = [];
@@ -186,8 +237,10 @@ export async function openZlecenie(id, onChange) {
       cl?.name ? h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name) : null,
       h('span', { class: 'muted' }, 'utworzono ' + new Date(z.created_at).toLocaleDateString('pl-PL'))),
     z.body ? h('div', { class: 'zl-body' }, z.body) : null,
+    tiles((files || []).filter(f => !f.wpis_id)),
+    admin && OPEN.includes(z.status) ? h('div', { class: 'zl-addtop' }, dropZone(addTop, 'dołącz plik do zlecenia')) : null,
     stepsBox,
     (wp || []).length ? h('h4', { class: 'zl-h4' }, 'Przebieg') : null, timeline,
-    (mine || admin) && z.status !== 'anulowane' ? h('div', { class: 'zl-comment' }, comment, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: sendC }, 'Dodaj komentarz')) : null),
+    (mine || admin) && z.status !== 'anulowane' ? h('div', { class: 'zl-comment' }, comment, pendingBox(cAtt), h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: sendC }, 'Dodaj komentarz')) : null),
   c => [...actions, B('btn-ghost', 'Zamknij', c)], { wide: true });
 }
