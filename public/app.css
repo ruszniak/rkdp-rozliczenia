@@ -1955,3 +1955,7 @@ a.lim-a:hover{border-color:var(--gold)}
 .push-nudge .pn-ico{font-size:22px;flex:none}
 .push-nudge .pn-txt{flex:1 1 320px;min-width:0;line-height:1.45}
 .push-nudge .pn-act{display:flex;gap:8px;flex-wrap:wrap;flex:none}
+
+/* kwoty do zapłaty – podgląd maila w szacie graficznej */
+.kw-preview{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#F3EEE6}
+.kw-frame{display:block;width:100%;height:min(68vh,760px);border:0;background:#F3EEE6}

@@ -56,6 +56,8 @@ export async function openAmounts({ client, period, entries, onDone }) {
   inputs.forEach(i => { i.amt.addEventListener('input', recalc); i.on.addEventListener('change', recalc); });
   recalc();
   const periodLbl = `${MON[+period.slice(5, 7) - 1]} ${period.slice(0, 4)}`;
+  const items = chosen => chosen.map(i => { const l = L[i.code], a = l.account === 'zus' ? c.acc_zus : c.acc_tax;
+    return { label: l.label, amount: parseAmt(i.amt.value), due: i.due.value, account: acc(a), acctype: l.account, title: l.title }; });
 
   async function saveAll() {
     const bad = inputs.find(i => i.amt.value.trim() && parseAmt(i.amt.value) == null);
@@ -81,7 +83,7 @@ export async function openAmounts({ client, period, entries, onDone }) {
         l.title ? `  tytuł przelewu: ${l.title}` : ''].filter(Boolean).join('\n');
     }).join('\n');
     const total = chosen.reduce((s, i) => s + parseAmt(i.amt.value), 0);
-    return `Dzień dobry,\n\nprzekazujemy kwoty do zapłaty za ${periodLbl}:\n\n${t}\n\nRazem: ${money(total)}.\n\nProsimy o terminowe przelewy. W razie pytań jesteśmy do dyspozycji.`;
+    return `Dzień dobry,\n\nprzekazujemy kwoty do zapłaty za ${periodLbl}:\n\n${t}\n\nRazem: ${money(total)}.\n\nPrzypominamy o terminowej płatności. W razie pytań jesteśmy do dyspozycji.`;
   }
 
   modal(`Kwoty do zapłaty – ${c.name}`, h('div', { class: 'kw' },
@@ -106,10 +108,17 @@ export async function openAmounts({ client, period, entries, onDone }) {
       if (!(await saveAll())) return;
       const body = mailText(chosen);
       const btn = e.currentTarget;
-      modal('Podgląd wiadomości', h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `Do: ${c.email} · Temat: Kwoty do zapłaty – ${periodLbl}`), h('pre', { class: 'wt-mailbody' }, body)),
+      const its = items(chosen);
+      // podgląd w szacie graficznej RKDP (z logo i stopką osoby wysyłającej) – gdy się nie uda, wersja tekstowa
+      const frame = h('iframe', { class: 'kw-frame', sandbox: '', title: 'Podgląd wiadomości' });
+      const pv = h('div', { class: 'kw-preview' }, h('p', { class: 'hint' }, 'Przygotowuję podgląd…'));
+      sb.functions.invoke('mail', { body: { action: 'preview_kwoty', period, items: its } }).then(({ data }) => {
+        if (data?.html) { frame.srcdoc = data.html; pv.replaceChildren(frame); } else pv.replaceChildren(h('pre', { class: 'wt-mailbody' }, body));
+      }, () => pv.replaceChildren(h('pre', { class: 'wt-mailbody' }, body)));
+      modal('Podgląd wiadomości', h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `Do: ${c.email} · Temat: Kwoty do zapłaty – ${periodLbl}`), pv),
         c2 => [h('button', { class: 'btn btn-ghost', onclick: c2 }, 'Wróć'), h('button', { class: 'btn btn-primary', onclick: async ev => {
           ev.currentTarget.disabled = true; btn.disabled = true;
-          const { data, error: er } = await sb.functions.invoke('mail', { body: { action: 'send', kind: 'kwoty', period, client_ids: [c.id], subject: `Kwoty do zapłaty – ${periodLbl}`, body, mark_done: { [c.id]: chosen.map(i => i.code) } } });
+          const { data, error: er } = await sb.functions.invoke('mail', { body: { action: 'send', kind: 'kwoty', period, client_ids: [c.id], subject: `Kwoty do zapłaty – ${periodLbl}`, body, items: its, mark_done: { [c.id]: chosen.map(i => i.code) } } });
           c2();
           if (er) { btn.disabled = false; return fail(er); }
           if (data?.error === 'not_configured') { btn.disabled = false; return toast('Wysyłka e-maili nie jest skonfigurowana', true); }

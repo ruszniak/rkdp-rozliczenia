@@ -182,6 +182,44 @@ async function broadcast(sb: any, body: any, cfg: { sub: string; from: string },
   return json({ sent: ok, failed, clients: okClients.size, no_email: noEmail, errors });
 }
 
+// ---------- kwoty do zapłaty: mail w szacie graficznej RKDP (logo, tabela kwot, stopka osoby wysyłającej) ----------
+const LOGO = 'https://raw.githubusercontent.com/ruszniak/rkdp/main/img/stopka-logo.png';
+const zl = (n: number) => n.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\u00a0/g, ' ') + ' zł';
+const dPL = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('.') : '';
+const accF = (a: string) => a.replace(/\D/g, '').replace(/^(\d{2})(\d{4})(\d{4})(\d{4})(\d{4})(\d{4})(\d{4})$/, '$1 $2 $3 $4 $5 $6 $7');
+function kwotyItems(raw: any): any[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 10).map((x: any) => ({
+    label: String(x?.label || '').slice(0, 80), amount: Number(x?.amount), due: String(x?.due || '').slice(0, 10),
+    account: String(x?.account || '').replace(/\D/g, '').slice(0, 34), zus: x?.acctype === 'zus', title: String(x?.title || '').slice(0, 60),
+  })).filter(x => x.label && isFinite(x.amount));
+}
+function kwotyHtml(period: string, items: any[], _note: string, sigHtml: string) {
+  const total = items.reduce((t, i) => t + i.amount, 0);
+  const per = period ? periodLabel(period + '-01') : '';
+  const row = (i: any) => `<tr><td style="padding:14px 0;border-bottom:1px solid #E8E0D4;vertical-align:top">`
+    + `<div style="font-size:15px;font-weight:700;color:#1D1A16">${escH(i.label)}</div>`
+    + (i.due ? `<div style="font-size:13px;color:#5E564C;margin-top:3px">termin płatności: <b style="color:#1D1A16">${dPL(i.due)}</b></div>` : '')
+    + (i.account ? `<div style="font-size:13px;color:#5E564C;margin-top:3px">${i.zus ? 'rachunek składkowy ZUS' : 'mikrorachunek podatkowy'}: <span style="font-family:Consolas,Menlo,monospace;color:#1D1A16;white-space:nowrap">${accF(i.account)}</span></div>` : '')
+    + (i.title ? `<div style="font-size:13px;color:#5E564C;margin-top:3px">tytuł przelewu: <span style="color:#1D1A16">${escH(i.title)}</span></div>` : '')
+    + `</td><td style="padding:14px 0 14px 16px;border-bottom:1px solid #E8E0D4;text-align:right;vertical-align:top;white-space:nowrap;font-size:17px;font-weight:700;color:#1D1A16">${zl(i.amount)}</td></tr>`;
+  return `<!doctype html><html lang="pl"><body style="margin:0;padding:0;background:#F3EEE6">`
+    + `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F3EEE6"><tr><td align="center" style="padding:24px 12px">`
+    + `<table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#1D1A16">`
+    + `<tr><td style="background:#FFFFFF;padding:20px 28px 16px;border-bottom:3px solid #806341"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>`
+    + `<td><a href="https://rkdp.pl" style="text-decoration:none"><img src="${LOGO}" alt="RKDP" height="44" style="display:block;height:44px;border:0"></a></td>`
+    + `<td style="text-align:right;color:#806341;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">Kwoty do zapłaty<br><span style="color:#1D1A16;font-size:13px;letter-spacing:.04em">${escH(per)}</span></td>`
+    + `</tr></table></td></tr>`
+    + `<tr><td style="padding:26px 28px 6px;font-size:15px;line-height:1.55">Dzień dobry,<br><br>przekazujemy kwoty do zapłaty za <b>${escH(per)}</b>:</td></tr>`
+    + `<tr><td style="padding:0 28px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0">${items.map(row).join('')}</table></td></tr>`
+    + `<tr><td style="padding:16px 28px 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#806341;border-radius:10px"><tr>`
+    + `<td style="padding:13px 16px;color:#FFFFFF;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Razem do zapłaty</td>`
+    + `<td style="padding:13px 16px;color:#FFFFFF;font-size:19px;font-weight:700;text-align:right;white-space:nowrap">${zl(total)}</td></tr></table></td></tr>`
+    + `<tr><td style="padding:18px 28px 8px;font-size:14px;line-height:1.55;color:#1D1A16">Przypominamy o terminowej płatności. W razie pytań jesteśmy do dyspozycji.</td></tr>`
+    + `<tr><td style="padding:8px 28px 26px">${sigHtml || ''}</td></tr>`
+    + `</table></td></tr></table></body></html>`;
+}
+
 // ---------- zlecenia: e-mail do pracownika (nowe, poprawka, odpowiedź, akceptacja) albo do zlecającego (pytanie, wykonanie) ----------
 const APP_URL = 'https://rozliczenia.rkdp.pl';
 async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
@@ -267,6 +305,12 @@ Deno.serve(async (req: Request) => {
       catch (e) { return json({ ready: false, from: cfg.from, reason: String((e as Error).message) }); }
     }
     if (body.action === 'broadcast') return await broadcast(sb, body, cfg, memberId);
+    if (body.action === 'preview_kwoty') {
+      const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
+      const { sigHtml } = await signatureOf(me, cfg);
+      const per = /^\d{4}-\d{2}$/.test(body.period || '') ? body.period : '';
+      return json({ html: kwotyHtml(per, kwotyItems(body.items), String(body.note || '').slice(0, 1500), sigHtml) });
+    }
     if (body.action !== 'send') return json({ error: 'Nieznana operacja' }, 400);
 
     const kind = String(body.kind || '');
@@ -288,7 +332,9 @@ Deno.serve(async (req: Request) => {
       const link = typeof body.links?.[c.id] === 'string' && body.links[c.id].startsWith('https://rozliczenia.rkdp.pl/wgraj.html#') ? body.links[c.id] : '';
       const fill = (t: string) => t.replaceAll('{klient}', c.name).replaceAll('{okres}', period ? periodLabel(period + '-01') : '').replaceAll('{link}', link);
       const subject = fill(subjectT), text = fill(bodyT) + '\n' + signature;
-      const html = sigHtml ? `${bodyHtml(fill(bodyT))}<br><br>${sigHtml}` : undefined;
+      const kItems = kind === 'kwoty' ? kwotyItems(body.items) : [];
+      const html = kItems.length ? kwotyHtml(period || '', kItems, String(body.note || '').slice(0, 1500), sigHtml)
+        : sigHtml ? `${bodyHtml(fill(bodyT))}<br><br>${sigHtml}` : undefined;
       if (!to) { results.push({ client_id: c.id, ok: false, error: 'brak adresu e-mail' }); continue; }
       try {
         await sendMail(cfg, fromName, to, subject, text, html);
