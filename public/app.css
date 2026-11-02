@@ -2238,3 +2238,10 @@ main>.page-head:first-child .info-i,main>a+.page-head .info-i{color:var(--accent
 :root[data-theme="dark"] .tabs button.on,:root[data-theme="dark"] main>.page-head:first-child .tabs button.on{background:var(--accent-soft);color:var(--accent-dark)}
 :root[data-theme="dark"] .more-menu .mm-logout{color:var(--warn)!important}
 @media (min-width:821px) and (max-width:1480px){.site-header .nav-links .tab-ico,.site-header .more-btn .tab-ico{display:none}.hdr-search{min-width:190px}}
+.oa-new{display:block}
+.oa-new summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;padding:2px 0}
+.oa-new summary::-webkit-details-marker{display:none}
+.oa-new summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+.oa-new[open] summary::after{transform:rotate(-135deg)}
+.oa-new summary .small{margin-left:4px}
+.oa-new ul{margin:10px 0 4px;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--text);font-size:14px}

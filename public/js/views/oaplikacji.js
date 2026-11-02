@@ -93,11 +93,78 @@ export const RODO = [
   ]],
 ];
 
+// historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
-  ['2.0', 'Nowy wygląd: jasny układ z granatowym akcentem, górny pasek na komputerze, własne ikony RKDP, czytelniejsze kolory statusów.'],
-  ['2.0', 'Face ID / odcisk palca w aplikacji na telefonie – logowanie bez hasła i blokada przy każdym uruchomieniu.'],
-  ['2.0', 'Ekran „O aplikacji i RODO”: polityka prywatności i klauzula informacyjna dla zespołu.'],
-  ['1.9', 'Kwoty podatków widoczne w kratkach rozliczeń, wysyłka kwot z logo i podpisem, wspólnicy spółek osobowych z osobnymi kratkami.'],
+  ['2.0', '2 listopada 2026', [
+    'Nowy wygląd: jasny układ z granatowym akcentem i logo RKDP, górny pasek zakładek na komputerze, własne ikony RKDP.',
+    'Czytelne kolory statusów: zielony – zrobione, bursztynowy – brak dokumentów, fioletowy – przypomniano, czerwony – po terminie.',
+    'Menu „Więcej” z ikonami, wylogowanie w menu; krótszy pasek narzędzi w Rozliczeniach, instrukcja zaznaczania pod ikonką „i”.',
+    'Ekran „O aplikacji i RODO”: polityka prywatności, klauzula informacyjna dla zespołu, historia zmian, zgłaszanie problemu.',
+    'Nowa ikona aplikacji (granatowa „R”), ciemny motyw w granacie.',
+  ]],
+  ['1.8', '2 listopada 2026', [
+    'Face ID / odcisk palca w aplikacji na telefonie – logowanie bez hasła i kodu, blokada przy każdym uruchomieniu i po 5 minutach w tle.',
+    'Aplikacja na telefonie nie wylogowuje po bezczynności (sesja do 30 dni) – powiadomienia działają cały czas.',
+    'Kwoty podatków w kratkach rozliczeń: kwota zapisana (jasna) i wysłana klientowi (zaznaczona ✓).',
+    'Zlecenia: czytelny widok z krokami i „co teraz”, zlecający może zamknąć zlecenie jako wykonane.',
+    'Telefon: długie nazwy klientów nie nachodzą na wiersz z księgową.',
+  ]],
+  ['1.7', '1 listopada 2026', [
+    'Zlecenia: dodatkowe zadania od administratora z akceptacją wykonania, załącznikami, powiadomieniami push i e-mail (e-maile można wyłączyć w profilu).',
+    'Moje sprawy: jedna lista zleceń, zadań, pytań i terminów ze zdjęciem osoby; nowe menu: Pulpit, Moje sprawy, Rozliczenia, Klienci, Rozmowy i „Więcej”.',
+    'Kwoty do zapłaty: kwota i termin przy kratce, rachunki klienta, e-mail z kwotami w szacie RKDP z podpisem i automatycznym odhaczeniem.',
+    'Karta klienta: stawki (abonament, dokumenty, pracownicy, usługi dodatkowe), zakres usług (księgowość / tylko doradztwo), spółka komandytowa jako podatnik CIT, fundacja rodzinna.',
+    'Wspólnicy spółek osobowych: osobne kratki PIT i ZUS dla każdego wspólnika.',
+    'Limity i progi 2026 z ostrzeżeniami, pełnomocnictwa z terminami ważności; UPL-1 i ZUS PEL domyślnie TAK, KSeF domyślnie NIE.',
+    'Telefon: Rozliczenia jako karty klientów, kratka jednym dotknięciem, zdjęcie dokumentu do klienta.',
+    'Czas pracy przy kliencie (M2 TAX): licznik start/stop, pakiety godzin, raport rentowności; kolumna klientów na liście obecności.',
+    'Kratki przeliczają się same po zmianie ustawień klienta.',
+  ]],
+  ['1.6', '30 października 2026', [
+    'Informacja do klientów: zbiorczy e-mail z kancelarii (adresaci w UDW, grupy klientów, gotowy mail HTML, historia wysyłek).',
+    'Karta klienta: historia składek ZUS, wakacje składkowe, Mały ZUS Plus.',
+    'Kosz na usunięte pliki – 30 dni na przywrócenie.',
+  ]],
+  ['1.5', '29 października 2026', [
+    'Rozmowy zamiast zgłoszeń: uwagi, pytania i zadania przy kliencie w jednej rozmowie, @wzmianki z powiadomieniem, załączniki, przypięte ustalenia.',
+    'Wiadomości do klientów z kancelaria@rkdp.pl i „Otwórz w Gmailu”, status „Wysłano przypomnienie”, prośby o dokumenty z linkiem dla klienta.',
+    'Dziś, kalendarz obowiązków z mapą miesiąca, zamknięcie roku, panel klienta.',
+    'Archiwum dokumentów klienta ze skanowaniem telefonem do PDF.',
+    'e-Sprawozdanie finansowe mikro: z JPK_KR_PD i KRS, XML do eKRS i PDF.',
+    'Weryfikacja JPK_PKPIR i JPK_EWP, link do oferty dla klienta, oferta Program Partner (M2 TAX), zdjęcia profilowe.',
+  ]],
+  ['1.4', '28 października 2026', [
+    'Instalacja jako aplikacja na telefonie i komputerze, powiadomienia push, ekran „brak internetu”.',
+    'Pierwsza nowa szata graficzna: motyw jasny i ciemny, wyszukiwarka Ctrl+K, pierścienie i paski postępu w rozliczeniach.',
+    'Kafelek „Rozliczeni” jako filtr klientów do rozliczenia.',
+  ]],
+  ['1.3', '23 października 2026', [
+    'Regulamin aplikacji z akceptacją przy logowaniu.',
+    'Podgląd JPK (JPK_KR_PD, JPK_ST_KR i inne) z kontrolą pliku, pomocniczym bilansem i RZiS – plik nie opuszcza przeglądarki.',
+    'Kalkulator formy opodatkowania oraz wzory umów i uchwał dla klientów; konto „tylko podgląd JPK”.',
+    'Szybsze działanie i przełączanie zakładek.',
+  ]],
+  ['1.2', '19 października 2026', [
+    'AML: karta weryfikacji klienta – CRBR, KRS, Biała lista VAT, listy sankcyjne, raport PDF.',
+    'Oferty RKDP i M2 TAX z cennikiem i szatą graficzną firmy.',
+    'Lista obecności (ewidencja czasu pracy) z PDF i Excelem.',
+    'Zakładka Dokumenty: umowy, pełnomocnictwa, protokoły i wzory pism procesowych M2 TAX w jednym miejscu.',
+    'Załączniki w uwagach klienta, historia zmian w M2 TAX.',
+  ]],
+  ['1.1', '18 października 2026', [
+    'Logowanie hasłem i kodem z e-maila, zapamiętane przeglądarki, wylogowanie po bezczynności.',
+    'Moduły RKDP / M2 TAX z przełącznikiem przy logo.',
+    'Umowy i pełnomocnictwa (UPL-1, PEL, PPS-1, procesowe) wg wzorów biura; Mój profil z danymi do pełnomocnictw.',
+    'Sprawozdania: dane z KRS i protokół ZZW z uchwałami.',
+    'Pulpit pracownika i doradcy, rejestr zgłoszeń z zadaniami cyklicznymi.',
+    'Wersja na telefon: dolny pasek zakładek, karty zamiast tabel.',
+  ]],
+  ['1.0', '17 października 2026', [
+    'Pierwsza wersja: rozliczenia klientów (Księgowość oraz Kadry i ZUS) zamiast arkusza Excel, kratki statusów, księgowa i kadrowa przy kliencie.',
+    'Filtry, układ tabel, tryb pełnego ekranu, pobieranie Excel / PDF / CSV.',
+    'Moduł Doradztwo podatkowe (M2 TAX), dane kontrahenta po NIP z Białej listy VAT.',
+    'Nocna zaszyfrowana kopia zapasowa bazy.',
+  ]],
 ];
 
 // ---------- widok ----------
@@ -148,5 +215,7 @@ export async function renderOAplikacji(main, sub) {
           row('#/profil', 'user', 'Mój profil, Face ID, powiadomienia', state.me?.email || ''),
           row(`mailto:${CONTACT}?subject=${encodeURIComponent('RKDP Rozliczenia – zgłoszenie problemu')}&body=${encodeURIComponent(`\n\n---\nWersja ${APP_VERSION} · ${navigator.userAgent}`)}`, 'mail', 'Zgłoś problem', 'e-mail z opisem i wersją aplikacji')),
         h('p', { class: 'oa-lbl' }, 'Co nowego'),
-        h('div', { class: 'card oa-news' }, ...NEWS.map(([v, t]) => h('div', { class: 'oa-new' }, h('span', { class: 'oa-v' }, v), h('span', {}, t)))))));
+        h('div', { class: 'card oa-news' }, ...NEWS.map(([v, d, items], i) => h('details', { class: 'oa-new', open: i === 0 ? true : null },
+          h('summary', {}, h('span', { class: 'oa-v' }, v), h('b', {}, i === 0 ? 'Aktualna wersja' : `Wersja ${v}`), h('span', { class: 'small muted' }, d)),
+          h('ul', {}, ...items.map(t => h('li', {}, t)))))))));
 }
