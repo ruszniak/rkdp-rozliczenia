@@ -17,10 +17,28 @@ export function registerSW() {
   if (!regPromise) regPromise = navigator.serviceWorker.register('/sw.js').catch(err => { console.warn('SW', err); return null; });
   return regPromise;
 }
-// kliknięcie powiadomienia, gdy aplikacja jest już otwarta
+// kliknięcie powiadomienia: przejdź do miejsca z powiadomienia, a nie tam, gdzie skończyłeś
+function goTo(url) {
+  try { const u = new URL(url, location.origin); const hash = u.hash || '#/'; if (location.hash !== hash) location.hash = hash; } catch {}
+}
+async function takePendingNav() {
+  if (!('caches' in window)) return;
+  try {
+    const c = await caches.open('rkdp-nav');
+    const r = await c.match('/__nav');
+    if (!r) return;
+    await c.delete('/__nav');
+    const d = await r.json();
+    if (d?.url && Date.now() - (d.t || 0) < 5 * 60 * 1000) goTo(d.url);
+  } catch {}
+}
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
-  if (e.data?.type === 'open' && e.data.url) { const u = new URL(e.data.url); location.hash = u.hash || '#/'; }
+  if (e.data?.type === 'open' && e.data.url) { goTo(e.data.url); caches?.open('rkdp-nav').then(c => c.delete('/__nav')).catch(() => {}); }
 });
+takePendingNav();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') takePendingNav(); });
+window.addEventListener('pageshow', takePendingNav);
+window.addEventListener('focus', takePendingNav);
 
 // ---------- instalacja ----------
 let installEvt = null;
