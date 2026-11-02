@@ -71,7 +71,7 @@ export async function renderShared(app, token) {
     return;
   }
   const { printableHtml, M2_BRAND, RKDP_BRAND } = await import('./m2/order.js');
-  const { printHtml } = await import('./ui.js');
+  const { printLegacy } = await import('./ui.js');
   const brand = data.brand === 'm2' ? M2_BRAND : RKDP_BRAND;
   let html, meta;
   if (data.kind === 'oferta') {
@@ -99,10 +99,9 @@ export async function renderShared(app, token) {
       h('img', { src: brand.logo, alt: brand.alt, class: 'sh-logo' }),
       h('div', { class: 'sh-meta small' }, meta),
       (() => { const b = h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async () => {
-        if (data.kind !== 'oferta') return printHtml(html, data.title);
         const label = b.textContent; b.disabled = true;
         try { const { downloadPdf } = await import('./pdfdoc.js'); await downloadPdf(html, document.title, t => { b.textContent = t; }); }
-        catch (e) { console.error(e); printHtml(html, data.title); }
+        catch (e) { console.error(e); printLegacy(html, data.title); }
         finally { b.disabled = false; b.textContent = label; }
       } }, 'Pobierz PDF'); return b; })()),
     wrap);

@@ -216,9 +216,7 @@ async function renderEditor(main, id, brand) {
     if (dirty || !row) { if (!(await save())) return; }
     const html = offerHtml(o, brand, { number: row.number });
     const name = `Oferta ${row.number || ''} – ${o.client?.name || ''}`.replace(/\s+–\s*$/, '').trim();
-    toast('Przygotowuję PDF…');
-    try { const { downloadPdf } = await import('../pdfdoc.js'); await downloadPdf(html, name); toast('Pobrano PDF'); }
-    catch (e) { console.error(e); printHtml(html); }
+    printHtml(html, name);
   }
   const statusSel = h('select', { class: 'select' }, ...Object.entries(STATUS).map(([k, v]) => h('option', { value: k }, v)));
   statusSel.value = status;

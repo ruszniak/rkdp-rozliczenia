@@ -5,7 +5,7 @@ export { esc };
 export const PAPER_CSS = `
 *{box-sizing:border-box}
 body{font-family:Inter,Montserrat,Arial,sans-serif;color:#1D1A16;font-size:10px;line-height:1.45;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.ph{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:8px;margin-bottom:12px;border-bottom:2px solid transparent;border-image:linear-gradient(90deg,#806341,#E0C098) 1}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:10px;margin-bottom:12px;background:linear-gradient(90deg,#806341,#E0C098) left bottom/100% 2px no-repeat}
 .ph h1{font-family:Montserrat,Arial,sans-serif;font-size:17px;margin:0;letter-spacing:-.01em}
 .ph p{margin:3px 0 0;color:#6A6157;font-size:9.5px}
 .ph img{height:30px}

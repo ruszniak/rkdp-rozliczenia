@@ -206,7 +206,17 @@ export function initMobileTables() {
 // Nowe okno about:blank dzieli wątek z aplikacją – gdy podgląd wydruku zostawał otwarty
 // w innej karcie, aplikacja przestawała reagować. Ramka znika po wydruku, a strona działa dalej.
 let printFrame = null;
+// „Pobierz PDF”: od razu gotowy plik PDF (z warstwą tekstu do zaznaczania i wyszukiwania) – bez okna drukowania.
+// Gdyby się nie udało (stara przeglądarka, brak pamięci), otwiera się dotychczasowe okno drukowania.
+let pdfBusy = false;
 export function printHtml(html, title) {
+  const docTitle = title || (html.match(/<title>([^<]*)<\/title>/i) || [])[1] || document.title;
+  if (pdfBusy) { toast('PDF jest już przygotowywany…'); return true; }
+  pdfBusy = true; toast('Przygotowuję PDF…');
+  import('./pdfdoc.js').then(m => m.downloadPdf(html, docTitle)).then(() => toast('Pobrano PDF'), e => { console.error('PDF', e); printLegacy(html, title); }).finally(() => { pdfBusy = false; });
+  return true;
+}
+export function printLegacy(html, title) {
   printFrame?.remove();
   const f = document.createElement('iframe');
   f.setAttribute('aria-hidden', 'true'); f.tabIndex = -1;
