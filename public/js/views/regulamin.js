@@ -42,7 +42,7 @@ export function termsGate({ onLogout, first = false } = {}) {
     const back = h('div', { class: 'tr-back', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'tr-title' },
       h('div', { class: 'tr-modal' },
         h('div', { class: 'tr-head' },
-          h('img', { src: '/logo-rkdp.png', alt: 'RKDP', class: 'tr-logo' }),
+          h('img', { src: '/logo-app.svg', alt: 'RKDP', class: 'tr-logo' }),
           h('h2', { id: 'tr-title' }, TERMS_TITLE),
           h('p', { class: 'small muted' }, first
             ? 'Przed rozpoczęciem pracy przeczytaj i zaakceptuj regulamin. Akceptację powtarzamy co najmniej raz na 30 dni.'

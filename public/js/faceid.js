@@ -113,7 +113,7 @@ function screen({ title, text, primary, onPrimary, secondary, onSecondary, extra
   const btn = h('button', { class: 'btn btn-primary fid-btn', type: 'button' }, primary);
   const el = h('div', { class: 'fid-lock', role: 'dialog', 'aria-modal': 'true' },
     h('div', { class: 'fid-box' },
-      h('img', { src: '/logo-rkdp.png', alt: 'RKDP', class: 'fid-logo' }),
+      h('img', { src: '/logo-app.svg', alt: 'RKDP', class: 'fid-logo' }),
       h('div', { class: 'fid-icon', 'aria-hidden': 'true' }, faceSvg()),
       h('h1', {}, title), h('p', { class: 'muted' }, text),
       btn, err,

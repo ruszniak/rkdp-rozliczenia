@@ -86,7 +86,7 @@ function staticItems() {
     if (hasModule('doradztwo')) out.push(go('Pulpit M2 TAX', '#/doradztwo', 'M2 TAX'), go('Sprawy', '#/doradztwo/sprawy', 'M2 TAX'), go('Klienci M2 TAX', '#/doradztwo/klienci', 'M2 TAX'),
       go('Dokumenty – wzory pism', '#/doradztwo/dokumenty', 'M2 TAX'), go('Zlecenia i umowy', '#/doradztwo/zlecenia', 'M2 TAX'), go('Zgłoszenia M2 TAX', '#/doradztwo/zgloszenia', 'M2 TAX'));
     out.push(tool('Kalkulator: JDG czy spółka z o.o.?', hasModule('rozliczenia') ? '#/kalkulator' : '#/doradztwo/kalkulator'), tool('Wzory umów i uchwał', hasModule('rozliczenia') ? '#/wzory' : '#/doradztwo/wzory'),
-      tool('Podgląd JPK_CIT', hasModule('rozliczenia') ? '#/jpk' : '#/doradztwo/jpk'), go('Lista obecności', '#/obecnosc'), go('Mój profil i powiadomienia', '#/profil'), go('Regulamin', '#/regulamin'));
+      tool('Podgląd JPK_CIT', hasModule('rozliczenia') ? '#/jpk' : '#/doradztwo/jpk'), go('Lista obecności', '#/obecnosc'), go('Mój profil i powiadomienia', '#/profil'), go('Regulamin', '#/regulamin'), go('O aplikacji i RODO', '#/o-aplikacji'), go('Polityka prywatności', '#/o-aplikacji/prywatnosc'), go('Klauzula informacyjna RODO', '#/o-aplikacji/rodo'));
     if (state.me?.role === 'admin') out.push(go('Zespół i ustawienia', '#/zespol'));
   }
   out.push({ group: 'Akcje', label: getTheme() === 'dark' ? 'Przełącz na motyw jasny' : 'Przełącz na motyw ciemny', meta: 'Ctrl Shift L', icon: 'theme', run: toggleTheme });

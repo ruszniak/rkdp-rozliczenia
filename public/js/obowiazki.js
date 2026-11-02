@@ -22,13 +22,13 @@ const hasZusOwner = c => zusOwner(c) && c.zus_type && c.zus_type !== 'brak';
 
 // Rodzaje obowiązków – kod, nazwa, kratka miesięczna w rozliczeniach (status)
 export const KINDS = {
-  vat:     { label: 'VAT i JPK_V7', short: 'JPK_V7', task: 'jpk', color: '#806341' },
-  vat_ue:  { label: 'VAT-UE', short: 'VAT-UE', color: '#9C7A52' },
-  pit:     { label: 'Zaliczka PIT / ryczałt', short: 'PIT', task: 'pit_cit', color: '#B38F62' },
-  cit:     { label: 'Zaliczka CIT', short: 'CIT', task: 'pit_cit', color: '#B38F62' },
-  zus:     { label: 'ZUS (DRA)', short: 'ZUS', task: 'zus_wyslany', area: 'kadry', color: '#5E4529' },
-  pit4:    { label: 'PIT-4 – zaliczki od wynagrodzeń', short: 'PIT-4', task: 'pit4', area: 'kadry', color: '#6F5534' },
-  roczne:  { label: 'Obowiązek roczny', short: 'Rok', color: '#1D1A16' },
+  vat:     { label: 'VAT i JPK_V7', short: 'JPK_V7', task: 'jpk', color: '#2D4A8A' },
+  vat_ue:  { label: 'VAT-UE', short: 'VAT-UE', color: '#5F78A8' },
+  pit:     { label: 'Zaliczka PIT / ryczałt', short: 'PIT', task: 'pit_cit', color: '#1F7A52' },
+  cit:     { label: 'Zaliczka CIT', short: 'CIT', task: 'pit_cit', color: '#1F7A52' },
+  zus:     { label: 'ZUS (DRA)', short: 'ZUS', task: 'zus_wyslany', area: 'kadry', color: '#223052' },
+  pit4:    { label: 'PIT-4 – zaliczki od wynagrodzeń', short: 'PIT-4', task: 'pit4', area: 'kadry', color: '#7B5FD6' },
+  roczne:  { label: 'Obowiązek roczny', short: 'Rok', color: '#16203A' },
 };
 
 // Zamknięcie roku: kratki dla roku podatkowego `year` (terminy w roku year+1, chyba że opisano inaczej)

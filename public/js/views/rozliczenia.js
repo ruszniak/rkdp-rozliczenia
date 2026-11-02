@@ -1,5 +1,5 @@
 import { AMOUNT_CODES, openAmounts } from '../kwoty.js';
-import { h, icon, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials, printHtml, ava } from '../ui.js';
+import { h, icon, infoTip, toast, toastAction, fail, periodLabel, shiftPeriod, defaultPeriod, downloadCsv, initials, printHtml, ava } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { STATUS, STATUS_ORDER, LEGAL_SHORT, sectionOf, deadlinesFor } from '../dict.js';
 import { downloadXlsx } from '../xlsx.js';
@@ -217,16 +217,17 @@ export async function renderRozliczenia(main, params) {
     h('option', { value: '' }, 'Wszyscy klienci'), h('option', { value: 'nierozliczeni' }, 'Tylko do rozliczenia'),
     h('option', { value: 'braki' }, 'Z brakiem dokumentów'), h('option', { value: 'uwagi' }, 'Z uwagami / pytaniami'));
   showSel.value = prefs.show;
-  const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: (ev) => exportMenu(ev.currentTarget) }, icon('download'), 'Pobierz');
+  const exportBtn = h('button', { class: 'btn btn-outline btn-sm btn-ico', 'aria-label': 'Pobierz (Excel, CSV, PDF)', 'data-tip': 'Pobierz tabelę – Excel, CSV, PDF', onclick: (ev) => exportMenu(ev.currentTarget) }, icon('download'));
   const ICON_LAYOUT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>';
-  const layoutBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wybierz grupy klientów i czy mają być w jednej tabeli', onclick: (ev) => layoutMenu(ev.currentTarget) },
-    h('span', { html: ICON_LAYOUT, style: { display: 'inline-flex' } }), 'Układ tabel');
+  const layoutBtn = h('button', { class: 'btn btn-outline btn-sm btn-ico', 'aria-label': 'Układ tabel', 'data-tip': 'Układ tabel – wybierz grupy klientów i czy mają być w jednej tabeli', onclick: (ev) => layoutMenu(ev.currentTarget) },
+    h('span', { html: ICON_LAYOUT, style: { display: 'inline-flex' } }));
   const ICON_FS = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   const ICON_FS_EXIT = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
-  const fsBtn = h('button', { class: 'btn btn-primary btn-sm', 'data-tip': 'Tabela na cały ekran (Esc – wyjście)' });
+  const fsBtn = h('button', { class: 'btn btn-outline btn-sm btn-ico', 'data-tip': 'Tabela na cały ekran (Esc – wyjście)' });
   const setFs = (on) => {
     document.body.classList.toggle('focus-mode', on);
-    fsBtn.replaceChildren(h('span', { html: on ? ICON_FS_EXIT : ICON_FS, style: { display: 'inline-flex' } }), on ? 'Zamknij pełny ekran' : 'Pełny ekran');
+    fsBtn.replaceChildren(h('span', { html: on ? ICON_FS_EXIT : ICON_FS, style: { display: 'inline-flex' } }));
+    fsBtn.setAttribute('aria-label', on ? 'Zamknij pełny ekran' : 'Pełny ekran');
   };
   fsBtn.addEventListener('click', async () => {
     const on = !document.body.classList.contains('focus-mode');
@@ -243,7 +244,7 @@ export async function renderRozliczenia(main, params) {
   setFs(false);
   const msgBtn = h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'E-mail do jednego lub wielu klientów z kancelaria@rkdp.pl\nFaktury KSeF w Saldeo, wyciąg bankowy, inne dokumenty',
     onclick: () => openMessage({ clients: [], kind: 'ksef', period }) }, icon('mail'), 'Wiadomość');
-  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, layoutBtn, h('span', { class: 'sel-wrap' }), msgBtn, exportBtn, fsBtn);
+  const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, h('span', { class: 'sel-wrap' }), msgBtn, h('span', { class: 'tb-icons' }, layoutBtn, exportBtn, fsBtn));
 
   // ---------- zapisane widoki (wspólne dla wszystkich urządzeń) ----------
   const viewsBar = h('div', { class: 'views-bar' });
@@ -276,7 +277,7 @@ export async function renderRozliczenia(main, params) {
     ['done', 'na', 'missing_docs', 'reminded', 'todo'].map(s => h('span', {}, h('span', { class: `cb cb-${s}` }, STATUS[s].mark), STATUS[s].label)),
     h('span', {}, h('span', { class: 'cb cb-todo cb-pill cb-pill-saved' }, '2 509,00'), 'kwota zapisana'),
     h('span', {}, h('span', { class: 'cb cb-done cb-pill cb-pill-sent' }, '✓ 2 509,00'), 'kwota wysłana klientowi'),
-    h('span', { class: 'muted' }, '· kliknij kratkę, aby zmienić · najedź na nagłówek, aby zobaczyć opis'));
+    infoTip('Kliknij kratkę, aby zmienić status. Najedź na nagłówek kolumny, aby zobaczyć opis.\nKlawiatura: strzałki – przejście, spacja – zrobione, N – nie dotyczy, B – brak dokumentów.\nCtrl/⌘ + klik – zaznaczenie wielu kratek naraz.', 'Jak zaznaczać'));
 
   function renderTabs() {
     tabsBox.replaceChildren(...Object.entries(AREAS).map(([k, a]) => {
@@ -316,10 +317,10 @@ export async function renderRozliczenia(main, params) {
         'data-tip': prefs.show === 'nierozliczeni' ? 'Pokaż wszystkich klientów' : 'Pokaż tylko klientów do rozliczenia',
         onclick: () => { prefs.show = prefs.show === 'nierozliczeni' ? '' : 'nierozliczeni'; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
         h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
-        h('span', { class: 'num' }, `${settled} / ${rows.length}`,
+        h('span', { class: 'num' }, rows.length ? `${settled} / ${rows.length}` : '—',
           hist ? h('span', { class: 'tile-spark', 'data-tip': 'Odsetek rozliczonych klientów w ostatnich 6 miesiącach' }, sparkline(hist[area].map((v, i) => i === hist[area].length - 1 ? pct : v), { labels: histPeriods.map(periodLabel) })) : null),
         h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } })),
-        h('span', { class: 'tile-more' }, prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
+        h('span', { class: 'tile-more' }, !rows.length ? 'Lista na ten miesiąc nie jest jeszcze otwarta' : prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
       tile(toSend, area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania', 'do_wyslania'),
       tile(miss, 'Klientów z brakiem dokumentów', 'braki'),
       tile(nts, 'Klientów z uwagami', 'uwagi'));
@@ -891,7 +892,6 @@ ${tables || '<p>Brak danych.</p>'}
   }
 
   toolbar.querySelector('.sel-wrap').replaceWith(selBtn);
-  legend.lastChild.textContent = '· kliknij kratkę, aby zmienić · klawiatura: strzałki, spacja = zrobione, N = nie dotyczy, B = brak dok. · Ctrl/⌘ + klik – zaznacz wiele';
   body.addEventListener('keydown', onGridKey);
   main.replaceChildren(head, tiles, deadlines, banner, toolbar, viewsBar, legend, body, bulkBar);
   renderAll();

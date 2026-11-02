@@ -3,10 +3,10 @@
 export const STATUS = {
   todo:         { label: 'Do zrobienia',    mark: '',  color: '#FFFFFF' },
   in_progress:  { label: 'Do zrobienia',    mark: '',  color: '#FFFFFF' },
-  missing_docs: { label: 'Brak dokumentów', mark: '!', color: '#A4462F' },
-  reminded:     { label: 'Wysłano przypomnienie', mark: '@', color: '#B7862F' },
-  done:         { label: 'Zrobione',        mark: '✓', color: '#3E6B47' },
-  na:           { label: 'Nie dotyczy',     mark: '–', color: '#D8CFC1' },
+  missing_docs: { label: 'Brak dokumentów', mark: '!', color: '#E08A1E' },
+  reminded:     { label: 'Wysłano przypomnienie', mark: '@', color: '#7B5FD6' },
+  done:         { label: 'Zrobione',        mark: '✓', color: '#1F7A52' },
+  na:           { label: 'Nie dotyczy',     mark: '–', color: '#D5DCE7' },
 };
 export const STATUS_ORDER = ['done', 'na', 'missing_docs', 'reminded', 'todo'];
 
