@@ -2,6 +2,7 @@
 import { h, toast, fail, infoTip, ava } from '../ui.js';
 import { sb, state } from '../store.js';
 import { validNip, cleanNip } from '../nip.js';
+import { isPhoneApp, faceIdAvailable, localKey, forgetLocal, enableFaceId, myPasskeys, removePasskey } from '../faceid.js';
 import { isIOS, isStandalone, pushSupported, canInstall, onInstallChange, promptInstall, currentSubscription, enablePush, disablePush, savePrefs, loadPrefs, sendTest, DEFAULT_PREFS } from '../push.js';
 
 const HELP = `Te dane wpisują się automatycznie w pełnomocnictwa UPL-1, PEL (ZUS) i PPS-1, gdy w „Umowy i pełnomocnictwa” wybierzesz siebie jako pełnomocnika.
@@ -74,9 +75,36 @@ function appSection() {
         : 'Najpierw włącz powiadomienia na tym urządzeniu. Bez działających powiadomień e-maile o zleceniach przychodzą zawsze.'))));
   }
   drawPush();
+  // Face ID / odcisk palca – tylko w aplikacji na telefonie
+  const fidBox = h('div', {}, h('p', { class: 'hint' }, 'Sprawdzanie…'));
+  const fmt = d => d ? new Date(d).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' }) : '–';
+  async function drawFid() {
+    const phone = isPhoneApp(), avail = phone && await faceIdAvailable(), here = phone && !!localKey();
+    let keys = [];
+    try { keys = await myPasskeys(state.me.id); } catch { /* */ }
+    const head = h('div', { class: 'pw-row' }, h('span', {}, h('b', {}, here ? '✓ Face ID / odcisk palca jest włączony na tym telefonie.' : 'Face ID (iPhone) / odcisk palca (Android)'), h('br'),
+      h('span', { class: 'small muted' }, !phone
+        ? 'Działa w aplikacji zainstalowanej na telefonie: przy każdym uruchomieniu odblokowujesz ją twarzą, a logujesz się bez hasła i kodu. Otwórz aplikację na telefonie, aby to włączyć.'
+        : !avail ? 'Na tym telefonie nie ustawiono Face ID / odcisku palca (Ustawienia telefonu → Face ID i kod / Zabezpieczenia).'
+        : here ? 'Aplikacja wymaga twarzy przy każdym uruchomieniu i po powrocie po ponad minucie.' : 'Włącz, aby odblokowywać aplikację twarzą i logować się bez hasła.')),
+      avail && !here ? h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async e => {
+        const b = e.currentTarget; b.disabled = true;
+        try { await enableFaceId(state.me.email); toast('Face ID włączone na tym telefonie'); } catch (er) { if (!['NotAllowedError', 'AbortError'].includes(er?.name)) fail(er, 'Face ID'); }
+        drawFid();
+      } }, 'Włącz') : null);
+    const list = keys.length ? h('ul', { class: 'fid-keys' }, ...keys.map(k => h('li', {},
+      h('span', {}, h('b', {}, k.label || 'Telefon', here && k.credential_id === localKey()?.credential_id ? ' (ten telefon)' : ''), h('br'), h('span', { class: 'small muted' }, `dodano ${fmt(k.created_at)} · ostatnio ${fmt(k.last_used_at)}`)),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async e => {
+        const b = e.currentTarget; b.disabled = true;
+        try { await removePasskey(k.id); if (here && (k.credential_id === localKey()?.credential_id || keys.length === 1)) forgetLocal(); toast('Usunięto – ten telefon zaloguje się znowu hasłem i kodem'); } catch (er) { fail(er); }
+        drawFid();
+      } }, 'Usuń')))) : null;
+    fidBox.replaceChildren(...[head, list].filter(Boolean));
+  }
+  drawFid();
   return h('section', { class: 'card section' },
     h('div', { class: 'section-head' }, h('h2', {}, 'Aplikacja i powiadomienia na tym urządzeniu')),
-    installBox, h('hr', { class: 'pw-hr' }), pushBox);
+    installBox, h('hr', { class: 'pw-hr' }), pushBox, h('hr', { class: 'pw-hr' }), fidBox);
 }
 
 export async function renderProfil(main) {

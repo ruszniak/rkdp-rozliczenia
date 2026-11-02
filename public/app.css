@@ -2019,3 +2019,19 @@ a.lim-a:hover{border-color:var(--gold)}
   .zl-tool{font-size:18px;padding:6px 9px}
 }
 @media (min-width:601px){ .zl-next-main .btn{flex:0 1 auto;min-width:220px} }
+
+/* Face ID – ekran blokady / włączenia (aplikacja na telefonie) */
+html.fid-locked, html.fid-locked body { overflow: hidden; }
+.fid-lock { position: fixed; inset: 0; z-index: 10000; background: var(--bg, #f7f5f0); display: flex; align-items: center; justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); }
+.fid-box { width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.fid-box h1 { margin: 4px 0 0; font-size: 24px; }
+.fid-box p { margin: 0; }
+.fid-logo { height: 34px; margin-bottom: 18px; }
+.fid-icon { color: var(--gold, #b8954a); margin: 6px 0; }
+.fid-btn { width: 100%; min-height: 50px; font-size: 16px; margin-top: 10px; }
+.fid-box .err:empty { display: none; }
+.fid-login { width: 100%; min-height: 48px; font-size: 16px; }
+.fid-or { margin: 2px 0 -4px; text-align: center; }
+.fid-keys { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 8px; }
+.fid-keys li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line, #e5e0d5); border-radius: 10px; }

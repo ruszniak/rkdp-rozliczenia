@@ -2,6 +2,8 @@ import { h } from '../ui.js';
 import { liveNetwork } from '../siec.js';
 import { sb } from '../store.js';
 import { deviceToken, saveDeviceToken, deviceLabel, markActive } from '../session.js';
+import { isIOS } from '../push.js';
+import { isPhoneApp, localKey, forgetLocal, loginWithFaceId, markUnlocked } from '../faceid.js';
 
 const MIN_PASSWORD = 10;
 const PW_RULES = [
@@ -29,7 +31,7 @@ function plError(err) {
   return 'Nie udało się: ' + (err?.message || 'spróbuj ponownie');
 }
 
-const go = () => { markActive(); if (!location.hash || location.hash === '#/') location.hash = '#/rozliczenia'; location.reload(); };
+const go = () => { markActive(); markUnlocked(); if (!location.hash || location.hash === '#/') location.hash = '#/rozliczenia'; location.reload(); };
 
 async function newMode() {
   const { data, error } = await sb.rpc('login_mode');
@@ -78,10 +80,24 @@ export async function renderLogin(app, initialError = '') {
       if (e3) { errBox.textContent = plError(e3); return; }
       stepCode('login');
     } }, mail, pass, btn);
-    box.replaceChildren(...head('Aplikacja wewnętrzna', 'Zaloguj się', 'Podaj służbowy e-mail i hasło. Potem wyślemy kod na e-mail (chyba że ta przeglądarka jest zapamiętana).'),
-      form, errBox,
+    // aplikacja na telefonie z włączonym Face ID: logowanie twarzą zamiast hasła i kodu
+    const lk = isPhoneApp() ? localKey() : null;
+    const bio = lk ? h('button', { class: 'btn btn-primary fid-login', type: 'button', onclick: async () => {
+      bio.disabled = true; errBox.textContent = '';
+      try { await loginWithFaceId(); return go(); }
+      catch (e) {
+        bio.disabled = false;
+        if (/nie jest już zapisany|nie ma już dostępu/.test(e?.message || '')) { forgetLocal(); bio.remove(); orTxt.remove(); }
+        errBox.textContent = ['NotAllowedError', 'AbortError'].includes(e?.name) ? 'Anulowano albo nie rozpoznano twarzy. Spróbuj ponownie albo zaloguj się hasłem.' : plError(e);
+      }
+    } }, isIOS() ? 'Zaloguj Face ID' : 'Zaloguj odciskiem palca / twarzą') : null;
+    const orTxt = lk ? h('p', { class: 'small muted fid-or' }, `${lk.email} · albo e-mail i hasło:`) : null;
+    if (lk) email = email || lk.email;
+    if (lk) mail.value = email;
+    box.replaceChildren(...head('Aplikacja wewnętrzna', 'Zaloguj się', lk ? 'Bez hasła i kodu – telefon sprawdzi, że to Ty.' : 'Podaj służbowy e-mail i hasło. Potem wyślemy kod na e-mail (chyba że ta przeglądarka jest zapamiętana).'),
+      bio, orTxt, form, errBox,
       linkBtn('Pierwsze logowanie / ustaw nowe hasło', stepSetupEmail));
-    (email ? pass : mail).focus();
+    if (!lk) (email ? pass : mail).focus();
   }
 
   // ---------- ustawienie hasła: e-mail → kod → nowe hasło ----------

@@ -335,6 +335,11 @@ async function start() {
   const phoneApp = isStandalone() && (isIOS() || /Android/i.test(navigator.userAgent));
   if (idleMinutes && phoneApp) { const { data: ok } = await sb.rpc('auth_app_session').then(r => r, () => ({})); if (ok) idleMinutes = 30 * 24 * 60; }
   if (idleMinutes) { sb.rpc('auth_touch'); startIdleWatch(idleMinutes); }
+  // aplikacja na telefonie: przy każdym uruchomieniu Face ID / odcisk palca (albo włączenie go po pierwszym logowaniu)
+  if (phoneApp && mode === 'haslo_kod') {
+    const { phoneGate } = await import('./faceid.js');
+    await phoneGate(state.me.email, r => endSession(r));
+  }
   // regulamin: przy pierwszym logowaniu, co 30 dni i po zmianie wersji – bez akceptacji brak dostępu
   if (!tsRes?.error && tsRes?.data?.needs) {
     const { termsGate } = await import('./views/regulamin.js');
