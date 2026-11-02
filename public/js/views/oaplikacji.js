@@ -108,7 +108,7 @@ const NEWS = [
     'Nowa ikona aplikacji (granatowa „R”), ciemny motyw w granacie.',
   ]],
   ['1.8', '2 listopada 2026', [
-    'Face ID / odcisk palca w aplikacji na telefonie – logowanie bez hasła i kodu, blokada przy każdym uruchomieniu i po 5 minutach w tle.',
+    'Face ID / odcisk palca w aplikacji na telefonie – logowanie bez hasła i kodu, odblokowanie twarzą ważne 24 godziny.',
     'Aplikacja na telefonie nie wylogowuje po bezczynności (sesja do 30 dni) – powiadomienia działają cały czas.',
     'Kwoty podatków w kratkach rozliczeń: kwota zapisana (jasna) i wysłana klientowi (zaznaczona ✓).',
     'Zadania: czytelny widok z krokami i „co teraz”, zlecający może zamknąć zadanie jako wykonane.',

@@ -1,7 +1,7 @@
 // Face ID (iPhone) / odcisk palca lub twarz (Android) w aplikacji zainstalowanej na telefonie.
 // Passkey (WebAuthn): klucz prywatny zostaje w telefonie, serwer (funkcja „passkey”) sprawdza podpis.
 //  • po zalogowaniu w aplikacji na telefonie – włączenie Face ID na tym telefonie,
-//  • przy każdym uruchomieniu aplikacji (i po powrocie po ponad minucie w tle) – ekran blokady, odblokowanie twarzą,
+//  • gdy od ostatniego odblokowania minęło 24 h – ekran blokady, odblokowanie twarzą,
 //  • na ekranie logowania – „Zaloguj Face ID” zamiast hasła i kodu z e-maila.
 import { h } from './ui.js';
 import { sb } from './store.js';
@@ -9,7 +9,7 @@ import { isIOS, isStandalone } from './push.js';
 import { deviceLabel } from './session.js';
 
 const KEY = 'rkdp_faceid', UNLOCK_KEY = 'rkdp_unlocked_at', SKIP_KEY = 'rkdp_faceid_skip';
-const RELOCK_MS = 5 * 60 * 1000;
+const RELOCK_MS = 24 * 60 * 60 * 1000; // po odblokowaniu twarzą aplikacja nie pyta ponownie przez 24 h
 const ls = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } },
@@ -30,8 +30,9 @@ export const localKey = () => { try { return JSON.parse(ls.get(KEY) || 'null'); 
 const saveLocal = (email, credential_id) => ls.set(KEY, JSON.stringify({ email, credential_id }));
 export const forgetLocal = () => ls.del(KEY);
 // odblokowano przed chwilą (np. po zalogowaniu i przeładowaniu strony) – bez ponownego pytania
-export const markUnlocked = () => ss.set(UNLOCK_KEY, String(Date.now()));
-const recentlyUnlocked = () => Date.now() - (Number(ss.get(UNLOCK_KEY)) || 0) < 30000;
+// czas ostatniego odblokowania zapisany na tym telefonie (przetrwa zamknięcie aplikacji)
+export const markUnlocked = () => ls.set(UNLOCK_KEY, String(Date.now()));
+const recentlyUnlocked = () => { const t = Number(ls.get(UNLOCK_KEY)) || 0; return t <= Date.now() && Date.now() - t < RELOCK_MS; };
 
 // ---------- konwersja JSON ⇄ WebAuthn ----------
 const b2u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -185,7 +186,7 @@ export function enrollScreen(email, onLogout) {
     const skip = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', hidden: true, onclick: () => { ss.set(SKIP_KEY, '1'); close(); } }, 'Pomiń na razie');
     const sc = screen({
       title: `Włącz ${bioName()}`,
-      text: `Aplikacja na telefonie jest chroniona ${isIOS() ? 'Face ID' : 'odciskiem palca lub twarzą'}: przy każdym uruchomieniu odblokujesz ją twarzą, a po wylogowaniu zalogujesz się bez hasła i kodu z e-maila. Twoja twarz nie jest nigdzie wysyłana – sprawdza ją telefon.`,
+      text: `Aplikacja na telefonie jest chroniona ${isIOS() ? 'Face ID' : 'odciskiem palca lub twarzą'}: odblokujesz ją twarzą (raz na 24 godziny), a po wylogowaniu zalogujesz się bez hasła i kodu z e-maila. Twoja twarz nie jest nigdzie wysyłana – sprawdza ją telefon.`,
       primary: `Włącz ${bioName()}`, onPrimary: async () => {
         try { await enableFaceId(email); close(); }
         catch (e) { failed++; if (failed >= 1) skip.hidden = false; throw e; }
@@ -205,11 +206,9 @@ export async function phoneGate(email, onLogout) {
   if (lk && lk.email !== email) forgetLocal();
   if (localKey()) { if (!recentlyUnlocked()) await lockApp(onLogout); }
   else if (ss.get(SKIP_KEY) !== '1') await enrollScreen(email, onLogout);
-  // powrót z tła po ponad 5 minutach = ponowne uruchomienie: znowu Face ID
-  let hiddenAt = 0;
+  // powrót z tła: Face ID dopiero, gdy od ostatniego odblokowania minęły 24 h
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
-    if (localKey() && hiddenAt && Date.now() - hiddenAt > RELOCK_MS) lockApp(onLogout);
+    if (document.visibilityState === 'visible' && localKey() && !recentlyUnlocked()) lockApp(onLogout);
   });
 }
 
