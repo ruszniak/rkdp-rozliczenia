@@ -151,7 +151,7 @@ export function lockApp(onLogout) {
     done(true);
   };
   const sc = screen({
-    title: 'Aplikacja zablokowana', text: `Odblokuj ${bioName()}, aby zobaczyć dane klientów.`,
+    title: 'Aplikacja zablokowana', text: `Stuknij ekran, aby odblokować ${bioName()}.`,
     primary: isIOS() ? 'Odblokuj Face ID' : 'Odblokuj', onPrimary: async () => {
       try { await unlock(); } catch (e) {
         // klucz usunięty w profilu albo sesja wygasła – trzeba zalogować się od nowa
@@ -166,7 +166,13 @@ export function lockApp(onLogout) {
   document.documentElement.classList.add('fid-locked');
   document.body.append(sc.el);
   // od razu pokazujemy Face ID (gdy telefon pozwala bez stuknięcia); w razie odmowy czeka przycisk
-  setTimeout(() => sc.run(true), 250);
+  // stuknięcie w dowolnym miejscu ekranu (poza „Zaloguj się hasłem”) uruchamia Face ID
+  sc.el.addEventListener('click', e => { if (!e.target.closest('button')) sc.run(false); });
+  // próba bez stuknięcia: gdy aplikacja jest już na wierzchu, albo gdy na niego wróci
+  const auto = () => { if (lockEl && document.visibilityState === 'visible') sc.run(true); };
+  setTimeout(auto, 300);
+  window.addEventListener('focus', auto, { once: true });
+  window.addEventListener('pageshow', auto, { once: true });
   return promise;
 }
 
