@@ -1,0 +1,2 @@
+Montserrat (Julieta Ulanovsky i in.) oraz Plus Jakarta Sans (Tokotype) – SIL Open Font License 1.1.
+Używane do wbudowania czcionek w pliki PDF generowane w przeglądarce (public/js/pdfdoc.js).

@@ -98,6 +98,12 @@ export async function renderShared(app, token) {
     h('div', { class: 'sh-bar' },
       h('img', { src: brand.logo, alt: brand.alt, class: 'sh-logo' }),
       h('div', { class: 'sh-meta small' }, meta),
-      h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => printHtml(html, data.title) }, 'Pobierz PDF')),
+      (() => { const b = h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async () => {
+        if (data.kind !== 'oferta') return printHtml(html, data.title);
+        const label = b.textContent; b.disabled = true;
+        try { const { downloadPdf } = await import('./pdfdoc.js'); await downloadPdf(html, document.title, t => { b.textContent = t; }); }
+        catch (e) { console.error(e); printHtml(html, data.title); }
+        finally { b.disabled = false; b.textContent = label; }
+      } }, 'Pobierz PDF'); return b; })()),
     wrap);
 }

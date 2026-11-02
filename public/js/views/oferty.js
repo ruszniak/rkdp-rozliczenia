@@ -214,7 +214,11 @@ async function renderEditor(main, id, brand) {
   loadLinkInfo();
   async function pdf() {
     if (dirty || !row) { if (!(await save())) return; }
-    printHtml(offerHtml(o, brand, { number: row.number }));
+    const html = offerHtml(o, brand, { number: row.number });
+    const name = `Oferta ${row.number || ''} – ${o.client?.name || ''}`.replace(/\s+–\s*$/, '').trim();
+    toast('Przygotowuję PDF…');
+    try { const { downloadPdf } = await import('../pdfdoc.js'); await downloadPdf(html, name); toast('Pobrano PDF'); }
+    catch (e) { console.error(e); printHtml(html); }
   }
   const statusSel = h('select', { class: 'select' }, ...Object.entries(STATUS).map(([k, v]) => h('option', { value: k }, v)));
   statusSel.value = status;

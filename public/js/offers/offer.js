@@ -424,5 +424,5 @@ table.pk-cmp tr.all td{background:#F8F5F0;font-weight:600}
 table.pk-cmp i.ok{display:inline-flex;width:4.6mm;height:4.6mm;border-radius:50%;background:#F3E6D2;color:#7A5A37;align-items:center;justify-content:center}
 table.pk-cmp .no{color:#B5AB9E}
 .pk-note{font-size:8pt;color:#6A6157;margin-top:3mm}
-@media screen{body{background:#E9E3D8}.doc{max-width:210mm;margin:0 auto;background:#fff}.flow{padding:0 17mm}}
+@media screen{body{background:#E9E3D8}.doc{width:210mm;max-width:100%;margin:0 auto;background:#fff}table.flow>thead>tr>td,table.flow>tbody>tr>td{padding:0 17mm}table.flow>thead>tr>td{padding-top:12mm}table.flow>tbody>tr>td{padding-bottom:16mm}}
 `;
