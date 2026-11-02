@@ -2314,3 +2314,9 @@ fieldset.kl-form.editing .section{box-shadow:0 0 0 2px rgba(45,74,138,.18),var(-
   .tiles>.tile .num{font-size:24px}
   .tiles>.tile .tile-more{font-size:11.5px}
 }
+
+/* szeroki widok na dużych monitorach (przycisk ↔ w nagłówku) */
+.hdr-wide{display:none}
+@media (min-width:1700px){.hdr-wide{display:inline-flex}}
+html.wide .wrap{max-width:none}
+@media (min-width:1700px){html.wide .wrap{padding-left:clamp(24px,2.5vw,56px);padding-right:clamp(24px,2.5vw,56px)}}

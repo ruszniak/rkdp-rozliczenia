@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.0', '2 listopada 2026', [
+    'Duże monitory: przycisk ↔ w nagłówku rozciąga stronę na całą szerokość ekranu (zapamiętywany w przeglądarce); kliknięcie powiadomienia push otwiera właściwe miejsce w aplikacji.',
     'Rozliczenia: nowa lista „Wyciągi” – wyciągi bankowe narastająco od początku roku (miesiące obok siebie, licznik braków).',
     'Karta klienta: dane w podglądzie, zmiany dopiero po kliknięciu „Edytuj dane” – nic nie zmieni się przez przypadek.',
     '„Zlecenia” dla zespołu nazywają się teraz „Zadania”, a „Kadry i ZUS” – „Płace”; na telefonie „Więcej” otwiera się jako cała strona.',

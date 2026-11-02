@@ -115,6 +115,10 @@ TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
 const TAB_SHORT = { moje: 'Sprawy', 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
 
 let themeOff = null;
+// szeroki widok (duże monitory) – zapamiętany w tej przeglądarce
+try { if (localStorage.getItem('rkdp-wide') === '1') document.documentElement.classList.add('wide'); } catch {}
+const ICON_WIDE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg>';
+const ICON_NARROW = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h7M14 12h7M7 8l4 4-4 4M17 8l-4 4 4 4"/></svg>';
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
 // menu „Więcej” w pasku zakładek
 let lastMore = [];
@@ -201,6 +205,10 @@ function layout(active) {
         (() => { const b = h('button', { type: 'button', class: 'hdr-icon', onclick: () => toggleTheme() });
           const draw = () => { const d = getTheme() === 'dark'; b.innerHTML = d ? ICON_SUN : ICON_MOON; b.setAttribute('aria-label', d ? 'Motyw jasny' : 'Motyw ciemny'); b.setAttribute('data-tip', d ? 'Przełącz na motyw jasny' : 'Przełącz na motyw ciemny'); };
           draw(); themeOff?.(); themeOff = onThemeChange(draw); return b; })(),
+        (() => { const b = h('button', { type: 'button', class: 'hdr-icon hdr-wide' });
+          const draw = () => { const w = document.documentElement.classList.contains('wide'); b.innerHTML = w ? ICON_NARROW : ICON_WIDE; b.setAttribute('aria-label', w ? 'Zwykła szerokość' : 'Pełna szerokość ekranu'); b.setAttribute('data-tip', w ? 'Zwykła szerokość strony' : 'Rozciągnij na całą szerokość ekranu'); b.setAttribute('aria-pressed', String(w)); };
+          b.onclick = () => { const w = document.documentElement.classList.toggle('wide'); try { localStorage.setItem('rkdp-wide', w ? '1' : '0'); } catch {} draw(); };
+          draw(); return b; })(),
         !jpkOnly && hasModule('rozliczenia') && mod === 'rkdp' ? unreadBadgeEl() : null,
         jpkOnly || !(state.me.attendance || state.me.role === 'admin' || state.me.attendance_scope) ? null : (() => { const i = h('a', { href: '#/obecnosc', class: 'ob-link' + (active.endsWith('obecnosc') ? ' on' : ''), 'aria-label': 'Lista obecności', 'data-tip': 'Lista obecności' }); i.innerHTML = TAB_ICONS['m2:spotkania']; return i; })(),
         jpkOnly ? h('span', { class: 'who' }, me.full_name) : h('a', { href: '#/profil', class: 'who', 'data-tip': 'Mój profil – dane do pełnomocnictw', style: { textDecoration: 'none', color: 'inherit' } }, me.full_name),
