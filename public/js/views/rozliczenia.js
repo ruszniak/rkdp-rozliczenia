@@ -607,7 +607,7 @@ export async function renderRozliczenia(main, params) {
       for (const r of rows) {
         const e = cur.get(r.id) || r;
         if (!m.has(e.client_id)) m.set(e.client_id, new Map());
-        m.get(e.client_id).set(+e.period.slice(5, 7), e);
+        m.get(e.client_id).set(+String(r.period || e.period || '').slice(5, 7), e);
       }
       yearData = m; return m;
     }, err => { yearLoading = null; throw err; });
