@@ -36,7 +36,7 @@ export const PRIVACY = [
   ]],
   ['5. Rejestr działań i bezpieczeństwo', [
     'Aplikacja rejestruje logowania, zmiany danych, wysłane wiadomości i akceptacje regulaminu (kto, kiedy, co). Służy to bezpieczeństwu, rozliczalności i wyjaśnianiu pomyłek.',
-    'Sesja wygasa po okresie bezczynności na komputerze; w aplikacji na telefonie chroni ją Face ID przy każdym uruchomieniu.',
+    'Sesja wygasa po okresie bezczynności na komputerze; w aplikacji na telefonie chroni ją Face ID (odblokowanie ważne 24 godziny).',
     'Utratę telefonu lub komputera, ujawnienie hasła albo podejrzenie nieuprawnionego dostępu należy niezwłocznie zgłosić administratorowi.',
   ]],
   ['6. Wiadomości e-mail wysyłane z aplikacji', [

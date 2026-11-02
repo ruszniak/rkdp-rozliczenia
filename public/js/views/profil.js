@@ -120,7 +120,7 @@ function appSection() {
     try { keys = await myPasskeys(state.me.id); } catch { /* */ }
     const head = h('div', { class: 'pw-row' }, h('span', {}, h('b', {}, here ? '✓ Face ID / odcisk palca jest włączony na tym telefonie.' : 'Face ID (iPhone) / odcisk palca (Android)'), h('br'),
       h('span', { class: 'small muted' }, !phone
-        ? 'Działa w aplikacji zainstalowanej na telefonie: przy każdym uruchomieniu odblokowujesz ją twarzą, a logujesz się bez hasła i kodu. Otwórz aplikację na telefonie, aby to włączyć.'
+        ? 'Działa w aplikacji zainstalowanej na telefonie: odblokowujesz ją twarzą (raz na 24 godziny), a logujesz się bez hasła i kodu. Otwórz aplikację na telefonie, aby to włączyć.'
         : !avail ? 'Na tym telefonie nie ustawiono Face ID / odcisku palca (Ustawienia telefonu → Face ID i kod / Zabezpieczenia).'
         : here ? 'Po odblokowaniu twarzą aplikacja nie pyta ponownie przez 24 godziny.' : 'Włącz, aby odblokowywać aplikację twarzą i logować się bez hasła.')),
       avail && !here ? h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async e => {

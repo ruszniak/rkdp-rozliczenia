@@ -92,7 +92,7 @@ export async function renderZlecenia(main, id) {
       ['koniec', 'Zakończone', z => !OPEN.includes(z.status)],
     ] : [
       ['aktywne', 'Do zrobienia', z => OPEN.includes(z.status) && z.assignee_id === state.me.id],
-      ['zlecone', 'Zleciłem', z => OPEN.includes(z.status) && z.created_by === state.me.id && z.assignee_id !== state.me.id],
+      ['zlecone', 'Zlecone przeze mnie', z => OPEN.includes(z.status) && z.created_by === state.me.id && z.assignee_id !== state.me.id],
       ['sprawdz', 'Do sprawdzenia', z => z.status === 'zgloszone' && z.created_by === state.me.id && z.assignee_id !== state.me.id],
       ['koniec', 'Zakończone', z => !OPEN.includes(z.status)]];
     put(chips, ...F.map(([k, l, f]) => { const n = all.filter(f).length; return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : '') + ((k === 'sprawdz' || k === 'pytania' || k === 'po') && n ? ' hot' : ''), onclick: () => { filter = k; draw(); } }, l, h('span', {}, String(n))); }));
