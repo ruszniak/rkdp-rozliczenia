@@ -32,7 +32,7 @@ export const PRIVACY = [
   ['4. Logowanie, Face ID i powiadomienia', [
     'Logowanie wymaga hasła i jednorazowego kodu wysyłanego na służbowy e-mail. Hasła są przechowywane wyłącznie w postaci zabezpieczonego skrótu – nikt, także administrator, ich nie zna.',
     'Face ID / odcisk palca działa na zasadzie klucza dostępu (passkey). Obraz twarzy i odcisk palca nigdy nie opuszczają telefonu – sprawdza je telefon. Aplikacja zapisuje jedynie klucz publiczny, nazwę urządzenia oraz datę dodania i ostatniego użycia. Klucz można usunąć w „Mój profil”.',
-    'Powiadomienia push są wysyłane za pośrednictwem usług producenta przeglądarki lub systemu (Apple, Google, Microsoft, Mozilla). Treść jest szyfrowana dla konkretnego urządzenia i zawiera tylko krótką informację (np. tytuł zlecenia). Powiadomienia można wyłączyć w „Mój profil”.',
+    'Powiadomienia push są wysyłane za pośrednictwem usług producenta przeglądarki lub systemu (Apple, Google, Microsoft, Mozilla). Treść jest szyfrowana dla konkretnego urządzenia i zawiera tylko krótką informację (np. tytuł zadania). Powiadomienia można wyłączyć w „Mój profil”.',
   ]],
   ['5. Rejestr działań i bezpieczeństwo', [
     'Aplikacja rejestruje logowania, zmiany danych, wysłane wiadomości i akceptacje regulaminu (kto, kiedy, co). Służy to bezpieczeństwu, rozliczalności i wyjaśnianiu pomyłek.',
@@ -60,7 +60,7 @@ export const RODO = [
     'Dane konta: imię i nazwisko, służbowy adres e-mail, stanowisko, rola i zakres uprawnień, zdjęcie lub inicjały, telefon.',
     'Dane do pełnomocnictw (UPL-1, PEL, PPS-1), które wpisujesz sam(a) w „Mój profil”: NIP, PESEL, seria i numer dowodu, adres do doręczeń, adres do e-Doręczeń. PESEL i numer dowodu widzisz wyłącznie Ty – nie widzi ich nikt z zespołu ani administrator.',
     'Dane o korzystaniu z aplikacji: logowania, urządzenia i przeglądarki, rejestr zmian i działań, akceptacje regulaminu, ustawienia powiadomień, klucze Face ID (bez danych biometrycznych).',
-    'Dane organizacyjne: przypisani klienci, zlecenia, zadania, komentarze i wiadomości, lista obecności i rejestr czasu pracy (jeżeli z nich korzystasz).',
+    'Dane organizacyjne: przypisani klienci, zadania, komentarze i wiadomości, lista obecności i rejestr czasu pracy (jeżeli z nich korzystasz).',
   ]],
   ['3. Cele i podstawy przetwarzania', [
     'Zapewnienie dostępu do aplikacji i organizacja pracy przy obsłudze klientów – w związku z umową o pracę lub umową o współpracę (art. 6 ust. 1 lit. b RODO) oraz w prawnie uzasadnionym interesie administratora polegającym na sprawnej organizacji pracy (art. 6 ust. 1 lit. f RODO).',
@@ -71,7 +71,7 @@ export const RODO = [
   ]],
   ['4. Odbiorcy danych', [
     'Dostawcy usług technicznych działający na zlecenie administratora: Supabase (baza danych i pliki, serwery w UE – Irlandia), Vercel (udostępnianie aplikacji), Google (poczta Google Workspace), usługi powiadomień producentów systemów i przeglądarek.',
-    'Inni użytkownicy aplikacji – w zakresie potrzebnym do współpracy (np. imię, nazwisko i zdjęcie przy zleceniach i klientach).',
+    'Inni użytkownicy aplikacji – w zakresie potrzebnym do współpracy (np. imię, nazwisko i zdjęcie przy zadaniach i klientach).',
     'Klienci i organy (urząd skarbowy, ZUS, sąd) – w zakresie danych zamieszczonych w pełnomocnictwie, w którym jesteś pełnomocnikiem.',
     'Część dostawców może przetwarzać dane poza Europejskim Obszarem Gospodarczym (np. w USA). Odbywa się to na podstawie standardowych klauzul umownych zatwierdzonych przez Komisję Europejską lub decyzji o adekwatności (EU-US Data Privacy Framework).',
   ]],
@@ -96,6 +96,9 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.0', '2 listopada 2026', [
+    'Rozliczenia: nowa lista „Wyciągi” – wyciągi bankowe narastająco od początku roku (miesiące obok siebie, licznik braków).',
+    'Karta klienta: dane w podglądzie, zmiany dopiero po kliknięciu „Edytuj dane” – nic nie zmieni się przez przypadek.',
+    '„Zlecenia” dla zespołu nazywają się teraz „Zadania”; na telefonie „Więcej” otwiera się jako cała strona.',
     'Nowy wygląd: jasny układ z granatowym akcentem i logo RKDP, górny pasek zakładek na komputerze, własne ikony RKDP.',
     'Czytelne kolory statusów: zielony – zrobione, bursztynowy – brak dokumentów, fioletowy – przypomniano, czerwony – po terminie.',
     'Menu „Więcej” z ikonami, wylogowanie w menu; krótszy pasek narzędzi w Rozliczeniach, instrukcja zaznaczania pod ikonką „i”.',
@@ -106,12 +109,12 @@ const NEWS = [
     'Face ID / odcisk palca w aplikacji na telefonie – logowanie bez hasła i kodu, blokada przy każdym uruchomieniu i po 5 minutach w tle.',
     'Aplikacja na telefonie nie wylogowuje po bezczynności (sesja do 30 dni) – powiadomienia działają cały czas.',
     'Kwoty podatków w kratkach rozliczeń: kwota zapisana (jasna) i wysłana klientowi (zaznaczona ✓).',
-    'Zlecenia: czytelny widok z krokami i „co teraz”, zlecający może zamknąć zlecenie jako wykonane.',
+    'Zadania: czytelny widok z krokami i „co teraz”, zlecający może zamknąć zadanie jako wykonane.',
     'Telefon: długie nazwy klientów nie nachodzą na wiersz z księgową.',
   ]],
   ['1.7', '1 listopada 2026', [
-    'Zlecenia: dodatkowe zadania od administratora z akceptacją wykonania, załącznikami, powiadomieniami push i e-mail (e-maile można wyłączyć w profilu).',
-    'Moje sprawy: jedna lista zleceń, zadań, pytań i terminów ze zdjęciem osoby; nowe menu: Pulpit, Moje sprawy, Rozliczenia, Klienci, Rozmowy i „Więcej”.',
+    'Zadania dla zespołu (dodatkowe zadania od administratora) z akceptacją wykonania, załącznikami, powiadomieniami push i e-mail (e-maile można wyłączyć w profilu).',
+    'Moje sprawy: jedna lista zadań, pytań i terminów ze zdjęciem osoby; nowe menu: Pulpit, Moje sprawy, Rozliczenia, Klienci, Rozmowy i „Więcej”.',
     'Kwoty do zapłaty: kwota i termin przy kratce, rachunki klienta, e-mail z kwotami w szacie RKDP z podpisem i automatycznym odhaczeniem.',
     'Karta klienta: stawki (abonament, dokumenty, pracownicy, usługi dodatkowe), zakres usług (księgowość / tylko doradztwo), spółka komandytowa jako podatnik CIT, fundacja rodzinna.',
     'Wspólnicy spółek osobowych: osobne kratki PIT i ZUS dla każdego wspólnika.',

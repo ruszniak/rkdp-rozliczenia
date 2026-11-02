@@ -289,7 +289,7 @@ export async function renderKlient(main, id) {
       // kratki PIT/ZUS wspólników w otwartych miesiącach Rozliczeń (brak funkcji w bazie = pomijamy)
       if (partnerList.length || isPartnership(draft.legal_form)) await sb.rpc('sync_partner_entries', { p_client: id }).then(() => {}, () => {});
       dirty = false; saveInfo.textContent = 'Zapisano'; toast('Zapisano zmiany');
-      titleEl.textContent = draft.name; renderComp();
+      titleEl.textContent = draft.name; renderComp(); setEdit(false);
     } catch (e) {
       saveBtn.disabled = false; saveInfo.textContent = 'Nie zapisano'; fail(e, 'Nie zapisano');
     }
@@ -311,20 +311,35 @@ export async function renderKlient(main, id) {
   } }, 'Usuń klienta') : null;
 
   renderSections(); renderPartners();
+  // tryb podglądu: dane klienta zablokowane do kliknięcia „Edytuj” – żeby niczego nie zmienić przez przypadek (zwłaszcza na telefonie)
+  const form = h('fieldset', { class: 'kl-form', disabled: true }, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null, sectionsBox, partnersBox);
+  const PENCIL = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m14 6 4 4"/></svg>';
+  const editBtn = editable ? h('button', { class: 'btn btn-primary btn-sm kl-edit', type: 'button', onclick: () => setEdit(true) }, h('span', { html: PENCIL, style: { display: 'inline-flex' } }), 'Edytuj dane') : null;
+  const cancelBtn = h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => {
+    if (dirty && !confirm('Porzucić niezapisane zmiany?')) return;
+    dirty = false; window.dispatchEvent(new HashChangeEvent('hashchange'));
+  } }, 'Anuluj');
+  const savebar = editable ? h('div', { class: 'savebar', hidden: true }, saveInfo, cancelBtn, saveBtn) : null;
+  const editHint = editable ? h('div', { class: 'kl-view-hint' }, h('span', {}, 'Podgląd danych klienta. Aby coś zmienić, kliknij „Edytuj dane”.'), h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => setEdit(true) }, h('span', { html: PENCIL, style: { display: 'inline-flex' } }), 'Edytuj dane')) : null;
+  function setEdit(on) {
+    form.disabled = !on; form.classList.toggle('editing', on);
+    if (savebar) savebar.hidden = !on;
+    if (editHint) editHint.hidden = on;
+    if (editBtn) editBtn.hidden = on;
+    if (on) { saveInfo.textContent = 'Tryb edycji – pamiętaj o zapisaniu'; form.querySelector('input,select,textarea')?.focus({ preventScroll: true }); }
+  }
   main.replaceChildren(
     h('a', { href: '#/klienci', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Wszyscy klienci'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, 'Karta klienta'), titleEl, compEl),
       h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-        editable ? null : h('span', { class: 'badge' }, 'Tylko podgląd'),
+        editable ? editBtn : h('span', { class: 'badge' }, 'Tylko podgląd'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../watek.js').then(m => m.openThread({ client: c })) }, 'Rozmowa i zadania'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, defaultPeriod(), []) }, icon('mail'), 'Wyślij wiadomość'),
         h('a', { class: 'btn btn-outline btn-sm', href: `#/oferty/nowa?klient=${c.id}` }, 'Oferta'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => dokumentyDialog({ client: { ...c, ...draft } }).catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'))),
     h('div', { class: 'two' },
-      h('div', {}, editable ? nipLookupBar(draft.nip, (r) => { mergeNipData(draft, r); markDirty(); renderSections(); }) : null,
-        sectionsBox, partnersBox,
-        editable ? h('div', { class: 'savebar' }, saveInfo, saveBtn) : null),
+      h('div', {}, editHint, form, savebar),
       h('div', {}, threadCard(c), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };

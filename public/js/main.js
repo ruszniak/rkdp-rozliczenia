@@ -67,7 +67,7 @@ const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
     tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/moje', 'Moje sprawy', 'moje'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozmowy', 'Rozmowy', 'rozmowy']],
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
-    more: [['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/zlecenia', 'Zlecenia', 'zlecenia'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
+    more: [['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/zlecenia', 'Zadania dla zespołu', 'zlecenia'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
       ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
@@ -100,6 +100,8 @@ const I = {
   skrzynka: duo('M3 13h5l1.5 3h5l1.5-3h5v6H3z', 'M3 13h5l1.5 3h5l1.5-3h5M5.5 5h13L21 13v6H3v-6z'),
   wyloguj: duo('M4 4h9v16H4z', 'M13 4H4v16h9M17 8l4 4-4 4M21 12H10'),
   info: duo('M12 21a9 9 0 100-18 9 9 0 000 18z', 'M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v6M12 7.5v.5'),
+  profil: duo('M4 21c0-4 3.6-7 8-7s8 3 8 7z', 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 3.6-7 8-7s8 3 8 7'),
+  motyw: duo('M12 3a9 9 0 109 9 7 7 0 01-9-9z', 'M12 3a9 9 0 109 9 7 7 0 01-9-9z'),
 };
 const TAB_ICONS = {
   moje: I.zlecenia, more: I.wiecej, rozmowy: I.rozmowy, pulpit: I.pulpit, rozliczenia: I.rozliczenia, klienci: I.klienci,
@@ -115,9 +117,12 @@ const TAB_SHORT = { moje: 'Sprawy', 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia',
 let themeOff = null;
 // active: 'rozliczenia' | 'klienci' | 'zespol' | 'm2:<podstrona>'
 // menu „Więcej” w pasku zakładek
+let lastMore = [];
+const isPhoneWidth = () => matchMedia('(max-width: 820px)').matches;
 function moreMenu(items, active) {
+  lastMore = items;
   const ico = h('span', { class: 'tab-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS.more;
-  const on = items.some(x => x[2] === active);
+  const on = items.some(x => x[2] === active) || /wiecej$/.test(active);
   const item = ([href, label, key]) => {
     const i = h('span', { class: 'mm-ico', 'aria-hidden': 'true' }); i.innerHTML = TAB_ICONS[key] || TAB_ICONS.default;
     if (key === 'logout') return h('a', { href: '#/', role: 'menuitem', class: 'mm-logout', onclick: (e) => { e.preventDefault(); menu.hidden = true; logout(); } }, i, label);
@@ -125,9 +130,34 @@ function moreMenu(items, active) {
   };
   const menu = h('div', { class: 'more-menu', role: 'menu', hidden: true }, ...items.map(item));
   const btn = h('button', { type: 'button', class: 'more-btn' + (on ? ' active' : ''), 'aria-haspopup': 'menu', 'aria-expanded': 'false',
-    onclick: e => { e.stopPropagation(); menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); if (!menu.hidden) setTimeout(() => document.addEventListener('click', function off(ev) { if (!menu.contains(ev.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); } document.removeEventListener('click', off); }), 0); } },
+    onclick: e => { e.stopPropagation(); if (isPhoneWidth()) { location.hash = '#/wiecej'; return; } menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); if (!menu.hidden) setTimeout(() => document.addEventListener('click', function off(ev) { if (!menu.contains(ev.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); } document.removeEventListener('click', off); }), 0); } },
     ico, h('span', { class: 'tab-full' }, 'Więcej'), h('span', { class: 'tab-short' }, 'Więcej'));
   return h('div', { class: 'more-wrap' }, btn, menu);
+}
+// „Więcej” na telefonie – cała strona z listą (moduły, ustawienia i pomoc, wylogowanie)
+function renderWiecej(main) {
+  const items = lastMore.filter(x => !['logout', 'oaplikacji', 'zespol'].includes(x[2]));
+  const row = (href, key, label, onclick, cls) => {
+    const i = h('span', { class: 'wq-ico', 'aria-hidden': 'true' }); i.innerHTML = I[key] || TAB_ICONS[key] || TAB_ICONS.default;
+    const chev = h('span', { class: 'wq-chev', 'aria-hidden': 'true' }); chev.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>';
+    return h('a', { href, class: 'wq-row' + (cls ? ' ' + cls : ''), onclick }, i, h('span', { class: 'wq-t' }, label), onclick ? null : chev);
+  };
+  const me = state.me;
+  const obec = !isJpkOnly() && (me.attendance || me.role === 'admin' || me.attendance_scope);
+  const themeRow = row('#/wiecej', 'motyw', getTheme() === 'dark' ? 'Motyw jasny' : 'Motyw ciemny', (e) => { e.preventDefault(); toggleTheme(); e.currentTarget.querySelector('.wq-t').textContent = getTheme() === 'dark' ? 'Motyw jasny' : 'Motyw ciemny'; });
+  main.replaceChildren(
+    h('h1', { class: 'wq-h' }, 'Więcej'),
+    h('p', { class: 'wq-lbl' }, 'Moduły'),
+    h('div', { class: 'card wq-list' }, ...items.map(([href, label, key]) => row(href, key, label))),
+    h('p', { class: 'wq-lbl' }, 'Ustawienia i pomoc'),
+    h('div', { class: 'card wq-list' },
+      row('#/profil', 'profil', 'Mój profil, Face ID, powiadomienia'),
+      obec ? row('#/obecnosc', 'zegar', 'Lista obecności') : null,
+      lastMore.some(x => x[2] === 'zespol') ? row('#/zespol', 'zespol', 'Zespół i ustawienia') : null,
+      themeRow,
+      row('#/o-aplikacji', 'info', 'O aplikacji i RODO')),
+    h('div', { class: 'card wq-list', style: { marginTop: '16px' } },
+      row('#/', 'wyloguj', 'Wyloguj się', (e) => { e.preventDefault(); logout(); }, 'wq-out')));
 }
 let timerMod = null;
 function timerPillEl() { const box = h('span', { class: 'tm-slot' }); (timerMod ||= import('./czas.js')).then(m => box.replaceChildren(m.timerPill())).catch(() => {}); return box; }
@@ -257,6 +287,7 @@ async function route(opts = {}) {
     if (view === 'obecnosc') c = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
     else if (view === 'regulamin') c = await renderRegulamin(layout('regulamin'));
     else if (view === 'o-aplikacji') { const m = await import('./views/oaplikacji.js'); c = await m.renderOAplikacji(layout('oaplikacji'), parts[1]); }
+    else if (view === 'wiecej') { const m2 = remembered() === 'm2' && hasModule('doradztwo'); renderWiecej(layout(m2 ? 'm2:wiecej' : 'wiecej')); }
     else if (view === 'profil') c = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
     else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) c = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
     else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) c = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });

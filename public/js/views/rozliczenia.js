@@ -27,7 +27,11 @@ export async function fetchAll(build) {
 const AREAS = {
   ksiegowosc: { label: 'Księgowość', person: 'accountant_id', personLabel: 'Księgowa' },
   kadry: { label: 'Kadry i ZUS', person: 'hr_id', personLabel: 'Kadrowa' },
+  // wyciągi bankowe – osobna lista, narastająco od początku roku (miesiące w kolumnach)
+  wyciagi: { label: 'Wyciągi', person: 'accountant_id', personLabel: 'Księgowa' },
 };
+const MONTHS_SHORT = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+const MONTHS_FULL = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 const GROUPS = {
   osobowe: 'JDG i spółki osobowe',
   kapitalowe: 'Spółki z o.o. i pełna księgowość',
@@ -41,6 +45,7 @@ const LAYOUT_MODES = {
 const DEFAULT_LAYOUT = {
   ksiegowosc: { groups: ['osobowe', 'kapitalowe', 'nieaktywni'], mode: 'separate' },
   kadry: { groups: ['osobowe', 'kapitalowe', 'nieaktywni'], mode: 'active_one' },
+  wyciagi: { groups: ['osobowe', 'kapitalowe', 'nieaktywni'], mode: 'active_one' },
 };
 const SECTIONS = {
   osobowe: { title: 'JDG i spółki osobowe', pitLabel: 'PIT' },
@@ -123,7 +128,7 @@ export async function renderRozliczenia(main, params) {
     let v = cellsCache.get(k);
     if (!v) {
       const m = byClient.get(c.id);
-      const ts = area === 'kadry' ? tasksFor('kadry') : tasksFor('ksiegowosc', sectionOf(c));
+      const ts = area === 'kadry' ? tasksFor('kadry') : tasksFor(area, sectionOf(c));
       v = !m ? [] : ts.map(t => m.get(t.code)).filter(Boolean);
       for (const p of partnersOf(c.id)) v.push(...ts.map(t => byPartner.get(p.id).get(t.code)).filter(Boolean));
       cellsCache.set(k, v);
@@ -133,7 +138,7 @@ export async function renderRozliczenia(main, params) {
   const rowsCache = new Map();
   // do statusu „rozliczony” liczą się tylko kolumny oznaczone counts_to_settled (np. bez wyciągów bankowych)
   const countsCode = new Set(tasksAll.filter(t => t.counts_to_settled !== false).map(t => t.code));
-  const requiredOf = (c, area) => cellsOf(c, area).filter(e => countsCode.has(e.task_code));
+  const requiredOf = (c, area) => area === 'wyciagi' ? cellsOf(c, area) : cellsOf(c, area).filter(e => countsCode.has(e.task_code));
   const isSettled = (c, area) => { const cs = requiredOf(c, area); return cs.length > 0 && cs.every(e => e.status === 'done' || e.status === 'na'); };
   const hasMissing = (c, area) => cellsOf(c, area).some(e => ['missing_docs', 'reminded'].includes(e.status));
   // JPK VAT (księgowość) / ZUS (kadry) jeszcze niewysłane: kratka nie jest „Zrobione” ani „Nie dotyczy”
@@ -151,6 +156,7 @@ export async function renderRozliczenia(main, params) {
   const inactiveIn = (area) => withCells(area).filter(c => c.status !== 'aktywny');
   const colsFor = (area, section) => {
     if (area === 'kadry') return tasksFor('kadry');
+    if (area === 'wyciagi') return tasksFor('wyciagi', 'kapitalowe');
     if (section === 'nieaktywni') return tasksFor('ksiegowosc', 'kapitalowe');
     return tasksFor('ksiegowosc', section).map(t => t.code === 'pit_cit' ? { ...t, label: SECTIONS[section].pitLabel } : t);
   };
@@ -168,6 +174,7 @@ export async function renderRozliczenia(main, params) {
   const groupRows = (area, g) => g === 'nieaktywni' ? inactiveIn(area) : rowsIn(area).filter(c => sectionOf(c) === g);
   const colsForGroups = (area, groups) => {
     if (area === 'kadry') return tasksFor('kadry');
+    if (area === 'wyciagi') return tasksFor('wyciagi', 'kapitalowe');
     const act = groups.filter(g => g !== 'nieaktywni');
     if (act.length === 1) return colsFor('ksiegowosc', act[0]);
     return tasksFor('ksiegowosc', 'kapitalowe'); // wspólna: PIT / CIT + wyciągi bankowe
@@ -282,7 +289,7 @@ export async function renderRozliczenia(main, params) {
   function renderTabs() {
     tabsBox.replaceChildren(...Object.entries(AREAS).map(([k, a]) => {
       const rows = rowsIn(k);
-      const open = rows.filter(c => !isSettled(c, k)).length;
+      const open = k === 'wyciagi' && yearData ? clients.filter(c => c.status === 'aktywny' && yearData.get(c.id) && [...yearData.get(c.id).values()].some(yearOpen)).length : rows.filter(c => !isSettled(c, k)).length;
       return h('button', { class: prefs.area === k ? 'on' : '', role: 'tab', 'aria-selected': String(prefs.area === k),
         onclick: () => { prefs.area = k; prefs.person = ''; savePrefs(prefs); renderAll(); } },
       a.label, h('span', { class: 'n', 'data-tip': 'Nierozliczeni klienci' }, open));
@@ -302,6 +309,7 @@ export async function renderRozliczenia(main, params) {
 
   function renderTiles() {
     const area = prefs.area;
+    if (area === 'wyciagi') return renderYearTiles();
     const rows = selectedActive(area);
     const settled = rows.filter(c => isSettled(c, area)).length;
     const toSend = rows.filter(c => pendingSend(c, area)).length;
@@ -318,7 +326,7 @@ export async function renderRozliczenia(main, params) {
         onclick: () => { prefs.show = prefs.show === 'nierozliczeni' ? '' : 'nierozliczeni'; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
         h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
         h('span', { class: 'num' }, rows.length ? `${settled} / ${rows.length}` : '—',
-          hist ? h('span', { class: 'tile-spark', 'data-tip': 'Odsetek rozliczonych klientów w ostatnich 6 miesiącach' }, sparkline(hist[area].map((v, i) => i === hist[area].length - 1 ? pct : v), { labels: histPeriods.map(periodLabel) })) : null),
+          hist?.[area] ? h('span', { class: 'tile-spark', 'data-tip': 'Odsetek rozliczonych klientów w ostatnich 6 miesiącach' }, sparkline(hist[area].map((v, i) => i === hist[area].length - 1 ? pct : v), { labels: histPeriods.map(periodLabel) })) : null),
         h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } })),
         h('span', { class: 'tile-more' }, !rows.length ? 'Lista na ten miesiąc nie jest jeszcze otwarta' : prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
       tile(toSend, area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania', 'do_wyslania'),
@@ -327,6 +335,8 @@ export async function renderRozliczenia(main, params) {
   }
 
   function renderDeadlines() {
+    deadlines.hidden = prefs.area === 'wyciagi';
+    if (deadlines.hidden) return;
     const today = new Date(); today.setHours(0, 0, 0, 0);
     deadlines.replaceChildren(h('b', {}, `Terminy za ${periodLabel(period).toLowerCase()}:`), ...
       deadlinesFor(period, prefs.area).map(d => h('span', { class: 'dl' + (d.date < today ? ' late' : ''), 'data-tip': d.moved ? 'Termin przesunięty na najbliższy dzień roboczy' : null },
@@ -531,6 +541,8 @@ export async function renderRozliczenia(main, params) {
 
   function renderBody() {
     const area = prefs.area;
+    toolbar.querySelector('.tb-icons')?.toggleAttribute('hidden', area === 'wyciagi');
+    if (area === 'wyciagi') { renderYear(); renderTabs(); if (views) drawViews(); return; }
     const model = tablesModel();
     const out = [];
     if (!model.length) out.push(h('div', { class: 'card empty' }, 'Nie wybrano żadnej grupy – zaznacz grupy w „Układ tabel”.'));
@@ -556,6 +568,7 @@ export async function renderRozliczenia(main, params) {
     requestAnimationFrame(() => { summaryQueued = false; renderTiles(); renderTabs(); });
   };
   function refreshRow(clientId) {
+    if (prefs.area === 'wyciagi' && yearData) { renderYear(); queueSummary(); return; }
     const c = clientMap.get(clientId);
     body.querySelectorAll(`tr[data-client="${clientId}"]`).forEach(tr => {
       const area = tr.dataset.area;
@@ -580,6 +593,91 @@ export async function renderRozliczenia(main, params) {
 
   function renderAll() {
     renderShowSel(); renderPersonSel(); renderDeadlines(); renderBanner(); renderBody(); drawViews();
+  }
+
+  // ---------- wyciągi bankowe: narastająco od stycznia do wybranego miesiąca ----------
+  const year = period.slice(0, 4), monthNo = +period.slice(5);
+  let yearData = null, yearLoading = null;
+  const loadYear = () => yearLoading ||= fetchAll(() => sb.from('checklist_entries')
+    .select('id,client_id,period,task_code,status,updated_by,updated_at').eq('task_code', 'wb').gte('period', `${year}-01-01`).lte('period', pdate))
+    .then(rows => {
+      // bieżący miesiąc – te same obiekty co w tabeli miesięcznej (zmiany widać od razu w obu miejscach)
+      const cur = new Map(entries.filter(e => e.task_code === 'wb').map(e => [e.id, e]));
+      const m = new Map();
+      for (const r of rows) {
+        const e = cur.get(r.id) || r;
+        if (!m.has(e.client_id)) m.set(e.client_id, new Map());
+        m.get(e.client_id).set(+e.period.slice(5, 7), e);
+      }
+      yearData = m; return m;
+    }, err => { yearLoading = null; throw err; });
+  const yearOpen = e => e && !['done', 'na'].includes(e.status);
+  const yearClients = () => {
+    if (!yearData) return [];
+    const field = AREAS.wyciagi.person, q = prefs.q.trim().toLowerCase();
+    return clients.filter(c => yearData.has(c.id)).filter(c => {
+      if (q && !c.name.toLowerCase().includes(q)) return false;
+      if (prefs.person === 'me' && c[field] !== state.me.id) return false;
+      if (prefs.person === 'none' && c[field]) return false;
+      if (prefs.person && !['me', 'none'].includes(prefs.person) && c[field] !== prefs.person) return false;
+      const ms = [...yearData.get(c.id).values()];
+      if (prefs.show === 'nierozliczeni' && !ms.some(yearOpen)) return false;
+      if (prefs.show === 'braki' && !ms.some(e => ['missing_docs', 'reminded'].includes(e.status))) return false;
+      if (prefs.show === 'uwagi' && !hasNote(c)) return false;
+      return true;
+    }).sort((a, b) => (a.status === 'aktywny' ? 0 : 1) - (b.status === 'aktywny' ? 0 : 1) || a.name.localeCompare(b.name, 'pl'));
+  };
+  function yearCell(e, c, mi) {
+    if (!e) return h('td', { class: 'c-task', 'data-label': MONTHS_SHORT[mi - 1] }, h('span', { class: 'muted small' }, ''));
+    const label = `Wyciąg – ${MONTHS_FULL[mi - 1]} ${year}`;
+    const b = h('button', { class: `cb cb-${e.status === 'in_progress' ? 'todo' : e.status}`, 'aria-label': `${c.name}: ${label} – ${STATUS[e.status].label}`, 'data-tip': `${label}: ${STATUS[e.status].label}`,
+      onclick: ev => { if (PHONE() && !['done', 'na'].includes(e.status)) return setStatus(e, 'done'); statusMenu(ev.currentTarget, e, label); },
+      oncontextmenu: ev => { if (!PHONE()) return; ev.preventDefault(); statusMenu(ev.currentTarget, e, label); } }, STATUS[e.status].mark);
+    return h('td', { class: 'c-task' + (mi === monthNo ? ' wb-cur' : ''), 'data-label': MONTHS_SHORT[mi - 1] }, b);
+  }
+  function renderYear() {
+    if (!yearData) {
+      body.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie wyciągów…'));
+      loadYear().then(() => { if (prefs.area === 'wyciagi') { renderYear(); renderYearTiles(); renderTabs(); } }, e => fail(e));
+      return;
+    }
+    const months = Array.from({ length: monthNo }, (_, i) => i + 1);
+    const list = yearClients();
+    const act = list.filter(c => c.status === 'aktywny');
+    const full = act.filter(c => ![...yearData.get(c.id).values()].some(yearOpen)).length;
+    const table = h('table', { class: 'grid wb-year' },
+      h('thead', {}, h('tr', {}, h('th', { class: 'c-name' }, 'Klient'), h('th', { class: 'c-person' }, 'Księgowa'),
+        ...months.map(mi => h('th', { class: 'c-task' + (mi === monthNo ? ' wb-cur' : ''), 'data-tip': `${MONTHS_FULL[mi - 1]} ${year}` }, MONTHS_SHORT[mi - 1])),
+        h('th', { 'data-tip': 'Miesiące od początku roku bez wyciągu (do zrobienia, brak dokumentów, przypomniano)' }, 'Brakuje'))),
+      h('tbody', {}, ...list.map(c => {
+        const ms = yearData.get(c.id);
+        const open = [...ms.values()].filter(yearOpen).length;
+        return h('tr', { class: (open ? '' : 'settled') + (c.status === 'aktywny' ? '' : ' inactive') },
+          h('td', { class: 'c-name' }, h('a', { href: `#/klient/${c.id}`, class: 'cname' }, c.name), c.status === 'aktywny' ? null : h('span', { class: 'badge' }, c.status)),
+          h('td', { class: 'c-person' }, personCell(c, 'wyciagi')),
+          ...months.map(mi => yearCell(ms.get(mi), c, mi)),
+          h('td', { class: 'wb-open' }, open ? h('span', { class: 'wb-miss' }, String(open)) : h('span', { class: 'wb-ok' }, '✓ komplet')));
+      })));
+    body.replaceChildren(
+      h('div', { class: 'table-title' }, h('h2', {}, `Wyciągi bankowe – ${year} narastająco (styczeń–${MONTHS_FULL[monthNo - 1]})`),
+        h('span', { class: 'muted small' }, `komplet ${full} z ${act.length} aktywnych`)),
+      list.length ? h('div', { class: 'card grid-wrap wb-wrap' }, table) : h('div', { class: 'card empty' }, 'Brak klientów z wyciągami w tym roku (wyciągi dotyczą spółek i pełnej księgowości) albo żaden nie pasuje do filtrów.'));
+  }
+  function renderYearTiles() {
+    if (!yearData) { tiles.replaceChildren(); return; }
+    const act = clients.filter(c => c.status === 'aktywny' && yearData.has(c.id));
+    const curDone = act.filter(c => !yearOpen(yearData.get(c.id).get(monthNo))).length;
+    const withGaps = act.filter(c => [...yearData.get(c.id).values()].some(yearOpen)).length;
+    const gaps = act.reduce((n, c) => n + [...yearData.get(c.id).values()].filter(yearOpen).length, 0);
+    const miss = act.filter(c => [...yearData.get(c.id).values()].some(e => ['missing_docs', 'reminded'].includes(e.status))).length;
+    const tile = (n, lbl, show, sub) => h('button', { class: 'card tile tile-btn' + (show && prefs.show === show ? ' on dark' : ''), type: 'button',
+      onclick: show ? () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } : null },
+    h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n), sub ? h('span', { class: 'tile-more' }, sub) : null);
+    tiles.replaceChildren(
+      tile(`${curDone} / ${act.length}`, `Wyciągi za ${MONTHS_FULL[monthNo - 1]}`, null, 'zrobione lub nie dotyczy'),
+      tile(withGaps, 'Klientów z brakami od stycznia', 'nierozliczeni', `${gaps} brakujących miesięcy`),
+      tile(miss, 'Brak dokumentów / przypomniano', 'braki'),
+      tile(act.length - withGaps, 'Komplet od początku roku', null));
   }
 
   // ---------- zapisy ----------

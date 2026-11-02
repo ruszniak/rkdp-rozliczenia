@@ -2245,3 +2245,72 @@ main>.page-head:first-child .info-i,main>a+.page-head .info-i{color:var(--accent
 .oa-new[open] summary::after{transform:rotate(-135deg)}
 .oa-new summary .small{margin-left:4px}
 .oa-new ul{margin:10px 0 4px;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--text);font-size:14px}
+/* wyciągi bankowe – narastająco od początku roku */
+.wb-wrap{overflow-x:auto}
+table.wb-year th.c-task,table.wb-year td.c-task{text-align:center;min-width:52px}
+table.wb-year th.wb-cur{color:var(--accent)}
+table.wb-year td.wb-cur{background:rgba(45,74,138,.05)}
+table.wb-year td.c-name{min-width:200px}
+table.wb-year tr.inactive td{opacity:.6}
+.wb-open{text-align:center;white-space:nowrap}
+.wb-miss{display:inline-flex;min-width:28px;height:24px;align-items:center;justify-content:center;border-radius:12px;background:var(--amber-bg);color:var(--amber);font-weight:700;font-size:12.5px;padding:0 8px}
+.wb-ok{color:var(--ok);font-weight:600;font-size:12.5px}
+@media (max-width:820px){table.wb-year td.c-name{min-width:150px;position:sticky;left:0;background:var(--card);z-index:1}}
+/* „Więcej” na telefonie – cała strona */
+.wq-h{font-size:28px;margin:4px 2px 14px}
+.wq-lbl{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 4px 8px}
+.wq-list{display:flex;flex-direction:column;overflow:hidden;border-radius:18px}
+.wq-row{display:flex;align-items:center;gap:14px;padding:12px 16px;min-height:62px;text-decoration:none;color:var(--ink);border-top:1px solid var(--line);font-size:16px;font-weight:500}
+.wq-row:first-child{border-top:0}
+.wq-row:active{background:var(--soft)}
+.wq-ico{width:42px;height:42px;border-radius:12px;background:var(--soft);color:var(--accent-dark);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.wq-t{flex:1;min-width:0}
+.wq-chev{color:var(--ink);display:inline-flex}
+.wq-out{color:var(--warn)}
+.wq-out .wq-ico{color:var(--warn)}
+@media (max-width:700px){.top-bar .tabs button{padding:10px 12px;font-size:14px;gap:6px}.top-bar .tabs button .n{padding:1px 6px}}
+/* karta klienta: podgląd / edycja */
+fieldset.kl-form{border:0;margin:0;padding:0;min-width:0}
+fieldset.kl-form:disabled .input,fieldset.kl-form:disabled .select,fieldset.kl-form:disabled textarea,fieldset.kl-form:disabled select{background:var(--soft);color:var(--ink);opacity:1;-webkit-text-fill-color:var(--ink);cursor:default;border-color:var(--line)}
+fieldset.kl-form:disabled .btn{opacity:.45}
+fieldset.kl-form.editing .section{box-shadow:0 0 0 2px rgba(45,74,138,.18),var(--shadow)}
+.kl-view-hint{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;margin-bottom:14px;border-radius:14px;background:var(--accent-soft);color:var(--accent-dark);font-size:14px;font-weight:500}
+@media (max-width:820px){
+  :root{--tabbar:calc(68px + env(safe-area-inset-bottom))}
+  html .site-header .nav-links{z-index:60;transform:translateZ(0)}
+}
+
+/* ---- kafelki C2: lekkie, z kolorowym akcentem i „poświatą” w rogu; kompaktowe na telefonie ---- */
+.tiles{gap:12px}
+.tiles>.tile{--t:#2D4A8A;position:relative;overflow:hidden;border:1px solid var(--line);border-radius:18px;padding:16px 18px 16px 20px;gap:4px;min-height:0;
+  background:radial-gradient(140px 110px at 100% 0%,color-mix(in srgb,var(--t) 13%,transparent),transparent 72%),var(--card);box-shadow:var(--shadow)}
+.tiles>.tile:nth-child(4n+2){--t:#1F7A52}
+.tiles>.tile:nth-child(4n+3){--t:#E08A1E}
+.tiles>.tile:nth-child(4n+4){--t:#7B5FD6}
+.tiles>.tile::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:4px;border-radius:0 4px 4px 0;background:var(--t);opacity:.9}
+.tiles>.tile .lbl{font-size:12.5px;font-weight:600;letter-spacing:.01em;color:var(--muted);line-height:1.3}
+.tiles>.tile .num{font-family:var(--sans);font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.1;color:var(--ink);display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
+.tiles>.tile .tile-more{font-size:12px;font-weight:600;color:var(--t);margin-top:2px}
+.tiles>.tile .bar{height:6px;margin-top:6px;background:color-mix(in srgb,var(--t) 12%,var(--soft))}
+.tiles>.tile .bar i{background:var(--t)}
+.tiles>.tile-btn:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--t) 40%,var(--line));box-shadow:0 14px 28px -18px color-mix(in srgb,var(--t) 70%,transparent)}
+.tiles>.tile.on,.tiles>.tile.dark{background:linear-gradient(135deg,var(--t),color-mix(in srgb,var(--t) 75%,#16203A));border-color:transparent;color:#fff;box-shadow:0 14px 28px -16px color-mix(in srgb,var(--t) 80%,transparent)}
+.tiles>.tile.on::before,.tiles>.tile.dark::before{background:#fff;opacity:.6}
+.tiles>.tile.on .lbl,.tiles>.tile.dark .lbl,.tiles>.tile.on .tile-more,.tiles>.tile.dark .tile-more{color:rgba(255,255,255,.85)}
+.tiles>.tile.on .num,.tiles>.tile.dark .num{color:#fff}
+.tiles>.tile.on .bar,.tiles>.tile.dark .bar{background:rgba(255,255,255,.25)}
+.tiles>.tile.on .bar i,.tiles>.tile.dark .bar i{background:#fff}
+:root[data-theme="dark"] .tiles>.tile{background:radial-gradient(140px 110px at 100% 0%,color-mix(in srgb,var(--t) 22%,transparent),transparent 72%),var(--card)}
+:root[data-theme="dark"] .tiles>.tile:nth-child(4n+1){--t:#8FA8E0}
+:root[data-theme="dark"] .tiles>.tile:nth-child(4n+2){--t:#5FC596}
+:root[data-theme="dark"] .tiles>.tile:nth-child(4n+3){--t:#F5B45B}
+:root[data-theme="dark"] .tiles>.tile:nth-child(4n+4){--t:#B9A6F2}
+:root[data-theme="dark"] .tiles>.tile.on .num,:root[data-theme="dark"] .tiles>.tile.on .lbl,:root[data-theme="dark"] .tiles>.tile.dark .num,:root[data-theme="dark"] .tiles>.tile.dark .lbl{color:#0F1626}
+@media (max-width:820px){
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .tiles>.tile{padding:12px 12px 12px 16px;border-radius:16px}
+  .tiles>.tile::before{top:12px;bottom:12px;width:3px}
+  .tiles>.tile .lbl{font-size:12px}
+  .tiles>.tile .num{font-size:24px}
+  .tiles>.tile .tile-more{font-size:11.5px}
+}

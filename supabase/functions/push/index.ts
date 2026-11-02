@@ -116,8 +116,8 @@ async function onMonitor(b: any) {
 
 // zlecenia od administratora: nowe / poprawka / odpowiedź / akceptacja → pracownik; pytanie / zgłoszenie → zlecający; komentarz → druga strona
 const ZL_TITLE: Record<string, string> = {
-  nowe: 'Nowe zlecenie', poprawka: 'Zlecenie do poprawy', odpowiedz: 'Odpowiedź na pytanie', zaakceptowane: 'Zlecenie zaakceptowane ✓',
-  pytanie: 'Pytanie do zlecenia', zgloszone: 'Zlecenie wykonane – do sprawdzenia', komentarz: 'Komentarz w zleceniu',
+  nowe: 'Nowe zadanie', poprawka: 'Zadanie do poprawy', odpowiedz: 'Odpowiedź na pytanie', zaakceptowane: 'Zadanie zaakceptowane ✓',
+  pytanie: 'Pytanie do zadania', zgloszone: 'Zadanie wykonane – do sprawdzenia', komentarz: 'Komentarz w zadaniu',
 };
 async function onZlecenie(b: any) {
   const { data: z } = await db.from('zlecenia').select('id, no, title, assignee_id, created_by, due_date').eq('id', b.id).maybeSingle();
@@ -132,7 +132,7 @@ async function onZlecenie(b: any) {
   let extra = '';
   if (ev === 'komentarz' && b.wpis) extra = (await db.from('zlecenia_wpisy').select('body').eq('id', b.wpis).maybeSingle()).data?.body || '';
   return notify(to, 'zgloszenia', {
-    title: `${ZL_TITLE[ev] || 'Zlecenie'} #${z.no}`,
+    title: `${ZL_TITLE[ev] || 'Zadanie'} #${z.no}`,
     body: [short(z.title), a?.full_name && ev !== 'nowe' ? a.full_name : '', extra ? short(extra, 100) : '', ev === 'nowe' && z.due_date ? `termin ${z.due_date.split('-').reverse().join('.')}` : ''].filter(Boolean).join(' · '),
     url: `/#/zlecenia/${z.id}`, tag: `zl-${z.id}`,
   });
@@ -158,7 +158,7 @@ async function daily() {
     const dToday = myDl.filter(x => x.due_date === d0).length, dTom = myDl.length - dToday;
     const myZl = (zl || []).filter(x => x.assignee_id === m.id);
     const zlLate = myZl.filter(x => x.due_date < d0).length, zlSoon = myZl.length - zlLate;
-    const parts = [zlLate ? `${zlLate} zlec. po terminie` : '', zlSoon ? `${zlSoon} zlec. z terminem dziś/jutro` : '', now ? `${now} zgłosz. na dziś` : '', late ? `${late} po terminie` : '', dToday ? `${dToday} termin(y) M2 dziś` : '', dTom ? `${dTom} termin(y) M2 jutro` : ''].filter(Boolean);
+    const parts = [zlLate ? `${zlLate} zad. po terminie` : '', zlSoon ? `${zlSoon} zad. z terminem dziś/jutro` : '', now ? `${now} zgłosz. na dziś` : '', late ? `${late} po terminie` : '', dToday ? `${dToday} termin(y) M2 dziś` : '', dTom ? `${dTom} termin(y) M2 jutro` : ''].filter(Boolean);
     if (!parts.length) continue;
     sent += await notify([m.id], 'terminy', { title: 'Plan na dziś', body: parts.join(' · '), url: '/#/pulpit?widok=dzis', tag: `daily-${d0}` });
   }

@@ -243,31 +243,31 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
   const client = z.client_id ? (await admin.from('clients').select('name').eq('id', z.client_id).maybeSingle()).data?.name || '' : '';
   const due = z.due_date ? z.due_date.split('-').reverse().join('.') : '';
   const HEAD: Record<string, string> = {
-    nowe: `${from?.full_name || 'Michał'} zlecił(a) Ci zadanie`, poprawka: 'Zlecenie wróciło do poprawy', odpowiedz: 'Odpowiedź na Twoje pytanie',
-    zaakceptowane: 'Zlecenie zaakceptowane – dziękuję!', pytanie: `${from?.full_name || 'Pracownik'} ma pytanie do zlecenia`, zgloszone: `${from?.full_name || 'Pracownik'} zgłosił(a) wykonanie zlecenia`,
+    nowe: `${from?.full_name || 'Michał'} zlecił(a) Ci zadanie`, poprawka: 'Zadanie wróciło do poprawy', odpowiedz: 'Odpowiedź na Twoje pytanie',
+    zaakceptowane: 'Zadanie zaakceptowane – dziękuję!', pytanie: `${from?.full_name || 'Pracownik'} ma pytanie do zadania`, zgloszone: `${from?.full_name || 'Pracownik'} zgłosił(a) wykonanie zadania`,
   };
-  const subject = `${ev === 'nowe' ? (z.priority === 'pilne' ? 'PILNE – zlecenie' : 'Zlecenie') : (HEAD[ev] || 'Zlecenie')} #${z.no}: ${z.title}`.slice(0, 200);
+  const subject = `${ev === 'nowe' ? (z.priority === 'pilne' ? 'PILNE – zadanie' : 'Zadanie') : (HEAD[ev] || 'Zadanie')} #${z.no}: ${z.title}`.slice(0, 200);
   const steps = Array.isArray(z.steps) ? z.steps.map((s: any) => `${s.done ? '☑' : '☐'} ${s.t}`) : [];
   const link = `${APP_URL}/#/zlecenia/${z.id}`;
   const lines = [
-    HEAD[ev] || 'Zlecenie', '', `„${z.title}”`, client ? `Klient: ${client}` : '', due ? `Termin: ${due}` : '', z.priority === 'pilne' ? 'Priorytet: PILNE' : '',
+    HEAD[ev] || 'Zadanie', '', `„${z.title}”`, client ? `Klient: ${client}` : '', due ? `Termin: ${due}` : '', z.priority === 'pilne' ? 'Priorytet: PILNE' : '',
     ev === 'nowe' && z.body ? '\n' + z.body : '', ev === 'nowe' && steps.length ? '\nKroki:\n' + steps.join('\n') : '',
     note ? `\n${ev === 'poprawka' ? 'Do poprawy' : ev === 'pytanie' ? 'Pytanie' : 'Wiadomość'}: ${note}` : '',
-    '', ev === 'zgloszone' ? 'Sprawdź i zaakceptuj albo odeślij do poprawy:' : ev === 'pytanie' ? 'Odpowiedz w aplikacji:' : 'Otwórz zlecenie w aplikacji:', link,
-    '', 'Nie odpowiadaj na tego maila – odpowiedzi nie trafiają do aplikacji. Odpowiadaj w zleceniu w aplikacji.',
+    '', ev === 'zgloszone' ? 'Sprawdź i zaakceptuj albo odeślij do poprawy:' : ev === 'pytanie' ? 'Odpowiedz w aplikacji:' : 'Otwórz zadanie w aplikacji:', link,
+    '', 'Nie odpowiadaj na tego maila – odpowiedzi nie trafiają do aplikacji. Odpowiadaj w zadaniu w aplikacji.',
   ].filter((x, i, arr) => !(x === '' && arr[i - 1] === ''));
   const text = lines.join('\n');
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;max-width:560px">`
-    + `<p style="margin:0 0 6px;color:#806341;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Zlecenie #${z.no}</p>`
-    + `<h2 style="margin:0 0 12px;font-size:19px">${escH(HEAD[ev] || 'Zlecenie')}</h2>`
+    + `<p style="margin:0 0 6px;color:#2D4A8A;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Zadanie #${z.no}</p>`
+    + `<h2 style="margin:0 0 12px;font-size:19px">${escH(HEAD[ev] || 'Zadanie')}</h2>`
     + `<p style="margin:0 0 6px;font-size:16px"><b>${escH(z.title)}</b></p>`
     + [client ? `Klient: ${escH(client)}` : '', due ? `Termin: <b>${due}</b>` : '', z.priority === 'pilne' ? '<b style="color:#A4462F">PILNE</b>' : ''].filter(Boolean).map(x => `<div>${x}</div>`).join('')
     + (ev === 'nowe' && z.body ? `<p style="white-space:pre-wrap;background:#F8F5F0;padding:10px 12px;border-radius:8px">${escH(z.body)}</p>` : '')
     + (ev === 'nowe' && steps.length ? `<p style="white-space:pre-wrap">${escH(steps.join('\n'))}</p>` : '')
     + (note ? `<p style="white-space:pre-wrap;background:#F5E7CF;padding:10px 12px;border-radius:8px">${escH(note)}</p>` : '')
-    + `<p style="margin:18px 0"><a href="${link}" style="background:#806341;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">Otwórz zlecenie</a></p>`
-    + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z aplikacji RKDP. <b>Nie odpowiadaj na tego maila</b> – odpowiedzi nie trafiają do aplikacji. Pytania, komentarze i zgłoszenie wykonania wpisuj w zleceniu w aplikacji (przycisk wyżej).</p></div>`;
-  try { await sendMail(cfg, 'RKDP | Zlecenia', String(to.email), subject, text, html); return { sent: 1 }; }
+    + `<p style="margin:18px 0"><a href="${link}" style="background:#2D4A8A;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">Otwórz zadanie</a></p>`
+    + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z aplikacji RKDP. <b>Nie odpowiadaj na tego maila</b> – odpowiedzi nie trafiają do aplikacji. Pytania, komentarze i zgłoszenie wykonania wpisuj w zadaniu w aplikacji (przycisk wyżej).</p></div>`;
+  try { await sendMail(cfg, 'RKDP | Zadania', String(to.email), subject, text, html); return { sent: 1 }; }
   catch (e) { console.error('zlecenie mail', e); return { sent: 0, error: String((e as Error).message || e).slice(0, 200) }; }
 }
 

@@ -64,7 +64,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
   const sendBtn = h('button', { type: 'button', class: 'chat-send', 'aria-label': 'Wyślij', onclick: () => send() },
     h('span', { html: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>', style: { display: 'inline-flex' } }));
   const kinds = h('div', { class: 'chat-kinds', role: 'group', 'aria-label': 'Rodzaj wpisu' },
-    ...[['uwaga', 'Uwaga'], ['pytanie', 'Pytanie'], ['zadanie', 'Zadanie']].map(([k, l]) => h('button', { type: 'button', class: 'chat-kind' + (k === kind ? ' on' : ''), 'data-k': k, onclick: () => setKind(k) }, l)),
+    ...[['uwaga', 'Uwaga'], ['pytanie', 'Pytanie']].map(([k, l]) => h('button', { type: 'button', class: 'chat-kind' + (k === kind ? ' on' : ''), 'data-k': k, onclick: () => setKind(k) }, l)),
     perSel,
     h('button', { type: 'button', class: 'chat-kind wt-qbtn', 'aria-label': 'Szybkie odpowiedzi', 'data-tip': 'Szybkie odpowiedzi', onclick: () => { quick.hidden = !quick.hidden; } }, '⚡'));
   const quick = h('div', { class: 'wt-quick', hidden: true }, ...QUICK.map(q => h('button', { type: 'button', class: 'arch-chip', onclick: () => { ta.value = (ta.value ? ta.value + ' ' : '') + q; grow(); ta.focus(); quick.hidden = true; } }, q)));
@@ -251,7 +251,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       !reply ? h('button', { type: 'button', class: 'chat-a' + (x.resolved_at ? '' : ' wt-ok'), onclick: () => upd(x.id, { resolved_at: x.resolved_at ? null : new Date().toISOString() }, x.resolved_at ? 'Otwarto ponownie' : (q ? 'Oznaczono jako wyjaśnione' : 'Oznaczono jako zrobione')) },
         x.resolved_at ? 'Otwórz ponownie' : (q ? '✓ Wyjaśnione' : '✓ Zrobione')) : null,
       !reply ? h('button', { type: 'button', class: 'chat-a', onclick: () => upd(x.id, { pinned: !x.pinned }, x.pinned ? 'Odpięto' : 'Przypięto na górze wątku') }, x.pinned ? 'Odepnij' : 'Przypnij') : null,
-      !reply ? h('button', { type: 'button', class: 'chat-a', onclick: () => toTask(x) }, 'Zrób zadanie') : null,
+
       mine ? h('button', { type: 'button', class: 'chat-a', onclick: () => { editing = x.id; draw(); } }, 'Edytuj') : null,
       mine || admin ? h('button', { type: 'button', class: 'chat-a', onclick: () => { if (confirm('Usunąć wpis? W historii zostanie ślad „wiadomość usunięta”.')) upd(x.id, { deleted_at: new Date().toISOString() }, 'Usunięto'); } }, 'Usuń') : null);
     return h('div', { class: 'chat-msg' + (mine ? ' mine' : '') + (q ? ' q' : '') + (x.resolved_at ? ' done' : '') + (reply ? ' wt-r' : ''), 'data-id': x.id },
@@ -322,7 +322,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       out.push(s.el());
     }
     if (D.more && showHist) out.unshift(h('button', { type: 'button', class: 'chat-a wt-older', onclick: () => { months += 12; reload(true); } }, 'Pokaż starsze zmiany kratek i e-maile'));
-    if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, onlyOpen ? 'Nie ma otwartych uwag, pytań ani zadań. 👍' : !showHist && (D.mails.length || D.audit.length) ? 'Brak wiadomości – zmiany statusów i e-maile są w zakładce „Historia”. Napisz uwagę, zadaj pytanie albo utwórz zadanie.' : 'Brak wpisów. Napisz uwagę, zadaj pytanie albo utwórz zadanie.'));
+    if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, onlyOpen ? 'Nie ma otwartych uwag ani pytań. 👍' : !showHist && (D.mails.length || D.audit.length) ? 'Brak wiadomości – zmiany statusów i e-maile są w zakładce „Historia”. Napisz uwagę albo zadaj pytanie.' : 'Brak wpisów. Napisz uwagę albo zadaj pytanie.'));
     const atBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
     thread.replaceChildren(...out);
     if (focus) { const el = thread.querySelector(`[data-id="${focus}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('wt-flash'); } focus = null; }

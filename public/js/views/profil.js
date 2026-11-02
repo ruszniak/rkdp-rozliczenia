@@ -31,7 +31,7 @@ function appSection() {
   offInstall?.(); offInstall = onInstallChange(drawInstall);
 
   const pushBox = h('div', {}, h('p', { class: 'hint' }, 'Sprawdzanie…'));
-  const LABELS = [['zgloszenia', 'Zlecenia i zgłoszenia: nowe, przypisane do mnie, pytania i odpowiedzi'], ['komentarze', 'Komentarze i wykonanie w moich zgłoszeniach'], ['terminy', 'Poranny plan dnia (dni robocze): zgłoszenia na dziś, po terminie, terminy spraw M2 TAX']];
+  const LABELS = [['zgloszenia', 'Zadania i zgłoszenia: nowe, przypisane do mnie, pytania i odpowiedzi'], ['komentarze', 'Komentarze i wykonanie w moich zgłoszeniach'], ['terminy', 'Poranny plan dnia (dni robocze): zgłoszenia na dziś, po terminie, terminy spraw M2 TAX']];
   async function drawPush() {
     if (isIOS() && !isStandalone()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Na iPhonie i iPadzie powiadomienia działają tylko w aplikacji dodanej do ekranu początkowego (iOS 16.4 lub nowszy). Dodaj ją (instrukcja wyżej), otwórz z ikony i włącz powiadomienia tutaj.'));
     if (!pushSupported()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Ta przeglądarka nie obsługuje powiadomień. Użyj Chrome, Edge, Firefox albo Safari w aktualnej wersji.'));
@@ -67,12 +67,12 @@ function appSection() {
     cb.addEventListener('change', async () => {
       const { error } = await sb.rpc('set_zl_email', { p_on: cb.checked });
       if (error) { cb.checked = !cb.checked; return fail(error); }
-      toast(cb.checked ? 'E-maile o zleceniach włączone' : 'E-maile o zleceniach wyłączone – zostają powiadomienia');
+      toast(cb.checked ? 'E-maile o zadaniach włączone' : 'E-maile o zadaniach wyłączone – zostają powiadomienia');
     });
-    return h('div', { class: 'pw-mail' }, h('label', { class: 'check', style: { margin: '4px 0' } }, cb, h('span', {}, h('b', {}, 'Wysyłaj mi też e-maile o zleceniach'), h('br'),
+    return h('div', { class: 'pw-mail' }, h('label', { class: 'check', style: { margin: '4px 0' } }, cb, h('span', {}, h('b', {}, 'Wysyłaj mi też e-maile o zadaniach'), h('br'),
       h('span', { class: 'small muted' }, on
         ? 'Odznacz, jeśli wystarczą Ci powiadomienia. Gdy na żadnym urządzeniu nie masz włączonych powiadomień (albo przestaną działać), e-mail i tak przyjdzie – nic nie przepadnie.'
-        : 'Najpierw włącz powiadomienia na tym urządzeniu. Bez działających powiadomień e-maile o zleceniach przychodzą zawsze.'))));
+        : 'Najpierw włącz powiadomienia na tym urządzeniu. Bez działających powiadomień e-maile o zadaniach przychodzą zawsze.'))));
   }
   drawPush();
   // Face ID / odcisk palca – tylko w aplikacji na telefonie

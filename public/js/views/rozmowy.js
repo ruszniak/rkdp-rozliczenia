@@ -7,16 +7,16 @@ import { fetchAll } from './rozliczenia.js';
 import { TK_STATUS, TK_OPEN, newTicketDialog, generateRecurring } from './zgloszenia.js';
 import { openThread } from '../watek.js';
 
-const HELP = `Rozmowy dotyczą bieżących rozliczeń klienta (nie dodatkowych zleceń od Michała – te są w „Zleceniach”).
+const HELP = `Rozmowy dotyczą bieżących rozliczeń klienta (nie dodatkowych zadań od Michała – te są w „Zadaniach”).
 Piszemy tu np.: czegoś nie da się zaksięgować, plik nie chce się zaimportować, klient zapomniał dosłać dokument, brakuje sprzedaży – czekamy.
 Ważne, stałe tematy klienta (żeby nie umknęły) zapisuj w karcie klienta (Klienci → klient → „Notatki stałe”).
 
 W rozmowie:
-• uwagi, pytania i zadania (dawne zgłoszenia), odpowiedzi, załączniki, wysłane e-maile i zmiany kratek,
-• kliknij klienta – otworzy się jego rozmowa; zadanie tworzysz w rozmowie przełącznikiem „Zadanie” (osoba, termin, priorytet),
+• uwagi i pytania, odpowiedzi, załączniki, wysłane e-maile i zmiany kratek,
+• kliknij klienta – otworzy się jego rozmowa; zadania dla zespołu zleca się w „Zadaniach” (Więcej → Zadania dla zespołu),
 • rozmowa z klientem jest jedna – bez podziału na miesiące; to, co załatwione, odznaczasz „✓ Zrobione” / „✓ Wyjaśnione”,
 • podświetleni na górze są klienci z wpisami, których jeszcze nie przeczytałeś(-aś) – każdy ma własne „przeczytane”,
-• zadania bez klienta (wewnętrzne) są w osobnej sekcji na dole.`;
+• dawne zadania z rozmów nadal widać w historii rozmowy.`;
 const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000);
   if (m < 1) return 'teraz'; if (m < 60) return `${m} min temu`; const hh = Math.round(m / 60); if (hh < 24) return `${hh} godz. temu`;
   const d = Math.round(hh / 24); return d === 1 ? 'wczoraj' : d < 7 ? `${d} dni temu` : new Date(t).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }); };
@@ -81,11 +81,8 @@ export async function renderRozmowy(main, params) {
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Rozmowy', infoTip(HELP, 'Rozmowy – jak to działa')),
-        h('p', { class: 'sub' }, 'Uwagi, pytania i zadania o klientach – w jednym miejscu.')),
-      h('div', { class: 'row-btns' },
-        h('a', { class: 'btn btn-ghost btn-sm', href: '#/zgloszenia/cykliczne' }, 'Zadania cykliczne'),
-        h('button', { class: 'btn btn-primary btn-sm', onclick: () => newTask() }, icon('plus'), 'Nowe zadanie'))),
-    h('div', { class: 'rz-bar' }, search, h('label', { class: 'check' }, mineCb, 'Tylko moi klienci (księgowa / kadry) i moje zadania')),
+        h('p', { class: 'sub' }, 'Uwagi i pytania o klientach – w jednym miejscu.'))),
+    h('div', { class: 'rz-bar' }, search, h('label', { class: 'check' }, mineCb, 'Tylko moi klienci (księgowa / kadry)')),
     bulk,
     list);
 

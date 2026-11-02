@@ -48,13 +48,13 @@ const who = id => memberById(id)?.full_name || '—';
 const pill = z => h('span', { class: 'zl-pill ' + (ZL_ST[z.status]?.[1] || '') }, ZL_ST[z.status]?.[0] || z.status);
 const dueEl = z => z.due_date ? h('span', { class: 'zl-due' + (late(z) ? ' late' : z.due_date === today() ? ' today' : '') }, late(z) ? `po terminie · ${fmtD(z.due_date)}` : `termin ${fmtD(z.due_date)}`) : null;
 const stepsOf = z => Array.isArray(z.steps) ? z.steps : [];
-const HELP = `Zlecenia to dodatkowe zadania od Michała.
+const HELP = `Zadania to dodatkowe zadania od Michała.
 • Michał zleca zadanie – dostajesz powiadomienie na telefon i e-mail.
 • Kliknij „Zaczynam”, odhaczaj kroki, a gdy skończysz – „Zrobione – zgłaszam” (możesz dopisać komentarz).
 • Gdy coś jest niejasne – „Mam pytanie”. Odpowiedź przyjdzie powiadomieniem.
 • Michał akceptuje wykonanie albo odsyła do poprawy z uwagą.
-Każda osoba widzi tylko swoje zlecenia.
-Nie odpowiadaj na maile o zleceniach – odpowiadaj tutaj. Sprawy bieżących rozliczeń klienta (braki dokumentów, problemy z księgowaniem) prowadź w „Rozmowach”.`;
+Każda osoba widzi tylko swoje zadania.
+Nie odpowiadaj na maile o zadaniach – odpowiadaj tutaj. Sprawy bieżących rozliczeń klienta (braki dokumentów, problemy z księgowaniem) prowadź w „Rozmowach”.`;
 
 async function loadAll() {
   const { data, error } = await sb.from('zlecenia').select('*').order('created_at', { ascending: false }).limit(500);
@@ -77,7 +77,7 @@ export async function renderZlecenia(main, id) {
   let all = [], filter = admin ? 'aktywne' : 'aktywne';
   const listBox = h('div', {}, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const chips = h('div', { class: 'zl-chips' });
-  const reload = async () => { try { all = await loadAll(); } catch (e) { put(listBox, h('p', { class: 'hint' }, 'Zlecenia są niedostępne.')); return; } draw(); };
+  const reload = async () => { try { all = await loadAll(); } catch (e) { put(listBox, h('p', { class: 'hint' }, 'Zadania są niedostępne.')); return; } draw(); };
   const open = z => openZlecenie(z.id, reload);
 
   function draw() {
@@ -91,7 +91,7 @@ export async function renderZlecenia(main, id) {
     put(chips, ...F.map(([k, l, f]) => { const n = all.filter(f).length; return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : '') + ((k === 'sprawdz' || k === 'pytania' || k === 'po') && n ? ' hot' : ''), onclick: () => { filter = k; draw(); } }, l, h('span', {}, String(n))); }));
     const f = F.find(x => x[0] === filter)[2];
     const rows = all.filter(f).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
-    if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zleceń. Kliknij „+ Zlecenie”, aby zlecić zadanie.' : 'Nie masz zleceń do zrobienia. 👍') : 'Brak zleceń.')); return; }
+    if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zadań. Kliknij „+ Zadanie”, aby zlecić zadanie.' : 'Nie masz zadań do zrobienia. 👍') : 'Brak zadań.')); return; }
     if (!admin) { put(listBox, h('div', { class: 'zl-list' }, ...rows.map(z => row(z, open)))); return; }
     const by = new Map(); rows.forEach(z => by.set(z.assignee_id, [...(by.get(z.assignee_id) || []), z]));
     put(listBox, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
@@ -102,9 +102,9 @@ export async function renderZlecenia(main, id) {
   put(main, 
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
-        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, admin ? 'Zlecenia dla zespołu' : 'Moje zlecenia', infoTip(HELP, 'Zlecenia – jak to działa')),
+        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, admin ? 'Zadania dla zespołu' : 'Moje zadania', infoTip(HELP, 'Zadania – jak to działa')),
         h('p', { class: 'sub' }, admin ? 'Dodatkowe zadania dla pracowników – z akceptacją wykonania.' : 'Dodatkowe zadania od Michała. Gdy skończysz, kliknij „Zrobione – zgłaszam”.')),
-      admin ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newZlecenie(reload) }, icon('plus'), 'Zlecenie') : null),
+      admin ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newZlecenie(reload) }, icon('plus'), 'Zadanie') : null),
     h('section', { class: 'card section' }, chips, listBox));
   await reload();
   if (id) openZlecenie(id, reload);
@@ -120,8 +120,8 @@ export function zleceniaCard() {
     const rep = act.filter(z => z.status === 'zgloszone'), q = act.filter(z => z.status === 'pytanie'), lt = act.filter(late);
     const show = (admin ? [...rep, ...q, ...lt.filter(z => !rep.includes(z) && !q.includes(z))] : act.sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))).slice(0, 6);
     put(box, 
-      h('div', { class: 'section-head' }, h('h2', {}, admin ? `Zlecenia (${act.length} aktywnych)` : `Zlecenia od Michała (${act.length})`),
-        h('div', { class: 'row-btns' }, admin ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newZlecenie(() => { location.hash = '#/zlecenia'; }) }, icon('plus'), 'Zlecenie') : null,
+      h('div', { class: 'section-head' }, h('h2', {}, admin ? `Zadania (${act.length} aktywnych)` : `Zadania od Michała (${act.length})`),
+        h('div', { class: 'row-btns' }, admin ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newZlecenie(() => { location.hash = '#/zlecenia'; }) }, icon('plus'), 'Zadanie') : null,
           h('a', { class: 'btn btn-ghost btn-sm', href: '#/zlecenia' }, 'Wszystkie →'))),
       admin ? h('div', { class: 'zl-sum' }, h('span', { class: rep.length ? 'hot' : '' }, `do sprawdzenia: ${rep.length}`), h('span', { class: q.length ? 'hot' : '' }, `pytania: ${q.length}`), h('span', { class: lt.length ? 'hot' : '' }, `po terminie: ${lt.length}`)) : null,
       show.length ? h('div', { class: 'zl-list' }, ...show.map(z => row(z, x => openZlecenie(x.id, () => { location.hash = '#/zlecenia'; })))) : h('p', { class: 'hint' }, admin ? 'Nic nie czeka na Ciebie.' : ''));
@@ -143,7 +143,7 @@ export async function newZlecenie(onDone, preset = {}) {
   const client = h('select', { class: 'select' }, h('option', { value: '' }, '— bez klienta —'), ...(cl || []).map(c => h('option', { value: c.id, selected: c.id === preset.client_id }, c.name)));
   const editing = !!preset.id;
   const pending = [];
-  modal(editing ? `Edytuj zlecenie #${preset.no}` : 'Nowe zlecenie', h('div', { class: 'zl-form' },
+  modal(editing ? `Edytuj zadanie #${preset.no}` : 'Nowe zadanie', h('div', { class: 'zl-form' },
     editing ? null : h('div', { class: 'field' }, h('span', {}, 'Dla kogo'), people),
     h('label', { class: 'field' }, h('span', {}, 'Zadanie'), title),
     h('label', { class: 'field' }, h('span', {}, 'Opis'), body),
@@ -151,7 +151,7 @@ export async function newZlecenie(onDone, preset = {}) {
     h('label', { class: 'field' }, h('span', {}, 'Kroki do odhaczenia'), steps),
     h('label', { class: 'check' }, hot, 'Pilne'),
     editing ? null : h('div', { class: 'field' }, h('span', {}, 'Załączniki (opcjonalnie)'), pendingBox(pending)),
-    editing ? null : h('p', { class: 'small muted' }, 'Każda wybrana osoba dostanie osobne zlecenie oraz powiadomienie na telefon i e-mail.')),
+    editing ? null : h('p', { class: 'small muted' }, 'Każda wybrana osoba dostanie osobne zadanie oraz powiadomienie na telefon i e-mail.')),
   close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async e => {
     if (!editing && !pick.size) return toast('Wybierz osobę', true);
     if (!title.value.trim()) { title.focus(); return toast('Wpisz zadanie', true); }
@@ -179,7 +179,7 @@ export async function openZlecenie(id, onChange) {
   const { data: files } = await sb.from('zlecenia_pliki').select('*').eq('zlecenie_id', id).order('created_at');
   const tiles = list => list.length ? h('div', { class: 'tk-files zl-files' }, ...list.map(f => fileTile({ ...f, bucket: ZL_BUCKET }, {
     onDelete: f.uploaded_by === state.me.id || isAdmin() ? async () => { if (!confirm(`Usunąć „${f.name}”? Trafi do kosza na 30 dni.`)) return; const { error: e } = await sb.from('zlecenia_pliki').delete().eq('id', f.id); if (e) return fail(e); toast('Usunięto'); refresh(); } : null }))) : null;
-  if (error || !z) return toast('Nie znaleziono zlecenia (albo nie masz do niego dostępu)', true);
+  if (error || !z) return toast('Nie znaleziono zadania (albo nie masz do niego dostępu)', true);
   const mine = z.assignee_id === state.me.id;
   const { data: cl } = z.client_id ? await sb.from('clients').select('name').eq('id', z.client_id).maybeSingle() : { data: null };
   let closeFn = () => {};
@@ -191,7 +191,7 @@ export async function openZlecenie(id, onChange) {
       const { data: lw } = await sb.from('zlecenia_wpisy').select('id').eq('zlecenie_id', id).eq('author_id', state.me.id).order('created_at', { ascending: false }).limit(1);
       await uploadZl(id, att, lw?.[0]?.id || null);
     }
-    toast({ start: 'Powodzenia!', pytanie: 'Wysłano pytanie do Michała', zglos: 'Zgłoszono wykonanie – Michał dostał powiadomienie', akceptuj: 'Zaakceptowano', zakoncz: 'Zlecenie zamknięte jako wykonane', popraw: 'Odesłano do poprawy', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zlecenie', wznow: 'Wznowiono' }[akcja] || 'Zapisano');
+    toast({ start: 'Powodzenia!', pytanie: 'Wysłano pytanie do Michała', zglos: 'Zgłoszono wykonanie – Michał dostał powiadomienie', akceptuj: 'Zaakceptowano', zakoncz: 'Zadanie zamknięte jako wykonane', popraw: 'Odesłano do poprawy', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zadanie', wznow: 'Wznowiono' }[akcja] || 'Zapisano');
     refresh();
   };
   const ask = (title, label, akcja, required, btn) => { const att = []; return modal(title, h('div', { class: 'zl-form' }, h('label', { class: 'field' }, h('span', {}, label), h('textarea', { class: 'input', rows: 4, maxlength: 3000, id: 'zl-ask' })),
@@ -248,27 +248,27 @@ export async function openZlecenie(id, onChange) {
   let hint = '', main = [], extra = [];
   const closed = !OPEN.includes(z.status);
   if (closed) {
-    hint = z.status === 'anulowane' ? 'Zlecenie anulowane.' : `Zlecenie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''}. 👍`;
-    if (admin) extra.push(B('btn-ghost btn-sm', 'Wznów zlecenie', () => act('wznow')));
+    hint = z.status === 'anulowane' ? 'Zadanie anulowane.' : `Zadanie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''}. 👍`;
+    if (admin) extra.push(B('btn-ghost btn-sm', 'Wznów zadanie', () => act('wznow')));
   } else if (mine) {
     hint = { nowe: 'Kliknij „Zaczynam”, gdy się za to weźmiesz. Po wykonaniu – „Zrobione – zgłaszam”.', w_toku: 'Gdy skończysz, kliknij „Zrobione – zgłaszam”. Coś niejasne? „Mam pytanie”.',
       pytanie: 'Czekasz na odpowiedź – dostaniesz powiadomienie. Możesz dalej pracować.', zgloszone: 'Zgłoszone – czeka na sprawdzenie i akceptację.' }[z.status];
     if (['nowe', 'pytanie'].includes(z.status)) main.push(B('btn-outline', 'Zaczynam', () => act('start')));
     if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) main.push(B('btn-primary', '✓ Zrobione – zgłaszam', () => ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie')));
-    if (['nowe', 'w_toku'].includes(z.status)) extra.push(B('btn-ghost btn-sm', '? Mam pytanie', () => ask('Pytanie do zlecenia', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie')));
+    if (['nowe', 'w_toku'].includes(z.status)) extra.push(B('btn-ghost btn-sm', '? Mam pytanie', () => ask('Pytanie do zadania', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie')));
   }
   if (!closed && admin && !mine) {
-    hint = { nowe: `Czeka, aż ${first} zacznie.`, w_toku: `${first} pracuje nad zleceniem.`, pytanie: `${first} ma pytanie – odpowiedz.`,
+    hint = { nowe: `Czeka, aż ${first} zacznie.`, w_toku: `${first} pracuje nad zadaniem.`, pytanie: `${first} ma pytanie – odpowiedz.`,
       zgloszone: `${first} zgłosił(a) wykonanie – sprawdź i zaakceptuj albo odeślij do poprawy.` }[z.status];
   }
   if (!closed && admin) {
     if (z.status === 'zgloszone') main.push(B('btn-outline', 'Do poprawy', () => ask('Odeślij do poprawy', 'Co trzeba poprawić?', 'popraw', true, 'Odeślij')), B('btn-primary', '✓ Akceptuję – zakończ', () => act('akceptuj')));
     if (z.status === 'pytanie') main.push(B('btn-primary', 'Odpowiedz', () => ask('Odpowiedź', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź')));
-    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) main.push(B(z.status === 'pytanie' ? 'btn-outline' : 'btn-primary', '✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zlecenie jako wykonane?')) act('zakoncz'); }));
+    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) main.push(B(z.status === 'pytanie' ? 'btn-outline' : 'btn-primary', '✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zadanie jako wykonane?')) act('zakoncz'); }));
     extra.push(B('btn-ghost btn-sm', 'Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }),
-      B('btn-ghost btn-sm zl-danger', 'Anuluj zlecenie', () => { if (confirm('Anulować to zlecenie?')) act('anuluj'); }));
+      B('btn-ghost btn-sm zl-danger', 'Anuluj zadanie', () => { if (confirm('Anulować to zadanie?')) act('anuluj'); }));
   }
-  if (admin) extra.unshift(B('btn-ghost btn-sm', '📎 Plik do zlecenia', () => topIn.click()));
+  if (admin) extra.unshift(B('btn-ghost btn-sm', '📎 Plik do zadania', () => topIn.click()));
   const STEPS = [['Zlecone', ['nowe']], ['W trakcie', ['w_toku', 'pytanie']], ['Zgłoszone', ['zgloszone']], ['Zakończone', ['zaakceptowane']]];
   const cur = STEPS.findIndex(([, ss]) => ss.includes(z.status));
   const stepper = z.status === 'anulowane' ? null : h('ol', { class: 'zl-stepper' }, ...STEPS.map(([l], i) => h('li', { class: i < cur ? 'done' : i === cur ? 'cur' : '' }, h('span', { class: 'dot' }, i < cur ? '✓' : String(i + 1)), h('span', { class: 'lbl' }, l + (i === 1 && z.status === 'pytanie' ? ' · pytanie' : '')))));
@@ -277,7 +277,7 @@ export async function openZlecenie(id, onChange) {
     main.length ? h('div', { class: 'zl-next-main' }, ...main) : null,
     extra.length ? h('div', { class: 'zl-next-extra' }, ...extra) : null, topIn);
 
-  closeFn = modal(`Zlecenie #${z.no}`, h('div', { class: 'zl-detail' },
+  closeFn = modal(`Zadanie #${z.no}`, h('div', { class: 'zl-detail' },
     h('div', { class: 'zl-dhead' }, h('h3', {}, z.title, z.priority === 'pilne' ? h('span', { class: 'zl-hot' }, 'pilne') : null), pill(z)),
     h('div', { class: 'zl-dmeta' },
       h('span', {}, 'Dla: ', h('b', {}, who(z.assignee_id))), h('span', {}, 'Zlecił(a): ', who(z.created_by)), dueEl(z),

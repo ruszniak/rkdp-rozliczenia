@@ -20,11 +20,11 @@ export function pushNudge() {
     const later = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { hide(7); box.remove(); } }, 'Później');
     let text, actions = [];
     if (ios && !standalone) {
-      text = [h('b', {}, 'Zainstaluj aplikację na iPhonie, żeby dostawać powiadomienia o zleceniach'), h('br'),
+      text = [h('b', {}, 'Zainstaluj aplikację na iPhonie, żeby dostawać powiadomienia o zadaniach'), h('br'),
         h('span', { class: 'small' }, 'W Safari stuknij „Udostępnij” (kwadrat ze strzałką) → „Do ekranu początkowego” → „Dodaj”. Potem otwórz aplikację z nowej ikony i włącz tu powiadomienia.')];
     } else {
       text = [h('b', {}, 'Włącz powiadomienia na tym urządzeniu'), h('br'),
-        h('span', { class: 'small' }, 'Od razu dowiesz się o nowym zleceniu, pytaniu albo odpowiedzi – bez sprawdzania poczty.' + (!standalone && !ios ? ' Możesz też zainstalować aplikację – będzie miała własną ikonę na pulpicie i w pasku zadań.' : ''))];
+        h('span', { class: 'small' }, 'Od razu dowiesz się o nowym zadaniu, pytaniu albo odpowiedzi – bez sprawdzania poczty.' + (!standalone && !ios ? ' Możesz też zainstalować aplikację – będzie miała własną ikonę na pulpicie i w pasku zadań.' : ''))];
       const on = h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async () => {
         on.disabled = true;
         try { await enablePush(DEFAULT_PREFS); toast('Powiadomienia włączone na tym urządzeniu'); box.remove(); }
