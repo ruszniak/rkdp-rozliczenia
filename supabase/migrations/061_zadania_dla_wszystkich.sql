@@ -1,0 +1,7 @@
+-- Zadania (tabela zlecenia): dodawać może każdy użytkownik RKDP; widzi i zarządza zlecający, wykonuje assignee, administrator wszystko.
+-- Zastosowano jako migracje "zadania_dla_wszystkich" i "zadania_akcja_coalesce" (polityki zl_*, zw_*, funkcje zl_visible, zlecenie_akcja, zlecenie_krok).
+-- zl_select/zw_*: is_admin() or assignee_id = me or created_by = me
+-- zl_insert: is_admin() or (me is not null and created_by = me)
+-- zl_update/zl_delete: is_admin() or created_by = me
+-- zlecenie_akcja: adm := coalesce(is_admin(), false) or coalesce(found and z.created_by = me, false)
+-- zlecenie_krok: dostęp także dla zlecającego (created_by)
