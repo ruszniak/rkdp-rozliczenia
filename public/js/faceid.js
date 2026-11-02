@@ -169,8 +169,8 @@ export function lockApp(onLogout) {
   // stuknięcie w dowolnym miejscu ekranu (poza „Zaloguj się hasłem”) uruchamia Face ID
   sc.el.addEventListener('click', e => { if (!e.target.closest('button')) sc.run(false); });
   // próba bez stuknięcia: gdy aplikacja jest już na wierzchu, albo gdy na niego wróci
-  // iPhone: wywołanie bez stuknięcia pokazuje dodatkowe okno „Użyj klucza” – tam czekamy na stuknięcie (wtedy od razu Face ID)
-  const auto = () => { if (!isIOS() && lockEl && document.visibilityState === 'visible') sc.run(true); };
+  // na iPhonie wywołanie bez stuknięcia pokazuje okno „Użyj klucza” (jedno stuknięcie i Face ID)
+  const auto = () => { if (lockEl && document.visibilityState === 'visible') sc.run(true); };
   setTimeout(auto, 300);
   window.addEventListener('focus', auto, { once: true });
   window.addEventListener('pageshow', auto, { once: true });
