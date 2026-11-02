@@ -86,7 +86,7 @@ function appSection() {
       h('span', { class: 'small muted' }, !phone
         ? 'Działa w aplikacji zainstalowanej na telefonie: przy każdym uruchomieniu odblokowujesz ją twarzą, a logujesz się bez hasła i kodu. Otwórz aplikację na telefonie, aby to włączyć.'
         : !avail ? 'Na tym telefonie nie ustawiono Face ID / odcisku palca (Ustawienia telefonu → Face ID i kod / Zabezpieczenia).'
-        : here ? 'Aplikacja wymaga twarzy przy każdym uruchomieniu i po powrocie po ponad minucie.' : 'Włącz, aby odblokowywać aplikację twarzą i logować się bez hasła.')),
+        : here ? 'Aplikacja wymaga twarzy przy każdym uruchomieniu i po powrocie po ponad 5 minutach w tle.' : 'Włącz, aby odblokowywać aplikację twarzą i logować się bez hasła.')),
       avail && !here ? h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async e => {
         const b = e.currentTarget; b.disabled = true;
         try { await enableFaceId(state.me.email); toast('Face ID włączone na tym telefonie'); } catch (er) { if (!['NotAllowedError', 'AbortError'].includes(er?.name)) fail(er, 'Face ID'); }

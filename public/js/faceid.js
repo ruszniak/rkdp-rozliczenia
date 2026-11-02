@@ -9,7 +9,7 @@ import { isIOS, isStandalone } from './push.js';
 import { deviceLabel } from './session.js';
 
 const KEY = 'rkdp_faceid', UNLOCK_KEY = 'rkdp_unlocked_at', SKIP_KEY = 'rkdp_faceid_skip';
-const RELOCK_MS = 60 * 1000;
+const RELOCK_MS = 5 * 60 * 1000;
 const ls = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* */ } },
@@ -204,7 +204,7 @@ export async function phoneGate(email, onLogout) {
   if (lk && lk.email !== email) forgetLocal();
   if (localKey()) { if (!recentlyUnlocked()) await lockApp(onLogout); }
   else if (ss.get(SKIP_KEY) !== '1') await enrollScreen(email, onLogout);
-  // powrót z tła po ponad minucie = ponowne uruchomienie: znowu Face ID
+  // powrót z tła po ponad 5 minutach = ponowne uruchomienie: znowu Face ID
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
