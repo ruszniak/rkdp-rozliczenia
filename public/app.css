@@ -2347,3 +2347,6 @@ html.wide .wrap{max-width:none}
 .kw-add{margin-top:8px}
 @media (min-width:601px){.kw-row-x{grid-template-columns:minmax(0,1.3fr) 1fr 1fr 34px}.kw-row-x>.field:nth-child(4){grid-column:2/3}.kw-row-x>.field:nth-child(5){grid-column:3/4}.kw-row-x .kw-rm{grid-row:1;grid-column:4}}
 @media (max-width:600px){.kw-row-x{grid-template-columns:1fr 1fr}.kw-row-x .kw-rm{position:absolute;top:4px;right:4px}.kw-row-x .kw-name{padding-right:34px}}
+/* wyciągi: brak kratki – dodaj i zaznacz */
+.cb.cb-add{background:transparent;border:1.5px dashed var(--line-2,#C9D0DC);color:var(--muted,#8A93A6);font-weight:600;font-size:14px;line-height:1}
+.cb.cb-add:hover{border-color:var(--accent);color:var(--accent)}

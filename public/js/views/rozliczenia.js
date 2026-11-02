@@ -289,7 +289,7 @@ export async function renderRozliczenia(main, params) {
   function renderTabs() {
     tabsBox.replaceChildren(...Object.entries(AREAS).map(([k, a]) => {
       const rows = rowsIn(k);
-      const open = k === 'wyciagi' && yearData ? clients.filter(c => c.status === 'aktywny' && yearData.get(c.id) && [...yearData.get(c.id).values()].some(yearOpen)).length : rows.filter(c => !isSettled(c, k)).length;
+      const open = k === 'wyciagi' && yearData ? clients.filter(c => c.status === 'aktywny' && ksiegi(c) && yearData.get(c.id) && [...yearData.get(c.id).values()].some(yearOpen)).length : rows.filter(c => !isSettled(c, k)).length;
       return h('button', { class: prefs.area === k ? 'on' : '', role: 'tab', 'aria-selected': String(prefs.area === k),
         onclick: () => { prefs.area = k; prefs.person = ''; savePrefs(prefs); renderAll(); } },
       a.label, h('span', { class: 'n', 'data-tip': 'Nierozliczeni klienci' }, open));
@@ -612,15 +612,17 @@ export async function renderRozliczenia(main, params) {
       yearData = m; return m;
     }, err => { yearLoading = null; throw err; });
   const yearOpen = e => e && !['done', 'na'].includes(e.status);
+  // wyciągi dotyczą klientów z księgami handlowymi (pełna księgowość)
+  function ksiegi(c) { return c.bookkeeping === 'pelna' || (!c.bookkeeping && ['spzoo', 'spolka_akcyjna', 'fundacja_rodzinna'].includes(c.legal_form)); }
   const yearClients = () => {
     if (!yearData) return [];
     const field = AREAS.wyciagi.person, q = prefs.q.trim().toLowerCase();
-    return clients.filter(c => yearData.has(c.id)).filter(c => {
+    return clients.filter(c => ksiegi(c) && (yearData.has(c.id) || c.status === 'aktywny')).filter(c => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
       if (prefs.person === 'me' && c[field] !== state.me.id) return false;
       if (prefs.person === 'none' && c[field]) return false;
       if (prefs.person && !['me', 'none'].includes(prefs.person) && c[field] !== prefs.person) return false;
-      const ms = [...yearData.get(c.id).values()];
+      const ms = [...(yearData.get(c.id) || new Map()).values()];
       if (prefs.show === 'nierozliczeni' && !ms.some(yearOpen)) return false;
       if (prefs.show === 'braki' && !ms.some(e => ['missing_docs', 'reminded'].includes(e.status))) return false;
       if (prefs.show === 'uwagi' && !hasNote(c)) return false;
@@ -628,7 +630,17 @@ export async function renderRozliczenia(main, params) {
     }).sort((a, b) => (a.status === 'aktywny' ? 0 : 1) - (b.status === 'aktywny' ? 0 : 1) || a.name.localeCompare(b.name, 'pl'));
   };
   function yearCell(e, c, mi) {
-    if (!e) return h('td', { class: 'c-task', 'data-label': MONTHS_SHORT[mi - 1] }, h('span', { class: 'muted small' }, ''));
+    if (!e) {
+      // brak kratki (np. klient dodany w trakcie roku) – kliknięcie zaznacza wyciąg jako zrobiony
+      const add = h('button', { class: 'cb cb-add', 'aria-label': `${c.name}: dodaj wyciąg – ${MONTHS_FULL[mi - 1]} ${year}`, 'data-tip': `Dodaj i zaznacz: wyciąg – ${MONTHS_FULL[mi - 1]} ${year}`, onclick: async () => {
+        add.disabled = true;
+        const { data: ne, error } = await sb.from('checklist_entries').insert({ client_id: c.id, period: `${year}-${String(mi).padStart(2, '0')}-01`, task_code: 'wb', status: 'done' }).select('id,client_id,period,task_code,status,updated_by,updated_at').single();
+        if (error) { add.disabled = false; return fail(error); }
+        if (!yearData.has(c.id)) yearData.set(c.id, new Map());
+        yearData.get(c.id).set(mi, ne); renderYear(); renderYearTiles(); renderTabs();
+      } }, '+');
+      return h('td', { class: 'c-task' + (mi === monthNo ? ' wb-cur' : ''), 'data-label': MONTHS_SHORT[mi - 1] }, add);
+    }
     const label = `Wyciąg – ${MONTHS_FULL[mi - 1]} ${year}`;
     const b = h('button', { class: `cb cb-${e.status === 'in_progress' ? 'todo' : e.status}`, 'aria-label': `${c.name}: ${label} – ${STATUS[e.status].label}`, 'data-tip': `${label}: ${STATUS[e.status].label}`,
       onclick: ev => { if (PHONE() && !['done', 'na'].includes(e.status)) return setStatus(e, 'done'); statusMenu(ev.currentTarget, e, label); },
@@ -644,13 +656,13 @@ export async function renderRozliczenia(main, params) {
     const months = Array.from({ length: monthNo }, (_, i) => i + 1);
     const list = yearClients();
     const act = list.filter(c => c.status === 'aktywny');
-    const full = act.filter(c => ![...yearData.get(c.id).values()].some(yearOpen)).length;
+    const full = act.filter(c => ![...(yearData.get(c.id) || new Map()).values()].some(yearOpen)).length;
     const table = h('table', { class: 'grid wb-year' },
       h('thead', {}, h('tr', {}, h('th', { class: 'c-name' }, 'Klient'), h('th', { class: 'c-person' }, 'Księgowa'),
         ...months.map(mi => h('th', { class: 'c-task' + (mi === monthNo ? ' wb-cur' : ''), 'data-tip': `${MONTHS_FULL[mi - 1]} ${year}` }, MONTHS_SHORT[mi - 1])),
         h('th', { 'data-tip': 'Miesiące od początku roku bez wyciągu (do zrobienia, brak dokumentów, przypomniano)' }, 'Brakuje'))),
       h('tbody', {}, ...list.map(c => {
-        const ms = yearData.get(c.id);
+        const ms = yearData.get(c.id) || new Map();
         const open = [...ms.values()].filter(yearOpen).length;
         return h('tr', { class: (open ? '' : 'settled') + (c.status === 'aktywny' ? '' : ' inactive') },
           h('td', { class: 'c-name' }, h('a', { href: `#/klient/${c.id}`, class: 'cname' }, c.name), c.status === 'aktywny' ? null : h('span', { class: 'badge' }, c.status)),
@@ -665,7 +677,7 @@ export async function renderRozliczenia(main, params) {
   }
   function renderYearTiles() {
     if (!yearData) { tiles.replaceChildren(); return; }
-    const act = clients.filter(c => c.status === 'aktywny' && yearData.has(c.id));
+    const act = clients.filter(c => c.status === 'aktywny' && ksiegi(c) && yearData.has(c.id));
     const curDone = act.filter(c => !yearOpen(yearData.get(c.id).get(monthNo))).length;
     const withGaps = act.filter(c => [...yearData.get(c.id).values()].some(yearOpen)).length;
     const gaps = act.reduce((n, c) => n + [...yearData.get(c.id).values()].filter(yearOpen).length, 0);
