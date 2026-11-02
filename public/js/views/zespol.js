@@ -147,7 +147,7 @@ export async function renderZespol(main) {
       sort.addEventListener('change', () => updTask(t, { sort: Number(sort.value) || t.sort }));
       const desc = h('input', { class: 'input', value: t.description || '', placeholder: 'Opis widoczny po najechaniu', style: { width: '100%' } });
       desc.addEventListener('change', () => updTask(t, { description: desc.value.trim() || null }));
-      const area = h('select', { class: 'select' }, h('option', { value: 'ksiegowosc' }, 'Księgowość'), h('option', { value: 'kadry' }, 'Kadry i ZUS'));
+      const area = h('select', { class: 'select' }, h('option', { value: 'ksiegowosc' }, 'Księgowość'), h('option', { value: 'kadry' }, 'Płace'));
       area.value = t.area; area.addEventListener('change', () => updTask(t, { area: area.value }));
       const req = h('input', { type: 'checkbox', checked: t.counts_to_settled !== false });
       req.addEventListener('change', () => updTask(t, { counts_to_settled: req.checked }));

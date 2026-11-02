@@ -26,7 +26,7 @@ export async function fetchAll(build) {
 
 const AREAS = {
   ksiegowosc: { label: 'Księgowość', person: 'accountant_id', personLabel: 'Księgowa' },
-  kadry: { label: 'Kadry i ZUS', person: 'hr_id', personLabel: 'Kadrowa' },
+  kadry: { label: 'Płace', person: 'hr_id', personLabel: 'Kadrowa' },
   // wyciągi bankowe – osobna lista, narastająco od początku roku (miesiące w kolumnach)
   wyciagi: { label: 'Wyciągi', person: 'accountant_id', personLabel: 'Księgowa' },
 };

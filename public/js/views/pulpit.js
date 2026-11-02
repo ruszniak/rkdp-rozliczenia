@@ -82,7 +82,7 @@ function myDashboard(D, period, hist) {
   const mine = D.tickets.filter(t => TK_OPEN.includes(t.status) && t.assignee_id === me).sort(byDue);
   const late = mine.filter(isLate);
   const delegated = D.tickets.filter(t => TK_OPEN.includes(t.status) && t.created_by === me && t.assignee_id !== me).sort(byDue);
-  const areas = [['ksiegowosc', 'Księgowość', 'accountant_id'], ['kadry', 'Kadry i ZUS', 'hr_id']]
+  const areas = [['ksiegowosc', 'Księgowość', 'accountant_id'], ['kadry', 'Płace', 'hr_id']]
     .map(([area, label, field]) => {
       const list = D.active.filter(c => c[field] === me).map(c => ({ c, s: D.settle(c, area) })).filter(x => x.s.has);
       return { area, label, list, settled: list.filter(x => x.s.settled).length, missing: list.filter(x => x.s.missing) };

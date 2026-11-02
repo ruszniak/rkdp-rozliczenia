@@ -59,7 +59,7 @@ export async function renderRaport(main, params) {
 <h2>Trend rozliczeń <small>% rozliczonych klientów, ostatnie 6 miesięcy</small></h2>
 <table><thead><tr><th class="l">Obszar</th>${lastPeriods(P, 6).map(p => `<th>${esc(periodLabel(p))}</th>`).join('')}</tr></thead><tbody>
 <tr><td class="l">Księgowość</td>${hist.ksiegowosc.map((v, i, a) => `<td>${i === a.length - 1 ? pct(A.pct) : v == null ? '—' : pct(v)}</td>`).join('')}</tr>
-<tr><td class="l">Kadry i ZUS</td>${hist.kadry.map((v, i, a) => `<td>${i === a.length - 1 ? pct(K.pct) : v == null ? '—' : pct(v)}</td>`).join('')}</tr></tbody></table>
+<tr><td class="l">Płace</td>${hist.kadry.map((v, i, a) => `<td>${i === a.length - 1 ? pct(K.pct) : v == null ? '—' : pct(v)}</td>`).join('')}</tr></tbody></table>
 <h2>Obciążenie zespołu</h2>
 <table><thead><tr><th class="l">Osoba</th><th>Klienci rozliczeni</th><th>Kratki otwarte</th><th>Zgłoszenia otwarte</th><th>Zamknięte w miesiącu</th></tr></thead><tbody>
 ${people.map(p => `<tr><td class="l">${esc(p.m.full_name)}</td><td>${p.n ? `${p.ok}/${p.n}` : '—'}</td><td>${p.open}</td><td>${p.tk}</td><td>${p.dn}</td></tr>`).join('')}

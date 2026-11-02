@@ -68,7 +68,7 @@ export async function openClientPanel(id) {
   const drawCells = () => cellsBox.replaceChildren(...['ksiegowosc', 'kadry', 'wyciagi'].map(area => {
     const ts = tasks.filter(t => t.area === area && byCode.has(t.code));
     if (!ts.length) return null;
-    return h('div', { class: 'cp-area' }, h('span', { class: 'lbl-sm' }, area === 'kadry' ? 'Kadry i ZUS' : area === 'wyciagi' ? 'Wyciągi' : 'Księgowość'),
+    return h('div', { class: 'cp-area' }, h('span', { class: 'lbl-sm' }, area === 'kadry' ? 'Płace' : area === 'wyciagi' ? 'Wyciągi' : 'Księgowość'),
       h('div', { class: 'cp-row' }, ts.map(t => {
         const e = byCode.get(t.code);
         return h('button', { class: 'cp-cell', type: 'button', 'data-tip': `${t.label}: ${STATUS[e.status].label}`,

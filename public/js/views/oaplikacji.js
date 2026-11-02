@@ -98,7 +98,7 @@ const NEWS = [
   ['2.0', '2 listopada 2026', [
     'Rozliczenia: nowa lista „Wyciągi” – wyciągi bankowe narastająco od początku roku (miesiące obok siebie, licznik braków).',
     'Karta klienta: dane w podglądzie, zmiany dopiero po kliknięciu „Edytuj dane” – nic nie zmieni się przez przypadek.',
-    '„Zlecenia” dla zespołu nazywają się teraz „Zadania”; na telefonie „Więcej” otwiera się jako cała strona.',
+    '„Zlecenia” dla zespołu nazywają się teraz „Zadania”, a „Kadry i ZUS” – „Płace”; na telefonie „Więcej” otwiera się jako cała strona.',
     'Nowy wygląd: jasny układ z granatowym akcentem i logo RKDP, górny pasek zakładek na komputerze, własne ikony RKDP.',
     'Czytelne kolory statusów: zielony – zrobione, bursztynowy – brak dokumentów, fioletowy – przypomniano, czerwony – po terminie.',
     'Menu „Więcej” z ikonami, wylogowanie w menu; krótszy pasek narzędzi w Rozliczeniach, instrukcja zaznaczania pod ikonką „i”.',
