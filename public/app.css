@@ -2335,3 +2335,15 @@ html.wide .wrap{max-width:none}
 .pw-day{min-width:42px;height:34px;border-radius:999px;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
 .pw-day.on{background:var(--accent);border-color:var(--accent);color:#fff}
 @media (max-width:600px){.pw-win-body{margin-left:0}}
+/* kwoty do zapłaty: dodatkowe pozycje */
+.kw-extra:empty{display:none}
+.kw-extra{margin-top:8px}
+.kw-row-x{grid-template-columns:minmax(0,1.3fr) 1fr 1fr auto;position:relative}
+.kw-row-x .kw-name{display:flex;align-items:flex-end;gap:8px;font-weight:400}
+.kw-row-x .kw-name .check{margin:0 0 10px}
+.kw-row-x .kw-name .field{flex:1;min-width:0;margin:0}
+.kw-row-x .field:nth-of-type(3),.kw-row-x .field:nth-of-type(4){grid-column:span 1}
+.kw-row-x .kw-rm{align-self:center}
+.kw-add{margin-top:8px}
+@media (min-width:601px){.kw-row-x{grid-template-columns:minmax(0,1.3fr) 1fr 1fr 34px}.kw-row-x>.field:nth-child(4){grid-column:2/3}.kw-row-x>.field:nth-child(5){grid-column:3/4}.kw-row-x .kw-rm{grid-row:1;grid-column:4}}
+@media (max-width:600px){.kw-row-x{grid-template-columns:1fr 1fr}.kw-row-x .kw-rm{position:absolute;top:4px;right:4px}.kw-row-x .kw-name{padding-right:34px}}

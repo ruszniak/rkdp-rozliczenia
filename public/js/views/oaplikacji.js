@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.0', '2 listopada 2026', [
+    'Kwoty do zapłaty: „+ Dodaj pozycję” – dodatkowe wiersze (np. kwota rozdzielona na części, osobna płatność) z własną nazwą, terminem, rachunkiem i tytułem przelewu; zapamiętują się dla klienta i miesiąca.',
     'Powiadomienia: własny adres e-mail do powiadomień oraz godziny i dni, w których mogą przychodzić (np. bez weekendów) – to, co przyjdzie poza nimi, dostajesz zbiorczo na początku kolejnego okna. Face ID ważne 24 godziny.',
     'Zadania: każdy użytkownik RKDP może dodać zadanie – dla siebie albo dla innej osoby (także dla Michała); zlecający akceptuje wykonanie, odpowiada na pytania i może zamknąć zadanie.',
     'Duże monitory: przycisk ↔ w nagłówku rozciąga stronę na całą szerokość ekranu (zapamiętywany w przeglądarce); kliknięcie powiadomienia push otwiera właściwe miejsce w aplikacji.',

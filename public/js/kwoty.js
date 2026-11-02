@@ -42,7 +42,8 @@ export async function openAmounts({ client, period, entries, onDone }) {
   if (autoTax) c.acc_tax_auto = autoTax;
   const L = lines(c, period);
   const rows = AMOUNT_CODES.map(code => ({ code, e: entries.get(code) })).filter(r => r.e && r.e.status !== 'na');
-  if (!rows.length) return toast('Ten klient nie ma w tym miesiącu kratek z kwotami (VAT, PIT/CIT, ZUS, PIT-4)', true);
+  // dodatkowe pozycje (np. podział kwoty, osobne płatności notariusza) – zapamiętane dla klienta i miesiąca
+  const { data: ex } = await sb.from('amount_extras').select('items').eq('client_id', c.id).eq('period', period + '-01').maybeSingle();
   const accTax = h('input', { class: 'input', inputmode: 'numeric', placeholder: 'mikrorachunek podatkowy (26 cyfr)', value: accFmt(c.acc_tax || c.acc_tax_auto) });
   const accZus = h('input', { class: 'input', inputmode: 'numeric', placeholder: 'rachunek składkowy ZUS (26 cyfr)', value: accFmt(c.acc_zus) });
   const inputs = rows.map(r => {
@@ -52,17 +53,43 @@ export async function openAmounts({ client, period, entries, onDone }) {
     return { ...r, amt, due, on };
   });
   const sumEl = h('b', {});
-  const recalc = () => { const s = inputs.filter(i => i.on.checked).reduce((t, i) => t + (parseAmt(i.amt.value) || 0), 0); sumEl.textContent = money(s); };
+  const extras = [];
+  const extraBox = h('div', { class: 'kw-rows kw-extra' });
+  const recalc = () => { const s = [...inputs, ...extras].filter(i => i.on.checked).reduce((t, i) => t + (parseAmt(i.amt.value) || 0), 0); sumEl.textContent = money(s); };
+  function addExtra(x = {}) {
+    const lbl = h('input', { class: 'input', maxlength: 80, placeholder: 'Nazwa, np. VAT – część 2', value: x.label || '' });
+    const amt = h('input', { class: 'input kw-amt', inputmode: 'decimal', placeholder: '0,00', value: x.amount != null ? String(x.amount).replace('.', ',') : '' });
+    const due = h('input', { class: 'input', type: 'date', value: x.due || nextMonthDay(period, 20) });
+    const accSel = h('select', { class: 'select' }, ...[['tax', 'Mikrorachunek'], ['zus', 'ZUS'], ['', 'Bez rachunku']].map(([v, l]) => h('option', { value: v, selected: (x.acctype ?? 'tax') === v }, l)));
+    const title = h('input', { class: 'input', maxlength: 60, placeholder: 'Tytuł przelewu (opcjonalnie)', value: x.title || '' });
+    const on = h('input', { type: 'checkbox', checked: x.on !== false });
+    const it = { extra: true, lbl, amt, due, accSel, title, on };
+    const rm = h('button', { type: 'button', class: 'btn btn-ghost btn-sm kw-rm', 'aria-label': 'Usuń pozycję', onclick: () => { extras.splice(extras.indexOf(it), 1); el.remove(); recalc(); } }, '✕');
+    const el = h('div', { class: 'kw-row kw-row-x' },
+      h('div', { class: 'kw-name' }, h('label', { class: 'check', 'aria-label': 'Wyślij tę pozycję' }, on), h('label', { class: 'field' }, h('span', {}, 'Pozycja'), lbl)),
+      h('label', { class: 'field' }, h('span', {}, 'Kwota (zł)'), amt),
+      h('label', { class: 'field' }, h('span', {}, 'Termin'), due),
+      h('label', { class: 'field' }, h('span', {}, 'Rachunek'), accSel),
+      h('label', { class: 'field' }, h('span', {}, 'Tytuł przelewu'), title), rm);
+    amt.addEventListener('input', recalc); on.addEventListener('change', recalc);
+    extras.push(it); extraBox.append(el); recalc();
+    return it;
+  }
   inputs.forEach(i => { i.amt.addEventListener('input', recalc); i.on.addEventListener('change', recalc); });
+  (Array.isArray(ex?.items) ? ex.items : []).forEach(x => addExtra(x));
   recalc();
+  const exLabel = i => i.lbl.value.trim() || 'Inna płatność';
   const periodLbl = `${MON[+period.slice(5, 7) - 1]} ${period.slice(0, 4)}`;
   // rozgrzanie funkcji wysyłki i stopki z rkdp.pl/stopki – podgląd po kliknięciu „Wyślij klientowi…” pojawi się od razu
   sb.functions.invoke('mail', { body: { action: 'preview_kwoty', period, items: [] } }).catch(() => {});
-  const items = chosen => chosen.map(i => { const l = L[i.code], a = l.account === 'zus' ? c.acc_zus : c.acc_tax;
+  const items = chosen => chosen.map(i => {
+    if (i.extra) { const t = i.accSel.value, a = t === 'zus' ? c.acc_zus : t === 'tax' ? c.acc_tax : '';
+      return { label: exLabel(i), amount: parseAmt(i.amt.value), due: i.due.value, account: acc(a), acctype: t || 'tax', title: i.title.value.trim() }; }
+    const l = L[i.code], a = l.account === 'zus' ? c.acc_zus : c.acc_tax;
     return { label: l.label, amount: parseAmt(i.amt.value), due: i.due.value, account: acc(a), acctype: l.account, title: l.title }; });
 
   async function saveAll() {
-    const bad = inputs.find(i => i.amt.value.trim() && parseAmt(i.amt.value) == null);
+    const bad = [...inputs, ...extras].find(i => i.amt.value.trim() && parseAmt(i.amt.value) == null);
     if (bad) { bad.amt.focus(); toast('Wpisz kwotę liczbą', true); return false; }
     for (const i of inputs) {
       const amount = i.amt.value.trim() ? parseAmt(i.amt.value) : null;
@@ -70,6 +97,11 @@ export async function openAmounts({ client, period, entries, onDone }) {
       const { error: e } = await sb.from('checklist_entries').update({ amount, due_date: i.due.value || null }).eq('id', i.e.id);
       if (e) { fail(e); return false; }
       i.e.amount = amount; i.e.due_date = i.due.value || null;
+    }
+    const exItems = extras.filter(i => i.lbl.value.trim() || i.amt.value.trim()).map(i => ({ label: i.lbl.value.trim(), amount: i.amt.value.trim() ? parseAmt(i.amt.value) : null, due: i.due.value || null, acctype: i.accSel.value, title: i.title.value.trim(), on: i.on.checked }));
+    if (exItems.length || (ex?.items || []).length) {
+      const { error: e } = await sb.from('amount_extras').upsert({ client_id: c.id, period: period + '-01', items: exItems, updated_at: new Date().toISOString() });
+      if (e) { fail(e); return false; }
     }
     const upd = {};
     if (acc(accTax.value) !== acc(c.acc_tax)) upd.acc_tax = acc(accTax.value) || null;
@@ -79,7 +111,7 @@ export async function openAmounts({ client, period, entries, onDone }) {
   }
   function mailText(chosen) {
     const t = chosen.map(i => {
-      const l = L[i.code], a = l.account === 'zus' ? c.acc_zus : c.acc_tax;
+      const l = i.extra ? { label: exLabel(i), account: i.accSel.value, title: i.title.value.trim() } : L[i.code], a = l.account === 'zus' ? c.acc_zus : l.account === 'tax' ? c.acc_tax : '';
       return [`• ${l.label}: ${money(parseAmt(i.amt.value))} – termin ${fmtD(i.due.value)}`,
         a ? `  rachunek: ${accFmt(a)}${l.account === 'tax' ? ' (mikrorachunek podatkowy)' : ' (rachunek składkowy ZUS)'}` : '',
         l.title ? `  tytuł przelewu: ${l.title}` : ''].filter(Boolean).join('\n');
@@ -94,6 +126,9 @@ export async function openAmounts({ client, period, entries, onDone }) {
       h('label', { class: 'check kw-name' }, i.on, L[i.code].label),
       h('label', { class: 'field' }, h('span', {}, 'Kwota (zł)'), i.amt),
       h('label', { class: 'field' }, h('span', {}, 'Termin'), i.due)))),
+    extraBox,
+    h('button', { type: 'button', class: 'btn btn-ghost btn-sm kw-add', onclick: () => addExtra().lbl.focus() }, '+ Dodaj pozycję'),
+    h('p', { class: 'small muted', style: { margin: '2px 0 0' } }, 'Dodatkowe pozycje, np. kwota rozdzielona na części albo osobna płatność – zapamiętują się dla klienta i miesiąca.'),
     h('div', { class: 'kw-sum' }, 'Razem do wysłania: ', sumEl),
     h('div', { class: 'form-grid' },
       h('label', { class: 'field' }, h('span', {}, 'Mikrorachunek podatkowy (VAT, PIT/CIT, PIT-4)'), accTax),
@@ -104,7 +139,7 @@ export async function openAmounts({ client, period, entries, onDone }) {
     h('button', { class: 'btn btn-outline', onclick: async () => { if (await saveAll()) { close(); toast('Zapisano kwoty'); onDone?.(); } } }, 'Zapisz'),
     h('button', { class: 'btn btn-primary', onclick: async e => {
       const btn = e.currentTarget; // przed „await” – potem currentTarget jest już pusty
-      const chosen = inputs.filter(i => i.on.checked && parseAmt(i.amt.value) != null && i.amt.value.trim());
+      const chosen = [...inputs, ...extras].filter(i => i.on.checked && parseAmt(i.amt.value) != null && i.amt.value.trim());
       if (!chosen.length) return toast('Wpisz co najmniej jedną kwotę', true);
       if ([accTax, accZus].some(x => x.value.trim() && !accOk(x.value))) return toast('Numer rachunku powinien mieć 26 cyfr', true);
       if (!c.email) return toast('Klient nie ma adresu e-mail w karcie', true);
@@ -121,13 +156,13 @@ export async function openAmounts({ client, period, entries, onDone }) {
       modal('Podgląd wiadomości', h('div', {}, h('p', { class: 'small muted', style: { marginTop: 0 } }, `Do: ${c.email} · Temat: Kwoty do zapłaty – ${periodLbl}`), pv),
         c2 => [h('button', { class: 'btn btn-ghost', onclick: c2 }, 'Wróć'), h('button', { class: 'btn btn-primary', onclick: async ev => {
           const sendBtn = ev.currentTarget; sendBtn.disabled = true; sendBtn.textContent = 'Wysyłam…'; btn.disabled = true;
-          const { data, error: er } = await sb.functions.invoke('mail', { body: { action: 'send', kind: 'kwoty', period, client_ids: [c.id], subject: `Kwoty do zapłaty – ${periodLbl}`, body, items: its, mark_done: { [c.id]: chosen.map(i => i.code) } } });
+          const { data, error: er } = await sb.functions.invoke('mail', { body: { action: 'send', kind: 'kwoty', period, client_ids: [c.id], subject: `Kwoty do zapłaty – ${periodLbl}`, body, items: its, mark_done: { [c.id]: chosen.filter(i => !i.extra).map(i => i.code) } } });
           c2();
           if (er) { btn.disabled = false; return fail(er); }
           if (data?.error === 'not_configured') { btn.disabled = false; return toast('Wysyłka e-maili nie jest skonfigurowana', true); }
           if (data?.error) { btn.disabled = false; return toast(data.error, true); }
           if (!data?.sent) { btn.disabled = false; return toast('Nie udało się wysłać: ' + (data?.results?.[0]?.error || ''), true); }
-          chosen.forEach(i => { i.e.status = 'done'; });
+          chosen.forEach(i => { if (i.e) i.e.status = 'done'; });
           close(); toast('Wysłano kwoty do klienta i odhaczono kratki'); onDone?.();
         } }, 'Wyślij')], { wide: true });
     } }, 'Wyślij klientowi…')], { wide: true });
