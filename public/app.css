@@ -2320,3 +2320,18 @@ fieldset.kl-form.editing .section{box-shadow:0 0 0 2px rgba(45,74,138,.18),var(-
 @media (min-width:1700px){.hdr-wide{display:inline-flex}}
 html.wide .wrap{max-width:none}
 @media (min-width:1700px){html.wide .wrap{padding-left:clamp(24px,2.5vw,56px);padding-right:clamp(24px,2.5vw,56px)}}
+/* Mój profil: adres do powiadomień e-mail obok przełącznika */
+.pw-addr{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0 2px 28px}
+.pw-addr .input{flex:1 1 220px;min-width:0}
+.pw-addr-hint{flex-basis:100%}
+@media (max-width:600px){.pw-addr{margin-left:0}}
+/* Mój profil: godziny powiadomień */
+.pw-win{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.pw-win-body{margin:6px 0 0 28px;display:flex;flex-direction:column;gap:8px}
+.pw-win-body[hidden]{display:none}
+.pw-win-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pw-win-row .input[type=time]{width:130px}
+.pw-days{display:flex;flex-wrap:wrap;gap:6px}
+.pw-day{min-width:42px;height:34px;border-radius:999px;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.pw-day.on{background:var(--accent);border-color:var(--accent);color:#fff}
+@media (max-width:600px){.pw-win-body{margin-left:0}}

@@ -33,8 +33,8 @@ function appSection() {
   const pushBox = h('div', {}, h('p', { class: 'hint' }, 'Sprawdzanie…'));
   const LABELS = [['zgloszenia', 'Zadania i zgłoszenia: nowe, przypisane do mnie, pytania i odpowiedzi'], ['komentarze', 'Komentarze i wykonanie w moich zgłoszeniach'], ['terminy', 'Poranny plan dnia (dni robocze): zgłoszenia na dziś, po terminie, terminy spraw M2 TAX']];
   async function drawPush() {
-    if (isIOS() && !isStandalone()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Na iPhonie i iPadzie powiadomienia działają tylko w aplikacji dodanej do ekranu początkowego (iOS 16.4 lub nowszy). Dodaj ją (instrukcja wyżej), otwórz z ikony i włącz powiadomienia tutaj.'));
-    if (!pushSupported()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Ta przeglądarka nie obsługuje powiadomień. Użyj Chrome, Edge, Firefox albo Safari w aktualnej wersji.'));
+    if (isIOS() && !isStandalone()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Na iPhonie i iPadzie powiadomienia działają tylko w aplikacji dodanej do ekranu początkowego (iOS 16.4 lub nowszy). Dodaj ją (instrukcja wyżej), otwórz z ikony i włącz powiadomienia tutaj.'), await mailToggle(false));
+    if (!pushSupported()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Ta przeglądarka nie obsługuje powiadomień. Użyj Chrome, Edge, Firefox albo Safari w aktualnej wersji.'), await mailToggle(false));
     const sub = await currentSubscription().catch(() => null);
     const on = !!sub && Notification.permission === 'granted';
     const prefs = { ...DEFAULT_PREFS, ...(on ? (await loadPrefs().catch(() => null)) || {} : {}) };
@@ -61,18 +61,54 @@ function appSection() {
   }
   // e-maile o zleceniach: można je wyłączyć, gdy działają powiadomienia (bez działających powiadomień mail i tak przyjdzie)
   async function mailToggle(on) {
-    const { data } = await sb.from('member_profiles').select('zl_email').eq('member_id', state.me.id).maybeSingle();
+    const { data } = await sb.from('member_profiles').select('zl_email, notify_email, notify_window').eq('member_id', state.me.id).maybeSingle();
     const cur = data?.zl_email !== false;
+    // własny adres do powiadomień e-mail (puste = adres logowania)
+    const addr = h('input', { class: 'input', type: 'email', inputmode: 'email', autocomplete: 'email', maxlength: 200, placeholder: state.me.email || 'adres e-mail', value: data?.notify_email || '', style: { maxWidth: '320px' } });
+    const saveAddr = h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: async () => {
+      const v = addr.value.trim();
+      const { data: r, error } = await sb.rpc('set_notify_email', { p_email: v || null });
+      if (error) return fail(error);
+      addr.value = r || '';
+      toast(r ? `Powiadomienia e-mail będą przychodzić na ${r}` : `Powiadomienia e-mail będą przychodzić na ${state.me.email}`);
+    } }, 'Zapisz adres');
+    addr.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveAddr.click(); } });
+    const addrRow = h('div', { class: 'pw-addr' }, h('span', { class: 'small' }, 'Adres do powiadomień:'), addr, saveAddr,
+      h('span', { class: 'small muted pw-addr-hint' }, `Puste = adres logowania (${state.me.email || '—'}).`));
     const cb = h('input', { type: 'checkbox', checked: cur });
     cb.addEventListener('change', async () => {
       const { error } = await sb.rpc('set_zl_email', { p_on: cb.checked });
       if (error) { cb.checked = !cb.checked; return fail(error); }
       toast(cb.checked ? 'E-maile o zadaniach włączone' : 'E-maile o zadaniach wyłączone – zostają powiadomienia');
     });
+    // godziny i dni powiadomień (telefon i e-mail); poza nimi – zbiorczo na początku kolejnego okna
+    const w0 = data?.notify_window || null;
+    const wOn = h('input', { type: 'checkbox', checked: !!w0?.on });
+    const wFrom = h('input', { class: 'input', type: 'time', value: w0?.from || '08:00', step: 900 });
+    const wTo = h('input', { class: 'input', type: 'time', value: w0?.to || '17:00', step: 900 });
+    const DN = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
+    const dset = new Set((w0?.days || [1, 2, 3, 4, 5]).map(Number));
+    const dayBtns = DN.map((l, i) => { const b = h('button', { type: 'button', class: 'pw-day' + (dset.has(i + 1) ? ' on' : ''), 'aria-pressed': String(dset.has(i + 1)), onclick: () => { dset.has(i + 1) ? dset.delete(i + 1) : dset.add(i + 1); b.classList.toggle('on', dset.has(i + 1)); b.setAttribute('aria-pressed', String(dset.has(i + 1))); } }, l); return b; });
+    const wBody = h('div', { class: 'pw-win-body', hidden: !w0?.on },
+      h('div', { class: 'pw-win-row' }, h('span', { class: 'small' }, 'od'), wFrom, h('span', { class: 'small' }, 'do'), wTo),
+      h('div', { class: 'pw-days' }, ...dayBtns),
+      h('div', { class: 'pw-win-row' }, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => saveWin() }, 'Zapisz godziny'),
+        h('span', { class: 'small muted' }, 'Np. 8:00–17:00, Pn–Pt: wieczorem i w weekend cisza, a w poniedziałek o 8:00 przyjdzie jedno zbiorcze powiadomienie.')));
+    const saveWin = async () => {
+      const p = wOn.checked ? { on: true, from: wFrom.value, to: wTo.value, days: [...dset].sort() } : { on: false };
+      const { data: r, error } = await sb.rpc('set_notify_window', { p });
+      if (error) return fail(error);
+      toast(r ? `Powiadomienia: ${r.from}–${r.to}, ${r.days.map(d => DN[d - 1]).join(', ')}` : 'Powiadomienia przychodzą o każdej porze');
+    };
+    wOn.addEventListener('change', () => { wBody.hidden = !wOn.checked; if (!wOn.checked) saveWin(); });
+    const winBox = h('div', { class: 'pw-win' },
+      h('label', { class: 'check', style: { margin: '4px 0' } }, wOn, h('span', {}, h('b', {}, 'Powiadomienia tylko w wybranych godzinach i dniach'), h('br'),
+        h('span', { class: 'small muted' }, 'Dotyczy telefonu i e-maili. To, co przyjdzie poza tymi godzinami, nie przepada – dostaniesz to zbiorczo na początku kolejnego okna.'))),
+      wBody);
     return h('div', { class: 'pw-mail' }, h('label', { class: 'check', style: { margin: '4px 0' } }, cb, h('span', {}, h('b', {}, 'Wysyłaj mi też e-maile o zadaniach'), h('br'),
       h('span', { class: 'small muted' }, on
         ? 'Odznacz, jeśli wystarczą Ci powiadomienia. Gdy na żadnym urządzeniu nie masz włączonych powiadomień (albo przestaną działać), e-mail i tak przyjdzie – nic nie przepadnie.'
-        : 'Najpierw włącz powiadomienia na tym urządzeniu. Bez działających powiadomień e-maile o zadaniach przychodzą zawsze.'))));
+        : 'Najpierw włącz powiadomienia na tym urządzeniu. Bez działających powiadomień e-maile o zadaniach przychodzą zawsze.'))), addrRow, winBox);
   }
   drawPush();
   // Face ID / odcisk palca – tylko w aplikacji na telefonie

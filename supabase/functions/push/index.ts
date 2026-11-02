@@ -26,15 +26,38 @@ const loadConfig = () => cfgLoaded ||= (async () => {
 const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
 const plusDays = (n: number) => { const d = new Date(today() + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const short = (s: string, n = 90) => (s || '').length > n ? s.slice(0, n - 1) + '…' : (s || '');
+// ---------- godziny powiadomień (Mój profil): poza nimi powiadomienia czekają w kolejce i przychodzą zbiorczo ----------
+const WD: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+const toMin = (s: string) => { const [h, m] = String(s || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+function windowOpen(w: any, at = new Date()): boolean {
+  if (!w?.on) return true;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Warsaw', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(at).map(x => [x.type, x.value]));
+  const day = WD[p.weekday] || 1, min = (+p.hour % 24) * 60 + +p.minute, days: number[] = Array.isArray(w.days) ? w.days.map(Number) : [];
+  const f = toMin(w.from), t = toMin(w.to);
+  if (f === t) return days.includes(day);
+  if (f < t) return days.includes(day) && min >= f && min < t;
+  // przez północ (np. 22:00–06:00): liczy się dzień rozpoczęcia
+  if (min >= f) return days.includes(day);
+  return days.includes(day === 1 ? 7 : day - 1) && min < t;
+}
 const ticketUrl = (t: any) => (t.module === 'm2' ? `/#/doradztwo/zgloszenia/${t.id}` : `/#/zgloszenia/${t.id}`);
 
 // wysyłka do wszystkich urządzeń osoby (z uwzględnieniem jej ustawień); martwe subskrypcje są usuwane
-async function notify(memberIds: (string | null | undefined)[], category: string, msg: { title: string; body: string; url: string; tag?: string }) {
-  const ids = [...new Set(memberIds.filter(Boolean))] as string[];
+// poza godzinami powiadomień osoby – zapis do kolejki (przyjdzie zbiorczo, gdy zacznie się jej okno)
+async function notify(memberIds: (string | null | undefined)[], category: string, msg: { title: string; body: string; url: string; tag?: string }, force = false) {
+  let ids = [...new Set(memberIds.filter(Boolean))] as string[];
   if (!ids.length) return 0;
-  const { data: subs } = await db.from('push_subscriptions').select('id, member_id, endpoint, p256dh, auth, prefs, fail_count').in('member_id', ids);
+  const { data: subs0 } = await db.from('push_subscriptions').select('id, member_id, endpoint, p256dh, auth, prefs, fail_count').in('member_id', ids);
+  const subs = (subs0 || []).filter(s => (s.prefs?.[category] ?? true) !== false);
+  if (!force) {
+    const { data: pf } = await db.from('member_profiles').select('member_id, notify_window').in('member_id', ids);
+    const closed = new Set((pf || []).filter(r => !windowOpen(r.notify_window)).map(r => r.member_id));
+    const wait = ids.filter(id => closed.has(id) && subs.some(s => s.member_id === id));
+    if (wait.length) await db.from('notify_queue').insert(wait.map(id => ({ member_id: id, channel: 'push', category, title: msg.title, body: msg.body, url: msg.url })));
+    ids = ids.filter(id => !closed.has(id));
+  }
   let sent = 0;
-  await Promise.all((subs || []).filter(s => (s.prefs?.[category] ?? true) !== false).map(async s => {
+  await Promise.all(subs.filter(s => ids.includes(s.member_id)).map(async s => {
     try {
       const st = await sendPush(s, msg, VAPID);
       if (st === 404 || st === 410) await db.from('push_subscriptions').delete().eq('id', s.id);
@@ -127,6 +150,7 @@ async function onZlecenie(b: any) {
   if (['nowe', 'poprawka', 'odpowiedz', 'zaakceptowane'].includes(ev)) to = [z.assignee_id];
   else if (['pytanie', 'zgloszone'].includes(ev)) to = [z.created_by];
   else if (ev === 'komentarz') to = [z.assignee_id, z.created_by].filter(x => x !== b.actor);
+  to = to.filter(x => x && x !== b.actor); // bez powiadomień o własnych czynnościach (np. zadanie dla siebie)
   if (!to.length) return 0;
   const { data: a } = b.actor ? await db.from('team_members').select('full_name').eq('id', b.actor).maybeSingle() : { data: null };
   let extra = '';
@@ -136,6 +160,25 @@ async function onZlecenie(b: any) {
     body: [short(z.title), a?.full_name && ev !== 'nowe' ? a.full_name : '', extra ? short(extra, 100) : '', ev === 'nowe' && z.due_date ? `termin ${z.due_date.split('-').reverse().join('.')}` : ''].filter(Boolean).join(' · '),
     url: `/#/zlecenia/${z.id}`, tag: `zl-${z.id}`,
   });
+}
+
+// wysyłka zbiorcza: to, co czekało w kolejce, gdy u danej osoby zaczęło się okno powiadomień
+async function flush() {
+  const { data: q } = await db.from('notify_queue').select('id, member_id, title, body, url, created_at').eq('channel', 'push').is('sent_at', null).order('created_at').limit(2000);
+  if (!q?.length) return 0;
+  const by = new Map<string, any[]>(); q.forEach(r => by.set(r.member_id, [...(by.get(r.member_id) || []), r]));
+  const { data: pf } = await db.from('member_profiles').select('member_id, notify_window').in('member_id', [...by.keys()]);
+  const win = new Map((pf || []).map(r => [r.member_id, r.notify_window]));
+  let sent = 0;
+  for (const [mid, items] of by) {
+    if (!windowOpen(win.get(mid))) continue;
+    const n = items.length, last = items[n - 1];
+    const msg = n === 1 ? { title: last.title, body: last.body || '', url: last.url || '/', tag: 'digest' }
+      : { title: `Powiadomienia z przerwy (${n})`, body: items.slice(-3).reverse().map(i => short(i.title, 50)).join(' · ') + (n > 3 ? ` · i ${n - 3} więcej` : ''), url: '/#/moje', tag: 'digest' };
+    sent += await notify([mid], 'digest', msg, true);
+    await db.from('notify_queue').update({ sent_at: new Date().toISOString() }).in('id', items.map(i => i.id));
+  }
+  return sent;
 }
 
 // poranny przegląd: zgłoszenia na dziś / po terminie oraz terminy spraw M2 na dziś i jutro
@@ -183,6 +226,7 @@ Deno.serve(async (req) => {
       if (body.event === 'docs_uploaded' || body.event === 'docs_remind') return json({ sent: await onDocs(String(body.request_id || ''), body.event === 'docs_remind', +body.count || 0) });
       if (body.event === 'monitor_alert') return json({ sent: await onMonitor(body) });
       if (body.event === 'zlecenie') return json({ sent: await onZlecenie(body) });
+      if (body.event === 'flush') return json({ sent: await flush() });
       return json({ error: 'Nieznane zdarzenie' }, 400);
     }
     // zalogowany użytkownik: tylko powiadomienie testowe na własne urządzenia
@@ -193,7 +237,7 @@ Deno.serve(async (req) => {
     const { data: me } = await db.from('team_members').select('id, full_name, active').eq('email', email).maybeSingle();
     if (!me?.active) return json({ error: 'Brak dostępu' }, 403);
     if (body.event === 'test') {
-      const sent = await notify([me.id], 'test', { title: 'Powiadomienia działają', body: `Cześć ${me.full_name.split(' ')[0]}! Tak będą wyglądały powiadomienia z aplikacji RKDP.`, url: '/#/profil', tag: 'test' });
+      const sent = await notify([me.id], 'test', { title: 'Powiadomienia działają', body: `Cześć ${me.full_name.split(' ')[0]}! Tak będą wyglądały powiadomienia z aplikacji RKDP.`, url: '/#/profil', tag: 'test' }, true);
       return json({ sent });
     }
     return json({ error: 'Nieznane zdarzenie' }, 400);

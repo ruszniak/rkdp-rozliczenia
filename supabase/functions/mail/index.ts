@@ -220,20 +220,39 @@ function kwotyHtml(period: string, items: any[], _note: string, sigHtml: string)
     + `</table></td></tr></table></body></html>`;
 }
 
+// ---------- godziny powiadomień (Mój profil): poza nimi powiadomienia czekają w kolejce i przychodzą zbiorczo ----------
+const WD: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+const toMin = (s: string) => { const [h, m] = String(s || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+function windowOpen(w: any, at = new Date()): boolean {
+  if (!w?.on) return true;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Warsaw', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(at).map(x => [x.type, x.value]));
+  const day = WD[p.weekday] || 1, min = (+p.hour % 24) * 60 + +p.minute, days: number[] = Array.isArray(w.days) ? w.days.map(Number) : [];
+  const f = toMin(w.from), t = toMin(w.to);
+  if (f === t) return days.includes(day);
+  if (f < t) return days.includes(day) && min >= f && min < t;
+  // przez północ (np. 22:00–06:00): liczy się dzień rozpoczęcia
+  if (min >= f) return days.includes(day);
+  return days.includes(day === 1 ? 7 : day - 1) && min < t;
+}
+
 // ---------- zlecenia: e-mail do pracownika (nowe, poprawka, odpowiedź, akceptacja) albo do zlecającego (pytanie, wykonanie) ----------
 const APP_URL = 'https://rozliczenia.rkdp.pl';
 async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
   const { data: z } = await admin.from('zlecenia').select('id, no, title, body, assignee_id, created_by, due_date, priority, steps, client_id').eq('id', String(b.id || '')).maybeSingle();
   if (!z) return { sent: 0 };
   const ev = String(b.ev || '');
+  // zadanie dodane samemu sobie – bez maila o nowym zadaniu
+  if (ev === 'nowe' && z.created_by && z.created_by === z.assignee_id) return { sent: 0, reason: 'self' };
   const toId = ['pytanie', 'zgloszone'].includes(ev) ? z.created_by : z.assignee_id;
   const ids = [z.assignee_id, z.created_by].filter(Boolean);
   const { data: ms } = await admin.from('team_members').select('id, full_name, email').in('id', ids);
   const m = new Map((ms || []).map((x: any) => [x.id, x]));
   const to = m.get(toId), from = m.get(toId === z.assignee_id ? z.created_by : z.assignee_id);
-  if (!to?.email || !emailOk(String(to.email))) return { sent: 0, reason: 'brak adresu' };
+  // odbiorca może wskazać własny adres do powiadomień (Mój profil)
+  const { data: pr } = to ? await admin.from('member_profiles').select('zl_email, notify_email, notify_window').eq('member_id', to.id).maybeSingle() : { data: null };
+  const toAddr = pr?.notify_email && emailOk(String(pr.notify_email)) ? String(pr.notify_email) : String(to?.email || '');
+  if (!to || !toAddr || !emailOk(toAddr)) return { sent: 0, reason: 'brak adresu' };
   // odbiorca wyłączył e-maile o zleceniach (Mój profil) – wystarczy powiadomienie push, o ile ma choć jedno działające
-  const { data: pr } = await admin.from('member_profiles').select('zl_email').eq('member_id', to.id).maybeSingle();
   if (pr?.zl_email === false) {
     const { data: subs } = await admin.from('push_subscriptions').select('prefs, fail_count').eq('member_id', to.id);
     if ((subs || []).some((x: any) => (x.fail_count || 0) < 3 && (x.prefs?.zgloszenia ?? true) !== false)) return { sent: 0, reason: 'push' };
@@ -267,8 +286,50 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }) {
     + (note ? `<p style="white-space:pre-wrap;background:#F5E7CF;padding:10px 12px;border-radius:8px">${escH(note)}</p>` : '')
     + `<p style="margin:18px 0"><a href="${link}" style="background:#2D4A8A;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">Otwórz zadanie</a></p>`
     + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z aplikacji RKDP. <b>Nie odpowiadaj na tego maila</b> – odpowiedzi nie trafiają do aplikacji. Pytania, komentarze i zgłoszenie wykonania wpisuj w zadaniu w aplikacji (przycisk wyżej).</p></div>`;
-  try { await sendMail(cfg, 'RKDP | Zadania', String(to.email), subject, text, html); return { sent: 1 }; }
+  // poza godzinami powiadomień odbiorcy – do kolejki (przyjdzie zbiorczo)
+  if (!windowOpen(pr?.notify_window)) {
+    await admin.from('notify_queue').insert({ member_id: to.id, channel: 'mail', category: 'zadania', title: subject, body: text, html, url: link });
+    return { sent: 0, queued: 1 };
+  }
+  try { await sendMail(cfg, 'RKDP | Zadania', toAddr, subject, text, html); return { sent: 1 }; }
   catch (e) { console.error('zlecenie mail', e); return { sent: 0, error: String((e as Error).message || e).slice(0, 200) }; }
+}
+
+// wysyłka zbiorcza e-maili, które czekały (poza godzinami powiadomień)
+async function flushMail(cfg: { sub: string; from: string }) {
+  const { data: q } = await admin.from('notify_queue').select('id, member_id, title, body, html, url, created_at').eq('channel', 'mail').is('sent_at', null).order('created_at').limit(1000);
+  if (!q?.length) return { sent: 0 };
+  const by = new Map<string, any[]>(); q.forEach((r: any) => by.set(r.member_id, [...(by.get(r.member_id) || []), r]));
+  const ids = [...by.keys()];
+  const [{ data: pf }, { data: ms }] = await Promise.all([
+    admin.from('member_profiles').select('member_id, notify_window, notify_email').in('member_id', ids),
+    admin.from('team_members').select('id, email').in('id', ids),
+  ]);
+  const P = new Map((pf || []).map((r: any) => [r.member_id, r])), E = new Map((ms || []).map((r: any) => [r.id, r.email]));
+  let sent = 0;
+  for (const [mid, items] of by) {
+    const pr: any = P.get(mid);
+    if (!windowOpen(pr?.notify_window)) continue;
+    const addr = pr?.notify_email && emailOk(String(pr.notify_email)) ? String(pr.notify_email) : String(E.get(mid) || '');
+    const done = () => admin.from('notify_queue').update({ sent_at: new Date().toISOString() }).in('id', items.map((i: any) => i.id));
+    if (!emailOk(addr)) { await done(); continue; }
+    try {
+      if (items.length === 1) await sendMail(cfg, 'RKDP | Zadania', addr, items[0].title, items[0].body || '', items[0].html || undefined);
+      else {
+        const when = (d: string) => new Date(d).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const subject = `Powiadomienia z aplikacji RKDP (${items.length})`;
+        const text = ['Powiadomienia, które przyszły poza Twoimi godzinami powiadomień:', '', ...items.map((i: any) => `• ${when(i.created_at)} – ${i.title}\n  ${i.url || APP_URL}`), '', 'Godziny powiadomień zmienisz w aplikacji: Mój profil.'].join('\n');
+        const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;max-width:560px">`
+          + `<p style="margin:0 0 6px;color:#2D4A8A;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Zestawienie powiadomień</p>`
+          + `<h2 style="margin:0 0 12px;font-size:19px">Powiadomienia z przerwy (${items.length})</h2>`
+          + items.map((i: any) => `<div style="padding:10px 0;border-bottom:1px solid #E5E8EF"><div style="color:#5E6577;font-size:12px">${when(i.created_at)}</div><a href="${i.url || APP_URL}" style="color:#2D4A8A;font-weight:700;text-decoration:none">${escH(i.title)}</a></div>`).join('')
+          + `<p style="color:#5E564C;font-size:12px;margin-top:16px">Te powiadomienia przyszły poza Twoimi godzinami powiadomień. Godziny zmienisz w aplikacji: Mój profil.</p></div>`;
+        await sendMail(cfg, 'RKDP | Zadania', addr, subject, text, html);
+      }
+      await done(); sent++;
+    } catch (e) { console.error('flush mail', e); }
+  }
+  return { sent };
 }
 
 Deno.serve(async (req: Request) => {
@@ -283,6 +344,7 @@ Deno.serve(async (req: Request) => {
       if (!sec || hook.length !== sec.length || hook !== sec) return json({ error: 'Brak dostępu' }, 401);
       const body = await req.json().catch(() => ({}));
       if (body.action === 'zlecenie') return json(await zlecenieMail(body, await config()));
+      if (body.action === 'flush') return json(await flushMail(await config()));
       return json({ error: 'Nieznana operacja' }, 400);
     }
     const auth = req.headers.get('Authorization') || '';
