@@ -10,7 +10,7 @@ const PPSA = 'ustawy z dnia 30 sierpnia 2002 r. – Prawo o postępowaniu przed 
 export const ADDR = {
   us: 'Naczelnik [……] Urzędu Skarbowego w [……]\n[ulica i numer]\n[kod pocztowy, miejscowość]',
   dias: 'Dyrektor Izby Administracji Skarbowej we Wrocławiu\nul. Powstańców Śląskich 24\n53-333 Wrocław',
-  wsa: 'Wojewódzki Sąd Administracyjny we Wrocławiu\nul. Jedności Narodowej 6c\n50-260 Wrocław',
+  wsa: 'Wojewódzki Sąd Administracyjny we Wrocławiu\nul. Świętego Mikołaja 78-79\n50-126 Wrocław',
   nsa: 'Naczelny Sąd Administracyjny\nul. gen. Józefa Bema 2\n01-244 Warszawa',
   kis: 'Dyrektor Krajowej Informacji Skarbowej\nul. Teodora Sixta 17\n43-300 Bielsko-Biała',
 };
