@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.0', '2 listopada 2026', [
+    'Zadania: do zadania można dodać kolejne osoby, które pracują nad nim razem (widzą je, komentują, dodają pliki, odhaczają kroki; dostają powiadomienie). W Moich sprawach zakładka „Zakończone”.',
     'PDF w całej aplikacji (oferty, raporty, zestawienia, pełnomocnictwa, umowy, eksporty) zapisuje się od razu jako gotowy plik – bez okna drukowania; tekst w PDF da się zaznaczać, kopiować i wyszukiwać. Poprawiony wygląd podglądu oferty z linku.',
     'Kwoty do zapłaty: „+ Dodaj pozycję” – dodatkowe wiersze (np. kwota rozdzielona na części, osobna płatność) z własną nazwą, terminem, rachunkiem i tytułem przelewu; zapamiętują się dla klienta i miesiąca.',
     'Powiadomienia: własny adres e-mail do powiadomień oraz godziny i dni, w których mogą przychodzić (np. bez weekendów) – to, co przyjdzie poza nimi, dostajesz zbiorczo na początku kolejnego okna. Face ID ważne 24 godziny.',

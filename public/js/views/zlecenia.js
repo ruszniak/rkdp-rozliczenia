@@ -43,6 +43,10 @@ const OPEN = ['nowe', 'w_toku', 'pytanie', 'zgloszone'];
 const isAdmin = () => state.me?.role === 'admin';
 // zlecający danego zadania (albo administrator) – akceptuje, odpowiada, edytuje, anuluje
 const canManage = z => isAdmin() || z?.created_by === state.me?.id;
+const helpersOf = z => Array.isArray(z?.helpers) ? z.helpers : [];
+const isHelper = z => helpersOf(z).includes(state.me?.id);
+// osoby pracujące nad zadaniem: zlecający, wykonujący albo administrator mogą dodawać kolejne
+const canAddPeople = z => isAdmin() || z?.created_by === state.me?.id || z?.assignee_id === state.me?.id;
 const firstName = id => (memberById(id)?.full_name || '').split(' ')[0] || 'zlecający';
 const today = () => new Date().toLocaleDateString('sv-SE');
 const fmtD = d => d ? d.split('-').reverse().join('.') : '';
@@ -70,7 +74,7 @@ function row(z, onOpen) {
   return h('button', { type: 'button', class: 'zl-row' + (late(z) ? ' late' : '') + (z.status === 'zgloszone' && canManage(z) && z.assignee_id !== state.me.id ? ' attn' : '') + (['nowe', 'poprawka'].includes(z.status) && z.assignee_id === state.me.id ? ' attn' : ''), onclick: () => onOpen(z) },
     h('span', { class: 'zl-no' }, `#${z.no}`),
     h('span', { class: 'zl-main' }, h('b', {}, z.title, z.priority === 'pilne' ? h('span', { class: 'zl-hot' }, 'pilne') : null),
-      h('span', { class: 'zl-meta' }, ...[z.assignee_id !== state.me.id ? `dla: ${who(z.assignee_id)}` : z.created_by && z.created_by !== state.me.id ? `od: ${who(z.created_by)}` : '', st.length ? `kroki ${done}/${st.length}` : ''].filter(Boolean).join(' · '))),
+      h('span', { class: 'zl-meta' }, ...[z.assignee_id !== state.me.id ? `dla: ${who(z.assignee_id)}` : z.created_by && z.created_by !== state.me.id ? `od: ${who(z.created_by)}` : '', helpersOf(z).length ? `razem z: ${helpersOf(z).map(id => who(id).split(' ')[0]).join(', ')}` : '', st.length ? `kroki ${done}/${st.length}` : ''].filter(Boolean).join(' · '))),
     dueEl(z), pill(z));
 }
 
@@ -91,7 +95,7 @@ export async function renderZlecenia(main, id) {
       ['po', 'Po terminie', late],
       ['koniec', 'Zakończone', z => !OPEN.includes(z.status)],
     ] : [
-      ['aktywne', 'Do zrobienia', z => OPEN.includes(z.status) && z.assignee_id === state.me.id],
+      ['aktywne', 'Do zrobienia', z => OPEN.includes(z.status) && (z.assignee_id === state.me.id || isHelper(z))],
       ['zlecone', 'Zlecone przeze mnie', z => OPEN.includes(z.status) && z.created_by === state.me.id && z.assignee_id !== state.me.id],
       ['sprawdz', 'Do sprawdzenia', z => z.status === 'zgloszone' && z.created_by === state.me.id && z.assignee_id !== state.me.id],
       ['koniec', 'Zakończone', z => !OPEN.includes(z.status)]];
@@ -149,9 +153,12 @@ export async function newZlecenie(onDone, preset = {}) {
   const { data: cl } = await sb.from('clients').select('id,name').eq('status', 'aktywny').order('name');
   const client = h('select', { class: 'select' }, h('option', { value: '' }, '— bez klienta —'), ...(cl || []).map(c => h('option', { value: c.id, selected: c.id === preset.client_id }, c.name)));
   const editing = !!preset.id;
+  const hpick = new Set(helpersOf(preset));
+  const helperBox = h('div', { class: 'zl-people' }, ...team.filter(m => m.id !== preset.assignee_id).map(m => { const cb = h('input', { type: 'checkbox', checked: hpick.has(m.id) }); cb.addEventListener('change', () => cb.checked ? hpick.add(m.id) : hpick.delete(m.id)); return h('label', { class: 'zl-person-pick' }, cb, ava(m), m.id === state.me.id ? 'Ja' : m.full_name); }));
   const pending = [];
   modal(editing ? `Edytuj zadanie #${preset.no}` : 'Nowe zadanie', h('div', { class: 'zl-form' },
     editing ? null : h('div', { class: 'field' }, h('span', {}, 'Dla kogo'), people),
+    editing && canAddPeople(preset) ? h('div', { class: 'field' }, h('span', {}, 'Pracują razem nad zadaniem (dodatkowe osoby)'), helperBox) : null,
     h('label', { class: 'field' }, h('span', {}, 'Zadanie'), title),
     h('label', { class: 'field' }, h('span', {}, 'Opis'), body),
     h('div', { class: 'form-grid' }, h('label', { class: 'field' }, h('span', {}, 'Termin'), due), h('label', { class: 'field' }, h('span', {}, 'Klient (opcjonalnie)'), client)),
@@ -170,10 +177,29 @@ export async function newZlecenie(onDone, preset = {}) {
     const { data: made, error } = editing ? await sb.from('zlecenia').update(rec).eq('id', preset.id).select('id')
       : await sb.from('zlecenia').insert([...pick].map(a => ({ ...rec, assignee_id: a }))).select('id');
     if (error) { btn.disabled = false; return fail(error); }
+    if (editing && canAddPeople(preset) && [...hpick].sort().join() !== [...helpersOf(preset)].sort().join()) {
+      const { error: e2 } = await sb.rpc('zlecenie_osoby', { p_id: preset.id, p_helpers: [...hpick] });
+      if (e2) { btn.disabled = false; return fail(e2); }
+    }
     if (!editing && pending.length) { btn.textContent = 'Wysyłanie plików…'; for (const r of made || []) await uploadZl(r.id, pending); }
     close(); toast(editing ? 'Zapisano zmiany' : pick.size > 1 ? `Zlecono ${pick.size} osobom – wysłano powiadomienia` : [...pick][0] === state.me.id ? 'Dodano zadanie dla Ciebie' : `Zlecono: ${who([...pick][0])} – wysłano powiadomienie`);
     onDone?.();
   } }, editing ? 'Zapisz' : 'Zleć')], { wide: true });
+}
+
+// ---------- osoby pracujące razem nad zadaniem ----------
+function peopleDialog(z, onDone) {
+  const team = state.members.filter(m => m.active !== false && m.id !== z.assignee_id && (m.role === 'admin' || (m.modules || ['rozliczenia']).includes('rozliczenia')));
+  const pick = new Set(helpersOf(z));
+  const box = h('div', { class: 'zl-people' }, ...team.map(m => { const cb = h('input', { type: 'checkbox', checked: pick.has(m.id) }); cb.addEventListener('change', () => cb.checked ? pick.add(m.id) : pick.delete(m.id)); return h('label', { class: 'zl-person-pick' }, cb, ava(m), m.id === state.me.id ? 'Ja' : m.full_name); }));
+  modal(`Osoby w zadaniu #${z.no}`, h('div', { class: 'zl-form' },
+    h('p', { class: 'small muted', style: { marginTop: 0 } }, `Wykonuje: ${who(z.assignee_id)}. Zaznacz osoby, które mają pracować razem nad tym zadaniem – zobaczą je u siebie, mogą komentować, dodawać pliki i odhaczać kroki. Nowe osoby dostaną powiadomienie.`), box),
+  close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async e => {
+    e.currentTarget.disabled = true;
+    const { error } = await sb.rpc('zlecenie_osoby', { p_id: z.id, p_helpers: [...pick] });
+    if (error) { e.currentTarget.disabled = false; return fail(error); }
+    close(); toast('Zapisano osoby w zadaniu'); onDone?.();
+  } }, 'Zapisz')]);
 }
 
 // ---------- szczegóły zlecenia ----------
@@ -189,6 +215,7 @@ export async function openZlecenie(id, onChange) {
   if (error || !z) return toast('Nie znaleziono zadania (albo nie masz do niego dostępu)', true);
   const mine = z.assignee_id === state.me.id;
   admin = canManage(z); // zlecający tego zadania ma te same przyciski co administrator
+  const helper = isHelper(z);
   const boss = firstName(z.created_by);
   const { data: cl } = z.client_id ? await sb.from('clients').select('name').eq('id', z.client_id).maybeSingle() : { data: null };
   let closeFn = () => {};
@@ -209,7 +236,7 @@ export async function openZlecenie(id, onChange) {
 
   const st = stepsOf(z);
   const stepsBox = st.length ? h('div', { class: 'zl-steps' }, ...st.map((s, i) => {
-    const cb = h('input', { type: 'checkbox', checked: !!s.done, disabled: !(mine || admin) || !OPEN.includes(z.status) });
+    const cb = h('input', { type: 'checkbox', checked: !!s.done, disabled: !(mine || admin || helper) || !OPEN.includes(z.status) });
     cb.addEventListener('change', async () => { const { error: e } = await sb.rpc('zlecenie_krok', { p_id: id, p_idx: i, p_done: cb.checked }); if (e) { cb.checked = !cb.checked; return fail(e); } s.done = cb.checked; onChange?.(); });
     return h('label', { class: 'check zl-step' }, cb, s.t);
   })) : null;
@@ -236,7 +263,7 @@ export async function openZlecenie(id, onChange) {
     if (cAtt.length) await uploadZl(id, cAtt, w.id);
     toast('Dodano komentarz'); refresh();
   };
-  const composer = (mine || admin) && z.status !== 'anulowane' ? h('div', { class: 'zl-composer' }, comment, cList,
+  const composer = (mine || admin || helper) && z.status !== 'anulowane' ? h('div', { class: 'zl-composer' }, comment, cList,
     h('div', { class: 'zl-ctools' },
       h('button', { type: 'button', class: 'zl-tool', title: 'Dołącz plik', onclick: () => fileIn.click() }, '📎', h('span', {}, 'Plik')),
       h('button', { type: 'button', class: 'zl-tool', title: 'Zrób zdjęcie', onclick: () => camIn.click() }, '📷', h('span', {}, 'Zdjęcie')),
@@ -290,6 +317,8 @@ export async function openZlecenie(id, onChange) {
     h('div', { class: 'zl-dhead' }, h('h3', {}, z.title, z.priority === 'pilne' ? h('span', { class: 'zl-hot' }, 'pilne') : null), pill(z)),
     h('div', { class: 'zl-dmeta' },
       h('span', {}, 'Dla: ', h('b', {}, who(z.assignee_id))), h('span', {}, 'Zlecił(a): ', who(z.created_by)), dueEl(z),
+      helpersOf(z).length || canAddPeople(z) ? h('span', { class: 'zl-helpers' }, helpersOf(z).length ? ['Razem z: ', h('b', {}, helpersOf(z).map(who).join(', '))] : null,
+        canAddPeople(z) && OPEN.includes(z.status) ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm zl-addp', onclick: () => peopleDialog(z, () => { closeFn(); onChange?.(); openZlecenie(id, onChange); }) }, helpersOf(z).length ? 'Zmień osoby' : '+ Dodaj osobę') : null) : null,
       cl?.name ? h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name) : null),
     z.body ? h('div', { class: 'zl-body' }, z.body) : null,
     stepper,

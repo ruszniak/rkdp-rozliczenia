@@ -22,7 +22,7 @@ async function collect() {
   const me = state.me.id, admin = state.me.role === 'admin', out = [];
   const soft = async q => { const { data, error } = await q; return error ? [] : (data || []); };
   const [zl, tk, cs] = await Promise.all([
-    soft(sb.from('zlecenia').select('id,no,title,status,due_date,priority,assignee_id,created_by,created_at').in('status', ['nowe', 'w_toku', 'pytanie', 'zgloszone'])),
+    soft(sb.from('zlecenia').select('id,no,title,status,due_date,priority,assignee_id,created_by,created_at,helpers').in('status', ['nowe', 'w_toku', 'pytanie', 'zgloszone'])),
     soft(sb.from('rkdp_tickets').select('id,no,title,status,due_date,priority,client_id,m2_client_id,module,created_at').eq('assignee_id', me).in('status', TK_OPEN)),
     soft(sb.from('clients').select('id,name,accountant_id,hr_id').eq('status', 'aktywny')),
   ]);
@@ -30,9 +30,10 @@ async function collect() {
   const myClients = new Set(cs.filter(c => c.accountant_id === me || c.hr_id === me).map(c => c.id));
   // zlecenia: pracownik – swoje do zrobienia; zlecający (administrator) – wszystkie aktywne, które zlecił (u kogo i na jakim etapie)
   const ZS = { nowe: 'nowe – jeszcze nie rozpoczęte', w_toku: 'w trakcie', pytanie: 'pytanie od pracownika – odpowiedz', zgloszone: 'zgłoszone – do sprawdzenia' };
-  zl.filter(z => z.assignee_id === me && z.created_by !== me ? ['nowe', 'w_toku', 'pytanie'].includes(z.status) : (z.created_by === me || admin)).forEach(z => out.push({
+  const helps = z => Array.isArray(z.helpers) && z.helpers.includes(me);
+  zl.filter(z => (z.assignee_id === me && z.created_by !== me) || (helps(z) && z.created_by !== me) ? ['nowe', 'w_toku', 'pytanie'].includes(z.status) : (z.created_by === me || admin)).forEach(z => out.push({
     kind: 'zlecenie', id: z.id, title: z.title, due: z.due_date, hot: z.priority === 'pilne' || (z.assignee_id !== me && ['zgloszone', 'pytanie'].includes(z.status)), created: z.created_at,
-    sub: z.assignee_id === me ? (z.status === 'pytanie' ? 'czeka na odpowiedź' : z.status === 'zgloszone' ? 'zgłoszone – czeka na akceptację' : z.status === 'nowe' ? (z.created_by && z.created_by !== me ? `nowe – od ${(memberById(z.created_by)?.full_name || '').split(' ')[0]}` : 'nowe – jeszcze nie rozpoczęte') : 'w trakcie') : (ZS[z.status] || z.status),
+    sub: z.assignee_id !== me && helps(z) ? `razem z: ${(memberById(z.assignee_id)?.full_name || '').split(' ')[0]} · ${ZS[z.status] || z.status}` : z.assignee_id === me ? (z.status === 'pytanie' ? 'czeka na odpowiedź' : z.status === 'zgloszone' ? 'zgłoszone – czeka na akceptację' : z.status === 'nowe' ? (z.created_by && z.created_by !== me ? `nowe – od ${(memberById(z.created_by)?.full_name || '').split(' ')[0]}` : 'nowe – jeszcze nie rozpoczęte') : 'w trakcie') : (ZS[z.status] || z.status),
     person: z.assignee_id === me ? memberById(z.created_by) : memberById(z.assignee_id), personRole: z.assignee_id === me ? 'zleca' : 'wykonuje',
     open: () => import('./zlecenia.js').then(m => m.openZlecenie(z.id, reload)) }));
   tk.forEach(t => out.push({ kind: 'zadanie', id: t.id, title: t.title, due: t.due_date, hot: ['pilny', 'wysoki'].includes(t.priority), created: t.created_at,
@@ -58,7 +59,7 @@ async function collectClosed() {
   const me = state.me.id, since = new Date(Date.now() - 90 * 86400000).toISOString();
   const soft = async q => { const { data, error } = await q; return error ? [] : (data || []); };
   const [zl, tk] = await Promise.all([
-    soft(sb.from('zlecenia').select('id,no,title,status,assignee_id,created_by,accepted_at,updated_at').in('status', ['zaakceptowane', 'anulowane']).or(`assignee_id.eq.${me},created_by.eq.${me}`).gte('updated_at', since).order('updated_at', { ascending: false }).limit(200)),
+    soft(sb.from('zlecenia').select('id,no,title,status,assignee_id,created_by,accepted_at,updated_at,helpers').in('status', ['zaakceptowane', 'anulowane']).or(`assignee_id.eq.${me},created_by.eq.${me},helpers.cs.{${me}}`).gte('updated_at', since).order('updated_at', { ascending: false }).limit(200)),
     soft(sb.from('rkdp_tickets').select('id,no,title,status,module,updated_at,done_at').eq('assignee_id', me).in('status', ['zrobione', 'anulowane']).gte('updated_at', since).order('updated_at', { ascending: false }).limit(200)),
   ]);
   return [

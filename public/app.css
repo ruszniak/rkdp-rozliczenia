@@ -2354,3 +2354,6 @@ html.wide .wrap{max-width:none}
 .mj-done{background:#E5F4E4;color:#2F6B3A}
 .mj-row.mj-closed b{color:var(--muted,#5E6577);font-weight:600}
 .zl-chip-done{margin-left:auto}
+/* zadania: osoby pracujące razem */
+.zl-helpers{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.zl-addp{padding:2px 8px;min-height:0}

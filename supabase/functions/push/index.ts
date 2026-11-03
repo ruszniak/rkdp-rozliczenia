@@ -140,16 +140,17 @@ async function onMonitor(b: any) {
 // zlecenia od administratora: nowe / poprawka / odpowiedź / akceptacja → pracownik; pytanie / zgłoszenie → zlecający; komentarz → druga strona
 const ZL_TITLE: Record<string, string> = {
   nowe: 'Nowe zadanie', poprawka: 'Zadanie do poprawy', odpowiedz: 'Odpowiedź na pytanie', zaakceptowane: 'Zadanie zaakceptowane ✓',
-  pytanie: 'Pytanie do zadania', zgloszone: 'Zadanie wykonane – do sprawdzenia', komentarz: 'Komentarz w zadaniu',
+  pytanie: 'Pytanie do zadania', zgloszone: 'Zadanie wykonane – do sprawdzenia', komentarz: 'Komentarz w zadaniu', dodany: 'Dodano Cię do zadania',
 };
 async function onZlecenie(b: any) {
-  const { data: z } = await db.from('zlecenia').select('id, no, title, assignee_id, created_by, due_date').eq('id', b.id).maybeSingle();
+  const { data: z } = await db.from('zlecenia').select('id, no, title, assignee_id, created_by, due_date, helpers').eq('id', b.id).maybeSingle();
   if (!z) return 0;
   const ev = String(b.ev || '');
   let to: (string | null)[] = [];
   if (['nowe', 'poprawka', 'odpowiedz', 'zaakceptowane'].includes(ev)) to = [z.assignee_id];
   else if (['pytanie', 'zgloszone'].includes(ev)) to = [z.created_by];
-  else if (ev === 'komentarz') to = [z.assignee_id, z.created_by].filter(x => x !== b.actor);
+  else if (ev === 'komentarz') to = [z.assignee_id, z.created_by, ...(z.helpers || [])].filter(x => x !== b.actor);
+  else if (ev === 'dodany') to = Array.isArray(b.to) ? b.to : [];
   to = to.filter(x => x && x !== b.actor); // bez powiadomień o własnych czynnościach (np. zadanie dla siebie)
   if (!to.length) return 0;
   const { data: a } = b.actor ? await db.from('team_members').select('full_name').eq('id', b.actor).maybeSingle() : { data: null };
@@ -157,7 +158,7 @@ async function onZlecenie(b: any) {
   if (ev === 'komentarz' && b.wpis) extra = (await db.from('zlecenia_wpisy').select('body').eq('id', b.wpis).maybeSingle()).data?.body || '';
   return notify(to, 'zgloszenia', {
     title: `${ZL_TITLE[ev] || 'Zadanie'} #${z.no}`,
-    body: [short(z.title), a?.full_name && ev !== 'nowe' ? a.full_name : '', extra ? short(extra, 100) : '', ev === 'nowe' && z.due_date ? `termin ${z.due_date.split('-').reverse().join('.')}` : ''].filter(Boolean).join(' · '),
+    body: [short(z.title), a?.full_name && ev !== 'nowe' ? (ev === 'dodany' ? 'dodał(a): ' : '') + a.full_name : '', extra ? short(extra, 100) : '', ev === 'nowe' && z.due_date ? `termin ${z.due_date.split('-').reverse().join('.')}` : ''].filter(Boolean).join(' · '),
     url: `/#/zlecenia/${z.id}`, tag: `zl-${z.id}`,
   });
 }
