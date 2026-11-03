@@ -2174,7 +2174,7 @@ main>.page-head:first-child .info-i,main>a+.page-head .info-i{color:var(--accent
 /* ---- logowanie, blokada Face ID ---- */
 .login-side{background:radial-gradient(90% 70% at 85% 0%,rgba(134,148,174,.35),transparent 60%),linear-gradient(160deg,#223052 0%,#2D4A8A 100%)!important}
 .login-side .eyebrow,.login-side .kicker{color:#C3CBDB}
-.login-side h2 em{background:linear-gradient(100deg,#AEB8CC 0%,#fff 45%,#AEB8CC 70%)!important;background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.login-side h2 em{background-image:linear-gradient(100deg,#AEB8CC 0%,#fff 45%,#AEB8CC 70%)!important;background-size:220% 100%!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;color:transparent;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .fid-lock{background:linear-gradient(#223052 0 env(safe-area-inset-top),var(--bg) env(safe-area-inset-top))}
 .fid-icon{color:var(--accent)}
 
