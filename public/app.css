@@ -2350,3 +2350,7 @@ html.wide .wrap{max-width:none}
 /* wyciągi: brak kratki – dodaj i zaznacz */
 .cb.cb-add{background:transparent;border:1.5px dashed var(--line-2,#C9D0DC);color:var(--muted,#8A93A6);font-weight:600;font-size:14px;line-height:1}
 .cb.cb-add:hover{border-color:var(--accent);color:var(--accent)}
+/* Moje sprawy: zakończone */
+.mj-done{background:#E5F4E4;color:#2F6B3A}
+.mj-row.mj-closed b{color:var(--muted,#5E6577);font-weight:600}
+.zl-chip-done{margin-left:auto}

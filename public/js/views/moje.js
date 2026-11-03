@@ -10,7 +10,7 @@ const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null &
 const today = () => new Date().toLocaleDateString('sv-SE');
 const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
 const fmtD = d => d ? d.slice(0, 10).split('-').reverse().join('.') : '';
-const KINDS = { zlecenie: ['Zadanie', 'mj-zl'], zadanie: ['Przy kliencie', 'mj-tk'], pytanie: ['Pytanie', 'mj-q'], termin: ['Termin', 'mj-dl'] };
+const KINDS = { zamkniete: ['Zakończone', 'mj-done'], zlecenie: ['Zadanie', 'mj-zl'], zadanie: ['Przy kliencie', 'mj-tk'], pytanie: ['Pytanie', 'mj-q'], termin: ['Termin', 'mj-dl'] };
 const HELP = `Wszystko, co czeka na Ciebie, w jednym miejscu:
 • Zadania – dodatkowe zadania w zespole; każdy może dodać zadanie dla siebie lub innej osoby, także dla Michała (po wykonaniu kliknij „Zrobione – zgłaszam”); zlecający widzi tu wszystkie swoje aktywne zadania i ich etap,
 • Przy kliencie – zadania przy klientach z rozmów,
@@ -53,15 +53,47 @@ async function collect() {
   return out;
 }
 
+// zakończone w ostatnich 90 dniach: zadania (zaakceptowane / anulowane), które wykonywałem albo zlecałem, i moje zgłoszenia przy klientach
+async function collectClosed() {
+  const me = state.me.id, since = new Date(Date.now() - 90 * 86400000).toISOString();
+  const soft = async q => { const { data, error } = await q; return error ? [] : (data || []); };
+  const [zl, tk] = await Promise.all([
+    soft(sb.from('zlecenia').select('id,no,title,status,assignee_id,created_by,accepted_at,updated_at').in('status', ['zaakceptowane', 'anulowane']).or(`assignee_id.eq.${me},created_by.eq.${me}`).gte('updated_at', since).order('updated_at', { ascending: false }).limit(200)),
+    soft(sb.from('rkdp_tickets').select('id,no,title,status,module,updated_at,done_at').eq('assignee_id', me).in('status', ['zrobione', 'anulowane']).gte('updated_at', since).order('updated_at', { ascending: false }).limit(200)),
+  ]);
+  return [
+    ...zl.map(z => ({ kind: 'zamkniete', id: z.id, title: z.title, closed: z.accepted_at || z.updated_at,
+      sub: `${z.status === 'anulowane' ? 'anulowane' : 'wykonane'} · zadanie #${z.no}${z.assignee_id !== me ? ' · wykonywał(a): ' + ((memberById(z.assignee_id)?.full_name || '').split(' ')[0]) : ''}`,
+      person: memberById(z.assignee_id === me ? z.created_by : z.assignee_id), personRole: z.assignee_id === me ? 'zlecił(a)' : 'wykonywał(a)',
+      open: () => import('./zlecenia.js').then(m => m.openZlecenie(z.id, reload)) })),
+    ...tk.map(t => ({ kind: 'zamkniete', id: t.id, title: t.title, closed: t.done_at || t.updated_at, sub: `${t.status === 'anulowane' ? 'anulowane' : 'zrobione'} · zgłoszenie #${t.no}`,
+      href: t.module === 'm2' ? `#/doradztwo/zgloszenia/${t.id}` : `#/zgloszenia/${t.id}` })),
+  ].sort((a, b) => String(b.closed).localeCompare(String(a.closed)));
+}
+
 let reload = () => {};
 export async function renderMoje(main, params) {
-  let filter = params?.get('f') || 'all', items = [];
+  let filter = params?.get('f') || 'all', items = [], closed = null;
   const chips = h('div', { class: 'zl-chips' }), list = h('div', { class: 'mj-list' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const order = it => { const d = it.due; return d && d < today() ? 0 : d === today() ? 1 : it.hot ? 2 : d && d <= plus(3) ? 3 : 4; };
   function draw() {
     const F = [['all', 'Wszystko'], ['zlecenie', 'Zadania'], ['zadanie', 'Zadania przy klientach'], ['pytanie', 'Pytania'], ['termin', 'Terminy']];
+    const go = k => { filter = k; history.replaceState(null, '', '#/moje' + (k === 'all' ? '' : '?f=' + k)); draw(); };
     put(chips, ...F.map(([k, l]) => { const n = k === 'all' ? items.length : items.filter(i => i.kind === k).length; if (k !== 'all' && k !== filter && !n) return null;
-      return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : ''), onclick: () => { filter = k; history.replaceState(null, '', '#/moje' + (k === 'all' ? '' : '?f=' + k)); draw(); } }, l, h('span', {}, String(n))); }).filter(Boolean));
+      return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : ''), onclick: () => go(k) }, l, h('span', {}, String(n))); }).filter(Boolean),
+      h('button', { type: 'button', class: 'zl-chip zl-chip-done' + (filter === 'zamkniete' ? ' on' : ''), onclick: () => go('zamkniete') }, 'Zakończone', closed ? h('span', {}, String(closed.length)) : null));
+    if (filter === 'zamkniete') {
+      if (!closed) { put(list, h('div', { class: 'spinner' }, 'Wczytywanie…')); collectClosed().then(c => { closed = c; draw(); }, e => { fail(e); closed = []; draw(); }); return; }
+      if (!closed.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, 'Brak zakończonych zadań i zgłoszeń z ostatnich 90 dni.')); return; }
+      put(list, ...closed.map(it => {
+        const inner = [h('span', { class: 'mj-kind ' + KINDS.zamkniete[1] }, KINDS.zamkniete[0]),
+          h('span', { class: 'mj-main' }, h('b', {}, it.title), h('span', { class: 'small muted' }, it.sub)),
+          h('span', { class: 'zl-due' }, fmtD(it.closed)),
+          it.person ? h('span', { class: 'mj-who', title: `${it.personRole}: ${it.person.full_name}` }, h('span', { class: 'avatar mj-av' }, ava(it.person)), h('span', { class: 'mj-who-n' }, (it.person.full_name || '').split(' ')[0])) : h('span')];
+        return it.href ? h('a', { class: 'mj-row mj-closed', href: it.href }, ...inner) : h('button', { type: 'button', class: 'mj-row mj-closed', onclick: it.open }, ...inner);
+      }));
+      return;
+    }
     const rows = items.filter(i => filter === 'all' || i.kind === filter).sort((a, b) => order(a) - order(b) || (a.due || '9999').localeCompare(b.due || '9999') || (b.created || '').localeCompare(a.created || ''));
     if (!rows.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, 'Nic na Ciebie nie czeka. 👍')); return; }
     put(list, ...rows.map(it => {
@@ -73,7 +105,7 @@ export async function renderMoje(main, params) {
       return it.href ? h('a', { class: 'mj-row', href: it.href }, ...inner) : h('button', { type: 'button', class: 'mj-row', onclick: it.open }, ...inner);
     }));
   }
-  reload = async () => { try { items = await collect(); } catch (e) { fail(e); items = []; } draw(); };
+  reload = async () => { closed = null; try { items = await collect(); } catch (e) { fail(e); items = []; } draw(); };
   put(main, 
     h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
       h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Moje sprawy', infoTip(HELP, 'Moje sprawy')),
