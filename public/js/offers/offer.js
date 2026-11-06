@@ -59,7 +59,6 @@ export const PARTNER_FEATURES = [
   ['direct', 'Bezpośredni kontakt każdej księgowej z doradcą', 'bool'],
   ['notes', 'Odpowiedź z podstawą prawną – do akt klienta', 'bool'],
   ['rollover', 'Niewykorzystane godziny przechodzą na kolejny miesiąc', 'bool'],
-  ['training', 'Szkolenia dla zespołu biura', 'text'],
   ['implement', 'Wsparcie wdrożeń (JPK CIT, KSeF) u klientów biura', 'text'],
   ['two', 'Stały kontakt z dwoma doradcami podatkowymi', 'bool'],
   ['discount', 'Rabat na sprawy klientów biura (interpretacje, kontrole, postępowania)', 'text'],
@@ -77,11 +76,11 @@ export const PARTNER_COMMON = [
 export function partnerPackages() {
   return [
     { key: 'baza', name: 'Biuro Baza', tagline: 'Dla biur, którym wystarczą pisemne odpowiedzi doradcy.', price: '249', unit: 'zł netto / mies.',
-      f: { hours: '1 godzina', channels: 'tylko e-mail', response: 'do 2 dni roboczych', direct: true, notes: true, rollover: false, training: '—', implement: '—', two: false, discount: '10%' } },
+      f: { hours: '1 godzina', channels: 'tylko e-mail', response: 'do 2 dni roboczych', direct: true, notes: true, rollover: false, implement: '—', two: false, discount: '10%' } },
     { key: 'partner', name: 'Biuro Partner', tagline: 'Doradca podatkowy pod telefonem dla całego zespołu.', price: '419', unit: 'zł netto / mies.',
-      f: { hours: '2 godziny', channels: 'e-mail, telefon, wideo', response: '1 dzień roboczy', direct: true, notes: true, rollover: true, training: '1 krótkie szkolenie online na kwartał', implement: 'konsultacje wdrożeniowe', two: false, discount: '15%' } },
+      f: { hours: '2 godziny', channels: 'e-mail, telefon, wideo', response: '1 dzień roboczy', direct: true, notes: true, rollover: true, implement: 'konsultacje wdrożeniowe', two: false, discount: '15%' } },
     { key: 'plus', name: 'Biuro Plus', tagline: 'Dla większych biur i na czas wdrożeń JPK CIT i KSeF.', price: '790', unit: 'zł netto / mies. (od)',
-      f: { hours: '4 godziny (lub więcej – do ustalenia)', channels: 'e-mail, telefon, wideo, spotkania w biurze', response: 'priorytet – w ten sam dzień roboczy', direct: true, notes: true, rollover: true, training: 'szkolenie zespołu raz w miesiącu (w biurze lub online)', implement: 'plan kont, znaczniki, test plików, pierwsze wysyłki', two: true, discount: '20%' } },
+      f: { hours: '4 godziny (lub więcej – do ustalenia)', channels: 'e-mail, telefon, wideo, spotkania w biurze', response: 'priorytet – w ten sam dzień roboczy', direct: true, notes: true, rollover: true, implement: 'plan kont, znaczniki, test plików, pierwsze wysyłki', two: true, discount: '20%' } },
   ];
 }
 
