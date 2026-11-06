@@ -2357,3 +2357,8 @@ html.wide .wrap{max-width:none}
 /* zadania: osoby pracujące razem */
 .zl-helpers{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
 .zl-addp{padding:2px 8px;min-height:0}
+/* terminy M2: zrealizowano */
+.dl-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.dl-row.done{opacity:1}.dl-row.done .dl-main,.dl-row.done .dl-date{opacity:.55}
+.dl-done-btn{white-space:nowrap}
+.dl-main{overflow-wrap:anywhere}

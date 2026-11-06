@@ -183,12 +183,13 @@ function deadlineRow(dl, matters, onChange) {
   const today = todayIso();
   const late = !dl.done && dl.due_date < today;
   const soon = !dl.done && !late && dl.due_date <= addDaysIso(3);
-  const cb = h('input', { type: 'checkbox', checked: dl.done, 'aria-label': 'Wykonane' });
-  cb.addEventListener('change', async () => {
-    const { error } = await sb.from('m2_deadlines').update({ done: cb.checked, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', dl.id);
-    if (error) { cb.checked = !cb.checked; return fail(error); }
-    dl.done = cb.checked; gcalSync([dl.id]); onChange?.();
-  });
+  const cb = h('input', { type: 'checkbox', checked: dl.done, 'aria-label': 'Zrealizowano' });
+  const setDone = async on => {
+    const { error } = await sb.from('m2_deadlines').update({ done: on, done_at: on ? new Date().toISOString() : null }).eq('id', dl.id);
+    if (error) { cb.checked = dl.done; return fail(error); }
+    dl.done = on; gcalSync([dl.id]); toast(on ? 'Termin oznaczony jako zrealizowany' : 'Przywrócono termin'); onChange?.();
+  };
+  cb.addEventListener('change', () => setDone(cb.checked));
   const m = dl.matter_id ? matters?.get(dl.matter_id) : null;
   const k = DEADLINE_KIND[dl.kind] || DEADLINE_KIND.wewnetrzny;
   return h('div', { class: 'dl-row' + (dl.done ? ' done' : '') + (late ? ' late' : '') + (soon ? ' soon' : '') },
@@ -199,7 +200,11 @@ function deadlineRow(dl, matters, onChange) {
       h('div', { class: 'small muted' }, m ? h('a', { href: `${BASE}/sprawa/${m.id}` }, `${m.number} · ${m.title}`) : null,
         dl.basis ? h('span', { 'data-tip': dl.basis }, (m ? ' · ' : '') + dl.basis) : null)),
     h('div', { class: 'small' }, who(dl.assignee_id)),
-    late ? h('span', { class: 'badge warn' }, 'po terminie') : soon ? h('span', { class: 'badge' }, 'wkrótce') : null);
+    h('div', { class: 'dl-act' },
+      late ? h('span', { class: 'badge warn' }, 'po terminie') : soon ? h('span', { class: 'badge' }, 'wkrótce') : null,
+      dl.done
+        ? [h('span', { class: 'badge ok' }, '✓ zrealizowano' + (dl.done_at ? ' ' + fmtDate(String(dl.done_at).slice(0, 10)) : '')), h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => setDone(false) }, 'Cofnij')]
+        : h('button', { type: 'button', class: 'btn btn-outline btn-sm dl-done-btn', onclick: () => setDone(true) }, '✓ Zrealizowano')));
 }
 
 const DOC = { zlecenie: 'Zlecenie', umowa: 'Umowa' };
