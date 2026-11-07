@@ -67,7 +67,7 @@ const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
     tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/moje', 'Moje sprawy', 'moje'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozmowy', 'Rozmowy', 'rozmowy']],
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
-    more: [['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/zlecenia', 'Zadania dla zespołu', 'zlecenia'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
+    more: [['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
       ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
@@ -311,7 +311,8 @@ async function route(opts = {}) {
     else if (view === 'oferty') c = await renderOferty(layout('oferty'), parts[1], 'rkdp');
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
     else if (view === 'moje') c = await renderMoje(layout('moje'), params);
-    else if (view === 'zlecenia') c = await renderZlecenia(layout('zlecenia'), parts[1]);
+    // „Zadania dla zespołu” połączone z „Moimi sprawami” – stare linki (także z powiadomień) prowadzą tutaj
+    else if (view === 'zlecenia') { const q = new URLSearchParams(state.me.role === 'admin' && !parts[1] ? 'f=zespol' : ''); if (parts[1]) q.set('zl', parts[1]); history.replaceState(null, '', '#/moje' + (q.toString() ? '?' + q : '')); c = await renderMoje(layout('moje'), q); }
     else if (view === 'czas' && state.me.role === 'admin' && hasModule('doradztwo')) c = await renderCzas(layout('m2:czas'), params);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('terminy'), params);
@@ -397,6 +398,9 @@ async function start() {
     if (!(await termsGate({ onLogout: logout, first: !tsRes.data.last }))) return;
   }
   window.addEventListener('hashchange', () => route());
+// iPhone: bez powiększania gestem szczypania (Safari ignoruje user-scalable=no)
+['gesturestart', 'gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+
   initShortcuts();
   // dane w bazie zmieniły się od ostatniej wizyty – przerysuj widok po cichu, o ile użytkownik nic teraz nie wpisuje
   let lastAuto = 0;

@@ -11,7 +11,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
 const plus = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
 const fmtD = d => d ? d.slice(0, 10).split('-').reverse().join('.') : '';
 const HELP = `Wszystko, co czeka na Ciebie, w jednym miejscu:
-• Zadania – dodatkowe zadania w zespole; każdy może dodać zadanie dla siebie lub innej osoby, także dla Michała (po wykonaniu kliknij „Zrobione – zgłaszam”); zlecający widzi tu wszystkie swoje aktywne zadania i ich etap,
+• Zadania – dodatkowe zadania w zespole (administrator: etykieta „Zespół” – wszystkie zadania zespołu według osób); każdy może dodać zadanie dla siebie lub innej osoby, także dla Michała (po wykonaniu kliknij „Zrobione – zgłaszam”); zlecający widzi tu wszystkie swoje aktywne zadania i ich etap,
 • Przy kliencie – zadania przy klientach z rozmów,
 • Pytania – nierozwiązane pytania w rozmowach Twoich klientów albo takie, w których Cię oznaczono,
 • Terminy – terminy spraw M2 TAX i wygasające pełnomocnictwa (14 dni).
@@ -145,15 +145,19 @@ function card(it, color) {
 
 export async function renderMoje(main, params) {
   let filter = params?.get('f') || 'all', items = [], closed = null;
-  if (!['all', 'pilne', 'zlecilem', 'zamkniete'].includes(filter)) filter = 'all';
+  const admin = state.me.role === 'admin';
+  if (!['all', 'pilne', 'zlecilem', 'zamkniete', ...(admin ? ['zespol'] : [])].includes(filter)) filter = 'all';
+  const openId = params?.get('zl');
   const chips = h('div', { class: 'zl-chips mj-chips' }), list = h('div', { class: 'mj-groups' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const order = it => { const d = it.due; return d && d < today() ? 0 : d === today() ? 1 : it.hot ? 2 : d && d <= plus(3) ? 3 : 4; };
   function draw() {
     const go = k => { filter = k; history.replaceState(null, '', '#/moje' + (k === 'all' ? '' : '?f=' + k)); draw(); };
     const urgent = items.filter(i => i.hot || (i.due && i.due < today())).length, mineOut = items.filter(i => i.byMe).length;
     const chip = (k, l, n, pre) => h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : ''), onclick: () => go(k) }, pre || null, l, n != null ? h('span', {}, String(n)) : null);
+    list.classList.toggle('mj-team', filter === 'zespol');
     put(chips, chip('all', 'Wszystko', items.length), urgent || filter === 'pilne' ? chip('pilne', 'Pilne', urgent, h('b', { class: 'mj-hot' }, '!')) : null,
-      mineOut || filter === 'zlecilem' ? chip('zlecilem', 'Zleciłem', mineOut) : null, chip('zamkniete', 'Zakończone', closed ? closed.length : null));
+      mineOut || filter === 'zlecilem' ? chip('zlecilem', 'Zleciłem', mineOut) : null, admin ? chip('zespol', 'Zespół', null) : null, chip('zamkniete', 'Zakończone', closed ? closed.length : null));
+    if (filter === 'zespol') { put(list, h('div', { class: 'spinner' }, 'Wczytywanie…')); import('./zlecenia.js').then(m => m.renderZlecenia(list, null, { embed: true })); return; }
     if (filter === 'zamkniete') {
       if (!closed) { put(list, h('div', { class: 'spinner' }, 'Wczytywanie…')); collectClosed().then(c => { closed = c; draw(); }, e => { fail(e); closed = []; draw(); }); return; }
       if (!closed.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, 'Brak zakończonych zadań i zgłoszeń z ostatnich 90 dni.')); return; }
@@ -180,6 +184,7 @@ export async function renderMoje(main, params) {
     pushNudge(),
     chips, list);
   await reload();
+  if (openId) import('./zlecenia.js').then(m => m.openZlecenie(openId, reload));
 }
 
 // licznik do zakładki „Moje sprawy” (po terminie + na dziś + nowe zlecenia)

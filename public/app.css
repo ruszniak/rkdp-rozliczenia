@@ -2779,3 +2779,12 @@ html main>.page-head .tabs a.on{background:#064B58!important;color:#fff!importan
 .mj-gh .zl-av{width:26px;height:26px}
 /* Rozliczenia (telefon): krótszy przycisk w pasku o brakujących klientach */
 @media (max-width:820px){.roz-banner h3{font-size:13px}.roz-banner .btn{white-space:nowrap}}
+.mj-groups.mj-team{display:block}.mj-team>.zl-chips{margin-top:2px}
+/* telefon: dolne menu przyklejone do samego dołu ekranu (bez pustego paska pod spodem) */
+@media (max-width:820px){
+  :root{--tabbar:calc(70px + env(safe-area-inset-bottom))}
+  .nav-links{left:0!important;right:0!important;bottom:0!important;border-radius:22px 22px 0 0!important;padding:6px 8px calc(6px + env(safe-area-inset-bottom))!important;box-shadow:0 -8px 24px -14px rgba(0,30,38,.5)!important}
+}
+/* telefon: bez powiększania (podwójne stuknięcie) i bez przesuwania strony na boki */
+html,body{overflow-x:clip;max-width:100%}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}

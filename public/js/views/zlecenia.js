@@ -90,7 +90,7 @@ function row(z, onOpen) {
 }
 
 // ---------- widok #/zlecenia ----------
-export async function renderZlecenia(main, id) {
+export async function renderZlecenia(main, id, { embed = false } = {}) {
   const admin = isAdmin();
   let all = [], filter = admin ? 'aktywne' : 'aktywne';
   const listBox = h('div', {}, h('div', { class: 'spinner' }, 'Wczytywanie…'));
@@ -121,6 +121,7 @@ export async function renderZlecenia(main, id) {
         ...zs.map(z => row(z, open))))));
   }
 
+  if (embed) { put(main, chips, listBox); await reload(); return; }
   put(main, 
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
@@ -143,10 +144,10 @@ export function zleceniaCard() {
     const show = (admin ? [...rep, ...q, ...lt.filter(z => !rep.includes(z) && !q.includes(z))] : act.sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))).slice(0, 6);
     put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, admin ? `Zadania (${act.length} aktywnych)` : `Zadania (${act.length})`),
-        h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newZlecenie(() => { location.hash = '#/zlecenia'; }) }, icon('plus'), 'Zadanie'),
-          h('a', { class: 'btn btn-ghost btn-sm', href: '#/zlecenia' }, 'Wszystkie →'))),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newZlecenie(() => { location.hash = isAdmin() ? '#/moje?f=zespol' : '#/moje'; }) }, icon('plus'), 'Zadanie'),
+          h('a', { class: 'btn btn-ghost btn-sm', href: isAdmin() ? '#/moje?f=zespol' : '#/moje' }, 'Wszystkie →'))),
       admin ? h('div', { class: 'zl-sum' }, h('span', { class: rep.length ? 'hot' : '' }, `do sprawdzenia: ${rep.length}`), h('span', { class: q.length ? 'hot' : '' }, `pytania: ${q.length}`), h('span', { class: lt.length ? 'hot' : '' }, `po terminie: ${lt.length}`)) : null,
-      show.length ? h('div', { class: 'zl-list' }, ...show.map(z => row(z, x => openZlecenie(x.id, () => { location.hash = '#/zlecenia'; })))) : h('p', { class: 'hint' }, admin ? 'Nic nie czeka na Ciebie.' : ''));
+      show.length ? h('div', { class: 'zl-list' }, ...show.map(z => row(z, x => openZlecenie(x.id, () => { location.hash = '#/moje'; })))) : h('p', { class: 'hint' }, admin ? 'Nic nie czeka na Ciebie.' : ''));
   })();
   return box;
 }

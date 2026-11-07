@@ -98,6 +98,7 @@ const NEWS = [
   ['2.1', '7 listopada 2026', [
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',
+    '„Zadania dla zespołu” połączone z „Moimi sprawami” – administrator ma tam etykietę „Zespół” (wszystkie zadania według osób); stare linki i powiadomienia prowadzą do Moich spraw. Dolne menu na telefonie przyklejone do dołu ekranu.',
     'Jednolity wygląd w całej aplikacji: płaskie nagłówki widoków (na telefonie sam tytuł i przyciski), przewijane etykiety filtrów, pola wyszukiwania z lupą, listy jako karty.',
     'iPhone: pisanie w oknach (zadanie, rozmowa) – pole wiadomości zostaje nad klawiaturą, ekran nie powiększa się przy wpisywaniu.',
     'Okno zadania jak czat: przypięta karta zadania (termin, opis, kroki – rozwija się po kliknięciu), wiadomości w dymkach, zdarzenia jako szare wstawki, szybkie przyciski nad polem wiadomości (Zaczynam, Zrobione, Akceptuję, Do poprawy…).',
