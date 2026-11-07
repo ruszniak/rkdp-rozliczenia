@@ -95,6 +95,10 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.1', '7 listopada 2026', [
+    'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
+    'Zdjęcia profilowe zespołu RKDP.',
+  ]],
   ['2.0', '2 listopada 2026', [
     'Nowa kolorystyka: ciemny turkus – nagłówek z gradientem, turkusowe przyciski i akcenty.',
     'Zadania: do zadania można dodać kolejne osoby, które pracują nad nim razem (widzą je, komentują, dodają pliki, odhaczają kroki; dostają powiadomienie). W Moich sprawach zakładka „Zakończone”.',

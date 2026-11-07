@@ -212,7 +212,7 @@ export async function renderRozliczenia(main, params) {
       h('a', { class: 'btn btn-ghost btn-sm', href: `#/terminy?rok=${+period.slice(0, 4) + (period.slice(5) === '12' ? 1 : 0)}&m=${period.slice(5) === '12' ? 1 : +period.slice(5) + 1}`, 'data-tip': 'Kalendarz obowiązków klientów – terminy z profilu klienta' }, icon('calendar'), 'Kalendarz obowiązków'),
       h('a', { class: 'btn btn-ghost btn-sm', href: '#/zamkniecie-roku', 'data-tip': 'Zamknięcie roku: sprawozdania, CIT-8, PIT roczny, PIT-11, KRS' }, 'Zamknięcie roku')),
     tabsBox, monthNav);
-  const tiles = h('div', { class: 'tiles' });
+  const tiles = h('div', { class: 'tiles tiles-bento' });
   const deadlines = h('div', { class: 'panel deadlines' });
   const banner = h('div', { class: 'card', style: { padding: '18px 22px', marginBottom: '18px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' } });
   const body = h('div');
@@ -307,6 +307,18 @@ export async function renderRozliczenia(main, params) {
     personSel.value = prefs.person || '';
   }
 
+  const TILE_ICONS = {
+    do_wyslania: '<path d="M4 12h16M14 6l6 6-6 6"/>',
+    braki: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>',
+    uwagi: '<path d="M5 5h14v10H9l-4 4z"/>',
+    nierozliczeni: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 3h6"/>',
+    ok: '<path d="M5 12.5 10 17 19 7"/>',
+    cal: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  };
+  const tileIcon = k => h('span', { class: 'tile-ic tic-' + (k || 'cal'), 'aria-hidden': 'true', html: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TILE_ICONS[k] || TILE_ICONS.cal}</svg>` });
+  const tileSub = (k, n) => !n ? null : h('span', { class: 'tile-more' }, k === 'braki' ? 'Pokaż i przypomnij →' : k === 'uwagi' ? 'Pokaż klientów →' : k === 'do_wyslania' ? 'Pokaż do wysłania →' : null);
+  const ring = pct => h('span', { class: 'tile-ring', 'aria-hidden': 'true', html: `<svg viewBox="0 0 160 160"><circle cx="80" cy="80" r="64" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="16"/><circle cx="80" cy="80" r="64" fill="none" stroke="#7FD6E2" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(pct / 100 * 402.1).toFixed(1)} 403" transform="rotate(-90 80 80)"/><text x="80" y="92" text-anchor="middle" fill="#fff" font-family="Plus Jakarta Sans,Inter,sans-serif" font-weight="800" font-size="36">${pct}%</text></svg>` });
+
   function renderTiles() {
     const area = prefs.area;
     if (area === 'wyciagi') return renderYearTiles();
@@ -319,16 +331,17 @@ export async function renderRozliczenia(main, params) {
     const tile = (n, lbl, show) => h('button', { class: 'card tile tile-btn' + (prefs.show === show ? ' on dark' : ''), type: 'button', 'aria-pressed': String(prefs.show === show),
       'data-tip': prefs.show === show ? 'Kliknij, aby pokazać wszystkich' : 'Kliknij, aby pokazać tylko tych klientów',
       onclick: () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
-    h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n));
+    tileIcon(show), h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n), tileSub(show, n));
     tiles.replaceChildren(
-      h('button', { class: 'card tile tile-btn' + (prefs.show === 'nierozliczeni' ? ' on dark' : ''), type: 'button', 'aria-pressed': String(prefs.show === 'nierozliczeni'),
+      h('button', { class: 'card tile tile-btn tile-hero' + (prefs.show === 'nierozliczeni' ? ' on' : ''), type: 'button', 'aria-pressed': String(prefs.show === 'nierozliczeni'),
         'data-tip': prefs.show === 'nierozliczeni' ? 'Pokaż wszystkich klientów' : 'Pokaż tylko klientów do rozliczenia',
         onclick: () => { prefs.show = prefs.show === 'nierozliczeni' ? '' : 'nierozliczeni'; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
-        h('span', { class: 'lbl' }, `Rozliczeni – ${AREAS[area].label.toLowerCase()}`),
-        h('span', { class: 'num' }, rows.length ? `${settled} / ${rows.length}` : '—',
-          hist?.[area] ? h('span', { class: 'tile-spark', 'data-tip': 'Odsetek rozliczonych klientów w ostatnich 6 miesiącach' }, sparkline(hist[area].map((v, i) => i === hist[area].length - 1 ? pct : v), { labels: histPeriods.map(periodLabel) })) : null),
-        h('div', { class: 'bar' }, h('i', { style: { width: pct + '%' } })),
-        h('span', { class: 'tile-more' }, !rows.length ? 'Lista na ten miesiąc nie jest jeszcze otwarta' : prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
+        h('span', { class: 'th-txt' },
+          h('span', { class: 'lbl' }, `${periodLabel(period)} · ${AREAS[area].label}`),
+          h('span', { class: 'num' }, rows.length ? h('span', {}, String(settled), h('small', {}, ` z ${rows.length} rozliczonych`)) : '—',
+            hist?.[area] ? h('span', { class: 'tile-spark', 'data-tip': 'Odsetek rozliczonych klientów w ostatnich 6 miesiącach' }, sparkline(hist[area].map((v, i) => i === hist[area].length - 1 ? pct : v), { labels: histPeriods.map(periodLabel) })) : null),
+          h('span', { class: 'tile-more' }, !rows.length ? 'Lista na ten miesiąc nie jest jeszcze otwarta' : prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
+        ring(pct)),
       tile(toSend, area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania', 'do_wyslania'),
       tile(miss, 'Klientów z brakiem dokumentów', 'braki'),
       tile(nts, 'Klientów z uwagami', 'uwagi'));
@@ -682,14 +695,20 @@ export async function renderRozliczenia(main, params) {
     const withGaps = act.filter(c => [...yearData.get(c.id).values()].some(yearOpen)).length;
     const gaps = act.reduce((n, c) => n + [...yearData.get(c.id).values()].filter(yearOpen).length, 0);
     const miss = act.filter(c => [...yearData.get(c.id).values()].some(e => ['missing_docs', 'reminded'].includes(e.status))).length;
-    const tile = (n, lbl, show, sub) => h('button', { class: 'card tile tile-btn' + (show && prefs.show === show ? ' on dark' : ''), type: 'button',
+    const tile = (n, lbl, show, sub, ic) => h('button', { class: 'card tile tile-btn' + (show && prefs.show === show ? ' on dark' : ''), type: 'button',
       onclick: show ? () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } : null },
-    h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n), sub ? h('span', { class: 'tile-more' }, sub) : null);
+    tileIcon(ic || show), h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n), sub ? h('span', { class: 'tile-more' }, sub) : null);
+    const ypct = act.length ? Math.round(curDone / act.length * 100) : 0;
     tiles.replaceChildren(
-      tile(`${curDone} / ${act.length}`, `Wyciągi za ${MONTHS_FULL[monthNo - 1]}`, null, 'zrobione lub nie dotyczy'),
+      h('div', { class: 'card tile tile-hero' },
+        h('span', { class: 'th-txt' },
+          h('span', { class: 'lbl' }, `Wyciągi bankowe · ${MONTHS_FULL[monthNo - 1]} ${year}`),
+          h('span', { class: 'num' }, h('span', {}, String(curDone), h('small', {}, ` z ${act.length}`))),
+          h('span', { class: 'tile-more' }, 'zrobione lub nie dotyczy')),
+        ring(ypct)),
       tile(withGaps, 'Klientów z brakami od stycznia', 'nierozliczeni', `${gaps} brakujących miesięcy`),
       tile(miss, 'Brak dokumentów / przypomniano', 'braki'),
-      tile(act.length - withGaps, 'Komplet od początku roku', null));
+      tile(act.length - withGaps, 'Komplet od początku roku', null, null, 'ok'));
   }
 
   // ---------- zapisy ----------
