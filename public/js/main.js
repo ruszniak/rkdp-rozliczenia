@@ -257,13 +257,39 @@ function commit() {
   app.replaceChildren(...pending); pending = null; hideProgress();
   const mn = app.querySelector('main'); if (mn && animate) mn.classList.add('view-enter');
   if (keepScrollY !== null) { const y = keepScrollY; requestAnimationFrame(() => window.scrollTo(0, y)); } else window.scrollTo(0, 0);
+  document.body.classList.remove('nav-mini'); placeNavInd();
 }
+// telefon: podświetlenie aktywnej zakładki przesuwa się płynnie między ikonami (jak w aplikacji Facebook)
+let lastInd = null;
+function placeNavInd() {
+  const nav = document.querySelector('.nav-links');
+  if (!nav || window.innerWidth > 820) return;
+  let ind = nav.querySelector('.nav-ind');
+  if (!ind) { ind = document.createElement('span'); ind.className = 'nav-ind'; nav.prepend(ind); }
+  const a = nav.querySelector('a.active, .more-btn.active');
+  if (!a) { ind.style.opacity = '0'; return; }
+  const box = { l: a.offsetLeft + 3, w: a.offsetWidth - 6 };
+  if (lastInd && (lastInd.l !== box.l || lastInd.w !== box.w)) {
+    ind.style.transition = 'none'; ind.style.transform = `translateX(${lastInd.l}px)`; ind.style.width = lastInd.w + 'px'; ind.getBoundingClientRect(); ind.style.transition = '';
+  }
+  ind.style.opacity = '1'; ind.style.transform = `translateX(${box.l}px)`; ind.style.width = box.w + 'px';
+  lastInd = box;
+}
+window.addEventListener('resize', () => { lastInd = null; placeNavInd(); });
+// przewijanie w dół – pasek lekko się chowa (zmniejsza), w górę – wraca
+let lastY = 0;
+window.addEventListener('scroll', () => {
+  const y = window.scrollY, d = y - lastY;
+  if (Math.abs(d) < 6) return;
+  document.body.classList.toggle('nav-mini', d > 0 && y > 80);
+  lastY = y;
+}, { passive: true });
 // od razu podświetl klikniętą zakładkę – nie czekając na dane
 function markActiveTab() {
   const cur = location.hash.split('?')[0] || '#/';
   const links = [...document.querySelectorAll('.nav-links a')];
   const fit = links.filter(a => { const hr = a.getAttribute('href'); return cur === hr || cur.startsWith(hr + '/'); }).sort((x, y) => y.getAttribute('href').length - x.getAttribute('href').length)[0];
-  if (fit) links.forEach(a => a.classList.toggle('active', a === fit));
+  if (fit) { links.forEach(a => a.classList.toggle('active', a === fit)); placeNavInd(); }
 }
 
 async function route(opts = {}) {
