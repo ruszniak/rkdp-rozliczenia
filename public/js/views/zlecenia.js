@@ -273,6 +273,7 @@ export async function openZlecenie(id, onChange) {
   const comment = h('textarea', { class: 'zl-ctext', rows: 1, maxlength: 3000, placeholder: 'Wiadomość…', 'aria-label': 'Wiadomość' });
   const grow = () => { comment.style.height = 'auto'; comment.style.height = Math.min(comment.scrollHeight, 140) + 'px'; };
   comment.addEventListener('input', grow);
+  comment.addEventListener('focus', () => setTimeout(() => { const m = comment.closest('.modal'); if (m) m.scrollTop = m.scrollHeight; }, 350));
   const cAtt = [];
   const cList = h('div', { class: 'zl-pend' });
   const drawAtt = () => put(cList, ...cAtt.map((f, i) => h('span', { class: 'zl-pfile' }, f.type?.startsWith('image/') ? h('img', { src: URL.createObjectURL(f), alt: '' }) : null,

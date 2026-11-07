@@ -163,7 +163,12 @@ export function infoTip(text, title = 'Jak to działa') {
 
 // Okno dialogowe (wspólne): actions(close) zwraca listę przycisków
 export function modal(title, body, actions, { wide = false } = {}) {
-  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
+  // iPhone: klawiatura nie zmniejsza okna – dopasuj tło okienka do widocznej części ekranu, żeby pole pisania było nad klawiaturą
+  const vv = window.visualViewport;
+  const fit = () => { if (!vv || window.innerWidth > 820) return; back.style.top = vv.offsetTop + 'px'; back.style.bottom = 'auto'; back.style.height = vv.height + 'px';
+    const m = back.firstChild; if (m) m.style.maxHeight = (vv.height - (vv.height < window.innerHeight - 80 ? 4 : 24)) + 'px'; };
+  vv?.addEventListener('resize', fit); vv?.addEventListener('scroll', fit);
+  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); vv?.removeEventListener('resize', fit); vv?.removeEventListener('scroll', fit); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   const back = h('div', { class: 'modal-back', onmousedown: (e) => { if (e.target === back) close(); } },
     h('div', { class: 'modal', role: 'dialog', 'aria-label': title, style: wide ? { maxWidth: '980px' } : null },
@@ -171,7 +176,8 @@ export function modal(title, body, actions, { wide = false } = {}) {
       body, h('div', { class: 'row', style: { justifyContent: 'flex-end', display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' } }, ...actions(close).filter(Boolean))));
   document.body.append(back);
   document.addEventListener('keydown', onKey);
-  back.querySelector('input, select, textarea')?.focus();
+  fit();
+  if (window.innerWidth > 820) back.querySelector('input, select, textarea')?.focus();
   return close;
 }
 
