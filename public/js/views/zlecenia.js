@@ -106,7 +106,7 @@ export async function renderZlecenia(main, id) {
     if (!admin) { put(listBox, h('div', { class: 'zl-list' }, ...rows.map(z => row(z, open)))); return; }
     const by = new Map(); rows.forEach(z => by.set(z.assignee_id, [...(by.get(z.assignee_id) || []), z]));
     put(listBox, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
-      h('section', { class: 'zl-person' }, h('div', { class: 'zl-phead' }, ava(memberById(mid) || { full_name: '?' }), h('b', {}, who(mid)), h('span', { class: 'small muted' }, `${zs.length}`)),
+      h('section', { class: 'zl-person' }, h('div', { class: 'zl-phead' }, h('span', { class: 'zl-av' }, ava(memberById(mid) || { full_name: '?' })), h('b', {}, who(mid)), h('span', { class: 'small muted' }, `${zs.length}`)),
         h('div', { class: 'zl-list' }, ...zs.map(z => row(z, open))))));
   }
 
@@ -243,8 +243,8 @@ export async function openZlecenie(id, onChange) {
 
   const KIND = { pytanie: 'Pytanie', zgloszenie: 'Zgłoszenie wykonania', poprawka: 'Do poprawy', akceptacja: 'Akceptacja', status: 'Zmiana', komentarz: '' };
   const timeline = h('div', { class: 'zl-tl' }, ...(wp || []).map(w => h('div', { class: 'zl-w zl-w-' + w.kind + (w.author_id === state.me.id ? ' mine' : '') },
-    ava(memberById(w.author_id) || { full_name: '?' }),
-    h('div', {}, h('div', { class: 'small muted' }, h('b', {}, who(w.author_id)), KIND[w.kind] ? ` · ${KIND[w.kind]}` : '', ' · ', new Date(w.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
+    h('span', { class: 'zl-av', title: who(w.author_id) }, ava(memberById(w.author_id) || { full_name: '?' })),
+    h('div', { class: 'zl-wmain' }, h('div', { class: 'small muted zl-whead' }, h('b', {}, who(w.author_id)), KIND[w.kind] ? ` · ${KIND[w.kind]}` : '', ' · ', new Date(w.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
       w.body ? h('div', { class: 'zl-wbody' }, w.body) : null, tiles((files || []).filter(f => f.wpis_id === w.id))))));
   // ---- komentarz: pole + małe przyciski „plik” i „zdjęcie” (przeciąganie i wklejanie zrzutu też działa) ----
   const comment = h('textarea', { class: 'input zl-ctext', rows: 2, maxlength: 3000, placeholder: 'Napisz komentarz albo dołącz plik…' });
