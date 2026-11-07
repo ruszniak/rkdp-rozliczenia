@@ -13,7 +13,7 @@ export function celebrate(msg) {
   cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
   document.body.append(cv);
   const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
-  const COLORS = ['#223052', '#2D4A8A', '#8694AE', '#1F7A52', '#AEB8CC'];
+  const COLORS = ['#17515D', '#167B8F', '#7DADB7', '#1F7A52', '#A7CBD3'];
   const parts = Array.from({ length: 110 }, () => ({
     x: innerWidth / 2 + (Math.random() - .5) * innerWidth * .5, y: innerHeight * .35 + (Math.random() - .5) * 60,
     vx: (Math.random() - .5) * 9, vy: -Math.random() * 9 - 3, r: 2 + Math.random() * 3.5,

@@ -16,10 +16,10 @@ export function sparkline(values, { w = 96, h: ht = 28, labels = [], max = null 
   const area = `${d} L${x(pts.at(-1)[0]).toFixed(1)},${ht} L${x(pts[0][0]).toFixed(1)},${ht} Z`;
   const gid = 'sg' + Math.random().toString(36).slice(2, 8);
   const defs = el('defs', {}), g = el('linearGradient', { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
-  g.append(el('stop', { offset: '0', 'stop-color': '#2D4A8A', 'stop-opacity': '.25' }), el('stop', { offset: '1', 'stop-color': '#2D4A8A', 'stop-opacity': '0' }));
-  defs.append(g); svg.append(defs, el('path', { d: area, fill: `url(#${gid})` }), el('path', { d, fill: 'none', stroke: '#2D4A8A', 'stroke-width': '1.8', 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+  g.append(el('stop', { offset: '0', 'stop-color': '#167B8F', 'stop-opacity': '.25' }), el('stop', { offset: '1', 'stop-color': '#167B8F', 'stop-opacity': '0' }));
+  defs.append(g); svg.append(defs, el('path', { d: area, fill: `url(#${gid})` }), el('path', { d, fill: 'none', stroke: '#167B8F', 'stroke-width': '1.8', 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
   const last = pts.at(-1);
-  svg.append(el('circle', { cx: x(last[0]).toFixed(1), cy: y(last[1]).toFixed(1), r: 2.6, fill: '#223052' }));
+  svg.append(el('circle', { cx: x(last[0]).toFixed(1), cy: y(last[1]).toFixed(1), r: 2.6, fill: '#17515D' }));
   if (labels.length) { const t = el('title', {}); t.textContent = labels.map((l, i) => `${l}: ${vs[i] == null ? '—' : Math.round(vs[i]) + '%'}`).join('\n'); svg.append(t); }
   return svg;
 }
