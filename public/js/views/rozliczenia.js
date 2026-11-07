@@ -214,7 +214,7 @@ export async function renderRozliczenia(main, params) {
     tabsBox, monthNav);
   const tiles = h('div', { class: 'tiles tiles-bento' });
   const deadlines = h('div', { class: 'panel deadlines' });
-  const banner = h('div', { class: 'card', style: { padding: '18px 22px', marginBottom: '18px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' } });
+  const banner = h('div', { class: 'card roz-banner', style: { padding: '18px 22px', marginBottom: '18px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' } });
   const body = h('div');
 
   // ---------- filtry ----------
@@ -252,6 +252,22 @@ export async function renderRozliczenia(main, params) {
   const msgBtn = h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'E-mail do jednego lub wielu klientów z kancelaria@rkdp.pl\nFaktury KSeF w Saldeo, wyciąg bankowy, inne dokumenty',
     onclick: () => openMessage({ clients: [], kind: 'ksef', period }) }, icon('mail'), 'Wiadomość');
   const toolbar = h('div', { class: 'toolbar' }, search, personSel, showSel, h('span', { class: 'sel-wrap' }), msgBtn, h('span', { class: 'tb-icons' }, layoutBtn, exportBtn, fsBtn));
+  // ---------- telefon: wyszukiwarka + filtr + menu „⋯”, etykiety szybkich filtrów ----------
+  const ICON_FILTER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
+  const filterBtn = h('button', { type: 'button', class: 'rm-ico', 'aria-label': 'Filtry', onclick: () => { document.body.classList.toggle('roz-filters'); filterBtn.classList.toggle('on', document.body.classList.contains('roz-filters')); } }, h('span', { html: ICON_FILTER, style: { display: 'inline-flex' } }));
+  const rMenu = h('div', { class: 'kl-menu rm-menu', hidden: true });
+  const moreBtn = h('button', { type: 'button', class: 'rm-ico', 'aria-label': 'Więcej', onclick: e => { e.stopPropagation(); rMenu.hidden = !rMenu.hidden; } }, '⋯');
+  const mItem = (ic, label, f) => h('button', { type: 'button', onclick: e => { rMenu.hidden = true; f(e); } }, h('span', {}, ic), label);
+  const closeRMenu = () => { rMenu.hidden = true; };
+  document.addEventListener('click', closeRMenu);
+  window.addEventListener('hashchange', () => document.removeEventListener('click', closeRMenu), { once: true });
+  const mobileBar = h('div', { class: 'roz-mbar' }, h('label', { class: 'kl-search' }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' }), h('span', { class: 'rm-slot' })),
+    filterBtn, h('span', { class: 'kl-more' }, moreBtn, rMenu));
+  const qChips = h('div', { class: 'zl-chips kl-chips roz-qchips' });
+  const mq = window.matchMedia('(max-width: 820px)');
+  // na telefonie pole szukania przenosi się do górnego paska (to samo pole – filtr działa tak samo)
+  const placeSearch = () => { if (mq.matches) mobileBar.querySelector('.rm-slot').replaceWith(search); else if (!toolbar.contains(search)) { toolbar.prepend(search); mobileBar.querySelector('.kl-search').append(h('span', { class: 'rm-slot' })); } };
+  mq.addEventListener?.('change', placeSearch);
 
   // ---------- zapisane widoki (wspólne dla wszystkich urządzeń) ----------
   const viewsBar = h('div', { class: 'views-bar' });
@@ -332,6 +348,15 @@ export async function renderRozliczenia(main, params) {
       'data-tip': prefs.show === show ? 'Kliknij, aby pokazać wszystkich' : 'Kliknij, aby pokazać tylko tych klientów',
       onclick: () => { prefs.show = prefs.show === show ? '' : show; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } },
     tileIcon(show), h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n), tileSub(show, n));
+    // telefon: szybkie filtry
+    const me = state.me.id, pk = AREAS[area].person;
+    const all = rowsIn(area);
+    const qc = (lbl, n, on, f) => h('button', { type: 'button', class: 'zl-chip' + (on ? ' on' : ''), onclick: () => { f(); search.value = prefs.q; personSel.value = prefs.person || ''; showSel.value = prefs.show; savePrefs(prefs); renderBody(); } }, lbl, h('span', {}, String(n)));
+    qChips.replaceChildren(
+      qc('Wszyscy', all.length, !prefs.person && !prefs.show, () => { prefs.person = ''; prefs.show = ''; }),
+      qc('Moi', all.filter(c => c[pk] === me).length, prefs.person === 'me' && !prefs.show, () => { prefs.person = prefs.person === 'me' && !prefs.show ? '' : 'me'; prefs.show = ''; }),
+      qc('Do rozliczenia', rows.length - settled, prefs.show === 'nierozliczeni', () => { prefs.show = prefs.show === 'nierozliczeni' ? '' : 'nierozliczeni'; }),
+      qc('Braki', miss, prefs.show === 'braki', () => { prefs.show = prefs.show === 'braki' ? '' : 'braki'; }));
     tiles.replaceChildren(
       h('button', { class: 'card tile tile-btn tile-hero' + (prefs.show === 'nierozliczeni' ? ' on' : ''), type: 'button', 'aria-pressed': String(prefs.show === 'nierozliczeni'),
         'data-tip': prefs.show === 'nierozliczeni' ? 'Pokaż wszystkich klientów' : 'Pokaż tylko klientów do rozliczenia',
@@ -340,7 +365,8 @@ export async function renderRozliczenia(main, params) {
           h('span', { class: 'lbl' }, `${periodLabel(period)} · ${AREAS[area].label}`),
           h('span', { class: 'num' }, rows.length ? h('span', {}, String(settled), h('small', {}, ` z ${rows.length} rozliczonych`)) : '—',
             hist?.[area] ? h('span', { class: 'tile-spark', 'data-tip': 'Odsetek rozliczonych klientów w ostatnich 6 miesiącach' }, sparkline(hist[area].map((v, i) => i === hist[area].length - 1 ? pct : v), { labels: histPeriods.map(periodLabel) })) : null),
-          h('span', { class: 'tile-more' }, !rows.length ? 'Lista na ten miesiąc nie jest jeszcze otwarta' : prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`)),
+          h('span', { class: 'tile-more' }, !rows.length ? 'Lista na ten miesiąc nie jest jeszcze otwarta' : prefs.show === 'nierozliczeni' ? '✕ pokaż wszystkich' : `Do rozliczenia: ${rows.length - settled} →`),
+          h('span', { class: 'th-mini' }, h('span', {}, area === 'kadry' ? 'ZUS ' : 'JPK ', h('b', {}, String(toSend))), h('span', {}, 'braki ', h('b', { class: 'm-miss' }, String(miss))), h('span', {}, 'uwagi ', h('b', { class: 'm-note' }, String(nts))))),
         ring(pct)),
       tile(toSend, area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania', 'do_wyslania'),
       tile(miss, 'Klientów z brakiem dokumentów', 'braki'),
@@ -689,6 +715,7 @@ export async function renderRozliczenia(main, params) {
       list.length ? h('div', { class: 'card grid-wrap wb-wrap' }, table) : h('div', { class: 'card empty' }, 'Brak klientów z wyciągami w tym roku (wyciągi dotyczą spółek i pełnej księgowości) albo żaden nie pasuje do filtrów.'));
   }
   function renderYearTiles() {
+    qChips.replaceChildren();
     if (!yearData) { tiles.replaceChildren(); return; }
     const act = clients.filter(c => c.status === 'aktywny' && ksiegi(c) && yearData.has(c.id));
     const curDone = act.filter(c => !yearOpen(yearData.get(c.id).get(monthNo))).length;
@@ -1022,7 +1049,17 @@ ${tables || '<p>Brak danych.</p>'}
 
   toolbar.querySelector('.sel-wrap').replaceWith(selBtn);
   body.addEventListener('keydown', onGridKey);
-  main.replaceChildren(head, tiles, deadlines, banner, toolbar, viewsBar, legend, body, bulkBar);
+  rMenu.append(
+    mItem('☑', 'Zaznacz wiele kratek', () => selBtn.click()),
+    mItem('✉', 'Wiadomość do klientów', () => msgBtn.click()),
+    mItem('▤', 'Układ tabel', () => layoutMenu(moreBtn)),
+    mItem('⬇', 'Pobierz (Excel, CSV, PDF)', () => exportMenu(moreBtn)),
+    mItem('★', 'Zapisane widoki', () => { document.body.classList.add('roz-filters'); filterBtn.classList.add('on'); viewsBar.scrollIntoView({ behavior: 'smooth', block: 'center' }); }),
+    mItem('ⓘ', 'Legenda kratek', () => { document.body.classList.toggle('roz-legend'); }),
+    mItem('📅', 'Kalendarz obowiązków', () => head.querySelector('.tb-links a')?.click()),
+    mItem('🗂', 'Zamknięcie roku', () => { location.hash = '#/zamkniecie-roku'; }));
+  main.replaceChildren(head, mobileBar, qChips, tiles, deadlines, banner, toolbar, viewsBar, legend, body, bulkBar);
+  placeSearch();
   renderAll();
 
   // ---------- zmiany na żywo od innych osób ----------

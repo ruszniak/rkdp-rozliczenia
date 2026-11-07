@@ -241,13 +241,38 @@ export async function openZlecenie(id, onChange) {
     return h('label', { class: 'check zl-step' }, cb, s.t);
   })) : null;
 
-  const KIND = { pytanie: 'Pytanie', zgloszenie: 'Zgłoszenie wykonania', poprawka: 'Do poprawy', akceptacja: 'Akceptacja', status: 'Zmiana', komentarz: '' };
-  const timeline = h('div', { class: 'zl-tl' }, ...(wp || []).map(w => h('div', { class: 'zl-w zl-w-' + w.kind + (w.author_id === state.me.id ? ' mine' : '') },
-    h('span', { class: 'zl-av', title: who(w.author_id) }, ava(memberById(w.author_id) || { full_name: '?' })),
-    h('div', { class: 'zl-wmain' }, h('div', { class: 'small muted zl-whead' }, h('b', {}, who(w.author_id)), KIND[w.kind] ? ` · ${KIND[w.kind]}` : '', ' · ', new Date(w.created_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
-      w.body ? h('div', { class: 'zl-wbody' }, w.body) : null, tiles((files || []).filter(f => f.wpis_id === w.id))))));
-  // ---- komentarz: pole + małe przyciski „plik” i „zdjęcie” (przeciąganie i wklejanie zrzutu też działa) ----
-  const comment = h('textarea', { class: 'input zl-ctext', rows: 2, maxlength: 3000, placeholder: 'Napisz komentarz albo dołącz plik…' });
+  // ---- przebieg jako czat: dymki, zdarzenia jako szare wstawki, separator dni ----
+  const KIND = { pytanie: 'Pytanie', zgloszenie: 'Zgłoszenie wykonania', poprawka: 'Do poprawy', akceptacja: 'Akceptacja', komentarz: '' };
+  const fn = idm => (who(idm) || '').split(' ')[0] || '—';
+  const dayOf = t => new Date(t).toLocaleDateString('sv-SE');
+  const dayLbl = t => { const d = dayOf(t), td = today(), y = new Date(Date.now() - 864e5).toLocaleDateString('sv-SE');
+    return d === td ? 'Dziś' : d === y ? 'Wczoraj' : new Date(t).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: d.slice(0, 4) !== td.slice(0, 4) ? 'numeric' : undefined }); };
+  const hm = t => new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+  const sys = (txt, cls = '') => h('div', { class: 'zl-sys ' + cls }, h('span', {}, txt));
+  const feed = [{ t: z.created_at, sys: `📌 ${fn(z.created_by)} ${z.created_by === z.assignee_id ? 'dodał(a) zadanie' : `zlecił(a) zadanie: ${fn(z.assignee_id)}`}` }, ...(wp || []).map(w => ({ t: w.created_at, w }))];
+  let lastDay = '', lastAuthor = null;
+  const msgs = [];
+  for (const it of feed) {
+    if (dayOf(it.t) !== lastDay) { lastDay = dayOf(it.t); msgs.push(sys(dayLbl(it.t), 'day')); lastAuthor = null; }
+    if (it.sys) { msgs.push(sys(it.sys)); lastAuthor = null; continue; }
+    const w = it.w, me = w.author_id === state.me.id;
+    const wf = (files || []).filter(f => f.wpis_id === w.id);
+    if (w.kind === 'status') { msgs.push(sys(`${fn(w.author_id)}: ${w.body || 'zmiana etapu'} · ${hm(w.created_at)}`)); lastAuthor = null; continue; }
+    const showHead = !me && lastAuthor !== w.author_id;
+    msgs.push(h('div', { class: 'zl-w zl-w-' + w.kind + (me ? ' mine' : '') + (showHead ? '' : ' cont') },
+      h('span', { class: 'zl-av', title: who(w.author_id) }, showHead ? ava(memberById(w.author_id) || { full_name: '?' }) : null),
+      h('div', { class: 'zl-wmain' },
+        showHead || KIND[w.kind] ? h('div', { class: 'zl-whead' }, showHead ? h('b', {}, fn(w.author_id)) : null, KIND[w.kind] ? h('span', { class: 'zl-wk' }, KIND[w.kind]) : null) : null,
+        w.body ? h('div', { class: 'zl-wbody' }, w.body, h('span', { class: 'zl-wt' }, hm(w.created_at))) : null,
+        tiles(wf))));
+    lastAuthor = w.author_id;
+  }
+  const timeline = h('div', { class: 'zl-tl' }, ...msgs);
+
+  // ---- pole wiadomości: + plik, tekst, zdjęcie, wyślij ----
+  const comment = h('textarea', { class: 'zl-ctext', rows: 1, maxlength: 3000, placeholder: 'Wiadomość…', 'aria-label': 'Wiadomość' });
+  const grow = () => { comment.style.height = 'auto'; comment.style.height = Math.min(comment.scrollHeight, 140) + 'px'; };
+  comment.addEventListener('input', grow);
   const cAtt = [];
   const cList = h('div', { class: 'zl-pend' });
   const drawAtt = () => put(cList, ...cAtt.map((f, i) => h('span', { class: 'zl-pfile' }, f.type?.startsWith('image/') ? h('img', { src: URL.createObjectURL(f), alt: '' }) : null,
@@ -256,76 +281,84 @@ export async function openZlecenie(id, onChange) {
   const fileIn = h('input', { type: 'file', multiple: true, hidden: true, onchange: () => { if (fileIn.files.length) addAtt([...fileIn.files]); fileIn.value = ''; } });
   const camIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: () => { if (camIn.files.length) addAtt([...camIn.files]); camIn.value = ''; } });
   const sendC = async ev => {
-    const v = comment.value.trim(); if (!v && !cAtt.length) { comment.focus(); return toast('Wpisz komentarz albo dodaj plik', true); }
-    const btn = ev.currentTarget; btn.disabled = true;
+    const v = comment.value.trim(); if (!v && !cAtt.length) { comment.focus(); return; }
+    const btn = ev?.currentTarget; if (btn) btn.disabled = true;
     const { data: w, error: e } = await sb.from('zlecenia_wpisy').insert({ zlecenie_id: id, kind: 'komentarz', body: v || `📎 ${cAtt.length === 1 ? 'załącznik' : `załączniki (${cAtt.length})`}`, author_id: state.me.id }).select('id').single();
-    if (e) { btn.disabled = false; return fail(e); }
+    if (e) { if (btn) btn.disabled = false; return fail(e); }
     if (cAtt.length) await uploadZl(id, cAtt, w.id);
-    toast('Dodano komentarz'); refresh();
+    refresh();
   };
-  const composer = (mine || admin || helper) && z.status !== 'anulowane' ? h('div', { class: 'zl-composer' }, comment, cList,
-    h('div', { class: 'zl-ctools' },
-      h('button', { type: 'button', class: 'zl-tool', title: 'Dołącz plik', onclick: () => fileIn.click() }, '📎', h('span', {}, 'Plik')),
-      h('button', { type: 'button', class: 'zl-tool', title: 'Zrób zdjęcie', onclick: () => camIn.click() }, '📷', h('span', {}, 'Zdjęcie')),
-      h('span', { class: 'zl-ctools-sp' }),
-      h('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: sendC }, 'Wyślij komentarz')), fileIn, camIn) : null;
+  comment.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendC(); } });
+  const canWrite = (mine || admin || helper) && z.status !== 'anulowane';
+  const composer = canWrite ? h('div', { class: 'zl-composer' }, cList,
+    h('div', { class: 'zl-crow' },
+      h('button', { type: 'button', class: 'zl-cbtn', title: 'Dołącz plik', 'aria-label': 'Dołącz plik', onclick: () => fileIn.click() }, '+'),
+      comment,
+      h('button', { type: 'button', class: 'zl-cbtn', title: 'Zrób zdjęcie', 'aria-label': 'Zrób zdjęcie', onclick: () => camIn.click() }, '📷'),
+      h('button', { type: 'button', class: 'zl-cbtn zl-send', title: 'Wyślij (Ctrl+Enter)', 'aria-label': 'Wyślij', onclick: sendC }, '➤')), fileIn, camIn) : null;
   if (composer) {
     ['dragenter', 'dragover'].forEach(t => composer.addEventListener(t, e => { e.preventDefault(); composer.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(t => composer.addEventListener(t, e => { e.preventDefault(); composer.classList.remove('over'); }));
     composer.addEventListener('drop', e => { const fs = [...(e.dataTransfer?.files || [])]; if (fs.length) addAtt(fs); });
     composer.addEventListener('paste', e => { const fs = pastedFiles(e); if (fs.length) { e.preventDefault(); addAtt(fs); } });
   }
-  // plik do samego zlecenia (zlecający)
   const topIn = h('input', { type: 'file', multiple: true, hidden: true, onchange: async () => { const fs = [...topIn.files]; topIn.value = ''; if (!fs.length) return; const n = await uploadZl(id, fs); if (n) { toast(n === 1 ? 'Dodano załącznik' : `Dodano załączniki: ${n}`); refresh(); } } });
 
-  // ---- „Co teraz?” – jeden wyraźny krok dla osoby, która patrzy ----
-  const B = (cls, label, fn) => h('button', { class: 'btn ' + cls, type: 'button', onclick: fn }, label);
-  const first = (who(z.assignee_id) || '').split(' ')[0] || 'Pracownik';
-  let hint = '', main = [], extra = [];
+  // ---- szybkie akcje nad polem wiadomości (co można teraz zrobić) ----
+  const first = fn(z.assignee_id) || 'Pracownik';
+  const acts = []; let hint = '';
+  const A = (label, f, tone = '') => acts.push(h('button', { type: 'button', class: 'zl-qa' + (tone ? ' ' + tone : ''), onclick: f }, label));
   const closed = !OPEN.includes(z.status);
   if (closed) {
-    hint = z.status === 'anulowane' ? 'Zadanie anulowane.' : `Zadanie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''}. 👍`;
-    if (admin) extra.push(B('btn-ghost btn-sm', 'Wznów zadanie', () => act('wznow')));
+    hint = z.status === 'anulowane' ? 'Zadanie anulowane.' : `✓ Zadanie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''} 👍`;
+    if (admin) A('Wznów zadanie', () => act('wznow'));
   } else if (mine) {
-    hint = { nowe: 'Kliknij „Zaczynam”, gdy się za to weźmiesz. Po wykonaniu – „Zrobione – zgłaszam”.', w_toku: 'Gdy skończysz, kliknij „Zrobione – zgłaszam”. Coś niejasne? „Mam pytanie”.',
-      pytanie: 'Czekasz na odpowiedź – dostaniesz powiadomienie. Możesz dalej pracować.', zgloszone: 'Zgłoszone – czeka na sprawdzenie i akceptację.' }[z.status];
-    if (['nowe', 'pytanie'].includes(z.status)) main.push(B('btn-outline', 'Zaczynam', () => act('start')));
-    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) main.push(B('btn-primary', '✓ Zrobione – zgłaszam', () => ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie')));
-    if (['nowe', 'w_toku'].includes(z.status)) extra.push(B('btn-ghost btn-sm', '? Mam pytanie', () => ask('Pytanie do zadania', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie')));
+    hint = { nowe: 'Kliknij „Zaczynam”, gdy się za to weźmiesz.', w_toku: 'Gdy skończysz – „Zrobione – zgłaszam”.', pytanie: 'Czekasz na odpowiedź – dostaniesz powiadomienie.', zgloszone: 'Zgłoszone – czeka na akceptację.' }[z.status];
+    if (['nowe', 'pytanie'].includes(z.status)) A('▶ Zaczynam', () => act('start'), 'pri');
+    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) A('✓ Zrobione – zgłaszam', () => ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie'), 'ok');
+    if (['nowe', 'w_toku'].includes(z.status)) A('? Mam pytanie', () => ask('Pytanie do zadania', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie'));
   }
-  if (!closed && admin && !mine) {
-    hint = { nowe: `Czeka, aż ${first} zacznie.`, w_toku: `${first} pracuje nad zadaniem.`, pytanie: `${first} ma pytanie – odpowiedz.`,
-      zgloszone: `${first} zgłosił(a) wykonanie – sprawdź i zaakceptuj albo odeślij do poprawy.` }[z.status];
-  }
+  if (!closed && admin && !mine) hint = { nowe: `Czeka, aż ${first} zacznie.`, w_toku: `${first} pracuje nad zadaniem.`, pytanie: `${first} ma pytanie – odpowiedz.`, zgloszone: `${first} zgłasza wykonanie – sprawdź.` }[z.status];
   if (!closed && admin) {
-    if (z.status === 'zgloszone') main.push(B('btn-outline', 'Do poprawy', () => ask('Odeślij do poprawy', 'Co trzeba poprawić?', 'popraw', true, 'Odeślij')), B('btn-primary', '✓ Akceptuję – zakończ', () => act('akceptuj')));
-    if (z.status === 'pytanie') main.push(B('btn-primary', 'Odpowiedz', () => ask('Odpowiedź', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź')));
-    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) main.push(B(z.status === 'pytanie' ? 'btn-outline' : 'btn-primary', '✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zadanie jako wykonane?')) act('zakoncz'); }));
-    extra.push(B('btn-ghost btn-sm', 'Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }),
-      B('btn-ghost btn-sm zl-danger', 'Anuluj zadanie', () => { if (confirm('Anulować to zadanie?')) act('anuluj'); }));
+    if (z.status === 'zgloszone') { A('✓ Akceptuję – zakończ', () => act('akceptuj'), 'ok'); A('Do poprawy', () => ask('Odeślij do poprawy', 'Co trzeba poprawić?', 'popraw', true, 'Odeślij'), 'warn'); }
+    if (z.status === 'pytanie') A('Odpowiedz', () => ask('Odpowiedź', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź'), 'pri');
+    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) A('✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zadanie jako wykonane?')) act('zakoncz'); }, z.status === 'pytanie' ? '' : 'ok');
   }
-  if (admin) extra.unshift(B('btn-ghost btn-sm', '📎 Plik do zadania', () => topIn.click()));
-  const STEPS = [['Zlecone', ['nowe']], ['W trakcie', ['w_toku', 'pytanie']], ['Zgłoszone', ['zgloszone']], ['Zakończone', ['zaakceptowane']]];
-  const cur = STEPS.findIndex(([, ss]) => ss.includes(z.status));
-  const stepper = z.status === 'anulowane' ? null : h('ol', { class: 'zl-stepper' }, ...STEPS.map(([l], i) => h('li', { class: i < cur ? 'done' : i === cur ? 'cur' : '' }, h('span', { class: 'dot' }, i < cur ? '✓' : String(i + 1)), h('span', { class: 'lbl' }, l + (i === 1 && z.status === 'pytanie' ? ' · pytanie' : '')))));
-  const next = h('div', { class: 'zl-next' + (closed ? ' closed' : '') },
-    hint ? h('p', { class: 'zl-next-hint' }, hint) : null,
-    main.length ? h('div', { class: 'zl-next-main' }, ...main) : null,
-    extra.length ? h('div', { class: 'zl-next-extra' }, ...extra) : null, topIn);
+  if (canAddPeople(z) && OPEN.includes(z.status)) A('+ Osoba', () => peopleDialog(z, () => { closeFn(); onChange?.(); openZlecenie(id, onChange); }));
+  if (admin) A('📎 Plik do zadania', () => topIn.click());
+  if (!closed && admin) { A('Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }); A('Anuluj zadanie', () => { if (confirm('Anulować to zadanie?')) act('anuluj'); }, 'danger'); }
+  if (hint) timeline.append(sys(hint, 'hint'));
 
-  closeFn = modal(`Zadanie #${z.no}`, h('div', { class: 'zl-detail' },
-    h('div', { class: 'zl-dhead' }, h('h3', {}, z.title, z.priority === 'pilne' ? h('span', { class: 'zl-hot' }, 'pilne') : null), pill(z)),
-    h('div', { class: 'zl-dmeta' },
-      h('span', {}, 'Dla: ', h('b', {}, who(z.assignee_id))), h('span', {}, 'Zlecił(a): ', who(z.created_by)), dueEl(z),
-      helpersOf(z).length || canAddPeople(z) ? h('span', { class: 'zl-helpers' }, helpersOf(z).length ? ['Razem z: ', h('b', {}, helpersOf(z).map(who).join(', '))] : null,
-        canAddPeople(z) && OPEN.includes(z.status) ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm zl-addp', onclick: () => peopleDialog(z, () => { closeFn(); onChange?.(); openZlecenie(id, onChange); }) }, helpersOf(z).length ? 'Zmień osoby' : '+ Dodaj osobę') : null) : null,
-      cl?.name ? h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name) : null),
-    z.body ? h('div', { class: 'zl-body' }, z.body) : null,
-    stepper,
-    next,
-    tiles((files || []).filter(f => !f.wpis_id)),
-    stepsBox,
-    h('h4', { class: 'zl-h4' }, 'Komentarze i przebieg'), timeline,
-    composer),
-  c => [B('btn-ghost', 'Zamknij okno', c)], { wide: true });
+  // ---- przypięta karta zadania: termin, opis, kroki, osoby (rozwijana) ----
+  const isLate = late(z), hot = z.priority === 'pilne';
+  const done = st.filter(s => s.done).length;
+  const pinTags = [hot ? 'Pilne' : null, ZL_ST[z.status]?.[0], z.due_date ? (isLate ? `po terminie · ${fmtD(z.due_date)}` : `termin ${fmtD(z.due_date)}`) : null].filter(Boolean).join(' · ');
+  const more = h('div', { class: 'zl-pin-more', hidden: true },
+    z.body ? h('div', { class: 'zl-pin-body' }, z.body) : null,
+    h('div', { class: 'zl-pin-meta' }, h('span', {}, 'Wykonuje: ', h('b', {}, who(z.assignee_id))), h('span', {}, 'Zlecił(a): ', h('b', {}, who(z.created_by))),
+      helpersOf(z).length ? h('span', {}, 'Razem z: ', h('b', {}, helpersOf(z).map(who).join(', '))) : null,
+      cl?.name ? h('span', {}, 'Klient: ', h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name)) : null),
+    stepsBox, tiles((files || []).filter(f => !f.wpis_id)));
+  const toggle = h('button', { type: 'button', class: 'zl-pin-tg', 'aria-expanded': 'false' }, '⌄');
+  const pin = h('div', { class: 'zl-pin' + (isLate || hot ? ' hot' : '') + (closed ? ' closed' : ''), role: 'button', tabindex: '0' },
+    h('div', { class: 'zl-pin-top' },
+      h('div', { class: 'zl-pin-main' }, h('div', { class: 'zl-pin-tags' }, pinTags),
+        h('div', { class: 'zl-pin-title' }, z.title),
+        z.body ? h('div', { class: 'zl-pin-sum' }, z.body.replace(/\s+/g, ' ').slice(0, 140)) : null,
+        st.length ? h('div', { class: 'zl-pin-prog' }, h('span', { class: 'zl-pin-bar' }, h('i', { style: { width: Math.round(done / st.length * 100) + '%' } })), `kroki ${done}/${st.length}`) : null),
+      toggle),
+    more);
+  const flip = () => { more.hidden = !more.hidden; pin.classList.toggle('open', !more.hidden); toggle.setAttribute('aria-expanded', String(!more.hidden)); };
+  pin.addEventListener('click', e => { if (e.target.closest('.zl-pin-more input, .zl-pin-more a, .zl-pin-more button, .zl-pin-more label')) return; flip(); });
+  // osoby w nagłówku
+  const people = [z.assignee_id, z.created_by, ...helpersOf(z)].filter((x, i, a) => x && a.indexOf(x) === i);
+
+  closeFn = modal(`Zadanie #${z.no}`, h('div', { class: 'zl-chat' },
+    h('div', { class: 'zl-chat-who' }, h('span', { class: 'zl-avs' }, ...people.slice(0, 4).map(p => h('span', { class: 'zl-av', title: who(p) }, ava(memberById(p) || { full_name: '?' })))),
+      h('span', { class: 'small muted' }, people.map(fn).join(', '))),
+    pin, timeline, topIn,
+    h('div', { class: 'zl-dock' }, acts.length ? h('div', { class: 'zl-qas' }, ...acts) : null, composer)),
+  () => [], { wide: true });
+  const mEl = timeline.closest('.modal');
+  if (mEl) { mEl.classList.add('zl-cmodal'); requestAnimationFrame(() => { mEl.scrollTop = mEl.scrollHeight; }); }
 }

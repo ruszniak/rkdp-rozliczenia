@@ -98,6 +98,8 @@ const NEWS = [
   ['2.1', '7 listopada 2026', [
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',
+    'Okno zadania jak czat: przypięta karta zadania (termin, opis, kroki – rozwija się po kliknięciu), wiadomości w dymkach, zdarzenia jako szare wstawki, szybkie przyciski nad polem wiadomości (Zaczynam, Zrobione, Akceptuję, Do poprawy…).',
+    'Rozliczenia na telefonie: wyszukiwarka z przyciskami filtrów i „⋯” (zaznaczanie, wiadomość, układ, pobieranie, widoki, legenda), szybkie filtry Wszyscy / Moi / Do rozliczenia / Braki, jedna zwarta karta postępu, wąski pasek o brakujących klientach.',
     'Klienci w nowym układzie: lista alfabetyczna z literami do szybkiego przewijania (telefon), filtry Wszyscy / Moi / Do uwagi, pasek rozliczeń bieżącego miesiąca przy każdym kliencie, narzędzia (Informacja, AML, Oferty, Umowy, Eksport, Biała lista) w menu „⋯”.',
     'Moje sprawy w nowym układzie: grupy według tego, co trzeba zrobić (do sprawdzenia, pytania, w toku, nowe, czeka na kogoś, terminy), karty z kolorowym paskiem, postępem kroków i przyciskami (Akceptuj, Zaczynam, Zrealizowano); na telefonie przesunięcie karty w lewo zgłasza wykonanie.',
   ]],
