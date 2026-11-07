@@ -98,6 +98,7 @@ const NEWS = [
   ['2.1', '7 listopada 2026', [
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',
+    'Moje sprawy w nowym układzie: grupy według tego, co trzeba zrobić (do sprawdzenia, pytania, w toku, nowe, czeka na kogoś, terminy), karty z kolorowym paskiem, postępem kroków i przyciskami (Akceptuj, Zaczynam, Zrealizowano); na telefonie przesunięcie karty w lewo zgłasza wykonanie.',
   ]],
   ['2.0', '2 listopada 2026', [
     'Nowa kolorystyka: ciemny turkus – nagłówek z gradientem, turkusowe przyciski i akcenty.',
