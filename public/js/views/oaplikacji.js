@@ -98,6 +98,7 @@ const NEWS = [
   ['2.1', '7 listopada 2026', [
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',
+    'Klienci w nowym układzie: lista alfabetyczna z literami do szybkiego przewijania (telefon), filtry Wszyscy / Moi / Do uwagi, pasek rozliczeń bieżącego miesiąca przy każdym kliencie, narzędzia (Informacja, AML, Oferty, Umowy, Eksport, Biała lista) w menu „⋯”.',
     'Moje sprawy w nowym układzie: grupy według tego, co trzeba zrobić (do sprawdzenia, pytania, w toku, nowe, czeka na kogoś, terminy), karty z kolorowym paskiem, postępem kroków i przyciskami (Akceptuj, Zaczynam, Zrealizowano); na telefonie przesunięcie karty w lewo zgłasza wykonanie.',
   ]],
   ['2.0', '2 listopada 2026', [

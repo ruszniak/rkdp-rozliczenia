@@ -1,4 +1,4 @@
-import { h, icon, fail, toast, modal, downloadCsv } from '../ui.js';
+import { h, icon, fail, toast, modal, downloadCsv, initials, defaultPeriod, periodLabel } from '../ui.js';
 import { sb, state, memberById, canEditClients } from '../store.js';
 import { LEGAL_SHORT, FORM_GROUP, VAT_SHORT, PIT_SHORT, CIT_SHORT, ZUS_SHORT, CLIENT_STATUS, isCompany, isPartnership,
   LEGAL_FORM, BOOKKEEPING, PIT_FORM, ADVANCES, ZUS_TYPE, CIT_TYPE, VAT_STATUS } from '../dict.js';
@@ -36,9 +36,28 @@ export function taxSummary(c) {
 }
 
 export async function renderKlienci(main) {
-  const prefs = { q: '', status: 'aktywny', group: '', ...loadPrefs() };
+  const prefs = { q: '', status: 'aktywny', group: '', who: '', ...loadPrefs() };
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie klientów…'));
-  const clients = await fetchAll(() => sb.from('clients').select('*, client_assignments(member_id), client_partners(id)').order('name'));
+  const period = defaultPeriod();
+  const [clients, entries] = await Promise.all([
+    fetchAll(() => sb.from('clients').select('*, client_assignments(member_id), client_partners(id)').order('name')),
+    fetchAll(() => sb.from('checklist_entries').select('client_id,task_code,status').eq('period', period + '-01')).catch(() => []),
+  ]);
+  // pasek rozliczeń bieżącego miesiąca: zrobione / do zrobienia (bez „nie dotyczy”); „do uwagi” – braki dokumentów, przypomnienia, po terminie
+  const counts = new Set(state.taskTypes.filter(t => t.counts_to_settled !== false).map(t => t.code));
+  const prog = new Map();
+  for (const e of entries) {
+    if (!counts.has(e.task_code) || e.status === 'na') continue;
+    const p = prog.get(e.client_id) || { done: 0, all: 0, miss: 0 };
+    p.all++; if (e.status === 'done') p.done++; if (['missing_docs', 'reminded'].includes(e.status)) p.miss++;
+    prog.set(e.client_id, p);
+  }
+  const [py, pm] = period.split('-').map(Number);
+  const lateDay = new Date(py, pm, 25).toLocaleDateString('sv-SE'); // 25. dzień kolejnego miesiąca – ostatni termin JPK/VAT
+  const isLate = new Date().toLocaleDateString('sv-SE') > lateDay;
+  const attention = c => { const p = prog.get(c.id); return !!p && c.status === 'aktywny' && (p.miss > 0 || (isLate && p.done < p.all)); };
+  const me = state.me.id;
+  const isMine = c => c.accountant_id === me || c.hr_id === me || (c.client_assignments || []).some(a => a.member_id === me);
 
   const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj po nazwie, NIP, e-mailu, telefonie…', value: prefs.q, 'aria-label': 'Szukaj' });
   const statusSel = h('select', { class: 'select', 'aria-label': 'Status' }, h('option', { value: '' }, 'Wszystkie statusy'),
@@ -51,12 +70,17 @@ export async function renderKlienci(main) {
   groupSel.value = prefs.group;
 
   const tbody = h('tbody');
-  const counter = h('span', { class: 'muted small' });
+  const counter = h('span', { class: 'kl-count' });
+  const chips = h('div', { class: 'zl-chips kl-chips' });
+  const cards = h('div', { class: 'kl-cards' });
+  const idx = h('nav', { class: 'kl-idx', 'aria-label': 'Litery' });
 
   const list = () => {
     const q = prefs.q.trim().toLowerCase();
     return clients.filter(c => {
       if (prefs.status && c.status !== prefs.status) return false;
+      if (prefs.who === 'moi' && !isMine(c)) return false;
+      if (prefs.who === 'uwaga' && !attention(c)) return false;
       if (prefs.group === 'niekompletne') { if (completeness(c, c.client_partners?.length).pct === 100) return false; }
       else if (prefs.group && (FORM_GROUP[c.legal_form] || 'inne') !== prefs.group) return false;
       if (q && ![c.name, c.nip, c.email, c.phone, c.contact_person].some(v => (v || '').toLowerCase().includes(q))) return false;
@@ -64,17 +88,57 @@ export async function renderKlienci(main) {
     });
   };
 
+  const PAL = [['#E1F1F3', '#064B58'], ['#EEEAFB', '#5B3FB0'], ['#FBEFD9', '#A05E00'], ['#E3F5EA', '#1E7A44'], ['#FCE6E3', '#B3261E'], ['#E6ECF7', '#2D4E8A']];
+  const tint = name => { let n = 0; for (const ch of name || '') n = (n * 31 + ch.charCodeAt(0)) >>> 0; return PAL[n % PAL.length]; };
+  const progEl = c => {
+    const p = prog.get(c.id);
+    if (!p || !p.all) return h('span', { class: 'kl-pr' });
+    if (p.done >= p.all) return h('span', { class: 'kl-pr' }, h('span', { class: 'kl-ok' }, '✓ rozliczony'));
+    return h('span', { class: 'kl-pr', title: `${periodLabel(period)}: zrobione ${p.done} z ${p.all}` },
+      h('span', { class: 'kl-bar' }, ...Array.from({ length: Math.min(p.all, 8) }, (_, i) => h('i', { class: i < Math.round(p.done / p.all * Math.min(p.all, 8)) ? 'd' : '' }))),
+      h('span', { class: 'kl-n' }, `${p.done}/${p.all}`));
+  };
+  const letter = n => (n || '#').trim().charAt(0).toLocaleUpperCase('pl') || '#';
+  const drawChips = () => {
+    const base = clients.filter(c => !prefs.status || c.status === prefs.status);
+    const chip = (k, l, n, pre) => h('button', { type: 'button', class: 'zl-chip' + (prefs.who === k ? ' on' : ''), onclick: () => { prefs.who = k; savePrefs(prefs); render(); } }, pre || null, l, h('span', {}, String(n)));
+    const nAtt = base.filter(attention).length;
+    chips.replaceChildren(...[chip('', 'Wszyscy', base.length), chip('moi', 'Moi', base.filter(isMine).length),
+      nAtt || prefs.who === 'uwaga' ? chip('uwaga', 'Do uwagi', nAtt, h('b', { class: 'mj-hot' }, '!')) : null,
+      h('label', { class: 'kl-sel' }, statusSel), h('label', { class: 'kl-sel' }, groupSel)].filter(Boolean));
+    [...chips.childNodes].forEach(n => { if (n.nodeType === 3 && n.textContent === 'null') n.remove(); });
+  };
   const render = () => {
     const rows = list();
-    counter.textContent = `${rows.length} z ${clients.length}`;
+    counter.textContent = String(rows.length);
+    drawChips();
+    // telefon: lista alfabetyczna z literami
+    const groups = new Map();
+    rows.forEach(c => { const l = letter(c.name); if (!groups.has(l)) groups.set(l, []); groups.get(l).push(c); });
+    cards.replaceChildren(...(rows.length ? [...groups.entries()].map(([l, cs]) => h('section', { class: 'kl-sec', id: 'kl-l-' + l },
+      h('div', { class: 'kl-let' }, l),
+      h('div', { class: 'kl-list' }, ...cs.map(c => {
+        const [bg, fg] = tint(c.name);
+        const meta = [LEGAL_SHORT[c.legal_form], taxSummary(c) || (c.nip ? 'NIP ' + c.nip : '')].filter(Boolean).join(' · ');
+        return h('a', { class: 'kl-row', href: `#/klient/${c.id}` },
+          h('span', { class: 'kl-ini', style: { background: bg, color: fg } }, initials(c.name).slice(0, 2)),
+          h('span', { class: 'kl-t' }, h('b', {}, c.name), h('span', { class: 'kl-m' }, c.status !== 'aktywny' ? CLIENT_STATUS[c.status] + ' · ' + meta : meta)),
+          progEl(c));
+      })))) : [h('p', { class: 'hint', style: { padding: '18px 4px' } }, prefs.who === 'uwaga' ? 'Nikt nie wymaga uwagi. 👍' : 'Brak klientów pasujących do filtrów.')]));
+    idx.replaceChildren(...[...groups.keys()].map(l => h('button', { type: 'button', onclick: () => document.getElementById('kl-l-' + l)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, l)));
+    idx.hidden = groups.size < 6;
+    // komputer: tabela
     tbody.replaceChildren(...rows.map(c => {
       const comp = completeness(c, c.client_partners?.length);
       const acc = memberById(c.accountant_id)?.short_name, hr = memberById(c.hr_id)?.short_name;
+      const [bg, fg] = tint(c.name);
       return h('tr', { class: 'click', onclick: () => { location.hash = `#/klient/${c.id}`; } },
-        h('td', {}, h('a', { href: `#/klient/${c.id}`, style: { fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' } }, c.name),
-          c.status !== 'aktywny' ? h('div', {}, h('span', { class: 'badge warn' }, CLIENT_STATUS[c.status])) : null),
+        h('td', {}, h('span', { class: 'kl-name' }, h('span', { class: 'kl-ini sm', style: { background: bg, color: fg } }, initials(c.name).slice(0, 2)),
+          h('span', {}, h('a', { href: `#/klient/${c.id}`, style: { fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' } }, c.name),
+            c.status !== 'aktywny' ? h('div', {}, h('span', { class: 'badge warn' }, CLIENT_STATUS[c.status])) : null))),
         h('td', {}, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?')),
         h('td', { class: 'small' }, taxSummary(c) || h('span', { class: 'muted' }, '—')),
+        h('td', {}, progEl(c)),
         h('td', { class: 'small' }, c.phone ? h('a', { href: 'tel:' + c.phone.replace(/\s/g, ''), onclick: e => e.stopPropagation() }, c.phone) : '',
           c.email ? h('div', {}, h('a', { href: 'mailto:' + c.email, onclick: e => e.stopPropagation() }, c.email)) : ''),
         h('td', { class: 'small' }, acc ? h('div', {}, 'Księgowość: ', h('b', {}, acc)) : null, hr ? h('div', {}, 'Kadry: ', h('b', {}, hr)) : null,
@@ -85,6 +149,7 @@ export async function renderKlienci(main) {
   };
 
   const onFilter = () => { Object.assign(prefs, { q: search.value, status: statusSel.value, group: groupSel.value }); savePrefs(prefs); render(); };
+  search.placeholder = 'Nazwa, NIP, e-mail, telefon…';
   let searchTimer;
   search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(onFilter, 180); });
   statusSel.addEventListener('change', onFilter);
@@ -178,19 +243,29 @@ export async function renderKlienci(main) {
     ], { wide: true });
   } }, icon('download'), 'Biała lista VAT') : null;
 
+  // menu „⋯”: narzędzia przy klientach
+  const menu = h('div', { class: 'kl-menu', hidden: true },
+    h('a', { href: '#/informacje' }, h('span', {}, '✉'), 'Informacja do klientów'),
+    h('a', { href: '#/aml' }, h('span', {}, '⛨'), 'AML'),
+    h('a', { href: '#/oferty' }, h('span', {}, '₪'), 'Oferty'),
+    h('button', { type: 'button', onclick: () => dokumentyDialog().catch(e => fail(e)) }, h('span', {}, '✎'), 'Umowy i pełnomocnictwa'),
+    h('button', { type: 'button', onclick: () => exportBtn.click() }, h('span', {}, '⬇'), 'Eksport (CSV)'),
+    wlBtn ? h('button', { type: 'button', onclick: () => wlBtn.click() }, h('span', {}, '⟳'), 'Biała lista VAT – aktualizacja') : null);
+  const moreBtn = h('button', { type: 'button', class: 'kl-icon', 'aria-label': 'Więcej', 'aria-haspopup': 'menu',
+    onclick: e => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, '⋯');
+  const closeMenu = () => { menu.hidden = true; };
+  document.addEventListener('click', closeMenu);
+  window.addEventListener('hashchange', () => document.removeEventListener('click', closeMenu), { once: true });
+  if (addBtn) { addBtn.classList.add('kl-add'); addBtn.setAttribute('aria-label', 'Dodaj klienta'); addBtn.replaceChildren(icon('plus'), h('span', { class: 'kl-add-t' }, 'Dodaj klienta')); }
   main.replaceChildren(
-    h('div', { class: 'page-head' },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'Baza klientów'), h('h1', { style: { marginTop: '6px' } }, 'Klienci'),
-        h('p', { class: 'sub' }, 'Dane kontaktowe i profil rozliczeń: PIT, CIT, VAT, ZUS, wspólnicy.')),
-      h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-        h('a', { class: 'btn btn-outline', href: '#/informacje' }, 'Informacja do klientów'),
-        h('a', { class: 'btn btn-outline', href: '#/aml' }, 'AML'),
-        h('a', { class: 'btn btn-outline', href: '#/oferty' }, 'Oferty'),
-        h('button', { class: 'btn btn-outline', onclick: () => dokumentyDialog().catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'), addBtn)),
-    h('div', { class: 'toolbar' }, search, statusSel, groupSel, counter, exportBtn, wlBtn),
-    h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-      h('thead', {}, h('tr', {}, ['Klient', 'Forma', 'Rozliczenia', 'Kontakt', 'Księgowa / kadrowa', 'Profil'].map(t => h('th', {}, t)))),
+    h('div', { class: 'kl-head' }, h('h1', {}, 'Klienci'), counter,
+      h('span', { class: 'kl-acts' }, h('span', { class: 'kl-more' }, moreBtn, menu), addBtn)),
+    h('label', { class: 'kl-search' }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' }), search),
+    chips,
+    h('div', { class: 'kl-mobile' }, idx, cards),
+    h('div', { class: 'list-wrap kl-desk' }, h('table', { class: 'list' },
+      h('thead', {}, h('tr', {}, ['Klient', 'Forma', 'Rozliczenia', periodLabel(period), 'Kontakt', 'Księgowa / kadrowa', 'Profil'].map(t => h('th', {}, t)))),
       tbody)));
   render();
-  if (!clients.length) tbody.replaceChildren(h('tr', {}, h('td', { colspan: 6, class: 'empty' }, 'Nie masz jeszcze przypisanych klientów.')));
+  if (!clients.length) tbody.replaceChildren(h('tr', {}, h('td', { colspan: 7, class: 'empty' }, 'Nie masz jeszcze przypisanych klientów.')));
 }
