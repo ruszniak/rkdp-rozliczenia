@@ -4,7 +4,7 @@ const listeners = new Set();
 export const onThemeChange = fn => { listeners.add(fn); return () => listeners.delete(fn); };
 export function setTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'dark' ? '#131314' : '#EAF0F1');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'dark' ? '#1F1F1F' : '#EAF0F1');
   try { localStorage.setItem('rkdp_theme', t); } catch { /* tryb prywatny */ }
   listeners.forEach(f => f(t));
 }

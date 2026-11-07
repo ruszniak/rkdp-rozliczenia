@@ -2494,7 +2494,7 @@ html:not([data-theme="dark"]) .grid thead th .sub{text-transform:none;letter-spa
   .nav-links{left:12px!important;right:12px!important;bottom:calc(10px + env(safe-area-inset-bottom))!important;padding:6px!important;border-radius:22px;border:0!important;background:#10262B!important;box-shadow:0 14px 30px -12px rgba(0,30,38,.55)}
   .nav-links a,.nav-links .more-btn{color:#8AA0A5!important;padding:6px 2px 5px!important}
   .nav-links a.active,.nav-links .more-btn.active{background:none!important;color:#fff!important}
-  .nav-links a.active .tab-ico,.nav-links .more-btn.active .tab-ico{background:#7FD6E2!important;color:#10262B;border-radius:12px}
+  .nav-links a.active .tab-ico,.nav-links .more-btn.active .tab-ico{color:#10262B}
   .tab-ico{padding:3px 12px;border-radius:12px}
 }
 .tiles-bento>.tile-hero .num{white-space:nowrap;flex-wrap:nowrap}
@@ -2849,3 +2849,44 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 :root[data-theme="dark"] .modal-back{background:rgba(0,0,0,.6)}
 :root[data-theme="dark"] .kl-ini{filter:brightness(.82) saturate(.9)}
 :root[data-theme="dark"] .mj-btn{background:#282A2C}
+
+/* ===== Tryb ciemny – bliżej Gmaila: szare tło, czarniejsze karty bez ramek, przyciemnione akcenty (jak niebieskie „pigułki” Gmaila, ale w turkusie) ===== */
+:root[data-theme="dark"]{
+  --bg:#1F1F1F; --card:#131314; --panel:#2D2F31; --soft:#1A1A1B; --line:#2A2B2D; --line-2:#3A3C3E;
+  --gm-pill:#004D57; --gm-pill-ink:#A9EEF7;
+}
+:root[data-theme="dark"] body,:root[data-theme="dark"] html{background:#1F1F1F!important}
+:root[data-theme="dark"] .site-header{background:#1F1F1F!important;border-bottom-color:transparent!important}
+:root[data-theme="dark"] main .page-head,:root[data-theme="dark"] main>.page-head:first-child,:root[data-theme="dark"] main>a+.page-head,:root[data-theme="dark"] main>.page-head.hero{background:none!important;border:0!important;box-shadow:none!important}
+:root[data-theme="dark"] .card,:root[data-theme="dark"] .mj-card,:root[data-theme="dark"] .kl-list,:root[data-theme="dark"] .zl-pin,:root[data-theme="dark"] .list-wrap,:root[data-theme="dark"] .grid-wrap,:root[data-theme="dark"] .tiles>.tile:not(.tile-hero),:root[data-theme="dark"] table.list tr{background:#131314!important;border-color:transparent!important;box-shadow:none!important}
+:root[data-theme="dark"] .grid th,:root[data-theme="dark"] .grid td{background:#131314;border-color:#2A2B2D}
+:root[data-theme="dark"] .grid thead th{background:#1A1A1B!important}
+:root[data-theme="dark"] .kl-row,:root[data-theme="dark"] .grid td{border-color:#2A2B2D}
+/* pola, etykiety, wyszukiwarki – szare „pigułki” jak pasek wyszukiwania Gmaila */
+:root[data-theme="dark"] .kl-search,:root[data-theme="dark"] input[type=search].input,:root[data-theme="dark"] .rm-ico,:root[data-theme="dark"] .kl-icon,:root[data-theme="dark"] .zl-chip,:root[data-theme="dark"] .zl-qa,:root[data-theme="dark"] .zl-cbtn,:root[data-theme="dark"] .zl-ctext,:root[data-theme="dark"] .hdr-search,:root[data-theme="dark"] .hdr-icon,:root[data-theme="dark"] .input,:root[data-theme="dark"] .select,:root[data-theme="dark"] .btn-outline,:root[data-theme="dark"] .tabs,:root[data-theme="dark"] .deadlines{background-color:#2D2F31!important;border-color:transparent!important;color:#E3E3E3}
+:root[data-theme="dark"] .btn-outline{color:#E3E3E3!important}
+/* aktywne elementy: przyciemniony turkus z jasnym tekstem (zamiast jaskrawego) */
+:root[data-theme="dark"] .zl-chip.on,:root[data-theme="dark"] .zl-chip.on span,:root[data-theme="dark"] .tabs button.on,:root[data-theme="dark"] .tabs a.on,:root[data-theme="dark"] main>.page-head .tabs button.on,:root[data-theme="dark"] main>.page-head .tabs a.on,:root[data-theme="dark"] .rm-ico.on{background:var(--gm-pill)!important;border-color:var(--gm-pill)!important;color:var(--gm-pill-ink)!important}
+:root[data-theme="dark"] .tabs button .n{background:rgba(255,255,255,.08);color:#C4C7C5}
+:root[data-theme="dark"] .btn-primary,:root[data-theme="dark"] .zl-send,:root[data-theme="dark"] .kl-add,:root[data-theme="dark"] .mj-add{background:var(--gm-pill)!important;border-color:var(--gm-pill)!important;color:var(--gm-pill-ink)!important}
+@media (max-width:820px){
+  :root[data-theme="dark"] .nav-links{background:rgba(45,47,49,.94)!important;box-shadow:0 12px 30px -10px rgba(0,0,0,.8)!important}
+  :root[data-theme="dark"] .nav-ind{background:var(--gm-pill)}
+  :root[data-theme="dark"] .nav-links a.active .tab-ico,:root[data-theme="dark"] .nav-links .more-btn.active .tab-ico{color:var(--gm-pill-ink)!important}
+  :root[data-theme="dark"] .nav-links a,:root[data-theme="dark"] .nav-links .more-btn{color:#C4C7C5!important}
+}
+:root[data-theme="dark"] .tiles-bento>.tile-hero{background:linear-gradient(120deg,#0B3E47,#072C33 55%,#04191D)!important}
+:root[data-theme="dark"] .zl-cmodal,:root[data-theme="dark"] .zl-cmodal>.section-head,:root[data-theme="dark"] .zl-dock,:root[data-theme="dark"] .modal{background:#1F1F1F}
+:root[data-theme="dark"] .zl-wbody{background:#2D2F31}
+:root[data-theme="dark"] .zl-w.mine .zl-wbody{background:var(--gm-pill);color:#E8FBFE}
+:root[data-theme="dark"] .zl-sys span{background:#2D2F31}
+:root[data-theme="dark"] .kl-menu,:root[data-theme="dark"] .rm-menu{background:#2D2F31}
+:root[data-theme="dark"] .avatar{background:#2D2F31;color:#E3E3E3}
+:root[data-theme="dark"] .lim-a{color:#E3E3E3!important}
+:root[data-theme="dark"] .lim-warn{background:#3A2F1C!important;color:#F5D9A8!important}
+:root[data-theme="dark"] .lim-a .small,:root[data-theme="dark"] .lim-a span{color:#D9CBB0}
+@media (max-width:820px){
+  :root[data-theme="dark"] .nav-links .duo{fill:currentColor;fill-opacity:.18}
+  :root[data-theme="dark"] .nav-links a.active .duo,:root[data-theme="dark"] .nav-links .more-btn.active .duo{fill:var(--gm-pill-ink);fill-opacity:.25}
+  .nav-links a.active .duo,.nav-links .more-btn.active .duo{fill-opacity:.2}
+}
