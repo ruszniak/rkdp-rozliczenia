@@ -98,6 +98,7 @@ const NEWS = [
   ['2.1', '7 listopada 2026', [
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',
+    'Tryb ciemny jak w Gmailu: neutralna czerń i szarości zamiast granatowo-turkusowych teł, turkus tylko jako akcent; pasek stanu telefonu w kolorze tła.',
     'Telefon: pływający pasek zakładek jak w aplikacji Facebook – same ikony, podświetlenie przesuwa się płynnie, przy przewijaniu w dół pasek się zmniejsza, w górę wraca.',
     '„Zadania dla zespołu” połączone z „Moimi sprawami” – administrator ma tam etykietę „Zespół” (wszystkie zadania według osób); stare linki i powiadomienia prowadzą do Moich spraw. Dolne menu na telefonie przyklejone do dołu ekranu.',
     'Jednolity wygląd w całej aplikacji: płaskie nagłówki widoków (na telefonie sam tytuł i przyciski), przewijane etykiety filtrów, pola wyszukiwania z lupą, listy jako karty.',
