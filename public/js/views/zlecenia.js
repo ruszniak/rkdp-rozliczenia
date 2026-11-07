@@ -69,13 +69,24 @@ async function loadAll() {
   return data || [];
 }
 
+const ST_COLOR = { nowe: '#8AA0A5', w_toku: '#007A8C', pytanie: '#6B4FC4', zgloszone: '#D08A00', zaakceptowane: '#2E9E5B', anulowane: '#A3B1B4' };
+// karta zadania – ten sam wygląd co w „Moich sprawach”
 function row(z, onOpen) {
-  const st = stepsOf(z), done = st.filter(s => s.done).length;
-  return h('button', { type: 'button', class: 'zl-row' + (late(z) ? ' late' : '') + (z.status === 'zgloszone' && canManage(z) && z.assignee_id !== state.me.id ? ' attn' : '') + (['nowe', 'poprawka'].includes(z.status) && z.assignee_id === state.me.id ? ' attn' : ''), onclick: () => onOpen(z) },
-    h('span', { class: 'zl-no' }, `#${z.no}`),
-    h('span', { class: 'zl-main' }, h('b', {}, z.title, z.priority === 'pilne' ? h('span', { class: 'zl-hot' }, 'pilne') : null),
-      h('span', { class: 'zl-meta' }, ...[z.assignee_id !== state.me.id ? `dla: ${who(z.assignee_id)}` : z.created_by && z.created_by !== state.me.id ? `od: ${who(z.created_by)}` : '', helpersOf(z).length ? `razem z: ${helpersOf(z).map(id => who(id).split(' ')[0]).join(', ')}` : '', st.length ? `kroki ${done}/${st.length}` : ''].filter(Boolean).join(' · '))),
-    dueEl(z), pill(z));
+  const st = stepsOf(z), done = st.filter(s => s.done).length, me = state.me.id;
+  const d = z.due_date, lt = late(z);
+  const sub = [z.assignee_id !== me ? `dla: ${who(z.assignee_id).split(' ')[0]}` : z.created_by && z.created_by !== me ? `od: ${who(z.created_by).split(' ')[0]}` : '', helpersOf(z).length ? `razem z: ${helpersOf(z).map(id => who(id).split(' ')[0]).join(', ')}` : ''].filter(Boolean).join(' · ');
+  const people = [z.assignee_id, ...helpersOf(z)].filter((x, i, arr) => x && arr.indexOf(x) === i).map(memberById).filter(Boolean);
+  const el = h('div', { class: 'mj-card', role: 'button', tabindex: '0', onclick: () => onOpen(z), onkeydown: e => { if (e.key === 'Enter') onOpen(z); } },
+    h('div', { class: 'mj-top' }, h('span', { class: 'mj-k' }, ZL_ST[z.status]?.[0] || z.status),
+      h('span', { class: 'mj-r' }, h('span', { class: 'mj-no' }, '#' + z.no),
+        d ? h('span', { class: 'mj-date' + (lt ? ' late' : d === today() ? ' today' : '') }, lt ? `po terminie · ${fmtD(d).slice(0, 5)}` : d === today() ? 'dziś' : fmtD(d).slice(0, 5)) : null)),
+    h('div', { class: 'mj-title' }, z.priority === 'pilne' ? h('span', { class: 'mj-hot', title: 'pilne' }, '!') : null, h('span', {}, z.title)),
+    sub ? h('div', { class: 'mj-sub' }, sub) : null,
+    st.length || people.length ? h('div', { class: 'mj-foot' },
+      st.length ? h('span', { class: 'mj-steps' }, h('span', { class: 'mj-bar' }, h('i', { style: { width: Math.round(done / st.length * 100) + '%' } })), `${done}/${st.length} kroki`) : null,
+      people.length ? h('span', { class: 'mj-avs' }, ...people.slice(0, 4).map(p => h('span', { class: 'avatar mj-av', title: p.full_name }, ava(p)))) : null) : null);
+  el.style.setProperty('--k', ST_COLOR[z.status] || '#8AA0A5');
+  return el;
 }
 
 // ---------- widok #/zlecenia ----------
@@ -103,11 +114,11 @@ export async function renderZlecenia(main, id) {
     const f = F.find(x => x[0] === filter)[2];
     const rows = all.filter(f).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
     if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zadań. Kliknij „+ Zadanie”, aby zlecić zadanie.' : 'Nie masz zadań do zrobienia. 👍 Kliknij „+ Zadanie”, aby dodać zadanie dla siebie lub kogoś z zespołu.') : 'Brak zadań.')); return; }
-    if (!admin) { put(listBox, h('div', { class: 'zl-list' }, ...rows.map(z => row(z, open)))); return; }
+    if (!admin) { put(listBox, h('div', { class: 'mj-groups' }, h('section', { class: 'mj-group' }, ...rows.map(z => row(z, open))))); return; }
     const by = new Map(); rows.forEach(z => by.set(z.assignee_id, [...(by.get(z.assignee_id) || []), z]));
-    put(listBox, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
-      h('section', { class: 'zl-person' }, h('div', { class: 'zl-phead' }, h('span', { class: 'zl-av' }, ava(memberById(mid) || { full_name: '?' })), h('b', {}, who(mid)), h('span', { class: 'small muted' }, `${zs.length}`)),
-        h('div', { class: 'zl-list' }, ...zs.map(z => row(z, open))))));
+    put(listBox, h('div', { class: 'mj-groups' }, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
+      h('section', { class: 'mj-group' }, h('h3', { class: 'mj-gh' }, h('span', { class: 'zl-av' }, ava(memberById(mid) || { full_name: '?' })), who(mid), h('span', { class: 'n' }, `${zs.length}`)),
+        ...zs.map(z => row(z, open))))));
   }
 
   put(main, 
@@ -116,7 +127,7 @@ export async function renderZlecenia(main, id) {
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, admin ? 'Zadania dla zespołu' : 'Zadania', infoTip(HELP, 'Zadania – jak to działa')),
         h('p', { class: 'sub' }, admin ? 'Dodatkowe zadania dla pracowników – z akceptacją wykonania.' : 'Twoje zadania i te, które zleciłeś innym. Gdy skończysz, kliknij „Zrobione – zgłaszam”.')),
       h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newZlecenie(reload) }, icon('plus'), 'Zadanie')),
-    h('section', { class: 'card section' }, chips, listBox));
+    chips, listBox);
   await reload();
   if (id) openZlecenie(id, reload);
 }

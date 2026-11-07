@@ -387,7 +387,7 @@ export async function renderRozliczenia(main, params) {
     banner.hidden = false;
     const none = entries.length === 0;
     banner.replaceChildren(
-      h('div', {}, h('h3', {}, none ? `Lista na ${periodLabel(period).toLowerCase()} nie jest jeszcze otwarta` : `${missing.length} aktywnych klientów nie ma jeszcze listy w tym miesiącu`),
+      h('div', {}, h('h3', {}, none ? `Lista na ${periodLabel(period).toLowerCase()} nie jest jeszcze otwarta` : PHONE() ? `${missing.length} klientów bez listy w tym miesiącu` : `${missing.length} aktywnych klientów nie ma jeszcze listy w tym miesiącu`),
         h('p', { class: 'hint', style: { marginTop: '4px' } },
           '„Nie dotyczy” ustawi się samo według profilu klienta (VAT, PIT/CIT, ZUS, pracownicy). Gdy profil nie jest uzupełniony, przejmiemy układ z poprzedniego miesiąca.')),
       h('button', { class: 'btn btn-primary', onclick: async (e) => {
@@ -396,7 +396,7 @@ export async function renderRozliczenia(main, params) {
         if (error) { e.target.disabled = false; return fail(error); }
         toast(`Utworzono ${data} pozycji`);
         renderRozliczenia(main, params);
-      } }, none ? 'Otwórz miesiąc' : 'Dodaj brakujących klientów'));
+      } }, none ? 'Otwórz miesiąc' : PHONE() ? 'Dodaj' : 'Dodaj brakujących klientów'));
   }
 
   // ---------- filtrowanie ----------
