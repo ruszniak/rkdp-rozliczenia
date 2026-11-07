@@ -209,7 +209,7 @@ export async function renderOAplikacji(main, sub) {
       h('p', { class: 'sub' }, 'Wersja, dokumenty i pomoc.'))),
     h('div', { class: 'oa-grid' },
       h('section', { class: 'card section oa-app' },
-        h('img', { src: '/icon-192-v4.png', alt: '', class: 'oa-logo', width: 72, height: 72 }),
+        h('img', { src: '/icon-192-v5.png', alt: '', class: 'oa-logo', width: 72, height: 72 }),
         h('h2', {}, 'RKDP Rozliczenia'),
         h('p', { class: 'muted' }, `Wersja ${APP_VERSION} · ${new Date(APP_DATE + 'T12:00:00').toLocaleDateString('pl-PL')}`),
         h('p', { class: 'small muted', style: { marginTop: '10px' } }, 'Właściciel: RKDP spółka doradztwa podatkowego sp. z o.o.', h('br'), 'Dane objęte tajemnicą doradcy podatkowego.'),
