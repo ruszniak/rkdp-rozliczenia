@@ -55,7 +55,7 @@ async function meetingByToken(token: string) {
 const publicInfo = (m: any) => ({
   amount: Number(m.price) || 0, paid: !!m.paid_at, paid_at: m.paid_at, can_pay: configured() && Number(m.price) > 0 && !m.paid_at && m.status === 'confirmed',
   seller: 'M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p., ul. Zwycięska 3, 53-033 Wrocław, NIP 8993058189',
-  terms: 'https://m2tax.pl/regulamin/', privacy: 'https://m2tax.pl/polityka-prywatnosci.html', operator: 'Przelewy24 (PayPro SA)',
+  terms: 'https://app.ruszniak.io/umow/regulamin/', privacy: 'https://app.ruszniak.io/umow/prywatnosc/', operator: 'Przelewy24 (PayPro SA)',
 });
 
 // wpłata potwierdzona: spotkanie i notatka wewnętrzna „opłacone – Przelewy24”, powiadomienie zespołu

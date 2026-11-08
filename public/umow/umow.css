@@ -5,7 +5,8 @@ body.embed{background:transparent}
 .um{max-width:1000px;margin:0 auto;padding:24px 16px 40px}
 body.embed .um{padding:0;max-width:none}
 .um-card{background:#fff;border-radius:22px;box-shadow:0 20px 60px rgba(17,24,39,.10);overflow:hidden}
-body.embed .um-card{border-radius:0;box-shadow:none;min-height:100vh}
+body.embed .um-card{border-radius:0;box-shadow:none}
+body.embed:not(:has(.um-foot)) .um-card{min-height:100vh}
 .um-load{padding:60px 20px;text-align:center;color:var(--muted)}
 .um-top{display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid #EEF0F3}
 .um-logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#3A3F4B,#0E1015);color:#fff;display:inline-flex;align-items:center;justify-content:center;font:800 20px 'Plus Jakarta Sans',Inter,sans-serif;flex:none}
@@ -223,4 +224,14 @@ body.th-m2tax .free.price{color:var(--ink);background:#F0E9DE}
 .pay .btn{width:100%;margin-top:4px}
 .pay .paid{margin:0;font-weight:700;color:var(--ok)}
 .pay-logos{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:10px}
-.pay-logos img{height:22px;width:auto;opacity:.9}
+.pay-logos img{width:240px;max-width:90%;height:auto;opacity:.85}
+/* zdjęcie przy rodzaju spotkania */
+.typ .ph{width:44px;height:44px;border-radius:11px;object-fit:cover;flex:none}
+/* stopka: dane usługodawcy, regulamin, polityka prywatności, metody płatności (wymogi Przelewy24) */
+.um-foot{max-width:980px;margin:14px auto 22px;padding:0 18px;text-align:center;font-size:11.5px;line-height:1.55;color:#8A8F97}
+.um-foot p{margin:2px 0}
+.um-foot a{color:inherit;text-decoration:underline}
+.um-foot b{font-weight:600;color:#6B7280}
+.um-flags{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:6px!important}
+.um-flags img{width:220px;max-width:70%;height:auto;opacity:.75}
+.um-flags:empty{display:none}

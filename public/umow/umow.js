@@ -5,7 +5,7 @@
   'use strict';
   var SB = (window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl) || 'https://iuszfoyttqnkzjzjpzma.supabase.co';
   var API = SB + '/functions/v1/spotkania', PAY_API = SB + '/functions/v1/platnosci';
-  var TERMS = 'https://m2tax.pl/regulamin/', PRIVACY = 'https://m2tax.pl/polityka-prywatnosci.html';
+  var APP = 'https://app.ruszniak.io', TERMS = APP + '/umow/regulamin/', PRIVACY = APP + '/umow/prywatnosc/';
   var q = new URLSearchParams(location.search);
   var EMBED = q.get('embed') === '1';
   var TOKEN = q.get('t');
@@ -84,8 +84,10 @@
   var inFrame = EMBED && window.parent !== window;
   function toTop() { window.scrollTo(0, 0); if (inFrame) window.parent.postMessage({ type: 'rkdp-umow-top' }, '*'); }
   if (inFrame) {
-    var lastH = 0, sendH = function () { var hh = Math.ceil(root.getBoundingClientRect().height); if (hh && Math.abs(hh - lastH) > 1) { lastH = hh; window.parent.postMessage({ type: 'rkdp-umow-height', height: hh }, '*'); } };
-    if (window.ResizeObserver) new ResizeObserver(sendH).observe(root); else setInterval(sendH, 500);
+    // wysokość okienka = kalendarz + stopka (dane usługodawcy, regulamin) – bez pętli: karta w okienku nie ma minimalnej wysokości ekranu
+    var foot = document.querySelector('.um-foot');
+    var lastH = 0, sendH = function () { var hh = Math.ceil(foot ? foot.getBoundingClientRect().bottom + window.scrollY + 12 : root.getBoundingClientRect().height); if (hh && Math.abs(hh - lastH) > 1) { lastH = hh; window.parent.postMessage({ type: 'rkdp-umow-height', height: hh }, '*'); } };
+    if (window.ResizeObserver) { var ro = new ResizeObserver(sendH); ro.observe(root); if (foot) ro.observe(foot); } else setInterval(sendH, 500);
     window.addEventListener('load', sendH);
   }
   function render() { root.innerHTML = ''; for (var i = 0; i < arguments.length; i++) add(root, arguments[i]); }
@@ -101,7 +103,7 @@
       h('p', { class: 'lbl' }, 'Rodzaj spotkania'),
       h('div', { class: 'typs' }, types.map(function (t) {
         return h('button', { type: 'button', class: 'typ' + (st.type && st.type.id === t.id ? ' on' : ''), onclick: function () { st.type = t; st.day = null; st.slot = null; loadSlots(); } },
-          h('span', { class: 'ic', html: ICON[t.mode] || ICON.meet }),
+          h('img', { class: 'ph', src: '/umow/img/' + (t.mode === 'office' ? 'stacjonarne' : 'online') + '.jpg', alt: '', width: 48, height: 48, loading: 'lazy' }),
           h('span', null, h('b', null, t.name), h('small', null, (t.duration_min >= 60 ? (t.duration_min / 60 + ' godz.').replace('.5', ',5') : t.duration_min + ' min') + ' · ' + (t.mode === 'office' ? (t.place || 'stacjonarnie').replace(/^RKDP Doradztwo Podatkowe, /, '') : t.mode === 'phone' ? 'telefonicznie' : 'online (Google Meet)'))),
           priceOf(t) > 0 ? h('span', { class: 'free price' }, zl(priceOf(t))) : h('span', { class: 'free' }, '0 zł'));
       })),
@@ -211,7 +213,7 @@
       inp('topic', 'W jakiej sprawie? (krótko – pomoże nam się przygotować)', null, null, 'np. sprzedaż mieszkania, kontrola z urzędu skarbowego, wybór formy opodatkowania'),
       hp,
       h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.consent, onchange: function (e) { form.consent = e.target.checked; } }), h('span', null,
-        'Zgadzam się na przetwarzanie moich danych w celu umówienia i przeprowadzenia spotkania. Administratorem danych jest kancelaria doradcy podatkowego, z którym odbędzie się spotkanie (RKDP spółka doradztwa podatkowego sp. z o.o. albo M2 TAX Doradcy Podatkowi). Dane nie są wykorzystywane do marketingu. ', h('a', { href: CHANNEL === 'm2tax' || priceOf(st.type) > 0 ? PRIVACY : 'https://rkdp.pl/polityka-prywatnosci.html', target: '_blank', rel: 'noopener' }, 'Polityka prywatności'))),
+        'Zgadzam się na przetwarzanie moich danych w celu umówienia i przeprowadzenia spotkania. Administratorem danych jest kancelaria doradcy podatkowego, z którym odbędzie się spotkanie (RKDP spółka doradztwa podatkowego sp. z o.o. albo M2 TAX Doradcy Podatkowi). Dane nie są wykorzystywane do marketingu. ', h('a', { href: PRIVACY, target: '_blank', rel: 'noopener' }, 'Polityka prywatności'))),
       priceOf(st.type) > 0 ? [
         h('div', { class: 'cost' }, h('b', null, 'Koszt konsultacji: ' + zl(priceOf(st.type)) + ' brutto'),
           h('span', null, 'Możesz zapłacić online od razu po umówieniu (BLIK, szybki przelew, karta) albo po spotkaniu – płatność z góry nie jest obowiązkowa.')),
@@ -291,7 +293,7 @@
         h('p', { class: 'hint', style: 'margin:4px 0 10px' }, 'BLIK, szybki przelew albo karta. ' + (afterBooking ? 'Możesz też zapłacić później – link jest w e-mailu.' : 'Płatność nie jest obowiązkowa przed spotkaniem.')),
         h('label', { class: 'consent', style: 'text-align:left' }, chk, h('span', null, 'Akceptuję ', h('a', { href: i.terms, target: '_blank', rel: 'noopener' }, 'Regulamin konsultacji'), ' i ', h('a', { href: i.privacy, target: '_blank', rel: 'noopener' }, 'Politykę prywatności'), '. Sprzedawca: ' + i.seller + '. Płatności obsługuje ' + i.operator + '.')),
         btn,
-        h('div', { class: 'pay-logos' }, h('img', { src: '/pobierz/p24/przelewy24.svg', alt: 'Przelewy24', onerror: function (e) { e.target.remove(); } }), h('img', { src: '/pobierz/p24/blik.svg', alt: 'BLIK', onerror: function (e) { e.target.remove(); } }))]);
+        h('div', { class: 'pay-logos' }, h('img', { src: '/umow/img/p24-metody.png', alt: 'Płatności obsługuje Przelewy24: BLIK, karty, przelewy' }))]);
     }).catch(function (e) { box.innerHTML = ''; add(box, h('p', { class: 'hint' }, e.message)); });
     return box;
   }
