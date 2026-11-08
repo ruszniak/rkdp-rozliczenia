@@ -3209,3 +3209,9 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 @media (max-width:820px){.upd-banner{bottom:calc(96px + env(safe-area-inset-bottom))}}
 .upd-banner .upd-btn{border-radius:999px;background:#2563EB;color:#fff;padding:7px 14px;text-decoration:none}
 .upd-banner .upd-x{background:none!important;color:#9CA3AF!important;padding:4px 6px!important}
+/* zdjęcie profilowe: bez tła pod spodem (białe/złote tło prześwitywało na zaokrąglonych krawędziach) */
+html body .avatar:has(.av-img),html body .site-header .avatar:has(.av-img),html body .av:has(.av-img){background:transparent!important;border:0!important;box-shadow:none!important}
+html body .avatar .av-img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+/* menu „Więcej”: przy długiej liście przewijane wewnątrz, nie wychodzi poza ekran */
+@media (min-width:821px){.more-menu{max-height:calc(100vh - 90px);max-height:calc(100dvh - 90px);overflow-y:auto;overscroll-behavior:contain}}
+.more-menu .mm-logout,.more-menu .mm-cfg{flex:none}

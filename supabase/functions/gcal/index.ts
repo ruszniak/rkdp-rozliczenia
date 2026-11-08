@@ -22,7 +22,7 @@ const REDIRECT = `${SB_URL}/functions/v1/gcal/callback`;
 let APP_URL = 'https://rozliczenia.rkdp.pl';
 async function loadAppUrl() { try { const { data } = await admin.from('app_settings').select('value').eq('key', 'app_url').maybeSingle(); if (data?.value) APP_URL = data.value.replace(/\/$/, ''); } catch { /* */ } }
 const API = 'https://www.googleapis.com/calendar/v3';
-// calendar.events – zapis spotkań w kalendarzu doradcy; freebusy – zajętość do wolnych terminów; calendarlist – wybór kalendarzy
+// calendar.events – zapis spotkań w kalendarzu doradcy; freebusy – zajętość do wolnych terminów; calendarlist – wybór kalendarzy; drive.meet.readonly – notatki Gemini z Meet (tylko pliki utworzone przez Meet)
 const SCOPES = 'openid email https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/drive.meet.readonly';
 const canBook = (sc: string | null) => /calendar\.events(\s|$)/.test(sc || '');
 const CAL_NAME = 'RKDP – terminy i zadania';
