@@ -72,11 +72,11 @@ const MODULES = {
     more: [['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
       ['#/doradztwo/dokumenty', 'Pisma procesowe – wzory (RKDP i M2 TAX)', 'm2:dokumenty'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
-      ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+      ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/zainstaluj/', 'Zainstaluj app.R na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     // ten sam układ zakładek co w RKDP: Pulpit · Klienci · Sprawy · … · Więcej
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
-    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/zainstaluj/', 'Zainstaluj app.R na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'RKDP · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -130,7 +130,7 @@ const isPhoneWidth = () => matchMedia('(max-width: 820px)').matches;
 // ---- własny pasek: każdy może przypiąć pozycje z „Więcej” do górnego paska (zapis na koncie, na wszystkich urządzeniach) ----
 let navPins = (() => { try { return JSON.parse(localStorage.getItem('rkdp_member_prefs') || '{}').nav_pins || {}; } catch { return {}; } })();
 let navLoaded = false;   // ustawienia z konta wczytujemy po zalogowaniu (przy pierwszym rysowaniu paska)
-const NOT_PINNABLE = ['logout', 'oaplikacji', 'navcfg'];
+const NOT_PINNABLE = ['logout', 'oaplikacji', 'navcfg', 'zainstaluj'];
 function navDialog(mod, all) {
   const pins = [...(navPins[mod] || [])].filter(href => all.some(x => x[0] === href));
   const box = h('div');

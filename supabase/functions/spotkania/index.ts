@@ -105,18 +105,60 @@ async function cals(memberId: string) {
   calCache.set(memberId, r);
   return r;
 }
+// zajętość z Google: własne kalendarze osoby + wybrane w ustawieniach.
+// Wydarzenia czytamy wprost (events.list) – liczą się też wpisy oznaczone jako „Dostępny”, np. szkolenie wpisane bez blokady;
+// pomijamy tylko całodniowe „dostępne” (urodziny, święta) i spotkania, które osoba odrzuciła. Kalendarze z dostępem tylko do
+// „wolny/zajęty” sprawdzamy przez freeBusy.
+const listCache = new Map<string, { at: number; items: { id: string; role: string }[] }>();
+async function calendarsOf(memberId: string, t: string) {
+  const c = listCache.get(memberId);
+  if (c && Date.now() - c.at < 10 * 60_000) return c.items;
+  const r = await gapi(t, 'GET', '/users/me/calendarList?minAccessRole=freeBusyReader&maxResults=100');
+  const items = r.ok ? (r.data?.items || []).filter((x: any) => x.selected !== false || x.primary).map((x: any) => ({ id: x.primary ? 'primary' : x.id, role: x.accessRole })) : [];
+  listCache.set(memberId, { at: Date.now(), items });
+  return items;
+}
 async function googleBusy(memberId: string, fromMs: number, toMs: number): Promise<Busy[] | null> {
   const t = await gToken(memberId);
   if (!t) return null;
   const { b } = await cals(memberId);
-  const r = await gapi(t, 'POST', '/freeBusy', { timeMin: new Date(fromMs).toISOString(), timeMax: new Date(toMs).toISOString(), timeZone: TZ, items: b.map(id => ({ id })) });
-  if (!r.ok) { console.error('freebusy', memberId, r.status, r.data?.error?.message); return null; }
+  const listed = await calendarsOf(memberId, t);
+  const all = new Map<string, string>();
+  // własne kalendarze osoby (właściciel) + kalendarze wybrane w ustawieniach (np. prywatny busum78@gmail.com);
+  // kalendarze innych osób widoczne u niej (np. udostępniony kalendarz Michała) NIE blokują jej terminów
+  listed.filter(x => x.role === 'owner').forEach(x => all.set(x.id, x.role));
+  b.forEach(id => { if (!all.has(id)) all.set(id, listed.find(x => x.id === id)?.role || 'freeBusyReader'); });
+  const readable = [...all.entries()].filter(([, role]) => ['reader', 'writer', 'owner'].includes(role)).map(([id]) => id).slice(0, 12);
+  const fbOnly = [...all.entries()].filter(([, role]) => !['reader', 'writer', 'owner'].includes(role)).map(([id]) => id).slice(0, 12);
   const out: Busy[] = [];
-  for (const [id, v] of Object.entries(r.data?.calendars || {})) {
-    if ((v as any).errors?.length) console.error('freebusy cal', id, JSON.stringify((v as any).errors));
-    for (const x of (v as any).busy || []) out.push({ s: Date.parse(x.start), e: Date.parse(x.end) });
+  const q = new URLSearchParams({ timeMin: new Date(fromMs).toISOString(), timeMax: new Date(toMs).toISOString(), singleEvents: 'true', maxResults: '250', timeZone: TZ,
+    fields: 'items(status,transparency,start,end,attendees(self,responseStatus),extendedProperties)' });
+  let ok = false;
+  await Promise.all(readable.map(async id => {
+    const r = await gapi(t, 'GET', `/calendars/${encodeURIComponent(id)}/events?${q}`);
+    if (!r.ok) { console.error('events busy', memberId, id, r.status, r.data?.error?.message); fbOnly.push(id); return; }
+    ok = true;
+    for (const e of r.data?.items || []) {
+      if (e.status === 'cancelled') continue;
+      if ((e.attendees || []).some((a: any) => a.self && a.responseStatus === 'declined')) continue;
+      const allDay = !!e.start?.date;
+      if (allDay && e.transparency === 'transparent') continue;
+      const s = allDay ? localToUtc(e.start.date, '00:00') : Date.parse(e.start?.dateTime);
+      const en = allDay ? localToUtc(e.end.date, '00:00') : Date.parse(e.end?.dateTime);
+      if (s && en) out.push({ s, e: en });
+    }
+  }));
+  if (fbOnly.length) {
+    const r = await gapi(t, 'POST', '/freeBusy', { timeMin: new Date(fromMs).toISOString(), timeMax: new Date(toMs).toISOString(), timeZone: TZ, items: fbOnly.map(id => ({ id })) });
+    if (r.ok) {
+      ok = true;
+      for (const [id, v] of Object.entries(r.data?.calendars || {})) {
+        if ((v as any).errors?.length) console.error('freebusy cal', id, JSON.stringify((v as any).errors));
+        for (const x of (v as any).busy || []) out.push({ s: Date.parse(x.start), e: Date.parse(x.end) });
+      }
+    } else console.error('freebusy', memberId, r.status, r.data?.error?.message);
   }
-  return out;
+  return ok ? out : null;
 }
 
 // ---------- wolne terminy ----------
