@@ -3239,3 +3239,12 @@ html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scal
 .sp-noshow-btn{color:#B91C1C!important;border-color:#FCA5A5!important}
 .sp-warn.sp-warn-red{background:#FEE2E2;color:#7F1D1D}
 :root[data-theme="dark"] .sp-noshow,:root[data-theme="dark"] .sp-warn.sp-warn-red,:root[data-theme="dark"] .sp-tag.noshow{background:rgba(220,38,38,.18);color:#FCA5A5}
+/* spotkania: płatność online za konsultację */
+.sp-pay{display:grid;gap:8px;margin:8px 0;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card)}
+.sp-pay.paid{background:#E4EDDF;border-color:#C7DCC0;color:#2F5B39}
+.sp-pay.paid small{opacity:.8}
+.sp-pay-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sp-pay-h small{color:var(--muted)}
+.sp-pay-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp-pay-amt{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+:root[data-theme="dark"] .sp-pay.paid{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.3);color:#86EFAC}

@@ -3,10 +3,13 @@
 // ?typ=<id|online|bezplatne|jagodno|zwycieska> i ?doradca=<id|michal|marcin> – wybór od razu.
 (function () {
   'use strict';
-  var API = ((window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl) || 'https://iuszfoyttqnkzjzjpzma.supabase.co') + '/functions/v1/spotkania';
+  var SB = (window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl) || 'https://iuszfoyttqnkzjzjpzma.supabase.co';
+  var API = SB + '/functions/v1/spotkania', PAY_API = SB + '/functions/v1/platnosci';
+  var TERMS = 'https://m2tax.pl/regulamin/', PRIVACY = 'https://m2tax.pl/polityka-prywatnosci.html';
   var q = new URLSearchParams(location.search);
   var EMBED = q.get('embed') === '1';
   var TOKEN = q.get('t');
+  var RETURNED = q.get('platnosc') === '1';
   if (EMBED) document.body.classList.add('embed');
   if (q.get('bare') === '1') document.body.classList.add('bare');   // w okienku strony, która ma własny nagłówek
   var root = document.getElementById('um');
@@ -43,6 +46,13 @@
     if (Array.isArray(c)) return c.forEach(function (x) { add(el, x); });
     el.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c)));
   }
+  function payApi(action, body) {
+    return fetch(PAY_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: action }, body || {})) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.error) throw new Error(j.error || 'Błąd połączenia – spróbuj ponownie.'); return j; }); });
+  }
+  // cena rodzaju spotkania (brutto) – zależy od strony, z której klient się umawia
+  function priceOf(t) { return Number(CHANNEL === 'm2tax' ? t.price_m2tax : t.price_rkdp) || 0; }
+  var zl = function (n) { return Number(n).toLocaleString('pl-PL', { maximumFractionDigits: 2 }) + ' zł'; };
   function api(action, body) {
     return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },  // „prosty” POST – bez dodatkowego zapytania CORS przed każdym wywołaniem
       body: JSON.stringify(Object.assign({ action: action }, body || {})) })
@@ -93,7 +103,7 @@
         return h('button', { type: 'button', class: 'typ' + (st.type && st.type.id === t.id ? ' on' : ''), onclick: function () { st.type = t; st.day = null; st.slot = null; loadSlots(); } },
           h('span', { class: 'ic', html: ICON[t.mode] || ICON.meet }),
           h('span', null, h('b', null, t.name), h('small', null, (t.duration_min >= 60 ? (t.duration_min / 60 + ' godz.').replace('.5', ',5') : t.duration_min + ' min') + ' · ' + (t.mode === 'office' ? (t.place || 'stacjonarnie').replace(/^RKDP Doradztwo Podatkowe, /, '') : t.mode === 'phone' ? 'telefonicznie' : 'online (Google Meet)'))),
-          /bezpłatn/i.test(t.name) ? h('span', { class: 'free' }, '0 zł') : null);
+          priceOf(t) > 0 ? h('span', { class: 'free price' }, zl(priceOf(t))) : h('span', { class: 'free' }, '0 zł'));
       })),
       cfg.advisors.length > 1 ? [h('p', { class: 'lbl', style: 'margin-top:14px' }, 'Doradca'),
         h('div', { class: 'dors' },
@@ -161,7 +171,7 @@
   function card(step, body) { return h('div', { class: 'um-card' }, top(step), body); }
 
   // ---------- krok 2: dane ----------
-  var form = { name: '', email: '', phone: '', nip: '', topic: '', consent: false };
+  var form = { name: '', email: '', phone: '', nip: '', topic: '', consent: false, terms: false };
   function summary() {
     var d = new Date(st.slot.start), end = new Date(d.getTime() + st.type.duration_min * 60000);
     var advId = st.adv !== 'any' ? st.adv : (st.slot.advisors.length === 1 ? st.slot.advisors[0] : null);
@@ -184,9 +194,10 @@
     var f = h('form', { onsubmit: function (e) {
       e.preventDefault();
       if (!form.consent) return render(card(2, step2('Zaznacz zgodę na przetwarzanie danych.')));
+      if (priceOf(st.type) > 0 && !form.terms) return render(card(2, step2('Zaakceptuj regulamin konsultacji.')));
       btn.disabled = true; btn.textContent = 'Rezerwuję…';
-      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
-        .then(function (r) { render(card(3, done(r.meeting, r.mailed))); toTop(); })
+      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, terms: priceOf(st.type) > 0 && form.terms, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
+        .then(function (r) { if (r.meeting) r.meeting._terms = form.terms; render(card(3, done(r.meeting, r.mailed))); toTop(); })
         .catch(function (e) {
           if (/zajęt/i.test(e.message)) { st.slot = null; loadSlots(); setTimeout(function () { alertBox(e.message); }, 50); return; }
           render(card(2, step2(e.message)));
@@ -199,8 +210,14 @@
       inp('nip', 'NIP firmy (opcjonalnie)', 'text', 'off', 'jeśli spotkanie dotyczy firmy'),
       inp('topic', 'W jakiej sprawie? (krótko – pomoże nam się przygotować)', null, null, 'np. sprzedaż mieszkania, kontrola z urzędu skarbowego, wybór formy opodatkowania'),
       hp,
-      h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.consent, onchange: function (e) { form.consent = e.target.checked; } }),
-        'Zgadzam się na przetwarzanie moich danych w celu umówienia i przeprowadzenia spotkania. Administratorem danych jest kancelaria doradcy podatkowego, z którym odbędzie się spotkanie (RKDP spółka doradztwa podatkowego sp. z o.o. albo M2 TAX Doradcy Podatkowi). Dane nie są wykorzystywane do marketingu. ', h('a', { href: 'https://rkdp.pl/polityka-prywatnosci.html', target: '_blank', rel: 'noopener' }, 'Polityka prywatności')),
+      h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.consent, onchange: function (e) { form.consent = e.target.checked; } }), h('span', null,
+        'Zgadzam się na przetwarzanie moich danych w celu umówienia i przeprowadzenia spotkania. Administratorem danych jest kancelaria doradcy podatkowego, z którym odbędzie się spotkanie (RKDP spółka doradztwa podatkowego sp. z o.o. albo M2 TAX Doradcy Podatkowi). Dane nie są wykorzystywane do marketingu. ', h('a', { href: CHANNEL === 'm2tax' || priceOf(st.type) > 0 ? PRIVACY : 'https://rkdp.pl/polityka-prywatnosci.html', target: '_blank', rel: 'noopener' }, 'Polityka prywatności'))),
+      priceOf(st.type) > 0 ? [
+        h('div', { class: 'cost' }, h('b', null, 'Koszt konsultacji: ' + zl(priceOf(st.type)) + ' brutto'),
+          h('span', null, 'Możesz zapłacić online od razu po umówieniu (BLIK, szybki przelew, karta) albo po spotkaniu – płatność z góry nie jest obowiązkowa.')),
+        h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.terms, onchange: function (e) { form.terms = e.target.checked; } }), h('span', null,
+          'Akceptuję ', h('a', { href: TERMS, target: '_blank', rel: 'noopener' }, 'Regulamin konsultacji'), ' i ', h('a', { href: PRIVACY, target: '_blank', rel: 'noopener' }, 'Politykę prywatności'),
+          '. Usługodawcą jest M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p. (NIP 8993058189). Proszę o wykonanie usługi przed upływem 14 dni na odstąpienie od umowy i przyjmuję do wiadomości, że po jej pełnym wykonaniu utracę prawo odstąpienia.'))] : null,
       h('div', { class: 'sticky' }, btn));
     return h('div', { class: 'form' }, f, summary());
   }
@@ -219,6 +236,7 @@
       h('h2', null, 'Spotkanie umówione'),
       h('p', { class: 'hint' }, mailed ? 'Wysłaliśmy potwierdzenie na Twój e-mail (sprawdź też folder Oferty / Spam). Dzień wcześniej przypomnimy o spotkaniu.' : 'Spotkanie jest zapisane. Jeśli nie dostaniesz e-maila w ciągu kilku minut – zadzwoń: 883 643 565.'),
       details(m),
+      m.price > 0 && !m.paid ? payBox(m, true) : null,
       h('div', { class: 'acts' }, h('a', { class: 'btn', href: gcalLink(m), target: '_blank', rel: 'noopener' }, 'Dodaj do Kalendarza Google'),
         EMBED ? h('button', { class: 'btn out', type: 'button', onclick: close }, 'Zamknij') : null));
   }
@@ -227,6 +245,7 @@
       h('span', null, 'Termin'), h('b', null, fullWhen(m.start, m.end)),
       h('span', null, 'Rodzaj'), h('b', null, m.type || 'Spotkanie'),
       h('span', null, 'Doradca'), h('b', null, (m.advisors || []).map(function (a) { return a.name; }).join(', ') || '—'),
+      m.price > 0 ? [h('span', null, 'Koszt'), h('b', null, zl(m.price) + (m.paid ? ' – opłacone ✓' : ''))] : null,
       h('span', null, m.mode === 'office' ? 'Miejsce' : 'Gdzie'),
       h('b', null, m.mode === 'office' ? [m.place || '', m.map_url ? [' · ', h('a', { href: m.map_url, target: '_blank', rel: 'noopener' }, 'mapa')] : null] : m.mode === 'phone' ? 'rozmowa telefoniczna' : (m.meet_url ? h('a', { href: m.meet_url, target: '_blank', rel: 'noopener' }, 'Google Meet – link do spotkania') : 'Google Meet (link w e-mailu)')));
   }
@@ -243,6 +262,7 @@
     var body = h('div', { class: 'done' },
       cancelled ? h('h2', null, 'Spotkanie odwołane') : h('h2', null, 'Twoje spotkanie'),
       details(m),
+      !cancelled && m.price > 0 && !m.paid ? payBox(m, false) : null,
       cancelled ? h('div', { class: 'acts' }, h('a', { class: 'btn', href: location.pathname + (EMBED ? '?embed=1' : '') }, 'Umów nowy termin'))
         : m.can_change ? h('div', { class: 'acts' },
           days ? h('button', { class: 'btn', type: 'button', onclick: function () { pickNew(m, days); } }, 'Zmień termin') : null,
@@ -250,6 +270,32 @@
           : h('p', { class: 'hint' }, 'Zmiana terminu jest możliwa najpóźniej 2 godziny przed spotkaniem. Zadzwoń: 883 643 565.'));
     render(card(0, body));
   }
+  // ---------- płatność online (dobrowolna) – Przelewy24, konto M2 TAX ----------
+  function payBox(m, afterBooking) {
+    var box = h('div', { class: 'pay' }, h('p', { class: 'hint' }, 'Sprawdzam płatność…'));
+    payApi('info', { token: m.token || TOKEN }).then(function (i) {
+      box.innerHTML = '';
+      if (i.paid) return add(box, h('p', { class: 'paid' }, '✓ Konsultacja opłacona – dziękujemy!'));
+      if (i.pending && RETURNED) return add(box, h('p', { class: 'hint' }, 'Płatność jest potwierdzana przez Przelewy24 – to zwykle kilkanaście sekund. Odśwież stronę za chwilę.'));
+      if (!i.can_pay) return add(box, h('p', { class: 'hint' }, 'Koszt konsultacji: ' + zl(i.amount) + '. Płatność online jest chwilowo niedostępna – zapłacisz po spotkaniu.'));
+      var ok = !!m._terms, chk = h('input', { type: 'checkbox', checked: ok, onchange: function (e) { ok = e.target.checked; } });
+      var btn = h('button', { class: 'btn', type: 'button', onclick: function () {
+        if (!ok) return alertBox('Zaakceptuj regulamin, aby przejść do płatności.');
+        btn.disabled = true; btn.textContent = 'Łączę z Przelewy24…';
+        payApi('pay', { token: m.token || TOKEN, accept: true }).then(function (r) {
+          try { (window.top || window).location.href = r.url; } catch (e) { window.open(r.url, '_blank'); }
+        }).catch(function (e) { btn.disabled = false; btn.textContent = 'Zapłać ' + zl(i.amount); alertBox(e.message); });
+      } }, 'Zapłać ' + zl(i.amount));
+      add(box, [
+        h('b', { class: 'pay-h' }, (afterBooking ? 'Chcesz zapłacić od razu? ' : '') + 'Koszt konsultacji: ' + zl(i.amount)),
+        h('p', { class: 'hint', style: 'margin:4px 0 10px' }, 'BLIK, szybki przelew albo karta. ' + (afterBooking ? 'Możesz też zapłacić później – link jest w e-mailu.' : 'Płatność nie jest obowiązkowa przed spotkaniem.')),
+        h('label', { class: 'consent', style: 'text-align:left' }, chk, h('span', null, 'Akceptuję ', h('a', { href: i.terms, target: '_blank', rel: 'noopener' }, 'Regulamin konsultacji'), ' i ', h('a', { href: i.privacy, target: '_blank', rel: 'noopener' }, 'Politykę prywatności'), '. Sprzedawca: ' + i.seller + '. Płatności obsługuje ' + i.operator + '.')),
+        btn,
+        h('div', { class: 'pay-logos' }, h('img', { src: '/pobierz/p24/przelewy24.svg', alt: 'Przelewy24', onerror: function (e) { e.target.remove(); } }), h('img', { src: '/pobierz/p24/blik.svg', alt: 'BLIK', onerror: function (e) { e.target.remove(); } }))]);
+    }).catch(function (e) { box.innerHTML = ''; add(box, h('p', { class: 'hint' }, e.message)); });
+    return box;
+  }
+
   function askCancel(m) {
     var reason = h('textarea', { placeholder: 'Powód (opcjonalnie)', style: 'width:100%;min-height:80px;border-radius:12px;border:1.5px solid #E7E2D8;padding:12px;font:inherit' });
     var btn = h('button', { class: 'btn', type: 'button', style: 'background:#9B1C1C', onclick: function () {

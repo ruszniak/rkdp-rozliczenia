@@ -38,7 +38,7 @@ const fmtRanges = r => (r || []).map(([a, b]) => `${a.replace(/^0/, '')}–${b.r
 const firstName = n => String(n || '').split(/\s+/)[0];
 const canNotes = () => ['admin', 'full'].includes(state.me?.role);
 const money = v => (v == null || v === '' ? '' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł');
-const PAY = { gotowka: 'gotówka', przelew: 'przelew', karta: 'karta / BLIK' };
+const PAY = { p24: 'online – Przelewy24', gotowka: 'gotówka', przelew: 'przelew', karta: 'karta / BLIK' };
 
 let typesP = null;
 const loadTypes = (fresh) => (typesP && !fresh ? typesP : (typesP = sb.from('meeting_types').select('*').order('sort').then(r => r.data || [])));
@@ -291,6 +291,7 @@ export async function openMeeting(id, onChange) {
   const body = h('div', { class: 'sp-detail' },
     cancelled ? h('p', { class: 'sp-warn' }, 'Spotkanie odwołane' + (m.cancel_reason ? ` – ${m.cancel_reason}` : '')) : null,
     !cancelled && !m.private ? noShowBox(m, s, () => { onChange?.(); openMeeting(m.id, onChange); }) : null,
+    !m.private && canNotes() ? payStaffBox(m, () => { onChange?.(); openMeeting(m.id, onChange); }) : null,
     row('Termin', m.all_day ? (isoDay(s) === isoDay(new Date(e - 1)) ? `${dayLabel(isoDay(s))} – cały dzień` : `${dayLabel(isoDay(s))} – ${dayLabel(isoDay(new Date(e - 1)))} (całe dni)`) : `${dayLabel(isoDay(s))}, ${hm(m.start_at)}–${hm(m.end_at)}`),
     row('Rodzaj', m.private ? 'Prywatne / wewnętrzne' : (t?.name || m.title)),
     m.private && m.mode === 'office' && !m.place ? null : row('Forma', m.mode === 'meet' ? (m.meet_url ? h('a', { href: m.meet_url, target: '_blank', rel: 'noopener' }, 'Google Meet – dołącz') : 'Google Meet') : m.mode === 'office' ? [m.place || 'Stacjonarnie', t?.map_url ? h('a', { href: t.map_url, target: '_blank', rel: 'noopener', style: { marginLeft: '8px' } }, 'mapa') : null] : 'Telefon'),
@@ -311,6 +312,31 @@ export async function openMeeting(id, onChange) {
     h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij'),
   ]);
 }
+// ---- płatność za konsultację (Przelewy24, konto M2 TAX): stan + link do płatności dla klienta (np. po spotkaniu) ----
+function payStaffBox(m, refresh) {
+  const money0 = n => `${Number(n).toLocaleString('pl-PL', { maximumFractionDigits: 2 })} zł`;
+  if (m.paid_at) return h('div', { class: 'sp-pay paid' }, h('b', {}, `✓ Opłacone online – ${money0(m.price)}`),
+    h('small', {}, `Przelewy24 · ${new Date(m.paid_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`));
+  const amount = h('input', { class: 'input', type: 'number', min: 1, step: '0.01', style: { maxWidth: '110px' } }); amount.value = Number(m.price) > 0 ? Number(m.price) : '';
+  const act = async (send, btn) => {
+    if (!(Number(amount.value) > 0)) return toast('Podaj kwotę do zapłaty', true);
+    btn.disabled = true;
+    try {
+      const r = await call('pay_link', { id: m.id, amount: Number(amount.value), send });
+      if (send) { toast(`Wysłano link do płatności na ${m.client_email}`); btn.closest('.modal-back')?.querySelector('.section-head .icon-btn')?.click(); refresh(); return; }
+      try { await navigator.clipboard.writeText(r.link); toast('Skopiowano link do płatności'); } catch { prompt('Link do płatności:', r.link); }
+    } catch (e) { fail(e); }
+    btn.disabled = false;
+  };
+  return h('div', { class: 'sp-pay' },
+    h('div', { class: 'sp-pay-h' }, h('b', {}, 'Płatność za konsultację'), h('small', {}, Number(m.price) > 0 ? `nieopłacone · ${money0(m.price)}` : 'bez ceny (bezpłatne)')),
+    h('div', { class: 'sp-pay-row' },
+      h('label', { class: 'sp-pay-amt' }, amount, ' zł'),
+      h('button', { class: 'btn btn-primary btn-sm', type: 'button', disabled: !m.client_email, title: m.client_email ? '' : 'Brak e-maila klienta', onclick: e => act(true, e.currentTarget) }, 'Wyślij link do płatności'),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: e => act(false, e.currentTarget) }, 'Kopiuj link')),
+    h('small', { class: 'muted' }, 'Klient zapłaci BLIK-iem, przelewem albo kartą (Przelewy24, konto M2 TAX). Po wpłacie spotkanie samo oznaczy się jako opłacone.'));
+}
+
 // ---- klient nie przyszedł i nie odwołał: oznaczenie po rozpoczęciu spotkania + ostrzeżenie o wcześniejszych nieobecnościach ----
 function noShowBox(m, s, refresh) {
   const box = h('div', { class: 'sp-noshow-wrap' });
@@ -695,7 +721,7 @@ async function rodzaje(box) {
   const admin = isAdmin();
   put(box, h('section', { class: 'card sp-types' },
     ...types.map(t => h('div', { class: 'sp-type' + (t.active ? '' : ' off') },
-      h('div', { style: { flex: 1, minWidth: 0 } }, h('b', {}, t.name), h('small', {}, [`${t.duration_min} min`, MODE[t.mode], t.place, t.public ? 'na stronie' : 'tylko w aplikacji', t.active ? '' : 'wyłączony'].filter(Boolean).join(' · '))),
+      h('div', { style: { flex: 1, minWidth: 0 } }, h('b', {}, t.name), h('small', {}, [`${t.duration_min} min`, MODE[t.mode], Number(t.price_rkdp) || Number(t.price_m2tax) ? `${Number(t.price_rkdp)} / ${Number(t.price_m2tax)} zł` : 'bezpłatne', t.place, t.public ? 'na stronie' : 'tylko w aplikacji', t.active ? '' : 'wyłączony'].filter(Boolean).join(' · '))),
       h('span', { class: 'sp-avs' }, ...(t.advisors || []).map(memberById).filter(Boolean).map(avaChip)),
       admin ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => editType(t, ids, () => rodzaje(box)) }, 'Edytuj') : null)),
     admin ? h('div', { style: { padding: '12px 16px' } }, h('button', { class: 'btn btn-primary btn-sm', onclick: () => editType(null, ids, () => rodzaje(box)) }, icon('plus'), 'Nowy rodzaj spotkania')) : h('p', { class: 'hint', style: { padding: '12px 16px' } }, 'Rodzaje spotkań zmienia administrator.')));
@@ -709,6 +735,7 @@ function editType(t, adv, onSave) {
   const map = h('input', { class: 'input', value: v.map_url || '', placeholder: 'link do Map Google (wizytówka)' });
   const desc = h('textarea', { class: 'input', rows: 2 }); desc.value = v.description || '';
   const pub = h('input', { type: 'checkbox', checked: v.public }), act = h('input', { type: 'checkbox', checked: v.active });
+  const pr1 = h('input', { class: 'input', type: 'number', min: 0, step: '1', value: Number(v.price_rkdp) || 0 }), pr2 = h('input', { class: 'input', type: 'number', min: 0, step: '1', value: Number(v.price_m2tax) || 0 });
   const sel = new Set(v.advisors || []);
   const people = state.members.filter(m => m.active !== false && (adv.includes(m.id) || (m.modules || []).includes('doradztwo')));
   modal(t ? 'Rodzaj spotkania' : 'Nowy rodzaj spotkania', h('div', { class: 'form-grid' },
@@ -717,6 +744,9 @@ function editType(t, adv, onSave) {
     h('label', { class: 'field wide' }, h('span', {}, 'Miejsce (dla spotkań stacjonarnych)'), place),
     h('label', { class: 'field wide' }, h('span', {}, 'Mapa'), map),
     h('label', { class: 'field wide' }, h('span', {}, 'Opis dla klienta'), desc),
+    h('label', { class: 'field' }, h('span', {}, 'Cena brutto (zł) – rezerwacja przez RKDP / link'), pr1),
+    h('label', { class: 'field' }, h('span', {}, 'Cena brutto (zł) – rezerwacja przez m2tax.pl'), pr2),
+    h('p', { class: 'small muted wide', style: { margin: '-4px 0 0' } }, '0 = bezpłatne. Płatność online (Przelewy24, konto M2 TAX) jest dla klienta dobrowolna – może zapłacić od razu albo po spotkaniu.'),
     h('div', { class: 'field wide' }, h('span', {}, 'Kto przyjmuje'), h('div', { class: 'sp-chips' }, ...people.map(p => {
       const b = h('button', { type: 'button', class: 'sp-chip sp-chip-p' + (sel.has(p.id) ? ' on' : ''), onclick: () => { sel.has(p.id) ? sel.delete(p.id) : sel.add(p.id); b.classList.toggle('on'); } }, avaChip(p), firstName(p.full_name));
       return b;
@@ -724,7 +754,7 @@ function editType(t, adv, onSave) {
     h('label', { class: 'sp-check wide' }, pub, 'Można zarezerwować na stronie internetowej'),
     h('label', { class: 'sp-check wide' }, act, 'Aktywny')),
   close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async () => {
-    const row = { name: name.value.trim(), duration_min: +dur.value, mode: mode.value, place: place.value.trim() || null, map_url: map.value.trim() || null, description: desc.value.trim() || null, advisors: [...sel], public: pub.checked, active: act.checked };
+    const row = { name: name.value.trim(), duration_min: +dur.value, mode: mode.value, place: place.value.trim() || null, map_url: map.value.trim() || null, description: desc.value.trim() || null, advisors: [...sel], public: pub.checked, active: act.checked, price_rkdp: Math.max(0, Number(pr1.value) || 0), price_m2tax: Math.max(0, Number(pr2.value) || 0) };
     if (!row.name) return toast('Wpisz nazwę', true);
     const { error } = t ? await sb.from('meeting_types').update(row).eq('id', t.id) : await sb.from('meeting_types').insert({ ...row, sort: 10 });
     if (error) return fail(error);

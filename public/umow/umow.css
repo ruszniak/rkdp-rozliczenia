@@ -213,3 +213,14 @@ body.th-m2tax.bare .form{grid-template-columns:minmax(0,1fr) 260px;gap:24px;padd
 body.th-m2tax .consent{display:block;position:relative;padding-left:30px}
 body.th-m2tax .consent input{position:absolute;left:0;top:1px}
 body.th-m2tax .consent a{color:var(--m-brown);font-weight:600}
+/* cena i płatność online (dobrowolna) */
+.free.price{color:var(--ink);background:var(--gold-l)}
+body.th-m2tax .free.price{color:var(--ink);background:#F0E9DE}
+.cost{display:flex;flex-direction:column;gap:3px;background:var(--gold-l);border-radius:12px;padding:10px 14px;margin:4px 0 10px;font-size:13px;line-height:1.45;color:var(--muted)}
+.cost b{color:var(--ink);font-size:14px}
+.pay{margin:4px 0 18px;padding:16px 18px;border-radius:14px;border:1.5px solid var(--line);background:#fff;text-align:left}
+.pay .pay-h{display:block;font-size:15px;color:var(--ink)}
+.pay .btn{width:100%;margin-top:4px}
+.pay .paid{margin:0;font-weight:700;color:var(--ok)}
+.pay-logos{display:flex;gap:12px;align-items:center;justify-content:center;margin-top:10px}
+.pay-logos img{height:22px;width:auto;opacity:.9}

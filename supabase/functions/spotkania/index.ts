@@ -7,6 +7,8 @@
 //  Zespół (zalogowany): create, cancel_staff, reschedule_staff, day (podgląd zajętości), staff_slots
 //  Harmonogram bazy (x-push-secret): cron – przypomnienia dzień przed spotkaniem, podsumowania (notatki Gemini) po spotkaniach w Meet.
 //  summary {id} – pobierz teraz notatki Gemini do notatki wewnętrznej spotkania.
+//  pay_link {id, amount?} – e-mail do klienta z linkiem do płatności (Przelewy24, funkcja „platnosci”) – np. po spotkaniu.
+// Cena spotkania (brutto) z rodzaju: price_rkdp (strona RKDP / link) albo price_m2tax (strona M2 TAX); płatność zawsze dobrowolna.
 // Wydarzenia trafiają do głównych Kalendarzy Google doradców (połączenie z profilu, funkcja „gcal”); e-maile do klientów
 // wychodzą z adresu z ustawień (domyślnie app@ruszniak.io, alias konta SMTP_USER) z plikiem .ics.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -235,7 +237,9 @@ function ics(m: any, summary: string, where: string, desc: string, cancelled = f
 type Ctx = { S: any; m: any; type: any; advisors: any[] };
 const CHANNEL: Record<string, string> = { rkdp: 'strona rkdp.pl', m2tax: 'strona m2tax.pl', link: 'link do rezerwacji', app: 'w aplikacji' };
 function whereOf(c: Ctx) { return c.m.mode === 'meet' ? (c.m.meet_url ? `Google Meet: ${c.m.meet_url}` : 'Google Meet (link w wiadomości)') : c.m.mode === 'phone' ? 'Rozmowa telefoniczna' : (c.m.place || ''); }
-async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie' | 'przypomnienie' | 'doradca') {
+type Kind = 'potwierdzenie' | 'zmiana' | 'odwolanie' | 'przypomnienie' | 'doradca' | 'platnosc';
+const zl = (n: number) => `${Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} zł`;
+async function mailClient(c: Ctx, kind: Kind) {
   const { S, m, type, advisors } = c;
   if (!m.client_email || !m.notify_client) return false;
   if (!SMTP_USER || !SMTP_PASS) { console.error('brak SMTP – e-mail nie wysłany'); return false; }
@@ -245,15 +249,19 @@ async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie'
   const tname = type?.name || m.title || 'Spotkanie';
   const manage = `${S.app_url}/umow/?t=${m.token}`;
   const first = String(m.client_name || '').trim().split(/\s+/)[0];
-  const head = { potwierdzenie: 'Spotkanie potwierdzone', zmiana: 'Zmieniliśmy termin spotkania', odwolanie: 'Spotkanie odwołane', przypomnienie: 'Przypomnienie o jutrzejszym spotkaniu', doradca: 'Zmiana doradcy na spotkaniu' }[kind];
-  const subj = { potwierdzenie: 'Potwierdzenie', zmiana: 'Nowy termin', odwolanie: 'Odwołane', przypomnienie: 'Przypomnienie', doradca: 'Zmiana doradcy' }[kind] + `: spotkanie ${shortDate(s)}, ${hmOf(s)}`;
+  const head = { potwierdzenie: 'Spotkanie potwierdzone', zmiana: 'Zmieniliśmy termin spotkania', odwolanie: 'Spotkanie odwołane', przypomnienie: 'Przypomnienie o jutrzejszym spotkaniu', doradca: 'Zmiana doradcy na spotkaniu', platnosc: 'Płatność za konsultację' }[kind];
+  const subj = { potwierdzenie: 'Potwierdzenie', zmiana: 'Nowy termin', odwolanie: 'Odwołane', przypomnienie: 'Przypomnienie', doradca: 'Zmiana doradcy', platnosc: 'Płatność za konsultację' }[kind] + `: spotkanie ${shortDate(s)}, ${hmOf(s)}`;
   const intro = {
     potwierdzenie: 'dziękujemy za umówienie spotkania. Poniżej szczegóły – do zobaczenia!',
     zmiana: 'termin spotkania został zmieniony. Aktualne szczegóły poniżej.',
     odwolanie: 'spotkanie zostało odwołane. Jeśli chcesz umówić nowy termin, skorzystaj z przycisku poniżej.',
     przypomnienie: 'przypominamy o spotkaniu. Szczegóły poniżej.',
     doradca: 'termin spotkania się nie zmienia, zmieniła się osoba, która z Tobą porozmawia. Aktualne szczegóły poniżej.',
+    platnosc: 'dziękujemy za spotkanie. Poniżej link do płatności za konsultację – BLIK, szybki przelew albo karta.',
   }[kind];
+  // płatność online (dobrowolna): przycisk w e-mailach, dopóki konsultacja nie jest opłacona
+  const price = Number(m.price) || 0, payUrl = `${S.app_url}/umow/?t=${m.token}&zaplac=1`;
+  const showPay = price > 0 && !m.paid_at && kind !== 'odwolanie';
   const where = whereOf(c);
   const whereHtml = m.mode === 'meet' && m.meet_url ? `<a href="${esc(m.meet_url)}" style="color:#2563EB;font-weight:bold;">Dołącz przez Google Meet</a>`
     : m.mode === 'office' ? `${esc(m.place || '')}${type?.map_url ? ` · <a href="${esc(type.map_url)}" style="color:#2563EB;">mapa</a>` : ''}` : esc(where);
@@ -268,18 +276,20 @@ async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie'
 <table style="border-collapse:collapse;background:#F3F4F6;border-radius:12px;width:100%;" cellpadding="0" cellspacing="0"><tr><td style="padding:12px 16px;"><table cellpadding="0" cellspacing="0">
 ${row('Termin', esc(when))}${row('Rodzaj', esc(tname))}${row('Doradca', esc(adv))}${row(m.mode === 'office' ? 'Miejsce' : 'Gdzie', whereHtml)}
 </table></td></tr></table>
-<div style="margin-top:18px;">${kind === 'odwolanie' ? btn(`${S.app_url}/umow/`, 'Umów nowy termin', true) : btn(manage, 'Zmień termin lub odwołaj', false)}</div>
-${kind !== 'odwolanie' ? `<p style="font-size:12.5px;color:#6B7280;line-height:1.55;margin:12px 0 0;">W załączniku jest plik do dodania spotkania do kalendarza. ${kind === 'potwierdzenie' ? 'Dzień przed spotkaniem wyślemy przypomnienie. ' : ''}Jeśli masz dokumenty dotyczące sprawy, możesz odpowiedzieć na tę wiadomość i je dołączyć.</p>` : ''}
+${showPay ? `<div style="margin-top:16px;padding:14px 16px;border-radius:12px;background:#EFF6FF;border:1px solid #BFDBFE;"><div style="font-size:14px;font-weight:bold;color:#111827;margin:0 0 4px;">Koszt konsultacji: ${zl(price)}</div><div style="font-size:12.5px;color:#4B5563;line-height:1.5;margin:0 0 10px;">${kind === 'platnosc' ? 'Zapłać wygodnie online – BLIK, szybki przelew albo karta.' : 'Możesz zapłacić od razu online (BLIK, szybki przelew, karta) – albo po spotkaniu. Płatność z góry nie jest obowiązkowa.'}</div>${btn(payUrl, `Zapłać ${zl(price)}`, true)}</div>` : ''}
+<div style="margin-top:18px;">${kind === 'odwolanie' ? btn(`${S.app_url}/umow/`, 'Umów nowy termin', true) : kind === 'platnosc' ? '' : btn(manage, 'Zmień termin lub odwołaj', false)}</div>
+${kind !== 'odwolanie' && kind !== 'platnosc' ? `<p style="font-size:12.5px;color:#6B7280;line-height:1.55;margin:12px 0 0;">W załączniku jest plik do dodania spotkania do kalendarza. ${kind === 'potwierdzenie' ? 'Dzień przed spotkaniem wyślemy przypomnienie. ' : ''}Jeśli masz dokumenty dotyczące sprawy, możesz odpowiedzieć na tę wiadomość i je dołączyć.</p>` : ''}
 </div>
-<div style="border-top:1px solid #F1F2F4;padding:14px 24px;font-size:11.5px;color:#9CA3AF;line-height:1.5;">Wiadomość wysłana automatycznie po umówieniu spotkania. Masz pytanie? Po prostu odpowiedz na tę wiadomość.</div>
+<div style="border-top:1px solid #F1F2F4;padding:14px 24px;font-size:11.5px;color:#9CA3AF;line-height:1.5;">Wiadomość wysłana automatycznie ${kind === 'platnosc' ? 'po spotkaniu' : 'po umówieniu spotkania'}. Masz pytanie? Po prostu odpowiedz na tę wiadomość.${price > 0 ? `<br>Usługodawca: M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p., ul. Zwycięska 3, 53-033 Wrocław, NIP 8993058189 · <a href="https://m2tax.pl/regulamin/" style="color:#9CA3AF;">Regulamin</a> · płatności: Przelewy24.` : ''}</div>
 </div></body></html>`;
   const text = [`${head}`, '', `${first ? `Dzień dobry ${first}, ` : 'Dzień dobry, '}${intro}`, '', `Termin: ${when}`, `Rodzaj: ${tname}`, `Doradca: ${adv}`, `${m.mode === 'office' ? 'Miejsce' : 'Gdzie'}: ${where}`,
-    ...(m.mode === 'office' && type?.map_url ? [`Mapa: ${type.map_url}`] : []), '', kind === 'odwolanie' ? `Nowy termin: ${S.app_url}/umow/` : `Zmiana terminu lub odwołanie: ${manage}`].join('\n');
+    ...(m.mode === 'office' && type?.map_url ? [`Mapa: ${type.map_url}`] : []), '', ...(showPay ? [`Koszt konsultacji: ${zl(price)} – ${kind === 'platnosc' ? 'płatność online' : 'możesz zapłacić od razu online albo po spotkaniu'}: ${payUrl}`, ''] : []),
+    kind === 'odwolanie' ? `Nowy termin: ${S.app_url}/umow/` : kind === 'platnosc' ? '' : `Zmiana terminu lub odwołanie: ${manage}`].join('\n').trim();
   const desc = [m.mode === 'meet' && m.meet_url ? `Google Meet: ${m.meet_url}` : '', `Doradca: ${adv}`, `Zmiana lub odwołanie: ${manage}`].filter(Boolean).join('\n');
   const replyTo = advisors[0]?.email || S.from_email;
   await transport().sendMail({
     from: { name: S.from_name || 'Spotkanie z Doradcą Podatkowym', address: S.from_email || SMTP_USER }, replyTo, to: m.client_email, subject: subj, text, html,
-    attachments: [{ filename: kind === 'odwolanie' ? 'odwolane.ics' : 'spotkanie.ics', content: ics(m, `Spotkanie z doradcą podatkowym – ${tname}`, where, desc, kind === 'odwolanie', Math.floor(Date.now() / 1000) % 100000), contentType: `text/calendar; charset=utf-8; method=${kind === 'odwolanie' ? 'CANCEL' : 'PUBLISH'}` }],
+    attachments: kind === 'platnosc' ? [] : [{ filename: kind === 'odwolanie' ? 'odwolane.ics' : 'spotkanie.ics', content: ics(m, `Spotkanie z doradcą podatkowym – ${tname}`, where, desc, kind === 'odwolanie', Math.floor(Date.now() / 1000) % 100000), contentType: `text/calendar; charset=utf-8; method=${kind === 'odwolanie' ? 'CANCEL' : 'PUBLISH'}` }],
   });
   return true;
 }
@@ -470,7 +480,7 @@ const clean = (s: unknown, n: number) => String(s ?? '').replace(/[\u0000-\u001f
 const publicMeeting = async (m: any) => {
   const c = await ctxOf(m);
   return { id: m.id, status: m.status, start: m.start_at, end: m.end_at, type_id: m.type_id, type: c.type?.name || m.title, mode: m.mode, place: m.place, meet_url: m.status === 'confirmed' ? m.meet_url : null,
-    map_url: c.type?.map_url || null, advisors: c.advisors.map(a => ({ id: a.id, name: a.full_name })), client_name: m.client_name, can_change: m.status === 'confirmed' && Date.parse(m.start_at) > Date.now() + 2 * 3600_000 };
+    map_url: c.type?.map_url || null, advisors: c.advisors.map(a => ({ id: a.id, name: a.full_name })), client_name: m.client_name, token: m.token, price: Number(m.price) || 0, paid: !!m.paid_at, can_change: m.status === 'confirmed' && Date.parse(m.start_at) > Date.now() + 2 * 3600_000 };
 };
 
 Deno.serve(async (req: Request) => {
@@ -483,7 +493,7 @@ Deno.serve(async (req: Request) => {
 
     // ===== publiczne =====
     if (action === 'config') {
-      const { data: types } = await admin.from('meeting_types').select('id,name,duration_min,mode,place,map_url,advisors,description,sort').eq('active', true).eq('public', true).order('sort');
+      const { data: types } = await admin.from('meeting_types').select('id,name,duration_min,mode,place,map_url,advisors,description,sort,price_rkdp,price_m2tax').eq('active', true).eq('public', true).order('sort');
       const ids = [...new Set((types || []).flatMap((t: any) => t.advisors || []))];
       const { data: adv } = ids.length ? await admin.from('team_members').select('id,full_name,job_title,active,avatar').in('id', ids) : { data: [] };
       return json({
@@ -534,6 +544,9 @@ Deno.serve(async (req: Request) => {
       if (!emailOk(email)) throw new Http(400, 'Podaj poprawny adres e-mail.');
       if (phone && phone.replace(/\D/g, '').length < 9) throw new Http(400, 'Numer telefonu wygląda na niepełny – popraw go albo zostaw puste.');
       if (body.consent !== true) throw new Http(400, 'Zaznacz zgodę na przetwarzanie danych.');
+      const channel = ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link';
+      const price = Number(channel === 'm2tax' ? type.price_m2tax : type.price_rkdp) || 0;
+      if (price > 0 && body.terms !== true) throw new Http(400, 'Zaakceptuj regulamin konsultacji.');
       const { count } = await admin.from('meetings').select('id', { count: 'exact', head: true }).eq('client_email', email).eq('status', 'confirmed').gte('start_at', new Date().toISOString());
       if ((count || 0) >= 3) throw new Http(429, 'Masz już kilka umówionych spotkań – zadzwoń do nas: 883 643 565.');
       // doradca: wybrany albo ten, kto ma tego dnia mniej spotkań
@@ -547,7 +560,7 @@ Deno.serve(async (req: Request) => {
       const match = await matchClient(email);
       const r = await createMeeting(S, {
         type_id: type.id, title: type.name, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + type.duration_min * 60000).toISOString(),
-        source: 'www', channel: ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link', mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone || null, client_nip: nip || null, topic, ...match, notify_client: true,
+        source: 'www', channel, price, terms_accepted_at: price > 0 ? new Date().toISOString() : null, mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone || null, client_nip: nip || null, topic, ...match, notify_client: true,
       }, [who], null);
       return json({ ok: true, mailed: r.mailed, meeting: await publicMeeting(r.meeting) });
     }
@@ -658,8 +671,9 @@ Deno.serve(async (req: Request) => {
       const title = clean(body.title, 200) || (priv ? 'Spotkanie' : type?.name || 'Spotkanie');
       let cid = body.client_id ? clean(body.client_id, 40) : null, m2id = body.m2_client_id ? clean(body.m2_client_id, 40) : null;
       if (!priv && email && !cid && !m2id) { const mc = await matchClient(email); cid = mc.client_id; m2id = mc.m2_client_id; }
+      const price = priv || !type ? 0 : body.price != null && body.price !== '' ? Math.max(0, Math.min(100000, Number(body.price) || 0)) : Number(m2id ? type.price_m2tax : type.price_rkdp) || 0;
       const r = await createMeeting(S, {
-        type_id: type?.id || null, title, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(), source: 'app', channel: 'app', private: priv, all_day: allDay,
+        price, type_id: type?.id || null, title, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(), source: 'app', channel: 'app', private: priv, all_day: allDay,
         mode, place: mode === 'office' && !body.block ? (clean(body.place, 300) || type?.place || null) : null,
         client_name: priv ? null : clean(body.client_name, 160) || null, client_email: priv ? null : email || null, client_phone: priv ? null : clean(body.client_phone, 40) || null,
         topic: clean(body.topic, 2000) || null, client_id: priv ? null : cid, m2_client_id: priv ? null : m2id, matter_id: body.matter_id ? clean(body.matter_id, 40) : null,
@@ -678,6 +692,25 @@ Deno.serve(async (req: Request) => {
       await saveSummary(m, r);
       await admin.from('meetings').update({ summary_tries: 99 }).eq('id', m.id);
       return json({ ok: true, summary: r.text, summary_url: r.url });
+    }
+    if (action === 'pay_link') {
+      const { data: m } = await user.from('meetings').select('*').eq('id', clean(body.id, 40)).maybeSingle();   // RLS: tylko widoczne spotkania
+      if (!m) throw new Http(404, 'Nie znaleziono spotkania.');
+      if (m.private) throw new Http(400, 'To spotkanie wewnętrzne – bez klienta.');
+      if (m.paid_at) throw new Http(400, 'To spotkanie jest już opłacone.');
+      let mm = m;
+      if (body.amount != null && body.amount !== '') {
+        const a = Math.round(Number(body.amount) * 100) / 100;
+        if (!(a > 0) || a > 100000) throw new Http(400, 'Podaj kwotę do zapłaty.');
+        const { data } = await admin.from('meetings').update({ price: a, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single(); mm = data;
+      }
+      if (!(Number(mm.price) > 0)) throw new Http(400, 'Ustaw kwotę do zapłaty.');
+      const link = `${S.app_url}/umow/?t=${mm.token}&zaplac=1`;
+      if (body.send === false) return json({ ok: true, link });
+      if (!mm.client_email) throw new Http(400, 'Brak e-maila klienta – skopiuj link i wyślij go inaczej.');
+      const mailed = await mailClient({ ...(await ctxOf(mm, S)), m: { ...mm, notify_client: true } }, 'platnosc');
+      if (!mailed) throw new Http(500, 'Nie udało się wysłać e-maila.');
+      return json({ ok: true, link, mailed });
     }
     if (action === 'members') {
       const { data: m } = await user.from('meetings').select('*').eq('id', clean(body.id, 40)).maybeSingle();
