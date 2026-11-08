@@ -7,6 +7,9 @@
   var API = SB + '/functions/v1/spotkania', PAY_API = SB + '/functions/v1/platnosci';
   var APP = 'https://app.ruszniak.io', TERMS = APP + '/umow/regulamin/', PRIVACY = APP + '/umow/prywatnosc/';
   var q = new URLSearchParams(location.search);
+  // dwie wersje: /umow/ – rezerwacja bez płatności (okienka na m2tax.pl i rkdp.pl), /umow2/ – z ceną i płatnością online (Przelewy24)
+  var PAYMODE = /^\/umow2(\/|$)/.test(location.pathname);
+  if (!PAYMODE && (q.get('zaplac') || q.get('platnosc'))) { location.replace('/umow2/' + location.search); return; }
   var EMBED = q.get('embed') === '1';
   var TOKEN = q.get('t');
   var RETURNED = q.get('platnosc') === '1';
@@ -51,7 +54,7 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.error) throw new Error(j.error || 'Błąd połączenia – spróbuj ponownie.'); return j; }); });
   }
   // cena rodzaju spotkania (brutto) – zależy od strony, z której klient się umawia
-  function priceOf(t) { return Number(CHANNEL === 'm2tax' ? t.price_m2tax : t.price_rkdp) || 0; }
+  function priceOf(t) { return PAYMODE ? Number(CHANNEL === 'm2tax' ? t.price_m2tax : t.price_rkdp) || 0 : 0; }
   var zl = function (n) { return Number(n).toLocaleString('pl-PL', { maximumFractionDigits: 2 }) + ' zł'; };
   function api(action, body) {
     return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },  // „prosty” POST – bez dodatkowego zapytania CORS przed każdym wywołaniem
@@ -105,7 +108,7 @@
         return h('button', { type: 'button', class: 'typ' + (st.type && st.type.id === t.id ? ' on' : ''), onclick: function () { st.type = t; st.day = null; st.slot = null; loadSlots(); } },
           h('span', { class: 'ic', html: ICON[t.mode] || ICON.meet }),
           h('span', null, h('b', null, t.name), h('small', null, (t.duration_min >= 60 ? (t.duration_min / 60 + ' godz.').replace('.5', ',5') : t.duration_min + ' min') + ' · ' + (t.mode === 'office' ? (t.place || 'stacjonarnie').replace(/^RKDP Doradztwo Podatkowe, /, '') : t.mode === 'phone' ? 'telefonicznie' : 'online (Google Meet)'))),
-          priceOf(t) > 0 ? h('span', { class: 'free price' }, zl(priceOf(t))) : h('span', { class: 'free' }, '0 zł'));
+          priceOf(t) > 0 ? h('span', { class: 'free price' }, zl(priceOf(t))) : /bezpłatn/i.test(t.name) ? h('span', { class: 'free' }, '0 zł') : null);
       })),
       cfg.advisors.length > 1 ? [h('p', { class: 'lbl', style: 'margin-top:14px' }, 'Doradca'),
         h('div', { class: 'dors' },
@@ -198,7 +201,7 @@
       if (!form.consent) return render(card(2, step2('Zaznacz zgodę na przetwarzanie danych.')));
       if (priceOf(st.type) > 0 && !form.terms) return render(card(2, step2('Zaakceptuj regulamin konsultacji.')));
       btn.disabled = true; btn.textContent = 'Rezerwuję…';
-      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, terms: priceOf(st.type) > 0 && form.terms, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
+      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, platnosc: PAYMODE, terms: priceOf(st.type) > 0 && form.terms, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
         .then(function (r) { if (r.meeting) r.meeting._terms = form.terms; render(card(3, done(r.meeting, r.mailed))); toTop(); })
         .catch(function (e) {
           if (/zajęt/i.test(e.message)) { st.slot = null; loadSlots(); setTimeout(function () { alertBox(e.message); }, 50); return; }

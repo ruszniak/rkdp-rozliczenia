@@ -7,6 +7,7 @@
 //  Zespół (zalogowany): create, cancel_staff, reschedule_staff, day (podgląd zajętości), staff_slots
 //  Harmonogram bazy (x-push-secret): cron – przypomnienia dzień przed spotkaniem, podsumowania (notatki Gemini) po spotkaniach w Meet.
 //  summary {id} – pobierz teraz notatki Gemini do notatki wewnętrznej spotkania.
+//  Rezerwacja ze strony /umow/ – bez płatności; ze strony /umow2/ (platnosc: true) – z ceną rodzaju spotkania i płatnością online.
 //  pay_link {id, amount?} – e-mail do klienta z linkiem do płatności (Przelewy24, funkcja „platnosci”) – np. po spotkaniu.
 // Cena spotkania (brutto) z rodzaju: price_rkdp (strona RKDP / link) albo price_m2tax (strona M2 TAX); płatność zawsze dobrowolna.
 // Wydarzenia trafiają do głównych Kalendarzy Google doradców (połączenie z profilu, funkcja „gcal”); e-maile do klientów
@@ -27,6 +28,8 @@ const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
 const API = 'https://www.googleapis.com/calendar/v3';
 const TZ = 'Europe/Warsaw';
+// płatności online działają dopiero po wpisaniu danych Przelewy24 (sekrety funkcji) – do tego czasu bez przycisku „Zapłać” w e-mailach
+const P24_ON = !!(Deno.env.get('P24_MERCHANT_ID') && Deno.env.get('P24_CRC') && Deno.env.get('P24_API_KEY'));
 const SMTP_USER = (Deno.env.get('SMTP_USER') || '').trim(), SMTP_PASS = (Deno.env.get('SMTP_PASS') || '').replace(/\s+/g, '');
 class Http extends Error { constructor(public status: number, msg: string) { super(msg); } }
 
@@ -261,7 +264,7 @@ async function mailClient(c: Ctx, kind: Kind) {
   }[kind];
   // płatność online (dobrowolna): przycisk w e-mailach, dopóki konsultacja nie jest opłacona
   const price = Number(m.price) || 0, payUrl = `${S.app_url}/umow/?t=${m.token}&zaplac=1`;
-  const showPay = price > 0 && !m.paid_at && kind !== 'odwolanie';
+  const showPay = P24_ON && price > 0 && !m.paid_at && kind !== 'odwolanie';
   const where = whereOf(c);
   const whereHtml = m.mode === 'meet' && m.meet_url ? `<a href="${esc(m.meet_url)}" style="color:#2563EB;font-weight:bold;">Dołącz przez Google Meet</a>`
     : m.mode === 'office' ? `${esc(m.place || '')}${type?.map_url ? ` · <a href="${esc(type.map_url)}" style="color:#2563EB;">mapa</a>` : ''}` : esc(where);
@@ -280,7 +283,7 @@ ${showPay ? `<div style="margin-top:16px;padding:14px 16px;border-radius:12px;ba
 <div style="margin-top:18px;">${kind === 'odwolanie' ? btn(`${S.app_url}/umow/`, 'Umów nowy termin', true) : kind === 'platnosc' ? '' : btn(manage, 'Zmień termin lub odwołaj', false)}</div>
 ${kind !== 'odwolanie' && kind !== 'platnosc' ? `<p style="font-size:12.5px;color:#6B7280;line-height:1.55;margin:12px 0 0;">W załączniku jest plik do dodania spotkania do kalendarza. ${kind === 'potwierdzenie' ? 'Dzień przed spotkaniem wyślemy przypomnienie. ' : ''}Jeśli masz dokumenty dotyczące sprawy, możesz odpowiedzieć na tę wiadomość i je dołączyć.</p>` : ''}
 </div>
-<div style="border-top:1px solid #F1F2F4;padding:14px 24px;font-size:11.5px;color:#9CA3AF;line-height:1.5;">Wiadomość wysłana automatycznie ${kind === 'platnosc' ? 'po spotkaniu' : 'po umówieniu spotkania'}. Masz pytanie? Po prostu odpowiedz na tę wiadomość.${price > 0 ? `<br>Usługodawca: M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p., ul. Zwycięska 3, 53-033 Wrocław, NIP 8993058189 · <a href="${S.app_url}/umow/regulamin/" style="color:#9CA3AF;">Regulamin</a> · płatności: Przelewy24.` : ''}</div>
+<div style="border-top:1px solid #F1F2F4;padding:14px 24px;font-size:11.5px;color:#9CA3AF;line-height:1.5;">Wiadomość wysłana automatycznie ${kind === 'platnosc' ? 'po spotkaniu' : 'po umówieniu spotkania'}. Masz pytanie? Po prostu odpowiedz na tę wiadomość.${showPay ? `<br>Usługodawca: M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p., ul. Zwycięska 3, 53-033 Wrocław, NIP 8993058189 · <a href="${S.app_url}/umow/regulamin/" style="color:#9CA3AF;">Regulamin</a> · płatności: Przelewy24.` : ''}</div>
 </div></body></html>`;
   const text = [`${head}`, '', `${first ? `Dzień dobry ${first}, ` : 'Dzień dobry, '}${intro}`, '', `Termin: ${when}`, `Rodzaj: ${tname}`, `Doradca: ${adv}`, `${m.mode === 'office' ? 'Miejsce' : 'Gdzie'}: ${where}`,
     ...(m.mode === 'office' && type?.map_url ? [`Mapa: ${type.map_url}`] : []), '', ...(showPay ? [`Koszt konsultacji: ${zl(price)} – ${kind === 'platnosc' ? 'płatność online' : 'możesz zapłacić od razu online albo po spotkaniu'}: ${payUrl}`, ''] : []),
@@ -545,7 +548,8 @@ Deno.serve(async (req: Request) => {
       if (phone && phone.replace(/\D/g, '').length < 9) throw new Http(400, 'Numer telefonu wygląda na niepełny – popraw go albo zostaw puste.');
       if (body.consent !== true) throw new Http(400, 'Zaznacz zgodę na przetwarzanie danych.');
       const channel = ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link';
-      const price = Number(channel === 'm2tax' ? type.price_m2tax : type.price_rkdp) || 0;
+      // cena tylko przy rezerwacji z płatnością (strona /umow2/); /umow/ (okienka na m2tax.pl i rkdp.pl) – bez płatności
+      const price = body.platnosc === true ? Number(channel === 'm2tax' ? type.price_m2tax : type.price_rkdp) || 0 : 0;
       if (price > 0 && body.terms !== true) throw new Http(400, 'Zaakceptuj regulamin konsultacji.');
       const { count } = await admin.from('meetings').select('id', { count: 'exact', head: true }).eq('client_email', email).eq('status', 'confirmed').gte('start_at', new Date().toISOString());
       if ((count || 0) >= 3) throw new Http(429, 'Masz już kilka umówionych spotkań – zadzwoń do nas: 883 643 565.');
