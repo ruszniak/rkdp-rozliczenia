@@ -110,10 +110,10 @@ export function gcalAgendaCard({ days = 7 } = {}) {
     const label = k => k === todayK ? 'Dziś' : k === tom ? 'Jutro' : DAY.format(new Date(k + 'T12:00:00'));
     const list = h('div', { class: 'gc-days' }, ...(items.length ? [...byDay.entries()].slice(0, 6).map(([k, es]) => h('div', { class: 'gc-day' + (k === todayK ? ' today' : '') },
       h('div', { class: 'gc-dl' }, label(k)),
-      ...es.map(e => h('a', { class: 'gc-ev', href: e.link || '#', target: '_blank', rel: 'noopener' },
+      h('div', { class: 'gc-evs' }, ...es.map(e => h('a', { class: 'gc-ev', href: e.link || '#', target: '_blank', rel: 'noopener' },
         h('span', { class: 'gc-t' }, e.allDay ? 'cały dzień' : HM.format(new Date(e.start))),
         h('span', { class: 'gc-n' }, e.title, e.location ? h('small', {}, e.location) : null),
-        e.meet ? h('span', { class: 'gc-meet' }, 'Meet') : null))))
+        e.meet ? h('span', { class: 'gc-meet' }, 'Meet') : null)))))
       : [h('p', { class: 'hint', style: { padding: '6px 0' } }, 'Brak wydarzeń w najbliższych dniach. 🙂')]));
     box.lastChild.replaceWith(list);
   })().catch(e => { box.replaceChildren(h('p', { class: 'hint' }, 'Kalendarz Google: ' + (e.message || e) + ' ', h('a', { href: '#/profil' }, 'Profil →'))); });

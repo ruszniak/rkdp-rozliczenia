@@ -2985,3 +2985,16 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 :root[data-theme="dark"] .gc-ico{background:#1E2A44;color:#93C5FD}
 :root[data-theme="dark"] .gc-err{background:#3B1D1D;color:#FCA5A5}
 @media (max-width:820px){.gc-head>.small.muted{display:none}.gc-agenda{padding:12px 14px}.gc-days{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -14px;padding:0 14px 4px}.gc-day{flex:0 0 82%;scroll-snap-align:start}}
+/* Kalendarz na Pulpicie – układ pionowy (dzień pod dniem) */
+.gc-agenda .gc-days{display:flex;flex-direction:column;gap:0;overflow:visible;margin:0;padding:0}
+.gc-agenda .gc-day{display:grid;grid-template-columns:170px 1fr;gap:4px 14px;align-items:start;background:none;border-radius:0;padding:10px 4px;border-top:1px solid var(--line);flex:none}
+.gc-agenda .gc-day:first-child{border-top:0}
+.gc-agenda .gc-day.today{background:#EEF4FF;box-shadow:none;border-radius:12px;border-top-color:transparent;padding:10px 12px;margin:0 -8px}
+.gc-agenda .gc-day.today+.gc-day{border-top-color:transparent}
+.gc-agenda .gc-dl{margin:0;padding-top:6px}
+.gc-agenda .gc-ev{padding:5px 0}
+.gc-evs{min-width:0}
+.gc-evs .gc-ev:first-child{border-top:0}
+:root[data-theme="dark"] .gc-agenda .gc-day.today{background:#1C2537}
+@media (max-width:820px){.gc-agenda .gc-day{grid-template-columns:1fr;flex:none}.gc-agenda .gc-dl{padding-top:0}}
+.gc-agenda .gc-t{width:76px;white-space:nowrap}
