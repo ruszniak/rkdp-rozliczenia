@@ -212,26 +212,26 @@ async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie'
     doradca: 'termin spotkania się nie zmienia, zmieniła się osoba, która z Tobą porozmawia. Aktualne szczegóły poniżej.',
   }[kind];
   const where = whereOf(c);
-  const whereHtml = m.mode === 'meet' && m.meet_url ? `<a href="${esc(m.meet_url)}" style="color:#7A5A28;font-weight:bold;">Dołącz przez Google Meet</a>`
-    : m.mode === 'office' ? `${esc(m.place || '')}${type?.map_url ? ` · <a href="${esc(type.map_url)}" style="color:#7A5A28;">mapa</a>` : ''}` : esc(where);
-  const row = (k: string, v: string) => `<tr><td style="padding:6px 14px 6px 0;color:#6B6F76;font-size:13px;vertical-align:top;white-space:nowrap;">${k}</td><td style="padding:6px 0;font-size:14px;font-weight:bold;color:#1A1C20;">${v}</td></tr>`;
-  const btn = (href: string, label: string, primary: boolean) => `<a href="${esc(href)}" style="display:inline-block;margin:0 8px 8px 0;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px;${primary ? 'background:#9A7740;color:#ffffff;' : 'background:#ffffff;color:#1A1C20;border:1px solid #E2DCCF;'}">${label}</a>`;
-  const html = `<!doctype html><html><body style="margin:0;background:#F2F0EC;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#1A1C20;">
-<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;">
-<div style="background:#1A1C20;padding:18px 24px;color:#ffffff;font-size:17px;font-weight:bold;letter-spacing:.3px;">Spotkanie z Doradcą Podatkowym</div>
+  const whereHtml = m.mode === 'meet' && m.meet_url ? `<a href="${esc(m.meet_url)}" style="color:#2563EB;font-weight:bold;">Dołącz przez Google Meet</a>`
+    : m.mode === 'office' ? `${esc(m.place || '')}${type?.map_url ? ` · <a href="${esc(type.map_url)}" style="color:#2563EB;">mapa</a>` : ''}` : esc(where);
+  const row = (k: string, v: string) => `<tr><td style="padding:6px 14px 6px 0;color:#6B7280;font-size:13px;vertical-align:top;white-space:nowrap;">${k}</td><td style="padding:6px 0;font-size:14px;font-weight:bold;color:#111827;">${v}</td></tr>`;
+  const btn = (href: string, label: string, primary: boolean) => `<a href="${esc(href)}" style="display:inline-block;margin:0 8px 8px 0;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px;${primary ? 'background:#2563EB;color:#ffffff;' : 'background:#ffffff;color:#111827;border:1px solid #D1D5DB;'}">${label}</a>`;
+  const html = `<!doctype html><html><body style="margin:0;background:#F6F6F7;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #E5E7EB;">
+<div style="background:#0E1015;background-image:linear-gradient(135deg,#1F2937,#0E1015);padding:18px 24px;"><table cellpadding="0" cellspacing="0" role="presentation"><tr><td style="vertical-align:middle;"><img src="${S.app_url}/icon-192-v6.png" width="36" height="36" alt="" style="display:block;border-radius:9px;"></td><td style="vertical-align:middle;padding-left:12px;color:#ffffff;font-size:17px;font-weight:bold;letter-spacing:.2px;">Spotkanie z Doradcą Podatkowym</td></tr></table></div>
 <div style="padding:24px;">
 <div style="font-size:21px;font-weight:bold;margin:0 0 10px;">${head}</div>
 <p style="font-size:14px;line-height:1.6;margin:0 0 16px;">${first ? `Dzień dobry ${esc(first)}, ` : 'Dzień dobry, '}${intro}</p>
-<table style="border-collapse:collapse;background:#FBF8F2;border-radius:10px;width:100%;" cellpadding="0" cellspacing="0"><tr><td style="padding:12px 16px;"><table cellpadding="0" cellspacing="0">
+<table style="border-collapse:collapse;background:#F3F4F6;border-radius:12px;width:100%;" cellpadding="0" cellspacing="0"><tr><td style="padding:12px 16px;"><table cellpadding="0" cellspacing="0">
 ${row('Termin', esc(when))}${row('Rodzaj', esc(tname))}${row('Doradca', esc(adv))}${row(m.mode === 'office' ? 'Miejsce' : 'Gdzie', whereHtml)}
 </table></td></tr></table>
 <div style="margin-top:18px;">${kind === 'odwolanie' ? btn(`${S.app_url}/umow/`, 'Umów nowy termin', true) : btn(manage, 'Zmień termin lub odwołaj', false)}</div>
-${kind !== 'odwolanie' ? `<p style="font-size:12.5px;color:#6B6F76;line-height:1.55;margin:12px 0 0;">W załączniku jest plik do dodania spotkania do kalendarza. ${kind === 'potwierdzenie' ? 'Dzień przed spotkaniem wyślemy przypomnienie. ' : ''}Jeśli masz dokumenty dotyczące sprawy, możesz odpowiedzieć na tę wiadomość i je dołączyć.</p>` : ''}
+${kind !== 'odwolanie' ? `<p style="font-size:12.5px;color:#6B7280;line-height:1.55;margin:12px 0 0;">W załączniku jest plik do dodania spotkania do kalendarza. ${kind === 'potwierdzenie' ? 'Dzień przed spotkaniem wyślemy przypomnienie. ' : ''}Jeśli masz dokumenty dotyczące sprawy, możesz odpowiedzieć na tę wiadomość i je dołączyć.</p>` : ''}
 </div>
-<div style="border-top:1px solid #EFEAE0;padding:14px 24px;font-size:11.5px;color:#8A8F97;line-height:1.5;">RKDP spółka doradztwa podatkowego sp. z o.o. · M2 TAX Doradcy Podatkowi · tel. 883 643 565<br>Wiadomość wysłana automatycznie po umówieniu spotkania.</div>
+<div style="border-top:1px solid #F1F2F4;padding:14px 24px;font-size:11.5px;color:#9CA3AF;line-height:1.5;">Wiadomość wysłana automatycznie po umówieniu spotkania. Masz pytanie? Po prostu odpowiedz na tę wiadomość.</div>
 </div></body></html>`;
   const text = [`${head}`, '', `${first ? `Dzień dobry ${first}, ` : 'Dzień dobry, '}${intro}`, '', `Termin: ${when}`, `Rodzaj: ${tname}`, `Doradca: ${adv}`, `${m.mode === 'office' ? 'Miejsce' : 'Gdzie'}: ${where}`,
-    ...(m.mode === 'office' && type?.map_url ? [`Mapa: ${type.map_url}`] : []), '', kind === 'odwolanie' ? `Nowy termin: ${S.app_url}/umow/` : `Zmiana terminu lub odwołanie: ${manage}`, '', 'tel. 883 643 565'].join('\n');
+    ...(m.mode === 'office' && type?.map_url ? [`Mapa: ${type.map_url}`] : []), '', kind === 'odwolanie' ? `Nowy termin: ${S.app_url}/umow/` : `Zmiana terminu lub odwołanie: ${manage}`].join('\n');
   const desc = [m.mode === 'meet' && m.meet_url ? `Google Meet: ${m.meet_url}` : '', `Doradca: ${adv}`, `Zmiana lub odwołanie: ${manage}`].filter(Boolean).join('\n');
   const replyTo = advisors[0]?.email || S.from_email;
   await transport().sendMail({
@@ -457,7 +457,7 @@ Deno.serve(async (req: Request) => {
       const name = clean(body.name, 120), email = clean(body.email, 160).toLowerCase(), phone = clean(body.phone, 40), topic = clean(body.topic, 1500);
       if (name.length < 3) throw new Http(400, 'Podaj imię i nazwisko.');
       if (!emailOk(email)) throw new Http(400, 'Podaj poprawny adres e-mail.');
-      if (phone.replace(/\D/g, '').length < 9) throw new Http(400, 'Podaj numer telefonu.');
+      if (phone && phone.replace(/\D/g, '').length < 9) throw new Http(400, 'Numer telefonu wygląda na niepełny – popraw go albo zostaw puste.');
       if (body.consent !== true) throw new Http(400, 'Zaznacz zgodę na przetwarzanie danych.');
       const { count } = await admin.from('meetings').select('id', { count: 'exact', head: true }).eq('client_email', email).eq('status', 'confirmed').gte('start_at', new Date().toISOString());
       if ((count || 0) >= 3) throw new Http(429, 'Masz już kilka umówionych spotkań – zadzwoń do nas: 883 643 565.');
@@ -472,7 +472,7 @@ Deno.serve(async (req: Request) => {
       const match = await matchClient(email);
       const r = await createMeeting(S, {
         type_id: type.id, title: type.name, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + type.duration_min * 60000).toISOString(),
-        source: 'www', channel: ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link', mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone, topic, ...match, notify_client: true,
+        source: 'www', channel: ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link', mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone || null, topic, ...match, notify_client: true,
       }, [who], null);
       return json({ ok: true, mailed: r.mailed, meeting: await publicMeeting(r.meeting) });
     }

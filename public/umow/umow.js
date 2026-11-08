@@ -174,7 +174,7 @@
       err ? h('p', { class: 'err', role: 'alert' }, err) : null,
       inp('name', 'Imię i nazwisko', 'text', 'name'),
       inp('email', 'E-mail', 'email', 'email'),
-      inp('phone', 'Telefon', 'tel', 'tel'),
+      inp('phone', 'Telefon (opcjonalnie)', 'tel', 'tel'),
       inp('topic', 'W jakiej sprawie? (krótko – pomoże nam się przygotować)', null, null, 'np. sprzedaż mieszkania, kontrola z urzędu skarbowego, wybór formy opodatkowania'),
       hp,
       h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.consent, onchange: function (e) { form.consent = e.target.checked; } }),
