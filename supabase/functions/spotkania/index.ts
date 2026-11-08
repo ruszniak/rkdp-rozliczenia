@@ -298,7 +298,7 @@ ${kind !== 'odwolanie' && kind !== 'platnosc' ? `<p style="font-size:12.5px;colo
 }
 
 // ---------- e-mail do osób z zespołu: ktoś umówił im spotkanie w aplikacji albo dodał je do spotkania ----------
-async function mailTeam(c: Ctx, ids: string[], actor: string | null, kind: 'nowe' | 'dodany') {
+async function mailTeam(c: Ctx, ids: string[], actor: string | null, kind: 'nowe' | 'dodany' | 'www') {
   const to = [...new Set(ids)].filter(x => x && x !== actor);
   if (!to.length || !SMTP_USER || !SMTP_PASS) return 0;
   const { S, m, type } = c;
@@ -314,10 +314,10 @@ async function mailTeam(c: Ctx, ids: string[], actor: string | null, kind: 'nowe
   const others = c.advisors.map((a: any) => a.full_name).join(', ');
   const link = `${S.app_url}/#/spotkania/${m.id}`;
   const where = m.mode === 'meet' ? (m.meet_url || 'Google Meet') : m.mode === 'phone' ? `telefon${m.client_phone ? ' ' + m.client_phone : ''}` : (m.place || '');
-  const head = kind === 'nowe' ? `${byName} umówił(a) Ci spotkanie` : `${byName} dodał(a) Cię do spotkania`;
-  const subject = `${kind === 'nowe' ? 'Nowe spotkanie' : 'Dodano Cię do spotkania'}: ${who} – ${shortDate(s)}${m.all_day ? '' : ', ' + hmOf(s)}`.slice(0, 200);
+  const head = kind === 'www' ? `Klient umówił spotkanie – ${CHANNEL[m.channel] || 'link do rezerwacji'}` : kind === 'nowe' ? `${byName} umówił(a) Ci spotkanie` : `${byName} dodał(a) Cię do spotkania`;
+  const subject = `${kind === 'www' ? 'Nowe spotkanie ze strony' : kind === 'nowe' ? 'Nowe spotkanie' : 'Dodano Cię do spotkania'}: ${who} – ${shortDate(s)}${m.all_day ? '' : ', ' + hmOf(s)}`.slice(0, 200);
   const rows: [string, string][] = [['Termin', when], ['Klient', m.private ? '' : (m.client_name || '')], ['Rodzaj', m.private ? 'wewnętrzne' : (type?.name || m.title || '')],
-    ['Gdzie', where], ['Kto', others], ['Temat', m.topic || ''], ['Kontakt', [m.client_email, m.client_phone].filter(Boolean).join(' · ')]].filter(r => r[1]) as [string, string][];
+    ['Gdzie', where], ['Kto', others], ['Temat', m.topic || ''], ['NIP', m.client_nip || ''], ['Kontakt', [m.client_email, m.client_phone].filter(Boolean).join(' · ')]].filter(r => r[1]) as [string, string][];
   const text = [head, '', ...rows.map(([k, v]) => `${k}: ${v}`), '', `W aplikacji: ${link}`, '', 'Spotkanie jest też w Twoim Kalendarzu Google (jeśli jest połączony).'].join('\n');
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px">`
     + `<p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Spotkanie · app.R</p>`
@@ -465,7 +465,8 @@ async function createMeeting(S: any, row: any, memberIds: string[], actor: strin
   try { mailed = await mailClient(c, 'potwierdzenie'); } catch (e) { console.error('mail', e); }
   await notifyTeam(m.id, 'nowe', actor);
   // umówione w aplikacji dla kogoś innego – e-mail do tej osoby (nie każdy ma włączone powiadomienia w aplikacji)
-  if (actor) { try { await mailTeam(c, memberIds, actor, 'nowe'); } catch (e) { console.error('mail zespół', e); } }
+  // rezerwacja klienta ze strony (m2tax.pl, rkdp.pl, link) – e-mail do doradcy
+  if (actor || m.source === 'www') { try { await mailTeam(c, memberIds, actor, actor ? 'nowe' : 'www'); } catch (e) { console.error('mail zespół', e); } }
   return { meeting: m2, mailed, google: Object.keys(gcal).length };
 }
 async function cancelMeeting(m: any, reason: string | null, actor: string | null, notifyClient: boolean) {
