@@ -8,3 +8,4 @@ public/config.js
 import_*.sql
 dane/
 public/assets/
+public/version.json

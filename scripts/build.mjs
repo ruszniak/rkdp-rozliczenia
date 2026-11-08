@@ -53,7 +53,11 @@ try {
     .replace('<script src="/vendor/supabase.js"></script>', `<script src="/assets/${sbName}"></script>`)
     .replace('<script type="module" src="/js/main.js"></script>', `<script type="module" src="${entry}"></script>`);
   if (!html.includes(entry) || !html.includes(cssName)) throw new Error('nie udało się podmienić odwołań w index.html');
+  // numer wersji: otwarta aplikacja co jakiś czas sprawdza /version.json i sama przeładowuje się do nowej wersji
+  const build = hash(entry + cssName + sbName);
+  html = html.replace('</head>', `  <meta name="app-build" content="${build}">\n</head>`);
   writeFileSync('public/index.html', html);
+  writeFileSync('public/version.json', JSON.stringify({ build, at: new Date().toISOString() }));
   // wersja demonstracyjna (/demo/?k=…) – ten sam pakiet aplikacji, dane fikcyjne w przeglądarce
   let demo = readFileSync('public/demo/index.html', 'utf8');
   demo = demo.replace('<meta name="app-entry" content="/js/main.js">', `<meta name="app-entry" content="${entry}">`)

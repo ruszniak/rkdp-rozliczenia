@@ -7,6 +7,7 @@ import { registerSW, isStandalone, isIOS } from './push.js';
 import { openCmdk, initShortcuts } from './cmdk.js';
 import { getTheme, toggleTheme, onThemeChange, ICON_MOON, ICON_SUN } from './motyw.js';
 import { initPanelLinks, closePanel } from './panel.js';
+import { initUpdates } from './update.js';
 // logo w aplikacji: RKDP – granatowe (logotyp aplikacji), M2 TAX – zwykłe; w motywie ciemnym rozjaśniane w CSS
 const LIGHT_LOGO = src => src.replace('/logo-rkdp.png', '/logo-app.svg').replace('/m2tax-logo.png', '/logo-app.svg');
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
@@ -503,3 +504,4 @@ initPanelLinks();
 start();
 // instalacja jako aplikacja, powiadomienia push, ekran „brak internetu”
 if (document.readyState === 'complete') registerSW(); else window.addEventListener('load', () => registerSW());
+initUpdates();
