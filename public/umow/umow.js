@@ -11,6 +11,15 @@
   if (q.get('bare') === '1') document.body.classList.add('bare');   // w okienku strony, która ma własny nagłówek
   var root = document.getElementById('um');
   var openedAt = Date.now();
+  // skąd klient się umawia: strona rkdp.pl, strona m2tax.pl albo bezpośredni link
+  var CHANNEL = (function () {
+    var z = (q.get('zrodlo') || '').toLowerCase();
+    if (z === 'rkdp' || z === 'm2tax') return z;
+    var r = ''; try { r = new URL(document.referrer).hostname; } catch (e) { r = ''; }
+    if (/(^|\.)rkdp\.pl$/.test(r)) return 'rkdp';
+    if (/(^|\.)m2tax\.pl$/.test(r)) return 'm2tax';
+    return 'link';
+  })();
 
   function h(tag, attrs) {
     var el = document.createElement(tag);
@@ -52,7 +61,7 @@
   function close() { if (EMBED && window.parent !== window) window.parent.postMessage({ type: 'rkdp-umow-close' }, '*'); }
   function top(step) {
     return h('div', { class: 'um-top' },
-      h('div', { class: 'um-logo', 'aria-hidden': 'true' }, 'R'),
+      h('img', { class: 'um-logo', src: '/logo-app.svg', alt: '', width: '44', height: '44' }),
       h('div', null, h('h1', null, TOKEN ? 'Twoje spotkanie' : 'Umów spotkanie z doradcą podatkowym'), h('p', null, 'Doradcy podatkowi · Wrocław i online · tel. 883 643 565')),
       !TOKEN ? h('div', { class: 'um-steps' }, h('span', { class: step === 1 ? 'on' : '' }, '1. Termin'), '—', h('span', { class: step === 2 ? 'on' : '' }, '2. Dane'), '—', h('span', { class: step === 3 ? 'on' : '' }, '3. Gotowe')) : null,
       EMBED ? h('button', { class: 'um-x', type: 'button', 'aria-label': 'Zamknij', onclick: close }, '✕') : null);
@@ -152,7 +161,7 @@
       e.preventDefault();
       if (!form.consent) return render(card(2, step2('Zaznacz zgodę na przetwarzanie danych.')));
       btn.disabled = true; btn.textContent = 'Rezerwuję…';
-      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, topic: form.topic, consent: true, hp: hp.value, ms: Date.now() - openedAt })
+      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, topic: form.topic, consent: true, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
         .then(function (r) { render(card(3, done(r.meeting, r.mailed))); window.scrollTo(0, 0); })
         .catch(function (e) {
           if (/zajęt/i.test(e.message)) { st.slot = null; loadSlots(); setTimeout(function () { alertBox(e.message); }, 50); return; }

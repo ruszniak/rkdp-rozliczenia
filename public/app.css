@@ -3177,3 +3177,4 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 .tm-stats b{font-size:20px}.tm-stats small{color:var(--muted,#6B7280)}
 :root[data-theme="dark"] .tm-row{background:var(--card)}
 :root[data-theme="dark"] .tm-tag{background:#1E2A44;color:#BFDBFE}
+.sp-tag.m2{background:#F3E9D8;color:#7A5520}

@@ -190,6 +190,7 @@ function ics(m: any, summary: string, where: string, desc: string, cancelled = f
     'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
 }
 type Ctx = { S: any; m: any; type: any; advisors: any[] };
+const CHANNEL: Record<string, string> = { rkdp: 'strona rkdp.pl', m2tax: 'strona m2tax.pl', link: 'link do rezerwacji', app: 'w aplikacji' };
 function whereOf(c: Ctx) { return c.m.mode === 'meet' ? (c.m.meet_url ? `Google Meet: ${c.m.meet_url}` : 'Google Meet (link w wiadomości)') : c.m.mode === 'phone' ? 'Rozmowa telefoniczna' : (c.m.place || ''); }
 async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie' | 'przypomnienie') {
   const { S, m, type, advisors } = c;
@@ -244,7 +245,7 @@ function eventBody(c: Ctx, withMeet: boolean, meetUrl: string | null) {
   const { S, m, type } = c;
   const who = m.private ? (m.title || 'Spotkanie') : `${m.client_name || m.title || 'Spotkanie'} – ${type?.name || m.title || 'spotkanie'}`;
   const lines = [m.topic ? `Temat: ${m.topic}` : '', m.client_phone ? `Telefon: ${m.client_phone}` : '', m.client_email ? `E-mail: ${m.client_email}` : '',
-    meetUrl && !withMeet ? `Google Meet: ${meetUrl}` : '', '', `W aplikacji: ${S.app_url}/#/spotkania/${m.id}`, m.source === 'www' ? 'Umówione przez stronę internetową.' : ''].filter((x, i, a) => x || (i && a[i - 1]));
+    meetUrl && !withMeet ? `Google Meet: ${meetUrl}` : '', '', `W aplikacji: ${S.app_url}/#/spotkania/${m.id}`, m.source === 'www' ? `Umówione: ${CHANNEL[m.channel] || 'link do rezerwacji'}.` : ''].filter((x, i, a) => x || (i && a[i - 1]));
   const ev: any = {
     summary: who, description: lines.join('\n').trim(),
     location: m.mode === 'office' ? (m.place || '') : m.mode === 'phone' ? (m.client_phone ? `Telefon ${m.client_phone}` : 'Telefon') : (meetUrl && !withMeet ? meetUrl : ''),
@@ -440,7 +441,7 @@ Deno.serve(async (req: Request) => {
       const match = await matchClient(email);
       const r = await createMeeting(S, {
         type_id: type.id, title: type.name, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + type.duration_min * 60000).toISOString(),
-        source: 'www', mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone, topic, ...match, notify_client: true,
+        source: 'www', channel: ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link', mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone, topic, ...match, notify_client: true,
       }, [who], null);
       return json({ ok: true, mailed: r.mailed, meeting: await publicMeeting(r.meeting) });
     }
@@ -522,7 +523,7 @@ Deno.serve(async (req: Request) => {
       let cid = body.client_id ? clean(body.client_id, 40) : null, m2id = body.m2_client_id ? clean(body.m2_client_id, 40) : null;
       if (!priv && email && !cid && !m2id) { const mc = await matchClient(email); cid = mc.client_id; m2id = mc.m2_client_id; }
       const r = await createMeeting(S, {
-        type_id: type?.id || null, title, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(), source: 'app', private: priv,
+        type_id: type?.id || null, title, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(), source: 'app', channel: 'app', private: priv,
         mode, place: mode === 'office' ? (clean(body.place, 300) || type?.place || null) : null,
         client_name: priv ? null : clean(body.client_name, 160) || null, client_email: priv ? null : email || null, client_phone: priv ? null : clean(body.client_phone, 40) || null,
         topic: clean(body.topic, 2000) || null, client_id: priv ? null : cid, m2_client_id: priv ? null : m2id, matter_id: body.matter_id ? clean(body.matter_id, 40) : null,

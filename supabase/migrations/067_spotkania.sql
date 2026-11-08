@@ -162,3 +162,6 @@ insert into public.booking_members (member_id, write_calendar, busy_calendars)
   select id, 'primary', case when email = 'marcin.otreba@m2tax.pl' then '{primary,busum78@gmail.com}'::text[] else '{primary}'::text[] end
   from public.team_members where email in ('michal@ruszniak.io', 'marcin.otreba@m2tax.pl')
 on conflict do nothing;
+
+-- skąd umówiono spotkanie: rkdp (strona rkdp.pl), m2tax (m2tax.pl), link (bezpośredni link), app (aplikacja)
+alter table public.meetings add column if not exists channel text;

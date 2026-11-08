@@ -14,6 +14,7 @@
     var u = new URL(href || base, location.href);
     if (u.pathname.indexOf('/umow') < 0) u = new URL(base);
     u.searchParams.set('embed', '1');
+    if (!u.searchParams.get('zrodlo')) { var hn = location.hostname; u.searchParams.set('zrodlo', /m2tax\.pl$/.test(hn) ? 'm2tax' : /rkdp\.pl$/.test(hn) ? 'rkdp' : hn); }
     back = document.createElement('div'); back.className = 'rkdp-umow-back';
     back.innerHTML = '<div class="rkdp-umow-box" role="dialog" aria-label="Umów spotkanie"><iframe title="Umów spotkanie" allow="clipboard-write"></iframe></div>';
     back.querySelector('iframe').src = u.toString();

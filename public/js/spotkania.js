@@ -22,6 +22,7 @@ const gcall = async (action, extra = {}) => {
 
 // replaceChildren bez pustych elementów (null / false)
 const put = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter(x => x != null && x !== false));
+const CHANNEL = { rkdp: 'ze strony rkdp.pl', m2tax: 'ze strony m2tax.pl', link: 'z linku', app: 'w aplikacji' };
 const MODE = { meet: 'Google Meet', office: 'Stacjonarnie', phone: 'Telefon' };
 const pad = n => String(n).padStart(2, '0');
 const isoDay = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -254,7 +255,7 @@ export async function openMeeting(id, onChange) {
     row('Kontakt', [m.client_email ? h('a', { href: `mailto:${m.client_email}` }, m.client_email) : null, m.client_phone ? h('a', { href: `tel:${m.client_phone.replace(/\s/g, '')}`, style: { marginLeft: '10px' } }, m.client_phone) : null].filter(Boolean)),
     row('Temat', m.topic),
     row('Kto', h('div', { class: 'sp-chips' }, ...mm.map(memberById).filter(Boolean).map(p => h('span', { class: 'sp-chip sp-chip-p on' }, avaChip(p), firstName(p.full_name))))),
-    row('Źródło', m.source === 'www' ? 'Rezerwacja przez stronę internetową' : `Umówione w aplikacji${m.created_by ? ' – ' + (memberById(m.created_by)?.full_name || '') : ''}`),
+    row('Skąd', m.source === 'www' ? `Klient umówił się sam – ${CHANNEL[m.channel] || 'przez stronę'}` : `Umówione w aplikacji${m.created_by ? ' – ' + (memberById(m.created_by)?.full_name || '') : ''}`),
     !m.private && m.client_email ? row('Klient wie', m.notify_client ? 'tak – dostał e-mail z potwierdzeniem (i dostanie przypomnienie)' : 'nie wysyłano e-maila') : null);
   modal(m.private ? (m.title || 'Spotkanie') : `Spotkanie – ${m.client_name || t?.name || ''}`, body, close => cancelled || e < new Date() ? [h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij')] : [
     h('button', { class: 'btn btn-ghost btn-sm', style: { color: 'var(--danger,#B3261E)' }, onclick: () => { close(); cancelDialog(m, onChange); } }, 'Odwołaj'),
@@ -344,7 +345,7 @@ export async function renderSpotkania(main, parts = [], params) {
           h('span', { class: 'sp-time' }, hm(x.start_at), h('small', {}, hm(x.end_at))),
           h('span', { class: 'sp-main' }, h('b', {}, x.private ? (x.title || 'Spotkanie') : (x.client_name || x.title)),
             h('small', {}, [x.private ? 'prywatne' : (t?.name || x.title), MODE[x.mode] || '', x.topic ? x.topic.slice(0, 80) : ''].filter(Boolean).join(' · '))),
-          x.source === 'www' ? h('span', { class: 'sp-tag' }, 'ze strony') : null,
+          x.source === 'www' ? h('span', { class: 'sp-tag' + (x.channel === 'm2tax' ? ' m2' : '') }, CHANNEL[x.channel] || 'ze strony') : null,
           x.mode === 'meet' && x.meet_url && x.status !== 'cancelled' ? h('a', { class: 'sp-tag meet', href: x.meet_url, target: '_blank', rel: 'noopener', onclick: e => e.stopPropagation() }, 'Meet') : null,
           h('span', { class: 'sp-avs' }, ...(mm.get(x.id) || []).map(memberById).filter(Boolean).map(avaChip)));
       })))));
@@ -608,14 +609,14 @@ async function strona(box) {
 export function clientMeetingsCard({ client_id = null, m2_client_id = null, name = '', email = '', phone = '' }) {
   const box = h('section', { class: 'card section sp-ccard' }, h('div', { class: 'section-head' }, h('h2', {}, 'Spotkania')), h('p', { class: 'hint' }, 'Wczytywanie…'));
   const load = async () => {
-    let q = sb.from('meetings').select('id,start_at,end_at,status,title,mode,type_id,meet_url,source').order('start_at', { ascending: false }).limit(20);
+    let q = sb.from('meetings').select('id,start_at,end_at,status,title,mode,type_id,meet_url,source,channel').order('start_at', { ascending: false }).limit(20);
     q = client_id ? q.eq('client_id', client_id) : q.eq('m2_client_id', m2_client_id);
     const { data } = await q;
     const now = Date.now();
     const up = (data || []).filter(x => x.status === 'confirmed' && new Date(x.end_at) > now).reverse();
     const past = (data || []).filter(x => !(x.status === 'confirmed' && new Date(x.end_at) > now));
     const row = x => h('button', { type: 'button', class: 'sp-mini' + (x.status === 'cancelled' ? ' off' : ''), onclick: () => openMeeting(x.id, load) },
-      h('b', {}, `${new Date(x.start_at).toLocaleDateString('pl-PL', { weekday: 'short', day: '2-digit', month: '2-digit' })}, ${hm(x.start_at)}`), ' ', x.title || '', x.status === 'cancelled' ? ' (odwołane)' : '', x.source === 'www' ? h('span', { class: 'sp-tag' }, 'ze strony') : null);
+      h('b', {}, `${new Date(x.start_at).toLocaleDateString('pl-PL', { weekday: 'short', day: '2-digit', month: '2-digit' })}, ${hm(x.start_at)}`), ' ', x.title || '', x.status === 'cancelled' ? ' (odwołane)' : '', x.source === 'www' ? h('span', { class: 'sp-tag' }, CHANNEL[x.channel] || 'ze strony') : null);
     put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, 'Spotkania'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => openMeetingDialog({ client_id, m2_client_id, name, email, phone, onDone: load }) }, icon('plus'), 'Umów')),
