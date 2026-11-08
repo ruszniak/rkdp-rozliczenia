@@ -93,3 +93,4 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 }
 .kv a{color:var(--gold-d)}
 body.bare .um-top{display:none}body.bare .um-grid{min-height:0}
+.dor img.av{object-fit:cover;background:#E7E2D8}

@@ -379,10 +379,10 @@ Deno.serve(async (req: Request) => {
     if (action === 'config') {
       const { data: types } = await admin.from('meeting_types').select('id,name,duration_min,mode,place,map_url,advisors,description,sort').eq('active', true).eq('public', true).order('sort');
       const ids = [...new Set((types || []).flatMap((t: any) => t.advisors || []))];
-      const { data: adv } = ids.length ? await admin.from('team_members').select('id,full_name,job_title,active').in('id', ids) : { data: [] };
+      const { data: adv } = ids.length ? await admin.from('team_members').select('id,full_name,job_title,active,avatar').in('id', ids) : { data: [] };
       return json({
         types, max_days: S.max_days, min_notice_h: S.min_notice_h,
-        advisors: (adv || []).filter((a: any) => a.active).map((a: any) => ({ id: a.id, name: a.full_name, title: a.job_title || 'Doradca podatkowy', initials: a.full_name.split(/\s+/).map((x: string) => x[0]).join('').slice(0, 2) })),
+        advisors: (adv || []).filter((a: any) => a.active).map((a: any) => ({ id: a.id, name: a.full_name, title: a.job_title || 'Doradca podatkowy', initials: a.full_name.split(/\s+/).map((x: string) => x[0]).join('').slice(0, 2), photo: /^data:image\/(jpeg|png|webp);base64,/.test(a.avatar || '') ? a.avatar : null })),
       });
     }
     if (action === 'slots' || action === 'book' || action === 'reschedule') {

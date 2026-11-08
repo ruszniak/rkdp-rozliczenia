@@ -78,7 +78,7 @@
         h('div', { class: 'dors' },
           h('button', { type: 'button', class: 'dor' + (st.adv === 'any' ? ' on' : ''), onclick: function () { st.adv = 'any'; st.slot = null; loadSlots(); } }, h('span', { class: 'av', style: 'background:#8A8F97', html: ICON.team }), 'Pierwszy wolny'),
           cfg.advisors.filter(function (a) { return !st.type || (st.type.advisors || []).indexOf(a.id) >= 0; }).map(function (a, i) {
-            return h('button', { type: 'button', class: 'dor' + (st.adv === a.id ? ' on' : ''), onclick: function () { st.adv = a.id; st.slot = null; loadSlots(); } }, h('span', { class: 'av', style: 'background:' + AVC[i % AVC.length] }, a.initials), a.name);
+            return h('button', { type: 'button', class: 'dor' + (st.adv === a.id ? ' on' : ''), onclick: function () { st.adv = a.id; st.slot = null; loadSlots(); } }, a.photo ? h('img', { class: 'av', src: a.photo, alt: '' }) : h('span', { class: 'av', style: 'background:' + AVC[i % AVC.length] }, a.initials), a.name);
           }))] : null,
       st.type && st.type.description ? h('div', { class: 'note' }, st.type.description) : h('div', { class: 'note' }, 'Spotkania prowadzą doradcy podatkowi. Potwierdzenie i szczegóły przyjdą na e-mail.'));
 
