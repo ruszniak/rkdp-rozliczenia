@@ -38,6 +38,8 @@ const fmtRanges = r => (r || []).map(([a, b]) => `${a.replace(/^0/, '')}–${b.r
 const firstName = n => String(n || '').split(/\s+/)[0];
 const canNotes = () => ['admin', 'full'].includes(state.me?.role);
 const money = v => (v == null || v === '' ? '' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł');
+// płatności online (Przelewy24) – w app.R wyłączone; rezerwacja z płatnością działa tylko na osobnej stronie /umow2/
+const PAYMENTS = false;
 const PAY = { p24: 'online – Przelewy24', gotowka: 'gotówka', przelew: 'przelew', karta: 'karta / BLIK' };
 
 let typesP = null;
@@ -254,7 +256,7 @@ export async function openMeetingDialog(opts = {}) {
     try {
       const t = types.find(x => x.id === st.type);
       const r = await call('create', {
-        private: st.priv, type_id: !st.priv && t ? t.id : null, duration: t && !st.priv ? t.duration_min : st.dur, mode: t && !st.priv ? t.mode : st.mode, place: t && !st.priv ? t.place : st.place,
+        price: 0, private: st.priv, type_id: !st.priv && t ? t.id : null, duration: t && !st.priv ? t.duration_min : st.dur, mode: t && !st.priv ? t.mode : st.mode, place: t && !st.priv ? t.place : st.place,
         members: st.members, start, title: st.priv ? titleIn.value.trim() : '', topic: topicIn.value.trim(),
         client_name: cName.value.trim(), client_email: cEmail.value.trim(), client_phone: cPhone.value.trim(),
         client_id: st.client.id, m2_client_id: st.client.m2, matter_id: st.matter, notify_client: st.notify,
@@ -291,7 +293,7 @@ export async function openMeeting(id, onChange) {
   const body = h('div', { class: 'sp-detail' },
     cancelled ? h('p', { class: 'sp-warn' }, 'Spotkanie odwołane' + (m.cancel_reason ? ` – ${m.cancel_reason}` : '')) : null,
     !cancelled && !m.private ? noShowBox(m, s, () => { onChange?.(); openMeeting(m.id, onChange); }) : null,
-    !m.private && canNotes() ? payStaffBox(m, () => { onChange?.(); openMeeting(m.id, onChange); }) : null,
+    PAYMENTS && !m.private && canNotes() ? payStaffBox(m, () => { onChange?.(); openMeeting(m.id, onChange); }) : null,
     row('Termin', m.all_day ? (isoDay(s) === isoDay(new Date(e - 1)) ? `${dayLabel(isoDay(s))} – cały dzień` : `${dayLabel(isoDay(s))} – ${dayLabel(isoDay(new Date(e - 1)))} (całe dni)`) : `${dayLabel(isoDay(s))}, ${hm(m.start_at)}–${hm(m.end_at)}`),
     row('Rodzaj', m.private ? 'Prywatne / wewnętrzne' : (t?.name || m.title)),
     m.private && m.mode === 'office' && !m.place ? null : row('Forma', m.mode === 'meet' ? (m.meet_url ? h('a', { href: m.meet_url, target: '_blank', rel: 'noopener' }, 'Google Meet – dołącz') : 'Google Meet') : m.mode === 'office' ? [m.place || 'Stacjonarnie', t?.map_url ? h('a', { href: t.map_url, target: '_blank', rel: 'noopener', style: { marginLeft: '8px' } }, 'mapa') : null] : 'Telefon'),
@@ -721,7 +723,7 @@ async function rodzaje(box) {
   const admin = isAdmin();
   put(box, h('section', { class: 'card sp-types' },
     ...types.map(t => h('div', { class: 'sp-type' + (t.active ? '' : ' off') },
-      h('div', { style: { flex: 1, minWidth: 0 } }, h('b', {}, t.name), h('small', {}, [`${t.duration_min} min`, MODE[t.mode], Number(t.price_rkdp) || Number(t.price_m2tax) ? `${Number(t.price_rkdp)} / ${Number(t.price_m2tax)} zł` : 'bezpłatne', t.place, t.public ? 'na stronie' : 'tylko w aplikacji', t.active ? '' : 'wyłączony'].filter(Boolean).join(' · '))),
+      h('div', { style: { flex: 1, minWidth: 0 } }, h('b', {}, t.name), h('small', {}, [`${t.duration_min} min`, MODE[t.mode], t.place, t.public ? 'na stronie' : 'tylko w aplikacji', t.active ? '' : 'wyłączony'].filter(Boolean).join(' · '))),
       h('span', { class: 'sp-avs' }, ...(t.advisors || []).map(memberById).filter(Boolean).map(avaChip)),
       admin ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => editType(t, ids, () => rodzaje(box)) }, 'Edytuj') : null)),
     admin ? h('div', { style: { padding: '12px 16px' } }, h('button', { class: 'btn btn-primary btn-sm', onclick: () => editType(null, ids, () => rodzaje(box)) }, icon('plus'), 'Nowy rodzaj spotkania')) : h('p', { class: 'hint', style: { padding: '12px 16px' } }, 'Rodzaje spotkań zmienia administrator.')));
@@ -744,9 +746,8 @@ function editType(t, adv, onSave) {
     h('label', { class: 'field wide' }, h('span', {}, 'Miejsce (dla spotkań stacjonarnych)'), place),
     h('label', { class: 'field wide' }, h('span', {}, 'Mapa'), map),
     h('label', { class: 'field wide' }, h('span', {}, 'Opis dla klienta'), desc),
-    h('label', { class: 'field' }, h('span', {}, 'Cena brutto (zł) – rezerwacja przez RKDP / link'), pr1),
-    h('label', { class: 'field' }, h('span', {}, 'Cena brutto (zł) – rezerwacja przez m2tax.pl'), pr2),
-    h('p', { class: 'small muted wide', style: { margin: '-4px 0 0' } }, '0 = bezpłatne. Płatność online (Przelewy24, konto M2 TAX) jest dla klienta dobrowolna – może zapłacić od razu albo po spotkaniu.'),
+    PAYMENTS ? h('label', { class: 'field' }, h('span', {}, 'Cena brutto (zł) – rezerwacja przez RKDP / link'), pr1) : null,
+    PAYMENTS ? h('label', { class: 'field' }, h('span', {}, 'Cena brutto (zł) – rezerwacja przez m2tax.pl'), pr2) : null,
     h('div', { class: 'field wide' }, h('span', {}, 'Kto przyjmuje'), h('div', { class: 'sp-chips' }, ...people.map(p => {
       const b = h('button', { type: 'button', class: 'sp-chip sp-chip-p' + (sel.has(p.id) ? ' on' : ''), onclick: () => { sel.has(p.id) ? sel.delete(p.id) : sel.add(p.id); b.classList.toggle('on'); } }, avaChip(p), firstName(p.full_name));
       return b;
@@ -754,7 +755,7 @@ function editType(t, adv, onSave) {
     h('label', { class: 'sp-check wide' }, pub, 'Można zarezerwować na stronie internetowej'),
     h('label', { class: 'sp-check wide' }, act, 'Aktywny')),
   close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async () => {
-    const row = { name: name.value.trim(), duration_min: +dur.value, mode: mode.value, place: place.value.trim() || null, map_url: map.value.trim() || null, description: desc.value.trim() || null, advisors: [...sel], public: pub.checked, active: act.checked, price_rkdp: Math.max(0, Number(pr1.value) || 0), price_m2tax: Math.max(0, Number(pr2.value) || 0) };
+    const row = { name: name.value.trim(), duration_min: +dur.value, mode: mode.value, place: place.value.trim() || null, map_url: map.value.trim() || null, description: desc.value.trim() || null, advisors: [...sel], public: pub.checked, active: act.checked, ...(PAYMENTS ? { price_rkdp: Math.max(0, Number(pr1.value) || 0), price_m2tax: Math.max(0, Number(pr2.value) || 0) } : {}) };
     if (!row.name) return toast('Wpisz nazwę', true);
     const { error } = t ? await sb.from('meeting_types').update(row).eq('id', t.id) : await sb.from('meeting_types').insert({ ...row, sort: 10 });
     if (error) return fail(error);
