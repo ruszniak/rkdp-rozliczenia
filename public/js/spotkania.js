@@ -290,6 +290,7 @@ export async function openMeeting(id, onChange) {
   const clientLink = m.client_id ? h('a', { href: `#/klient/${m.client_id}` }, m.client_name || 'karta klienta') : m.m2_client_id ? h('a', { href: `#/doradztwo/klient/${m.m2_client_id}` }, m.client_name || 'karta klienta') : (m.client_name || null);
   const body = h('div', { class: 'sp-detail' },
     cancelled ? h('p', { class: 'sp-warn' }, 'Spotkanie odwołane' + (m.cancel_reason ? ` – ${m.cancel_reason}` : '')) : null,
+    !cancelled && !m.private ? noShowBox(m, s, () => { onChange?.(); openMeeting(m.id, onChange); }) : null,
     row('Termin', m.all_day ? (isoDay(s) === isoDay(new Date(e - 1)) ? `${dayLabel(isoDay(s))} – cały dzień` : `${dayLabel(isoDay(s))} – ${dayLabel(isoDay(new Date(e - 1)))} (całe dni)`) : `${dayLabel(isoDay(s))}, ${hm(m.start_at)}–${hm(m.end_at)}`),
     row('Rodzaj', m.private ? 'Prywatne / wewnętrzne' : (t?.name || m.title)),
     m.private && m.mode === 'office' && !m.place ? null : row('Forma', m.mode === 'meet' ? (m.meet_url ? h('a', { href: m.meet_url, target: '_blank', rel: 'noopener' }, 'Google Meet – dołącz') : 'Google Meet') : m.mode === 'office' ? [m.place || 'Stacjonarnie', t?.map_url ? h('a', { href: t.map_url, target: '_blank', rel: 'noopener', style: { marginLeft: '8px' } }, 'mapa') : null] : 'Telefon'),
@@ -310,6 +311,36 @@ export async function openMeeting(id, onChange) {
     h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij'),
   ]);
 }
+// ---- klient nie przyszedł i nie odwołał: oznaczenie po rozpoczęciu spotkania + ostrzeżenie o wcześniejszych nieobecnościach ----
+function noShowBox(m, s, refresh) {
+  const box = h('div', { class: 'sp-noshow-wrap' });
+  const started = s <= new Date();
+  const set = async (val, btn) => {
+    btn.disabled = true;
+    const { error } = await sb.rpc('meeting_mark_no_show', { p_meeting: m.id, p_value: val });
+    if (error) { btn.disabled = false; return fail(error); }
+    toast(val ? 'Oznaczono: klient nie przyszedł' : 'Cofnięto oznaczenie');
+    btn.closest('.modal-back')?.querySelector('.section-head .icon-btn')?.click();
+    refresh();
+  };
+  if (m.no_show) {
+    const by = m.no_show_by ? firstName(memberById(m.no_show_by)?.full_name || '') : '';
+    box.append(h('div', { class: 'sp-noshow' },
+      h('div', {}, h('b', {}, 'Klient nie przyszedł i nie odwołał'), h('small', {}, [by ? `oznaczył(a): ${by}` : '', m.no_show_at ? new Date(m.no_show_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''].filter(Boolean).join(', '))),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: e => set(false, e.currentTarget) }, 'Cofnij')));
+  } else if (started) {
+    box.append(h('div', { class: 'sp-noshow-ask' },
+      h('span', { class: 'small muted' }, 'Klient się nie pojawił?'),
+      h('button', { class: 'btn btn-outline btn-sm sp-noshow-btn', type: 'button', onclick: e => set(true, e.currentTarget) }, 'Nie przyszedł – nie odwołał')));
+  }
+  // wcześniejsze nieobecności tego samego klienta (po e-mailu)
+  if (m.client_email) (async () => {
+    const { data } = await sb.from('meetings').select('id,start_at').eq('client_email', m.client_email).eq('no_show', true).neq('id', m.id).order('start_at', { ascending: false }).limit(10);
+    if (data?.length) box.prepend(h('p', { class: 'sp-warn sp-warn-red' }, `Uwaga: ten klient już ${data.length === 1 ? 'raz nie przyszedł' : `${data.length} razy nie przyszedł`} bez odwołania (ostatnio ${new Date(data[0].start_at).toLocaleDateString('pl-PL')}).`));
+  })().catch(() => {});
+  return box;
+}
+
 // ---- notatka wewnętrzna: opis spotkania, koszt wizyty, płatność, faktura (administratorzy i pełny dostęp) ----
 function notesBox(m) {
   const box = h('section', { class: 'sp-notes' }, h('p', { class: 'hint' }, 'Wczytywanie notatki…'));
@@ -517,6 +548,7 @@ export async function renderSpotkania(main, parts = [], params) {
           h('span', { class: 'sp-main' }, h('b', {}, x.private ? (x.title || 'Spotkanie') : (x.client_name || x.title)),
             h('small', {}, [x.private ? 'prywatne' : (t?.name || x.title), MODE[x.mode] || '', x.topic ? x.topic.slice(0, 80) : ''].filter(Boolean).join(' · '))),
           x.source === 'www' ? h('span', { class: 'sp-tag' + (x.channel === 'm2tax' ? ' m2' : '') }, CHANNEL[x.channel] || 'ze strony') : null,
+          x.no_show ? h('span', { class: 'sp-tag noshow', title: 'Klient nie przyszedł i nie odwołał' }, 'nie przyszedł') : null,
           payTag(x),
           x.mode === 'meet' && x.meet_url && x.status !== 'cancelled' ? h('a', { class: 'sp-tag meet', href: x.meet_url, target: '_blank', rel: 'noopener', onclick: e => e.stopPropagation() }, 'Meet') : null,
           h('span', { class: 'sp-avs' }, ...(mm.get(x.id) || []).map(memberById).filter(Boolean).map(avaChip)));

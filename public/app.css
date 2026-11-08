@@ -3231,3 +3231,11 @@ html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scal
 .gc-ev.past .gc-st{background:var(--panel);color:var(--muted);text-decoration:none;display:inline-block}
 .gc-ev.past .gc-meet{opacity:.4}
 :root[data-theme="dark"] .gc-ev.now .gc-st{background:rgba(22,163,74,.2);color:#86EFAC}
+/* spotkania: klient nie przyszedł i nie odwołał */
+.sp-tag.noshow{background:#FEE2E2;color:#991B1B}
+.sp-noshow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 4px;padding:10px 12px;border-radius:12px;background:#FEE2E2;color:#7F1D1D}
+.sp-noshow b{display:block;font-size:13.5px}.sp-noshow small{font-size:12px;opacity:.8}
+.sp-noshow-ask{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:4px 0 6px}
+.sp-noshow-btn{color:#B91C1C!important;border-color:#FCA5A5!important}
+.sp-warn.sp-warn-red{background:#FEE2E2;color:#7F1D1D}
+:root[data-theme="dark"] .sp-noshow,:root[data-theme="dark"] .sp-warn.sp-warn-red,:root[data-theme="dark"] .sp-tag.noshow{background:rgba(220,38,38,.18);color:#FCA5A5}
