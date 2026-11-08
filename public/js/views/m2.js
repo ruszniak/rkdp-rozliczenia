@@ -173,6 +173,7 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
       const row = { title: d.title, due_date: d.due_date, due_time: d.due_time || null, kind: d.kind || 'wewnetrzny', assignee_id: d.assignee_id || null,
         notes: d.notes || null, basis: d.basis, served_at: d.served_at, matter_id: matter?.id || null, client_id: matter?.client_id || clientId || null };
       const { data: ins, error } = await sb.from('m2_deadlines').insert(row).select('id').single();
+      if (!error) import('../gcal.js').then(m => m.gcalSyncSoon()).catch(() => {});
       if (error) return fail(error);
       gcalSync([ins.id]);
       // pismo z PDF trafia do dziennika sprawy jako „pismo otrzymane”
@@ -188,6 +189,7 @@ function deadlineRow(dl, matters, onChange) {
   const cb = h('input', { type: 'checkbox', checked: dl.done, 'aria-label': 'Zrealizowano' });
   const setDone = async on => {
     const { error } = await sb.from('m2_deadlines').update({ done: on, done_at: on ? new Date().toISOString() : null }).eq('id', dl.id);
+    if (!error) import('../gcal.js').then(m => m.gcalSyncSoon()).catch(() => {});
     if (error) { cb.checked = dl.done; return fail(error); }
     dl.done = on; gcalSync([dl.id]); toast(on ? 'Termin oznaczony jako zrealizowany' : 'Przywrócono termin'); onChange?.();
   };

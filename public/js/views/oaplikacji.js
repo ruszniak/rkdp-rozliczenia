@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.1', '7 listopada 2026', [
+    'Kalendarz Google: w profilu „Połącz z Google” – terminy spraw, zadania z terminem i pytania do Ciebie trafiają do osobnego kalendarza z przypomnieniami, a na Pulpicie widać najbliższe spotkania. Ciemny górny pasek na komputerze.',
     'Nowa kolorystyka „Grafit” – grafit i biel z niebieskim akcentem – oraz nowe logo: litera R ze strzałką w górę (także ikona na telefonie i w przeglądarce).',
     'Wzory pism procesowych także na papierze RKDP – przełącznik RKDP | M2 TAX nad wzorami, zespół RKDP ma je w „Więcej”.',
     'RKDP i M2 TAX w jednej aplikacji – bez przełączania. W Klientach przełącznik RKDP | M2 TAX (osobne listy). RKDP prowadzi też sprawy doradcze: zlecenia i umowy na papierze RKDP, sekcja „Doradztwo podatkowe” na karcie klienta, zakładka Sprawy dla zespołu RKDP. Dostęp do firmy pilnuje baza.',

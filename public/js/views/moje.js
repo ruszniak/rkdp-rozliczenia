@@ -31,7 +31,7 @@ async function collect() {
   const ZS = { nowe: 'nowe – jeszcze nie rozpoczęte', w_toku: 'w trakcie', pytanie: 'pytanie od pracownika – odpowiedz', zgloszone: 'zgłoszone – do sprawdzenia' };
   const helps = z => Array.isArray(z.helpers) && z.helpers.includes(me);
   const fn = id => (memberById(id)?.full_name || '').split(' ')[0];
-  const zact = (z, akcja, msg) => async () => { const { error } = await sb.rpc('zlecenie_akcja', { p_id: z.id, p_akcja: akcja, p_tekst: null }); if (error) return fail(error); toast(msg); reload(); };
+  const zact = (z, akcja, msg) => async () => { const { error } = await sb.rpc('zlecenie_akcja', { p_id: z.id, p_akcja: akcja, p_tekst: null }); if (error) return fail(error); import('../gcal.js').then(m => m.gcalSyncSoon()).catch(() => {}); toast(msg); reload(); };
   const openZ = z => () => import('./zlecenia.js').then(m => m.openZlecenie(z.id, reload));
   zl.filter(z => (z.assignee_id === me && z.created_by !== me) || (helps(z) && z.created_by !== me) ? ['nowe', 'w_toku', 'pytanie'].includes(z.status) : (z.created_by === me || admin)).forEach(z => {
     const mine = z.assignee_id === me, boss = !mine && !helps(z);
@@ -65,7 +65,7 @@ async function collect() {
   if (hasModule('doradztwo') || hasModule('rozliczenia')) {
     const dl = await soft(sb.from('m2_deadlines').select('id,matter_id,title,due_date,assignee_id,done,m2_matters(number,firm)').eq('done', false).lte('due_date', plus(14)).eq('assignee_id', me));
     dl.forEach(d => out.push({ kind: 'termin', group: 'dl', label: `Termin · ${d.m2_matters?.firm === 'rkdp' ? 'RKDP' : 'M2 TAX'}`, id: d.id, title: d.title || 'Termin w sprawie', due: d.due_date, sub: `sprawa ${d.m2_matters?.number || ''}`.trim(), href: `#/doradztwo/sprawa/${d.matter_id}`,
-      actions: [{ label: '✓ Zrealizowano', cls: 'ok', fn: async () => { const { error } = await sb.from('m2_deadlines').update({ done: true, done_at: new Date().toISOString() }).eq('id', d.id); if (error) return fail(error); toast('Oznaczono jako zrealizowane'); reload(); } }] }));
+      actions: [{ label: '✓ Zrealizowano', cls: 'ok', fn: async () => { const { error } = await sb.from('m2_deadlines').update({ done: true, done_at: new Date().toISOString() }).eq('id', d.id); if (error) return fail(error); import('../gcal.js').then(m => m.gcalSyncSoon()).catch(() => {}); toast('Oznaczono jako zrealizowane'); reload(); } }] }));
   }
   const poa = await soft(sb.from('client_poa').select('id,client_id,kind,valid_to,revoked_at').is('revoked_at', null).not('valid_to', 'is', null).gte('valid_to', plus(-30)).lte('valid_to', plus(14)));
   poa.filter(p => admin || myClients.has(p.client_id)).forEach(p => out.push({ kind: 'termin', group: 'dl', label: 'Termin · pełnomocnictwo', id: p.id, title: `${p.kind} – ${p.valid_to < today() ? 'wygasło' : 'wygasa'}`, due: p.valid_to, sub: cname.get(p.client_id) || '', href: `#/klient/${p.client_id}` }));

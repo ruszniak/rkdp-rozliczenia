@@ -1,4 +1,5 @@
 // „Mój profil” – każdy pracownik sam uzupełnia swoje dane do pełnomocnictw (UPL-1, PEL, PPS-1).
+import { gcalCard } from '../gcal.js';
 import { h, toast, fail, infoTip, ava } from '../ui.js';
 import { sb, state } from '../store.js';
 import { validNip, cleanNip } from '../nip.js';
@@ -193,6 +194,7 @@ export async function renderProfil(main) {
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, me.full_name, infoTip(HELP, 'Dane do pełnomocnictw')),
         h('p', { class: 'sub' }, `${me.job_title ? me.job_title + ' · ' : ''}${me.email}`))),
     photoCard(),
+    gcalCard(),
     h('section', { class: 'card section' },
       h('div', { class: 'section-head' }, h('h2', {}, 'Dane do pełnomocnictw (UPL-1, PEL, PPS-1)')),
       h('div', { class: 'form-grid' },

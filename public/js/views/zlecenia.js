@@ -189,6 +189,7 @@ export async function newZlecenie(onDone, preset = {}) {
     const { data: made, error } = editing ? await sb.from('zlecenia').update(rec).eq('id', preset.id).select('id')
       : await sb.from('zlecenia').insert([...pick].map(a => ({ ...rec, assignee_id: a }))).select('id');
     if (error) { btn.disabled = false; return fail(error); }
+    import('../gcal.js').then(m => m.gcalSyncSoon()).catch(() => {});
     if (editing && canAddPeople(preset) && [...hpick].sort().join() !== [...helpersOf(preset)].sort().join()) {
       const { error: e2 } = await sb.rpc('zlecenie_osoby', { p_id: preset.id, p_helpers: [...hpick] });
       if (e2) { btn.disabled = false; return fail(e2); }
@@ -234,6 +235,7 @@ export async function openZlecenie(id, onChange) {
   const refresh = () => { closeFn(); onChange?.(); openZlecenie(id, onChange); };
   const act = async (akcja, tekst, att = []) => {
     const { error: e } = await sb.rpc('zlecenie_akcja', { p_id: id, p_akcja: akcja, p_tekst: tekst || null });
+    if (!e) import('../gcal.js').then(m => m.gcalSyncSoon()).catch(() => {});
     if (e) return fail(e);
     if (att.length) {
       const { data: lw } = await sb.from('zlecenia_wpisy').select('id').eq('zlecenie_id', id).eq('author_id', state.me.id).order('created_at', { ascending: false }).limit(1);
