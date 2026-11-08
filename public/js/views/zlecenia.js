@@ -114,7 +114,6 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
     const f = F.find(x => x[0] === filter)[2];
     const rows = all.filter(f).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
     if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zadań. Kliknij „+ Zadanie”, aby zlecić zadanie.' : 'Nie masz zadań do zrobienia. 👍 Kliknij „+ Zadanie”, aby dodać zadanie dla siebie lub kogoś z zespołu.') : 'Brak zadań.')); return; }
-    if (!admin) { put(listBox, h('div', { class: 'mj-groups' }, h('section', { class: 'mj-group' }, ...rows.map(z => row(z, open))))); return; }
     const by = new Map(); rows.forEach(z => by.set(z.assignee_id, [...(by.get(z.assignee_id) || []), z]));
     put(listBox, h('div', { class: 'mj-groups' }, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
       h('section', { class: 'mj-group' }, h('h3', { class: 'mj-gh' }, h('span', { class: 'zl-av' }, ava(memberById(mid) || { full_name: '?' })), who(mid), h('span', { class: 'n' }, `${zs.length}`)),
@@ -131,6 +130,20 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
     chips, listBox);
   await reload();
   if (id) openZlecenie(id, reload);
+}
+
+// ---------- wspólna górna część pulpitu (RKDP i M2 TAX, każdy użytkownik): „Zadania zespołu” + „Terminy i pytania” ----------
+export function teamBlocks({ zl = null } = {}) {
+  const team = h('section', { class: 'pl-team' });
+  const sprawy = h('div', { class: 'pl-sprawy' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
+  const draw0 = () => renderZlecenia(team, zl, { embed: true });
+  draw0();
+  import('./moje.js').then(m => m.renderMoje(sprawy, new URLSearchParams(), { embed: true, noTasks: true }));
+  return [
+    h('div', { class: 'pl-head pl-first' }, h('h2', {}, 'Zadania zespołu'),
+      h('button', { class: 'btn btn-primary mj-add', type: 'button', style: { marginLeft: 'auto' }, onclick: () => newZlecenie(() => draw0()) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie'))),
+    team,
+    h('div', { class: 'pl-head' }, h('h2', {}, 'Terminy i pytania')), sprawy];
 }
 
 // ---------- karta na Pulpicie ----------

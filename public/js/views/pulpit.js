@@ -1,5 +1,6 @@
 // RKDP – pulpit: dla pracownika (moje zgłoszenia, moje rozliczenia, terminy) i pulpit doradcy dla administratora.
 import { gcalAgendaCard } from '../gcal.js';
+import { teamBlocks } from './zlecenia.js';
 import { h, fail, icon, periodLabel, defaultPeriod, initials, infoTip, ava } from '../ui.js';
 import { sb, state, memberById } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
@@ -260,8 +261,7 @@ export async function renderPulpit(main, params) {
   // Jeden pulpit bez zakładek: na górze „Sprawy” (to, co czeka na Ciebie), niżej –
   // pracownik: jego kratki, terminy i braki + jego sekcje; szef (administrator): zadania całego zespołu + podsumowanie biura.
   const body = h('div');
-  const sprawy = h('div', { class: 'pl-sprawy' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
-  const team = admin ? h('section', { class: 'pl-team' }) : null;
+  const zl = params?.get?.('zl') || null;
   const dzis = !admin ? h('div', { class: 'pl-dzis' }) : null;
   let editing = false;
   const editBtn = h('button', { class: 'btn btn-outline btn-sm dash-edit-btn', type: 'button', onclick: () => { editing = !editing; draw(); } });
@@ -282,19 +282,10 @@ export async function renderPulpit(main, params) {
     h('div', { class: 'pl-grid' },
       h('aside', { class: 'pl-side' }, gcalAgendaCard()),
       h('div', { class: 'pl-main' }, ...[
-    ...(admin ? [
-      h('div', { class: 'pl-head pl-first' }, h('h2', {}, 'Zadania zespołu'),
-        h('button', { class: 'btn btn-primary mj-add', type: 'button', style: { marginLeft: 'auto' }, onclick: () => import('./zlecenia.js').then(m => m.newZlecenie(() => draw0())) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie'))),
-      team,
-      h('div', { class: 'pl-head' }, h('h2', {}, 'Terminy i pytania')), sprawy] : [sprawy]),
+    ...teamBlocks({ zl }),
     dzis,
     h('div', { class: 'pl-head' }, h('h2', {}, admin ? 'Biuro' : 'Mój pulpit'), editBtn),
     body].filter(Boolean)))].filter(Boolean));
-  const wantF = params?.get?.('f'), zl = params?.get?.('zl');
-  const sp = new URLSearchParams(); if (wantF && wantF !== 'zespol') sp.set('f', wantF); if (zl) sp.set('zl', zl);
-  import('./moje.js').then(m => m.renderMoje(sprawy, sp, { embed: true, noTasks: admin }));
-  const draw0 = () => import('./zlecenia.js').then(m => m.renderZlecenia(team, zl && admin ? zl : null, { embed: true }));
-  if (team) draw0();
   if (dzis) renderDzis(dzis, D, { lite: true });
   draw();
 }

@@ -22,7 +22,7 @@ import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
 import { clientMeetingsCard, openMeetingDialog } from '../spotkania.js';
 import { gcalAgendaCard } from '../gcal.js';
-import { zleceniaCard } from './zlecenia.js';
+import { teamBlocks } from './zlecenia.js';
 import { pdfText, analyzeLetter } from '../pismo.js';
 
 const BASE = '#/doradztwo';
@@ -250,7 +250,7 @@ export async function newMatterDialog({ clientId = null, firm = null, rkdpClient
 }
 
 // ================= PULPIT =================
-async function viewDashboard(main) {
+async function viewDashboard(main, params) {
   const [matters, deadlines, orders, settings] = await Promise.all([
     fetchAll(() => sb.from('m2_matters').select('id,number,title,status,lead_id,second_id,assistant_id,client_id,m2_clients(name)').order('opened_at', { ascending: false })),
     fetchAll(() => sb.from('m2_deadlines').select('*').eq('done', false).lte('due_date', addDaysIso(30)).order('due_date')),
@@ -267,24 +267,33 @@ async function viewDashboard(main) {
     h('span', { class: 'lbl' }, lbl), h('span', { class: 'num' }, n));
   const list = h('div', { class: 'card', style: { padding: '8px 0' } });
   const renderList = () => list.replaceChildren(...(deadlines.length
-    ? deadlines.map(d => deadlineRow(d, mm, () => viewDashboard(main)))
+    ? deadlines.map(d => deadlineRow(d, mm, () => viewDashboard(main, params)))
     : [h('p', { class: 'empty' }, 'Brak terminów w najbliższych 30 dniach.')]));
   renderList();
-  main.replaceChildren(...header('', 'Pulpit doradcy', `Dzień dobry, ${state.me.short_name}. Terminy, sprawy i zlecenia w jednym miejscu.`,
-    [h('button', { class: 'btn btn-outline btn-sm', onclick: () => newMatterDialog() }, icon('plus'), 'Nowa sprawa'),
-      h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewDashboard(main) }) }, icon('plus'), 'Nowy termin')]),
-  h('div', { class: 'tiles' },
-    tile(late.length, 'Terminy po czasie', `${BASE}/sprawy`, late.length > 0),
-    tile(week.length, 'Terminy w 7 dni', `${BASE}/sprawy`),
-    tile(open.length, 'Otwarte sprawy', `${BASE}/sprawy`),
-    tile(orders.filter(o => o.status === 'projekt' || o.status === 'wyslane').length, 'Zlecenia i umowy niepodpisane', `${BASE}/zlecenia`)),
-  h('div', { class: 'two' },
-    h('div', {}, h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list,
-      h('div', { class: 'table-title', style: { marginTop: '22px' } }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
-      h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
-        h('div', {}, h('b', {}, m.number), ' ', m.title, h('div', { class: 'small muted' }, m.m2_clients?.name || '')), statusPill(m.status)))
-        : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')]))),
-    h('div', {}, meetingsCard(), zleceniaCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'))));
+  // ten sam układ co pulpit RKDP: kalendarz z prawej, u góry „Zadania zespołu” i „Terminy i pytania”, niżej – doradztwo M2 TAX
+  main.replaceChildren(
+    h('div', { class: 'page-head' },
+      h('div', {}, h('p', { class: 'eyebrow' }, new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
+        h('h1', { style: { marginTop: '6px' } }, `Dzień dobry, ${state.me.short_name || (state.me.full_name || '').split(' ')[0]}`),
+        h('p', { class: 'sub' }, 'Doradztwo podatkowe · M2 TAX'))),
+    h('div', { class: 'pl-grid' },
+      h('aside', { class: 'pl-side' }, meetingsCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2')),
+      h('div', { class: 'pl-main' },
+        ...teamBlocks({ zl: params?.get?.('zl') || null }),
+        h('div', { class: 'pl-head' }, h('h2', {}, 'Doradztwo M2 TAX'),
+          h('div', { style: { marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+            h('button', { class: 'btn btn-outline btn-sm', onclick: () => newMatterDialog() }, icon('plus'), 'Nowa sprawa'),
+            h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewDashboard(main, params) }) }, icon('plus'), 'Nowy termin'))),
+        h('div', { class: 'tiles m2-tiles' },
+          tile(late.length, 'Terminy po czasie', `${BASE}/sprawy`, late.length > 0),
+          tile(week.length, 'Terminy w 7 dni', `${BASE}/sprawy`),
+          tile(open.length, 'Otwarte sprawy', `${BASE}/sprawy`),
+          tile(orders.filter(o => o.status === 'projekt' || o.status === 'wyslane').length, 'Zlecenia niepodpisane', `${BASE}/zlecenia`)),
+        h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list,
+        h('div', { class: 'table-title', style: { marginTop: '22px' } }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
+        h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
+          h('div', {}, h('b', {}, m.number), ' ', m.title, h('div', { class: 'small muted' }, m.m2_clients?.name || '')), statusPill(m.status)))
+          : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')])))));
 }
 
 // ================= SPRAWY =================
@@ -1199,5 +1208,5 @@ export async function renderM2(main, parts, params) {
   if (sub === 'aml') return renderAml(main, 'm2');
   if (sub === 'zgloszenia') return renderZgloszenia(main, parts[2], params, 'm2');
   if (sub === 'oferty') return renderOferty(main, parts[2], 'm2');
-  return viewDashboard(main);
+  return viewDashboard(main, params);
 }
