@@ -86,13 +86,12 @@ export function doradztwoCard(c) {
       h('span', { class: 'pill ' + (MATTER_STATUS[m.status]?.cls || '') }, MATTER_STATUS[m.status]?.label || m.status));
     box.replaceChildren(
       h('div', { class: 'section-head' }, h('h2', {}, 'Doradztwo podatkowe'), firmTag('rkdp')),
-      ...(open.length ? open.map(row) : [h('p', { class: 'hint' }, ms?.length ? 'Brak otwartych spraw.' : 'Brak spraw doradczych. Sprawa zakłada się razem ze zleceniem albo umową.')]),
+      ...(open.length ? open.map(row) : [h('p', { class: 'hint' }, ms?.length ? 'Brak otwartych spraw.' : 'Brak spraw doradczych.')]),
       ...(rest.length ? [h('details', { class: 'dr-closed' }, h('summary', {}, `Zakończone i pozostałe (${rest.length})`), ...rest.map(row))] : []),
       ...((os || []).length ? [h('p', { class: 'small muted', style: { margin: '10px 0 4px' } }, 'Zlecenia i umowy: ', ...(os.map((o, i) => [i ? ', ' : '', h('a', { href: `#/doradztwo/zlecenie/${o.id}` }, o.number)]).flat()))] : []),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' } },
-        h('a', { class: 'btn btn-outline btn-sm', href: `#/doradztwo/zlecenie/nowe?typ=zlecenie&rkdp=${c.id}` }, '+ Zlecenie'),
-        h('a', { class: 'btn btn-outline btn-sm', href: `#/doradztwo/zlecenie/nowe?typ=umowa&rkdp=${c.id}` }, '+ Umowa'),
-        (os || []).length ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => import('./views/m2.js').then(m => m.newMatterDialog({ rkdpClientId: c.id })) }, '+ Sprawa do zlecenia') : null,
+        h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: () => import('./views/m2.js').then(m => m.newMatterDialog({ rkdpClientId: c.id })) }, '+ Sprawa'),
+        h('a', { class: 'btn btn-outline btn-sm', href: `#/doradztwo/zlecenie/nowe?typ=umowa&rkdp=${c.id}` }, '+ Umowa (abonament)'),
         m2twin ? h('a', { class: 'btn btn-ghost btn-sm', href: `#/doradztwo/klient/${m2twin.id}`, style: { marginLeft: 'auto' } }, 'Też klient M2 TAX →') : null));
   })().catch(e => box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, 'Doradztwo podatkowe')), h('p', { class: 'hint' }, 'Nie udało się wczytać: ' + (e.message || e))));
   return box;

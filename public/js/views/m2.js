@@ -220,34 +220,12 @@ const docLabel = o => `${DOC[o.doc_type] || 'Zlecenie'} ${o.number || ''}`.trim(
 
 // Każda sprawa musi należeć do zlecenia albo umowy
 export async function newMatterDialog({ clientId = null, firm = null, rkdpClientId = null } = {}) {
-  const orders = await fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,status,firm,m2_clients(name,rkdp_client_id)').neq('status', 'anulowane').order('order_date', { ascending: false }));
-  let f = rkdpClientId ? 'rkdp' : (firm || defaultFirm());
-  const firmSel = bothFirms() && !clientId && !rkdpClientId ? h('select', { class: 'select', style: { width: '100%' } }, h('option', { value: 'rkdp' }, 'RKDP spółka doradztwa podatkowego'), h('option', { value: 'm2' }, 'M2 TAX Doradcy Podatkowi')) : null;
-  if (firmSel) firmSel.value = f;
-  const sel = h('select', { class: 'select', style: { width: '100%' } });
-  const listBox = h('div');
-  const q = () => (clientId ? `&klient=${clientId}` : '') + (rkdpClientId ? `&rkdp=${rkdpClientId}` : '') + `&firma=${f}`;
-  const newBtns = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-  let list = [];
-  const fill = () => {
-    list = orders.filter(o => (o.firm || 'm2') === f && (!clientId || o.client_id === clientId) && (!rkdpClientId || o.m2_clients?.rkdp_client_id === rkdpClientId));
-    sel.replaceChildren(...list.map(o => h('option', { value: o.id }, `${docLabel(o)} · ${o.m2_clients?.name || ''} · ${o.subject}`)));
-    listBox.replaceChildren(list.length ? h('label', { class: 'field wide' }, h('span', {}, 'Zlecenie / umowa'), sel) : h('p', { class: 'empty', style: { padding: '10px 0' } }, 'Brak zleceń i umów' + (clientId || rkdpClientId ? ' tego klienta.' : '.')));
-    addBtn.hidden = !list.length;
-  };
-  const addBtn = h('button', { class: 'btn btn-primary btn-sm', onclick: () => { closeFn(); location.hash = `${BASE}/sprawa/nowa?zlecenie=${sel.value}`; } }, 'Dodaj sprawę do wybranego');
-  let closeFn = () => {};
-  firmSel?.addEventListener('change', () => { f = firmSel.value; fill(); });
-  fill();
-  modal('Nowa sprawa', h('div', {},
-    h('p', { class: 'hint', style: { marginBottom: '12px' } }, 'Każda sprawa należy do zlecenia albo umowy. Wybierz istniejące albo utwórz nowe – sprawa założy się wtedy automatycznie.'),
-    firmSel ? h('label', { class: 'field wide', style: { marginBottom: '10px' } }, h('span', {}, 'Firma'), firmSel) : null,
-    listBox),
-  (close) => { closeFn = close; return [
-    h('a', { class: 'btn btn-ghost btn-sm', href: '#', onclick: (e) => { e.preventDefault(); close(); location.hash = `${BASE}/zlecenie/nowe?typ=zlecenie${q()}`; } }, '+ Nowe zlecenie'),
-    h('a', { class: 'btn btn-ghost btn-sm', href: '#', onclick: (e) => { e.preventDefault(); close(); location.hash = `${BASE}/zlecenie/nowe?typ=umowa${q()}`; } }, '+ Nowa umowa'),
-    addBtn,
-  ]; });
+  // sprawa = zlecenie: zakładamy od razu sprawę; dokument zlecenia/umowy można przygotować potem z karty sprawy
+  const q = new URLSearchParams();
+  if (clientId) q.set('klient', clientId);
+  if (rkdpClientId) q.set('rkdp', rkdpClientId);
+  if (firm) q.set('firma', firm);
+  location.hash = `${BASE}/sprawa/nowa${q.toString() ? '?' + q : ''}`;
 }
 
 // ================= PULPIT =================
@@ -373,16 +351,18 @@ async function viewMatter(main, id, params) {
     fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,fee_type,fee_amount,firm,m2_clients(name)').order('order_date', { ascending: false })),
     isNew ? Promise.resolve(null) : sb.from('m2_matters').select('*').eq('id', id).maybeSingle(),
   ]);
-  let m;
+  let m, newClients = [];
   if (isNew) {
     const ord = orders.find(o => o.id === params.get('zlecenie'));
-    if (!ord) {
-      main.replaceChildren(...header('sprawy', 'Nowa sprawa', 'Każda sprawa należy do zlecenia albo umowy.'),
-        h('div', { class: 'card empty' }, h('button', { class: 'btn btn-primary btn-sm', onclick: () => newMatterDialog({ clientId: params.get('klient') }) }, 'Wybierz zlecenie lub umowę')));
-      newMatterDialog({ clientId: params.get('klient') });
-      return;
+    if (ord) m = { order_id: ord.id, client_id: ord.client_id, firm: ord.firm, title: '', matter_type: 'konsultacja', status: 'nowa', lead_id: state.me.id, opened_at: todayIso(), fee_type: ord.fee_type, fee_amount: ord.fee_amount };
+    else {
+      const rk = params.get('rkdp');
+      let f0 = rk ? 'rkdp' : (myFirms().includes(params.get('firma')) ? params.get('firma') : defaultFirm());
+      if (!rk && params.get('klient') && !params.get('firma')) { const { data: kc } = await sb.from('m2_clients').select('firm').eq('id', params.get('klient')).maybeSingle(); if (kc?.firm) f0 = kc.firm; }
+      m = { order_id: null, client_id: params.get('klient') || '', firm: f0, title: '', matter_type: 'konsultacja', status: 'nowa', lead_id: state.me.id, opened_at: todayIso() };
+      newClients = await (f0 === 'rkdp' ? rkdpClientChoices() : fetchAll(() => sb.from('m2_clients').select('id,name,nip,firm,status,billing_type,hourly_rate').eq('firm', 'm2').eq('status', 'aktywny').order('name')));
+      if (rk) m.client_id = (newClients.find(c => c.rkdp_client_id === rk) || {}).id || '';
     }
-    m = { order_id: ord.id, client_id: ord.client_id, firm: ord.firm, title: '', matter_type: 'konsultacja', status: 'nowa', lead_id: state.me.id, opened_at: todayIso(), fee_type: ord.fee_type, fee_amount: ord.fee_amount };
   } else {
     const { data, error } = mRes;
     if (error) throw error;
@@ -393,7 +373,7 @@ async function viewMatter(main, id, params) {
   const orderOpts = Object.fromEntries(orders.filter(o => (o.firm || 'm2') === (m.firm || 'm2')).map(o => [o.id, `${docLabel(o)} · ${o.m2_clients?.name || ''} · ${o.subject}`]));
   const defs = [
     ['title', 'Tytuł sprawy', 'text', null, true],
-    ['order_id', 'Zlecenie / umowa (klient sprawy = klient zlecenia)', 'select', orderOpts, true], ['matter_type', 'Rodzaj', 'select', MATTER_TYPE],
+    ['matter_type', 'Rodzaj', 'select', MATTER_TYPE],
     ['status', 'Status', 'select', Object.fromEntries(Object.entries(MATTER_STATUS).map(([k, v]) => [k, v.label]))], ['stage', 'Etap (opis)', 'text'],
     ['authority', 'Organ', 'list', AUTHORITIES], ['case_ref', 'Sygnatura / znak sprawy', 'text'],
     ['tax_kind', 'Podatek', 'list', TAX_KINDS], ['tax_period', 'Okres', 'text'],
@@ -407,8 +387,17 @@ async function viewMatter(main, id, params) {
   ];
   const saveBtn = h('button', { class: 'btn btn-primary', onclick: save }, isNew ? 'Utwórz sprawę' : 'Zapisz zmiany');
   async function save() {
-    if (!draft.title || !draft.order_id) return toast('Podaj tytuł i wybierz zlecenie lub umowę', true);
+    if (!draft.title) return toast('Podaj tytuł sprawy', true);
+    if (isNew && !draft.order_id && !draft.client_id) return toast('Wybierz klienta', true);
     const row = {}; defs.forEach(([k]) => { row[k] = draft[k] ?? null; });
+    if (isNew) {
+      row.order_id = draft.order_id || null;
+      if (!row.order_id) {
+        // klient RKDP: profil doradczy zakładany przy pierwszej sprawie
+        if (String(draft.client_id).startsWith('rk:')) { try { draft.client_id = (await rkdpProfile(String(draft.client_id).slice(3))).id; } catch (e) { return fail(e); } }
+        row.client_id = draft.client_id; row.firm = draft.firm;
+      }
+    }
     row.due_approx = String(row.due_approx) === 'true';
     if (row.status === 'zakonczona' && !row.closed_at) row.closed_at = todayIso();
     saveBtn.disabled = true;
@@ -418,7 +407,6 @@ async function viewMatter(main, id, params) {
     if (error) return fail(error);
     toast(isNew ? 'Utworzono sprawę' : 'Zapisano');
     if (isNew) location.hash = `${BASE}/sprawa/${data.id}`;
-    else if (row.order_id !== m.order_id) viewMatter(main, id, params);
     else Object.assign(m, row);
   }
   const gridBox = h('div');
@@ -429,7 +417,21 @@ async function viewMatter(main, id, params) {
   const ord = orders.find(o => o.id === m.order_id);
 
   if (isNew) {
-    main.replaceChildren(...header('sprawy', 'Nowa sprawa', `${docLabel(ord)} · klient: ${ord.m2_clients?.name || ''}`), formCard);
+    if (ord) { main.replaceChildren(...header('sprawy', 'Nowa sprawa', `${docLabel(ord)} · klient: ${ord.m2_clients?.name || ''}`), formCard); return; }
+    // wybór firmy i klienta (bez zlecenia – dokument zlecenia/umowy przygotujesz potem z karty sprawy)
+    const cSel = h('select', { class: 'select', style: { width: '100%' } });
+    const fillC = () => { cSel.replaceChildren(h('option', { value: '' }, '— wybierz klienta —'), ...newClients.map(c => h('option', { value: c.id, selected: c.id === draft.client_id }, c.name + (c.nip ? ` · NIP ${c.nip}` : '')))); };
+    cSel.addEventListener('change', () => { draft.client_id = cSel.value; });
+    fillC();
+    const fSel = bothFirms() ? h('select', { class: 'select', style: { width: '100%' } }, h('option', { value: 'm2' }, 'M2 TAX Doradcy Podatkowi'), h('option', { value: 'rkdp' }, 'RKDP spółka doradztwa podatkowego')) : null;
+    if (fSel) { fSel.value = draft.firm; fSel.addEventListener('change', async () => { draft.firm = fSel.value; draft.client_id = ''; newClients = await (draft.firm === 'rkdp' ? rkdpClientChoices() : fetchAll(() => sb.from('m2_clients').select('id,name,nip,firm,status').eq('firm', 'm2').eq('status', 'aktywny').order('name'))); fillC(); addC.hidden = draft.firm === 'rkdp'; }); }
+    const addC = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', hidden: draft.firm === 'rkdp', onclick: () => quickClientDialog(c => { newClients.unshift(c); draft.client_id = c.id; fillC(); }) }, '+ Nowy klient');
+    const whoCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Klient')),
+      h('div', { class: 'form-grid' },
+        fSel ? h('label', { class: 'field' }, h('span', {}, 'Firma'), fSel) : null,
+        h('label', { class: 'field' }, h('span', {}, 'Klient'), cSel)),
+      h('div', { style: { marginTop: '6px' } }, addC));
+    main.replaceChildren(...header('sprawy', 'Nowa sprawa', 'Zlecenie albo umowę (dokument do podpisu) przygotujesz po zapisaniu – z karty sprawy.'), whoCard, formCard);
     return;
   }
 
@@ -438,7 +440,7 @@ async function viewMatter(main, id, params) {
     fetchAll(() => sb.from('m2_deadlines').select('*').eq('matter_id', id).order('due_date')),
     fetchAll(() => sb.from('m2_journal').select('*').eq('matter_id', id).order('entry_date', { ascending: false }).order('created_at', { ascending: false })),
     fetchAll(() => sb.from('m2_time').select('*').eq('matter_id', id).order('work_date', { ascending: false })),
-    fetchAll(() => sb.from('m2_matters').select('id,number,title,status').eq('order_id', m.order_id).order('opened_at')),
+    m.order_id ? fetchAll(() => sb.from('m2_matters').select('id,number,title,status').eq('order_id', m.order_id).order('opened_at')) : Promise.resolve([]),
   ]);
   const client = (await sb.from('m2_clients').select('id,name,hourly_rate,billing_type').eq('id', m.client_id).maybeSingle()).data;
   const reload = () => viewMatter(main, id, params);
@@ -498,12 +500,32 @@ async function viewMatter(main, id, params) {
         j.body ? h('p', { class: 'small', style: { whiteSpace: 'pre-wrap', marginTop: '4px' } }, j.body) : null,
         h('div', { class: 'small muted' }, (state.members.find(x => x.email === j.author)?.short_name || j.author || ''))))) : [h('p', { class: 'hint' }, 'Brak wpisów.')])));
 
-  const others = siblings.filter(x => x.id !== m.id);
-  const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, ord?.doc_type === 'umowa' ? 'Umowa' : 'Zlecenie'),
-    h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/sprawa/nowa?zlecenie=${m.order_id}` }, '+ Sprawa w tym zleceniu')),
-  ord ? h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${ord.id}` }, h('div', {}, h('b', {}, docLabel(ord)), ' ', ord.subject)) : null,
-  others.length ? h('p', { class: 'small muted', style: { margin: '10px 0 4px' } }, 'Inne sprawy w tym zleceniu:') : null,
-  ...others.map(x => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${x.id}` }, h('div', {}, h('b', {}, x.number), ' ', x.title), statusPill(x.status))));
+  const others = m.order_id ? siblings.filter(x => x.id !== m.id) : [];
+  const docHref = typ => `${BASE}/zlecenie/nowe?typ=${typ}&firma=${m.firm || 'm2'}&klient=${m.client_id}&sprawa=${m.id}`;
+  const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Zlecenie / umowa')),
+    ord ? h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${ord.id}` }, h('div', {}, h('b', {}, docLabel(ord)), ' ', ord.subject, h('div', { class: 'small muted' }, 'otwórz, aby pobrać PDF / Word lub oznaczyć podpisanie')))
+      : h('div', {}, h('p', { class: 'hint', style: { marginBottom: '10px' } }, 'Ta sprawa nie ma jeszcze dokumentu zlecenia ani umowy. Przygotuj go, gdy klient ma podpisać.'),
+        h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+          h('a', { class: 'btn btn-outline btn-sm', href: docHref('zlecenie') }, '+ Zlecenie do podpisu'),
+          h('a', { class: 'btn btn-outline btn-sm', href: docHref('umowa') }, '+ Umowa'))),
+    others.length ? h('p', { class: 'small muted', style: { margin: '10px 0 4px' } }, 'Inne sprawy w tej umowie:') : null,
+    ...others.map(x => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${x.id}` }, h('div', {}, h('b', {}, x.number), ' ', x.title), statusPill(x.status))));
+
+  // zakończenie sprawy jednym przyciskiem (otwarte terminy zostają odhaczone); można wznowić
+  const isOpen = OPEN_STATUSES.includes(m.status);
+  const closeBtn = h('button', { class: isOpen ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm', onclick: async () => {
+    if (isOpen) {
+      const openDl = deadlines.filter(d => !d.done);
+      if (!confirm(`Zakończyć sprawę ${m.number}?${openDl.length ? ` Otwarte terminy (${openDl.length}) zostaną oznaczone jako zrealizowane.` : ''}`)) return;
+      const { error } = await sb.from('m2_matters').update({ status: 'zakonczona', closed_at: m.closed_at || todayIso() }).eq('id', id);
+      if (error) return fail(error);
+      if (openDl.length) await sb.from('m2_deadlines').update({ done: true, done_at: new Date().toISOString() }).in('id', openDl.map(d => d.id));
+      toast('Sprawa zakończona'); reload();
+    } else {
+      const { error } = await sb.from('m2_matters').update({ status: 'w_toku', closed_at: null }).eq('id', id);
+      if (error) return fail(error); toast('Wznowiono sprawę'); reload();
+    }
+  } }, isOpen ? '✓ Zakończ sprawę' : 'Wznów sprawę');
 
   const delMatter = isAdmin() ? h('button', { class: 'btn btn-danger btn-sm', onclick: async () => {
     if (!confirm(`Usunąć sprawę ${m.number} razem z terminami, dziennikiem i czasem pracy? Tego nie da się cofnąć.`)) return;
@@ -514,7 +536,7 @@ async function viewMatter(main, id, params) {
 
   const poaBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     const { data: cl } = await sb.from('m2_clients').select('*').eq('id', m.client_id).maybeSingle();
-    const { data: od } = await sb.from('m2_orders').select('params').eq('id', m.order_id).maybeSingle();
+    const { data: od } = m.order_id ? await sb.from('m2_orders').select('params').eq('id', m.order_id).maybeSingle() : { data: null };
     pelnomocnictwoDialog({ client: cl, kind: ['wsa', 'nsa'].includes(m.matter_type) ? 'procesowe' : 'pps1', params: { ...(od?.params || {}), matter_type: m.matter_type, authority: m.authority || od?.params?.authority, tax: m.tax_kind || od?.params?.tax, period: m.tax_period || od?.params?.period, ref_no: m.case_ref || od?.params?.ref_no } });
   } }, 'Pełnomocnictwo');
   const reportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => {
@@ -546,7 +568,7 @@ async function viewMatter(main, id, params) {
     ]);
   } }, icon('download'), 'Raport PDF');
   main.replaceChildren(...header('sprawy', `${m.number} · ${m.title}`, null,
-    [statusPill(m.status), timerButton({ module: 'm2', clientId: m.client_id, matterId: m.id, name: `${client?.name || 'klient'} · ${m.number}`, onSaved: reload }), h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/dokumenty?sprawa=${m.id}` }, 'Pismo'), reportBtn, poaBtn, delMatter].filter(Boolean)),
+    [statusPill(m.status), closeBtn, timerButton({ module: 'm2', clientId: m.client_id, matterId: m.id, name: `${client?.name || 'klient'} · ${m.number}`, onSaved: reload }), h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/dokumenty?sprawa=${m.id}` }, 'Pismo'), reportBtn, poaBtn, delMatter].filter(Boolean)),
   h('p', { class: 'sub', style: { marginTop: '-12px', marginBottom: '18px' } }, 'Klient: ', h('a', { href: `${BASE}/klient/${m.client_id}` }, client?.name || ''),
     ' · ', MATTER_TYPE[m.matter_type] || '', m.case_ref ? ` · ${m.case_ref}` : ''),
   h('div', { class: 'two' }, h('div', {}, formCard), h('div', {}, dlCard, journalCard, ordersCard, timeCard, historyCard({ matter: m.id }))));
@@ -673,10 +695,9 @@ async function viewClient(main, id) {
   const mattersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Sprawy'),
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => newMatterDialog({ clientId: id }) }, '+ Sprawa')),
   ...(matters.length ? matters.map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` }, h('div', {}, h('b', {}, m.number), ' ', m.title), statusPill(m.status))) : [h('p', { class: 'hint' }, 'Brak spraw.')]));
-  const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Zlecenia i umowy'),
+  const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Umowy i zlecenia'),
     h('div', { style: { display: 'flex', gap: '6px' } },
-      h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=zlecenie&klient=${id}` }, '+ Zlecenie'),
-      h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
+      h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa (abonament)'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
     h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
@@ -1007,7 +1028,7 @@ async function viewOrder(main, id, params) {
         ['extra_terms', 'Dodatkowe postanowienia (opcjonalnie)', 'textarea'],
         ['signer_id', `Podpisuje w imieniu ${FIRM_LABEL[firm]}`, 'select', signerOpts],
       ];
-      const extra = isNew && !draft.id ? fieldsGrid([['matter_type', 'Rodzaj sprawy (założy się automatycznie)', 'select', MATTER_TYPE]], { get matter_type() { return matterType; }, set matter_type(v) { matterType = v || 'konsultacja'; } }) : null;
+      const extra = isNew && !draft.id && !params.get('sprawa') ? fieldsGrid([['matter_type', 'Rodzaj sprawy (założy się automatycznie)', 'select', MATTER_TYPE]], { get matter_type() { return matterType; }, set matter_type(v) { matterType = v || 'konsultacja'; } }) : null;
       formBox.replaceChildren(h('div', { class: 'form-grid' }, clientBox), fieldsGrid(defs, draft, onAny), extra || '');
       return;
     }
@@ -1151,6 +1172,14 @@ async function viewOrder(main, id, params) {
         ...(isUmowa() ? { authority: P.authority || null, case_ref: P.ref_no || null, tax_kind: P.tax || null, tax_period: P.period || null,
           poa_type: /^nie dotyczy/.test(P.poa_type || matterTemplate(P.matter_type).poa) ? null : (P.poa_type || matterTemplate(P.matter_type).poa), description: P.description || null } : {}),
       };
+      const forMatter = params.get('sprawa');
+      if (forMatter) {
+        const { error: e3 } = await sb.from('m2_matters').update({ order_id: data.id }).eq('id', forMatter);
+        if (e3) fail(e3, 'Zapisano dokument, ale nie udało się podpiąć go do sprawy');
+        toast(`Zapisano ${docLabel(data).toLowerCase()} w sprawie`);
+        location.hash = `${BASE}/zlecenie/${data.id}`;
+        return true;
+      }
       const { data: mt, error: e2 } = await sb.from('m2_matters').insert(matter).select('id,number').single();
       if (e2) fail(e2, 'Zapisano dokument, ale nie udało się założyć sprawy');
       toast(`Zapisano ${docLabel(data).toLowerCase()}${mt ? ` i założono sprawę ${mt.number}` : ''}`);
@@ -1195,7 +1224,7 @@ async function viewOrder(main, id, params) {
   const title = draft.id ? docLabel(draft) : (isUmowa() ? 'Nowa umowa' : 'Nowe zlecenie');
   const subTitle = (bothFirms() ? `${FIRM_LABEL[firm]} · ` : '') + (draft.id ? `Klient: ${client()?.name || '—'}` : 'Wybierz rodzaj dokumentu. Po zapisaniu automatycznie założy się sprawa – możesz ją potem edytować.');
   main.replaceChildren(...header('zlecenia', title, subTitle,
-    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn,
+    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : params.get('sprawa') ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn,
       h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ firm, client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id, kind: isUmowa() && /procesow|p\.p\.s\.a/i.test(P.poa_type || matterTemplate(P.matter_type).poa) ? 'procesowe' : 'pps1' }) }, 'Pełnomocnictwo'),
       delBtn].filter(Boolean)),
   typeSwitch || '',
