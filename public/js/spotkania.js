@@ -332,7 +332,25 @@ function notesBox(m) {
       if (error) return fail(error);
       toast('Zapisano notatkę');
     } }, 'Zapisz notatkę');
+    // podsumowanie z Google Meet (notatki Gemini) – pobierane samo po spotkaniu albo na żądanie
+    const sumBox = m.mode === 'meet' ? h('div', { class: 'sp-sum' }) : null;
+    const drawSum = (txt, url, at) => sumBox && put(sumBox,
+      h('div', { class: 'sp-notes-h' }, h('b', {}, 'Podsumowanie z Google Meet'), txt ? h('span', { class: 'small muted' }, 'notatki Gemini' + (at ? ` · ${new Date(at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '')) : null),
+      txt ? h('div', { class: 'sp-sum-txt' }, txt) : h('p', { class: 'small muted', style: { margin: '0 0 6px' } }, new Date(m.end_at) > new Date()
+        ? 'Po spotkaniu app.R sama pobierze notatki Gemini (jeśli w Meet włączysz „Rób notatki z Gemini”).'
+        : 'Notatki Gemini pojawiają się zwykle kilka–kilkanaście minut po spotkaniu. app.R sprawdza je sama przez 3 dni.'),
+      h('div', { class: 'sp-notes-foot' },
+        url ? h('a', { class: 'btn btn-ghost btn-sm', href: url, target: '_blank', rel: 'noopener' }, 'Otwórz dokument') : null,
+        new Date(m.end_at) <= new Date() ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: async (e) => {
+          e.target.disabled = true;
+          try {
+            const data = await call('summary', { id: m.id });
+            drawSum(data.summary, data.summary_url, new Date().toISOString()); toast('Pobrano podsumowanie');
+          } catch (er) { e.target.disabled = false; fail(er); }
+        } }, txt ? 'Pobierz ponownie' : 'Pobierz teraz') : null));
+    drawSum(n0?.summary, n0?.summary_url, n0?.summary_at);
     put(box,
+      sumBox,
       h('div', { class: 'sp-notes-h' }, h('b', {}, 'Notatka wewnętrzna'), h('span', { class: 'small muted' }, 'widzą tylko osoby z pełnym dostępem')),
       body,
       h('div', { class: 'sp-notes-row' },

@@ -5,7 +5,8 @@
 //   • book    {type_id, advisor, start, name, email, phone, topic, consent, hp, ms}
 //   • manage  {token} / cancel {token, reason} / reschedule {token, start} – z linku w e-mailu
 //  Zespół (zalogowany): create, cancel_staff, reschedule_staff, day (podgląd zajętości), staff_slots
-//  Harmonogram bazy (x-push-secret): cron – przypomnienia dzień przed spotkaniem.
+//  Harmonogram bazy (x-push-secret): cron – przypomnienia dzień przed spotkaniem, podsumowania (notatki Gemini) po spotkaniach w Meet.
+//  summary {id} – pobierz teraz notatki Gemini do notatki wewnętrznej spotkania.
 // Wydarzenia trafiają do głównych Kalendarzy Google doradców (połączenie z profilu, funkcja „gcal”); e-maile do klientów
 // wychodzą z adresu z ustawień (domyślnie app@ruszniak.io, alias konta SMTP_USER) z plikiem .ics.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -339,6 +340,35 @@ async function notifyTeam(id: string, ev: string, actor?: string | null, extra: 
     await fetch(`${SB_URL}/functions/v1/push`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-push-secret': s }, body: JSON.stringify({ event: 'spotkanie', id, ev, actor: actor || null, ...extra }) });
   } catch (e) { console.error('push', e); }
 }
+// ---------- podsumowanie spotkania online: notatki Gemini z Google Meet ----------
+// Gdy na spotkaniu w Meet włączono „Rób notatki z Gemini”, po spotkaniu Google dołącza dokument z notatkami do wydarzenia
+// w kalendarzu organizatora. Czytamy załączniki wydarzenia (zgoda calendar.events) i pobieramy treść dokumentu jako tekst
+// (zgoda drive.meet.readonly – tylko pliki utworzone przez Google Meet). Wynik trafia do notatki wewnętrznej spotkania.
+async function fetchSummary(m: any): Promise<{ text: string; url: string } | { error: string }> {
+  const gc = m.gcal || {};
+  let why = 'Brak notatek z Gemini przy tym spotkaniu (jeszcze się nie pojawiły albo notatki nie były włączone).';
+  for (const mid of Object.keys(gc)) {
+    const cur = gc[mid]; if (!cur?.e) continue;
+    const t = await gToken(mid); if (!t) continue;
+    const r = await gapi(t, 'GET', `/calendars/${encodeURIComponent(cur.c || 'primary')}/events/${encodeURIComponent(cur.e)}?supportsAttachments=true`);
+    if (!r.ok) continue;
+    const docs = (r.data?.attachments || []).filter((a: any) => a.fileId && a.mimeType === 'application/vnd.google-apps.document');
+    const pick = docs.find((a: any) => /gemini/i.test(a.title || '')) || docs.find((a: any) => !/transkry|transcript|nagranie|recording/i.test(a.title || ''));
+    if (!pick) continue;
+    const x = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(pick.fileId)}/export?mimeType=text/plain`, { headers: { Authorization: `Bearer ${t}` } });
+    if (x.status === 401 || x.status === 403) { why = 'Notatki są w kalendarzu, ale aplikacja nie ma zgody na ich odczyt – połącz ponownie Google w Profilu.'; continue; }
+    if (!x.ok) continue;
+    const text = (await x.text()).replace(/^\uFEFF/, '').replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 60000);
+    if (text) return { text, url: pick.fileUrl || `https://docs.google.com/document/d/${pick.fileId}/edit` };
+  }
+  return { error: why };
+}
+async function saveSummary(m: any, r: { text: string; url: string }) {
+  const { data: n } = await admin.from('meeting_notes').select('meeting_id').eq('meeting_id', m.id).maybeSingle();
+  const row = { summary: r.text, summary_url: r.url, summary_at: new Date().toISOString() };
+  if (n) await admin.from('meeting_notes').update(row).eq('meeting_id', m.id);
+  else await admin.from('meeting_notes').insert({ meeting_id: m.id, ...row });
+}
 async function ctxOf(m: any, S?: any): Promise<Ctx> {
   const [{ data: type }, { data: mm }] = await Promise.all([
     m.type_id ? admin.from('meeting_types').select('*').eq('id', m.type_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -549,7 +579,20 @@ Deno.serve(async (req: Request) => {
       const { data: soon } = await admin.from('meetings').select('id').eq('status', 'confirmed').is('team_reminder_sent_at', null)
         .gte('start_at', new Date(now).toISOString()).lte('start_at', new Date(now + 65 * 60_000).toISOString());
       for (const x of soon || []) { await notifyTeam(x.id, 'przypomnienie', null); await admin.from('meetings').update({ team_reminder_sent_at: new Date().toISOString() }).eq('id', x.id); }
-      return json({ ok: true, sent, team: (soon || []).length });
+      // spotkania w Meet, które się skończyły (do 3 dni wstecz) – pobierz notatki Gemini, gdy Google je dołączy
+      const { data: done } = await admin.from('meetings').select('id, gcal, summary_tries').eq('status', 'confirmed').eq('mode', 'meet').eq('private', false).lt('summary_tries', 16)
+        .lte('end_at', new Date(now - 10 * 60_000).toISOString()).gte('end_at', new Date(now - 3 * 86400_000).toISOString()).limit(20);
+      let sums = 0;
+      for (const x of done || []) {
+        const { data: n } = await admin.from('meeting_notes').select('summary_at').eq('meeting_id', x.id).maybeSingle();
+        if (n?.summary_at) { await admin.from('meetings').update({ summary_tries: 99 }).eq('id', x.id); continue; }
+        try {
+          const r = await fetchSummary(x);
+          if ('text' in r) { await saveSummary(x, r); await admin.from('meetings').update({ summary_tries: 99 }).eq('id', x.id); await notifyTeam(x.id, 'podsumowanie', null); sums++; }
+          else await admin.from('meetings').update({ summary_tries: (x.summary_tries || 0) + 1 }).eq('id', x.id);
+        } catch (e) { console.error('summary', x.id, e); }
+      }
+      return json({ ok: true, sent, team: (soon || []).length, summaries: sums });
     }
 
     // ===== zespół (zalogowany) =====
@@ -623,6 +666,18 @@ Deno.serve(async (req: Request) => {
         notify_client: !priv && !!email && body.notify_client !== false, created_by: me,
       }, members, me);
       return json({ ok: true, ...r });
+    }
+    if (action === 'summary') {
+      const { data: ok } = await user.rpc('can_see_meeting_notes');
+      if (!ok) throw new Http(403, 'Brak dostępu do notatek spotkań.');
+      const { data: m } = await user.from('meetings').select('*').eq('id', clean(body.id, 40)).maybeSingle();
+      if (!m) throw new Http(404, 'Nie znaleziono spotkania.');
+      if (m.mode !== 'meet') throw new Http(400, 'Podsumowania są dostępne dla spotkań w Google Meet.');
+      const r = await fetchSummary(m);
+      if ('error' in r) return json({ ok: false, error: r.error });
+      await saveSummary(m, r);
+      await admin.from('meetings').update({ summary_tries: 99 }).eq('id', m.id);
+      return json({ ok: true, summary: r.text, summary_url: r.url });
     }
     if (action === 'members') {
       const { data: m } = await user.from('meetings').select('*').eq('id', clean(body.id, 40)).maybeSingle();

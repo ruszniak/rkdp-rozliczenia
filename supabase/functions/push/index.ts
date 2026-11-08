@@ -230,6 +230,7 @@ async function onSpotkanie(b: any) {
     if (removed.length) n += await notify(removed, 'spotkania', { title: 'Nie uczestniczysz już w spotkaniu', body: `${short(who, 60)} · ${when}` + (by ? ` · zmienił(a): ${by}` : ''), url, tag });
     return n;
   }
+  if (ev === 'podsumowanie') return act.length ? notify(act, 'spotkania', { title: 'Podsumowanie spotkania z Meet', body: `${short(who, 60)} · ${when} – notatki Gemini są w app.R`, url, tag: `sum-${m.id}` }) : 0;
   if (ev === 'przypomnienie') return act.length ? notify(act, 'spotkania', { title: `O ${hour}: spotkanie`, body: `${short(who, 60)}` + (act.length > 1 ? ' · uczestniczycie razem' : ''), url, tag }) : 0;
   const all = ev.startsWith('odwolane') ? (mm || []).map((x: any) => x.member_id) : act;
   const to = all.filter((x: string) => x && x !== b.actor);

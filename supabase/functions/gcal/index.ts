@@ -23,7 +23,7 @@ let APP_URL = 'https://rozliczenia.rkdp.pl';
 async function loadAppUrl() { try { const { data } = await admin.from('app_settings').select('value').eq('key', 'app_url').maybeSingle(); if (data?.value) APP_URL = data.value.replace(/\/$/, ''); } catch { /* */ } }
 const API = 'https://www.googleapis.com/calendar/v3';
 // calendar.events – zapis spotkań w kalendarzu doradcy; freebusy – zajętość do wolnych terminów; calendarlist – wybór kalendarzy
-const SCOPES = 'openid email https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+const SCOPES = 'openid email https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/drive.meet.readonly';
 const canBook = (sc: string | null) => /calendar\.events(\s|$)/.test(sc || '');
 const CAL_NAME = 'RKDP – terminy i zadania';
 const TZ = 'Europe/Warsaw';
@@ -279,7 +279,7 @@ Deno.serve(async (req: Request) => {
       const owners = (sh || []).map((x: any) => x.owner_id);
       const { data: ol } = owners.length ? await admin.from('gcal_links').select('member_id').in('member_id', owners) : { data: [] };
       const { data: on } = owners.length ? await admin.from('team_members').select('id,full_name').in('id', (ol || []).map((x: any) => x.member_id)) : { data: [] };
-      return json({ configured, connected: !!link, ...rest, can_book: !!link && canBook(scopes), calendar_name: CAL_NAME, shared: (on || []).map((x: any) => ({ id: x.id, name: x.full_name })) });
+      return json({ configured, connected: !!link, ...rest, can_book: !!link && canBook(scopes), can_summary: !!link && /drive\.meet\.readonly/.test(scopes || ''), calendar_name: CAL_NAME, shared: (on || []).map((x: any) => ({ id: x.id, name: x.full_name })) });
     }
     if (!configured) return json({ configured: false, error: 'Połączenie z Google nie jest jeszcze skonfigurowane (brak danych klienta OAuth w ustawieniach serwera).' }, 400);
     if (action === 'connect') {
