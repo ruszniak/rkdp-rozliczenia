@@ -44,7 +44,34 @@ async function check() {
   else showBanner();
 }
 
+// aplikacja na Androida (.apk): przy starcie dostaje w adresie ?apk=<wersja>; gdy jest nowsza wersja pliku – podpowiedź, by ją pobrać
+async function checkApk() {
+  let have = null;
+  try {
+    const q = new URLSearchParams(location.search).get('apk');
+    if (q) { localStorage.setItem('rkdp_apk', q); history.replaceState(null, '', location.pathname + location.hash); }
+    have = Number(localStorage.getItem('rkdp_apk')) || null;
+  } catch { /* */ }
+  if (!have) return;
+  try {
+    const r = await fetch('/pobierz/apk.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const { version } = await r.json();
+    if (!(version > have)) return;
+    let skip = null; try { skip = sessionStorage.getItem('rkdp_apk_skip'); } catch { /* */ }
+    if (skip) return;
+    const el = document.createElement('div');
+    el.className = 'upd-banner';
+    el.innerHTML = '<span>Jest nowa wersja aplikacji app.R na Androida</span>';
+    const a = document.createElement('a'); a.href = '/pobierz/app-r.apk'; a.textContent = 'Pobierz'; a.className = 'upd-btn';
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.className = 'upd-x';
+    x.onclick = () => { el.remove(); try { sessionStorage.setItem('rkdp_apk_skip', '1'); } catch { /* */ } };
+    el.append(a, x); document.body.append(el);
+  } catch { /* */ }
+}
+
 export function initUpdates() {
+  setTimeout(checkApk, 4000);
   try { if (sessionStorage.getItem('rkdp_updated')) { sessionStorage.removeItem('rkdp_updated'); setTimeout(() => toast('Zaktualizowano app.R do najnowszej wersji'), 800); } } catch { /* */ }
   if (!current) return;
   document.addEventListener('visibilitychange', () => {

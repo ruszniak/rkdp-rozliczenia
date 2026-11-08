@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "io.ruszniak.app",
+    "sha256_cert_fingerprints": ["D1:AD:C6:37:18:E2:19:A1:9E:43:00:30:12:7C:32:3A:7B:64:CA:03:74:AA:81:71:A1:20:7C:8B:47:23:1A:34"]
+  }
+}]

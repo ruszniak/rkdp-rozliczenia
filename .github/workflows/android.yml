@@ -1,0 +1,48 @@
+# Budowanie aplikacji app.R na Androida (.apk) – automatycznie po zmianie w katalogu android/ albo ręcznie (Actions → Run workflow).
+# Klucz podpisu wydaje funkcja Supabase „apk-signing” tylko dla tego workflow (token OIDC z GitHuba) – w repozytorium nie ma haseł.
+# Gotowy plik trafia do public/pobierz/app-r.apk (do pobrania z https://app.ruszniak.io/pobierz/app-r.apk).
+name: Android (app.R)
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  id-token: write
+concurrency: { group: android, cancel-in-progress: false }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.7' }
+      - name: Klucz podpisu (z Supabase, przez OIDC)
+        run: |
+          TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=app-r-apk" | jq -r .value)
+          RESP=$(curl -sS -f -X POST -H "x-github-oidc: $TOKEN" https://iuszfoyttqnkzjzjpzma.supabase.co/functions/v1/apk-signing)
+          PASS=$(echo "$RESP" | jq -r .password)
+          echo "::add-mask::$PASS"
+          echo "$RESP" | jq -r .keystore | base64 -d > "$RUNNER_TEMP/appr.jks"
+          echo "KS_FILE=$RUNNER_TEMP/appr.jks" >> "$GITHUB_ENV"
+          echo "KS_PASS=$PASS" >> "$GITHUB_ENV"
+      - name: Budowanie
+        working-directory: android
+        run: gradle --no-daemon assembleRelease
+      - name: Publikacja pliku do pobrania
+        run: |
+          mkdir -p public/pobierz
+          cp android/app/build/outputs/apk/release/app-release.apk public/pobierz/app-r.apk
+          printf '{"version":%s,"built":"%s"}\n' "$VERSION_CODE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > public/pobierz/apk.json
+          rm -f "$RUNNER_TEMP/appr.jks"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/pobierz
+          git commit -m "Android: nowa wersja aplikacji app.R (.apk) – build ${VERSION_CODE}"
+          git pull --rebase origin main
+          git push origin HEAD:main
