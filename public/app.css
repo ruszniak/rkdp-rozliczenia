@@ -2945,11 +2945,11 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 /* ===== komputer: ciemny, grafitowy górny pasek (jak dolny pasek na telefonie) ===== */
 @media (min-width:821px){
   :root:is([data-theme],:not([data-theme])) body .site-header{background:linear-gradient(180deg,#1A1F29,#11151C)!important;border-bottom:0!important;box-shadow:0 6px 20px -14px rgba(0,0,0,.6);-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
-:root:is([data-theme],:not([data-theme])) body .site-header .nav-links a,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-btn{color:#B6BFCC!important;background:transparent!important}
-:root:is([data-theme],:not([data-theme])) body .site-header .nav-links a:hover,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-btn:hover{color:#fff!important;background:rgba(255,255,255,.07)!important}
-:root:is([data-theme],:not([data-theme])) body .site-header .nav-links a.active,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-btn.active{color:#0E1015!important;background:#BFDBFE!important;box-shadow:none!important}
-:root:is([data-theme],:not([data-theme])) body .site-header .nav-links a .tab-ico,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-btn .tab-ico{color:inherit!important;background:none!important}
-:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .duo{fill:currentColor;fill-opacity:.18}
+:root:is([data-theme],:not([data-theme])) body .site-header .nav-links > a,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-wrap > .more-btn{color:#B6BFCC!important;background:transparent!important}
+:root:is([data-theme],:not([data-theme])) body .site-header .nav-links > a:hover,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-wrap > .more-btn:hover{color:#fff!important;background:rgba(255,255,255,.07)!important}
+:root:is([data-theme],:not([data-theme])) body .site-header .nav-links > a.active,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-wrap > .more-btn.active{color:#0E1015!important;background:#BFDBFE!important;box-shadow:none!important}
+:root:is([data-theme],:not([data-theme])) body .site-header .nav-links > a .tab-ico,:root:is([data-theme],:not([data-theme])) body .site-header .nav-links .more-wrap > .more-btn .tab-ico{color:inherit!important;background:none!important}
+:root:is([data-theme],:not([data-theme])) body .site-header .nav-links > a .duo,.site-header .nav-links .more-btn .duo{fill:currentColor;fill-opacity:.18}
 :root:is([data-theme],:not([data-theme])) body .site-header .hdr-search{background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.08)!important;color:#C9D1DC!important;box-shadow:none!important}
 :root:is([data-theme],:not([data-theme])) body .site-header .hdr-search kbd{background:rgba(255,255,255,.1)!important;color:#C9D1DC!important;border-color:transparent!important}
 :root:is([data-theme],:not([data-theme])) body .site-header .hdr-icon,:root:is([data-theme],:not([data-theme])) body .site-header .ob-link,:root:is([data-theme],:not([data-theme])) body .site-header .tm-slot>*{background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.08)!important;color:#E5E7EB!important;box-shadow:none!important}
@@ -2958,6 +2958,8 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 :root:is([data-theme],:not([data-theme])) body .site-header .brand-logo img{box-shadow:0 0 0 1px rgba(255,255,255,.14)}
 :root:is([data-theme],:not([data-theme])) body .site-header .mod-label{color:#E5E7EB;border-left-color:rgba(255,255,255,.15)}
   :root:is([data-theme],:not([data-theme])) body .site-header .nav-links{background:transparent!important;box-shadow:none!important}
+  :root:is([data-theme],:not([data-theme])) body .site-header .more-menu a{color:var(--ink)!important}
+  :root:is([data-theme],:not([data-theme])) body .site-header .more-menu a:hover,:root:is([data-theme],:not([data-theme])) body .site-header .more-menu a.on{background:var(--panel)!important;color:var(--ink)!important}
 }
 /* ===== Kalendarz Google ===== */
 .gc-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
