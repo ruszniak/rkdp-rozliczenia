@@ -3218,3 +3218,16 @@ html body .avatar .av-img{width:100%;height:100%;object-fit:cover;border-radius:
 /* zdjęcia wgrane jako okrągłe (białe rogi w pliku) – miniatura zawsze w kółku, lekko powiększona, żeby rogi i krawędź nie prześwitywały */
 html body .avatar:has(.av-img),html body .site-header .avatar:has(.av-img),html body .av:has(.av-img){border-radius:50%!important;overflow:hidden}
 html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scale(1.06)}
+/* kalendarz na pulpicie: wydarzenie trwające / zakończone */
+.gc-st{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-left:8px;padding:2px 7px;border-radius:6px;vertical-align:1px;white-space:nowrap}
+.gc-st:empty{display:none}
+.gc-ev.now .gc-st{background:#DCFCE7;color:#166534}
+.gc-ev.now .gc-t{color:#16A34A}
+.gc-ev.now{position:relative}
+.gc-ev.now .gc-t::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#16A34A;margin-right:5px;vertical-align:1px;animation:gcPulse 1.6s ease-in-out infinite}
+@keyframes gcPulse{50%{opacity:.35}}
+.gc-ev.past .gc-t,.gc-ev.past .gc-n{opacity:.45}
+.gc-ev.past .gc-n{text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25)}
+.gc-ev.past .gc-st{background:var(--panel);color:var(--muted);text-decoration:none;display:inline-block}
+.gc-ev.past .gc-meet{opacity:.4}
+:root[data-theme="dark"] .gc-ev.now .gc-st{background:rgba(22,163,74,.2);color:#86EFAC}

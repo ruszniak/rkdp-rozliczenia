@@ -131,14 +131,27 @@ export function gcalAgendaCard({ days = 7 } = {}) {
       const label = k => k === todayK ? 'Dziś' : k === tom ? 'Jutro' : DAY.format(new Date(k + 'T12:00:00'));
       put(listBox, h('div', { class: 'gc-days' }, ...(items.length ? [...byDay.entries()].slice(0, 8).map(([k, es]) => h('div', { class: 'gc-day' + (k === todayK ? ' today' : '') },
         h('div', { class: 'gc-dl' }, label(k)),
-        h('div', { class: 'gc-evs' }, ...es.map(e => h(cur ? 'div' : 'a', cur ? { class: 'gc-ev' } : { class: 'gc-ev', href: e.link || '#', target: '_blank', rel: 'noopener' },
+        h('div', { class: 'gc-evs' }, ...es.map(e => h(cur ? 'div' : 'a', { class: 'gc-ev', 'data-s': e.allDay ? '' : e.start, 'data-e': e.allDay ? '' : (e.end || ''), ...(cur ? {} : { href: e.link || '#', target: '_blank', rel: 'noopener' }) },
           h('span', { class: 'gc-t' }, e.allDay ? 'cały dzień' : HM.format(new Date(e.start))),
-          h('span', { class: 'gc-n' }, e.title, e.location ? h('small', {}, e.location) : null),
+          h('span', { class: 'gc-n' }, e.title, h('em', { class: 'gc-st' }), e.location ? h('small', {}, e.location) : null),
           e.meet ? h('a', { class: 'gc-meet', href: e.meet, target: '_blank', rel: 'noopener', onclick: ev => ev.stopPropagation() }, 'Meet') : null)))))
         : [h('p', { class: 'hint', style: { padding: '6px 0' } }, 'Brak wydarzeń w najbliższych dniach. 🙂')])));
+      markNow(listBox);
     };
+    // co minutę: „trwa” przy bieżącym wydarzeniu, „zakończone” (wyszarzone) przy tych, które już minęły
+    const tick = setInterval(() => { if (!box.isConnected) return clearInterval(tick); markNow(listBox); }, 60_000);
     await load().catch(e => put(listBox, h('p', { class: 'hint' }, 'Kalendarz Google: ' + (e.message || e) + ' ', h('a', { href: '#/profil' }, 'Profil →'))));
   })().catch(e => { put(box, h('p', { class: 'hint' }, 'Kalendarz Google: ' + (e.message || e) + ' ', h('a', { href: '#/profil' }, 'Profil →'))); });
   return box;
+}
+function markNow(root) {
+  const now = Date.now();
+  root.querySelectorAll('.gc-ev[data-s]').forEach(el => {
+    const s = Date.parse(el.dataset.s), e = Date.parse(el.dataset.e) || s + 3600_000;
+    if (!s) return;
+    const st = now >= e ? 'past' : now >= s ? 'now' : '';
+    el.classList.toggle('past', st === 'past'); el.classList.toggle('now', st === 'now');
+    const tag = el.querySelector('.gc-st'); if (tag) tag.textContent = st === 'past' ? 'zakończone' : st === 'now' ? 'trwa' : '';
+  });
 }
 const CAL_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
