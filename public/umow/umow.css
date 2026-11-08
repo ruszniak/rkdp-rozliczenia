@@ -26,6 +26,7 @@ body.embed .um-card{border-radius:0;box-shadow:none;min-height:100vh}
 .typ b{display:block;font-size:14.5px}
 .typ small{display:block;font-size:12.5px;color:var(--muted)}
 .free{font-size:12px;font-weight:700;color:var(--ok);background:#E4EDDF;padding:3px 8px;border-radius:7px;margin-left:auto;flex:none}
+.typs{display:flex;flex-direction:column;gap:10px}
 .dors{display:flex;gap:8px;flex-wrap:wrap}
 .dor{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px 6px 6px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font:inherit;font-weight:600;font-size:13.5px;color:inherit;cursor:pointer}
 .dor.on{border-color:var(--gold);background:var(--gold-l)}
@@ -129,3 +130,86 @@ body.th-rkdp .sum a,body.th-m2tax .sum a{color:#D9B98E}
 body.th-rkdp .lbl,body.th-m2tax .lbl{color:#7A5A37}
 body.th-rkdp .btn.ghost,body.th-m2tax .btn.ghost{background:none;color:#9B1C1C}
 body.th-rkdp .typ.on,body.th-m2tax .typ.on{box-shadow:0 0 0 3px rgba(122,90,55,.14)}body.th-rkdp .fl input:focus,body.th-rkdp .fl textarea:focus,body.th-m2tax .fl input:focus,body.th-m2tax .fl textarea:focus{outline-color:rgba(122,90,55,.35)}body.th-m2tax .cal button.ok{background:#f4f4f2}
+
+/* ===== m2tax.pl: kalendarz osadzony na stronie (bare) – czytelny układ, kolory strony, wysokość dopasowana do treści ===== */
+body.bare.embed .um-card{min-height:0}
+body.th-m2tax{--m-ink:#16171a;--m-gold:#D9B98E;--m-brown:#7A5A37;--m-cream:#F5EFE6;--m-line:#e3e0d9;background:#fff}
+body.th-m2tax.bare .um-card{background:#fff}
+body.th-m2tax.bare .um-grid{display:block;min-height:0}
+body.th-m2tax.bare .um-side{background:#fff;border:0;padding:22px 24px 6px;gap:8px}
+body.th-m2tax.bare .note{display:none}
+body.th-m2tax .lbl{font-size:11.5px;letter-spacing:.12em;color:var(--m-brown)}
+/* rodzaje spotkań: siatka 2 × 2 */
+body.th-m2tax.bare .typs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+body.th-m2tax .typ{border:1.5px solid var(--m-line);border-radius:12px;padding:12px 14px;min-height:64px;transition:border-color .15s,background .15s}
+body.th-m2tax .typ:hover{border-color:#bfb6a8}
+body.th-m2tax .typ.on{border-color:var(--m-ink);background:var(--m-cream);box-shadow:none}
+body.th-m2tax .typ .ic{width:36px;height:36px;border-radius:10px;background:var(--m-cream);color:var(--m-brown)}
+body.th-m2tax .typ.on .ic{background:var(--m-ink);color:var(--m-gold)}
+body.th-m2tax .typ b{font-size:14.5px;line-height:1.3}
+body.th-m2tax .typ small{font-size:12.5px;line-height:1.35;margin-top:2px}
+body.th-m2tax .free{background:#EAF3E6;color:#2f6b3c}
+/* doradcy */
+body.th-m2tax.bare .dors{gap:8px}
+body.th-m2tax .dor{border:1.5px solid var(--m-line);min-height:42px;font-size:13.5px}
+body.th-m2tax .dor:hover{border-color:#bfb6a8}
+body.th-m2tax .dor.on{border-color:var(--m-ink);background:var(--m-cream)}
+/* kalendarz + godziny */
+body.th-m2tax.bare .um-mainp{grid-template-columns:minmax(0,1fr) 200px;gap:26px;padding:18px 24px 24px;border-top:1px solid var(--m-line);margin-top:16px}
+body.th-m2tax .cal{gap:5px}
+body.th-m2tax .cal span{color:#8a8578;font-size:11px}
+body.th-m2tax .cal button{height:42px;border-radius:10px;color:#c9c4ba;font-weight:500;background:transparent;position:relative}
+body.th-m2tax .cal button.ok,body.th-m2tax.bare .cal button.ok{background:#fff;color:var(--m-ink);font-weight:700;box-shadow:inset 0 0 0 1.5px var(--m-line)}
+body.th-m2tax .cal button.ok:hover{background:var(--m-cream);box-shadow:inset 0 0 0 1.5px #bfb6a8}
+body.th-m2tax .cal button.sel,body.th-m2tax .cal button.ok.sel{background:var(--m-ink);color:var(--m-gold);box-shadow:none}
+body.th-m2tax .cal button.td{box-shadow:none}
+body.th-m2tax .cal button.ok.td:not(.sel){box-shadow:inset 0 0 0 1.5px var(--m-line)}
+body.th-m2tax .cal button.td::after{content:"";position:absolute;left:50%;bottom:6px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--m-brown)}
+body.th-m2tax .cal button.sel.td::after{background:var(--m-gold)}
+body.th-m2tax .nb{border:1.5px solid var(--m-line);border-radius:10px;background:#fff}
+body.th-m2tax .nb:not(:disabled):hover{border-color:var(--m-ink)}
+body.th-m2tax .cal-h .nav{font-size:15px}
+body.th-m2tax.bare .slots{max-height:none;overflow:visible}
+body.th-m2tax .slot{border:1.5px solid var(--m-line);border-radius:10px;font-size:15px}
+body.th-m2tax .slot:hover{border-color:var(--m-ink)}
+body.th-m2tax .slot.sel{background:var(--m-ink);color:var(--m-gold);border-color:var(--m-ink)}
+body.th-m2tax .btn{background:var(--m-brown);border-radius:8px}
+body.th-m2tax .btn:not(:disabled):hover{background:#5C4228}
+body.th-m2tax .btn:disabled{background:#d8d2c8;color:#fff;opacity:1}
+body.th-m2tax .btn.out{border-radius:8px}
+body.th-m2tax .sum{background:var(--m-ink)}
+body.th-m2tax .sum .dd{background:var(--m-gold);color:var(--m-ink)}
+body.th-m2tax.bare .sticky{position:static;margin:0;padding:0;border:0;background:none}
+body.th-m2tax .fl input,body.th-m2tax .fl textarea{border-radius:10px;border-color:var(--m-line)}
+body.th-m2tax .fl input:focus,body.th-m2tax .fl textarea:focus{border-color:var(--m-ink);outline:2px solid rgba(217,185,142,.45)}
+body.th-m2tax .consent input{accent-color:var(--m-brown)}
+body.th-m2tax.bare .form{grid-template-columns:minmax(0,1fr) 260px;gap:24px;padding:22px 24px}
+@media (max-width:720px){
+  body.th-m2tax.bare .form{grid-template-columns:1fr}
+  body.th-m2tax.bare .sum{order:-1}
+}
+@media (max-width:640px){
+  body.th-m2tax.bare .um-mainp{grid-template-columns:1fr;gap:18px}
+  body.th-m2tax.bare .slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  body.th-m2tax.bare .slot{min-width:0}
+}
+@media (max-width:560px){
+  body.th-m2tax.bare .um-side{padding:16px 14px 4px}
+  body.th-m2tax.bare .typs{grid-template-columns:1fr;gap:8px}
+  body.th-m2tax .typ{min-height:0;padding:10px 12px}
+  body.th-m2tax .typ .ic{width:32px;height:32px}
+  body.th-m2tax .typ b{font-size:14px}
+  body.th-m2tax .typ small{font-size:12px}
+  body.th-m2tax.bare .dors{display:grid;grid-template-columns:1fr 1fr}
+  body.th-m2tax.bare .dor:first-child{grid-column:1/-1}
+  body.th-m2tax .dor{padding:5px 10px 5px 5px;font-size:13px}
+  body.th-m2tax.bare .um-mainp{padding:14px 14px 18px;margin-top:12px}
+  body.th-m2tax .cal{gap:4px}
+  body.th-m2tax .cal button{height:40px}
+  body.th-m2tax.bare .slots{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.th-m2tax.bare .form{padding:16px 14px}
+}
+@media (min-width:641px){body.th-m2tax.bare .slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}body.th-m2tax.bare .slot{min-width:0}}
+body.th-m2tax .consent{display:block;position:relative;padding-left:30px}
+body.th-m2tax .consent input{position:absolute;left:0;top:1px}
+body.th-m2tax .consent a{color:var(--m-brown);font-weight:600}

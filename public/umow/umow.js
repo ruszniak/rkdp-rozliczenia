@@ -69,6 +69,14 @@
       !TOKEN ? h('div', { class: 'um-steps' }, h('span', { class: step === 1 ? 'on' : '' }, '1. Termin'), '—', h('span', { class: step === 2 ? 'on' : '' }, '2. Dane'), '—', h('span', { class: step === 3 ? 'on' : '' }, '3. Gotowe')) : null,
       EMBED ? h('button', { class: 'um-x', type: 'button', 'aria-label': 'Zamknij', onclick: close }, '✕') : null);
   }
+  // w okienku na stronie: podaj stronie wysokość treści (bez przewijania wewnątrz) i przewiń do góry kalendarza przy zmianie kroku
+  var inFrame = EMBED && window.parent !== window;
+  function toTop() { window.scrollTo(0, 0); if (inFrame) window.parent.postMessage({ type: 'rkdp-umow-top' }, '*'); }
+  if (inFrame) {
+    var lastH = 0, sendH = function () { var hh = Math.ceil(root.getBoundingClientRect().height); if (hh && Math.abs(hh - lastH) > 1) { lastH = hh; window.parent.postMessage({ type: 'rkdp-umow-height', height: hh }, '*'); } };
+    if (window.ResizeObserver) new ResizeObserver(sendH).observe(root); else setInterval(sendH, 500);
+    window.addEventListener('load', sendH);
+  }
   function render() { root.innerHTML = ''; for (var i = 0; i < arguments.length; i++) add(root, arguments[i]); }
   function fail(msg) { render(h('div', { class: 'um-card' }, top(0), h('div', { class: 'done' }, h('p', { class: 'err' }, msg), h('p', null, 'Możesz też zadzwonić: ', h('a', { href: 'tel:+48883643565' }, '883 643 565'))))); }
 
@@ -80,12 +88,12 @@
     var advName = function (id) { var a = cfg.advisors.filter(function (x) { return x.id === id; })[0]; return a ? a.name : ''; };
     var side = h('div', { class: 'um-side' },
       h('p', { class: 'lbl' }, 'Rodzaj spotkania'),
-      types.map(function (t) {
+      h('div', { class: 'typs' }, types.map(function (t) {
         return h('button', { type: 'button', class: 'typ' + (st.type && st.type.id === t.id ? ' on' : ''), onclick: function () { st.type = t; st.day = null; st.slot = null; loadSlots(); } },
           h('span', { class: 'ic', html: ICON[t.mode] || ICON.meet }),
           h('span', null, h('b', null, t.name), h('small', null, (t.duration_min >= 60 ? (t.duration_min / 60 + ' godz.').replace('.5', ',5') : t.duration_min + ' min') + ' · ' + (t.mode === 'office' ? (t.place || 'stacjonarnie').replace(/^RKDP Doradztwo Podatkowe, /, '') : t.mode === 'phone' ? 'telefonicznie' : 'online (Google Meet)'))),
           /bezpłatn/i.test(t.name) ? h('span', { class: 'free' }, '0 zł') : null);
-      }),
+      })),
       cfg.advisors.length > 1 ? [h('p', { class: 'lbl', style: 'margin-top:14px' }, 'Doradca'),
         h('div', { class: 'dors' },
           h('button', { type: 'button', class: 'dor' + (st.adv === 'any' ? ' on' : ''), onclick: function () { st.adv = 'any'; st.slot = null; loadSlots(); } }, h('span', { class: 'av', style: 'background:#8A8F97', html: ICON.team }), 'Pierwszy wolny'),
@@ -122,7 +130,7 @@
         add(main, h('div', null,
           h('p', { class: 'lbl' }, longDay(st.day)),
           h('div', { class: 'slots' }, sl.map(function (s) { return h('button', { type: 'button', class: 'slot' + (st.slot && st.slot.start === s.start ? ' sel' : ''), onclick: function () { st.slot = s; render(card(1, step1())); } }, s.t); })),
-          h('div', { class: 'sticky' }, h('button', { class: 'btn', type: 'button', style: 'width:100%;margin-top:14px', disabled: !st.slot, onclick: function () { render(card(2, step2())); window.scrollTo(0, 0); } }, st.slot ? 'Dalej – ' + st.slot.t : 'Wybierz godzinę')),
+          h('div', { class: 'sticky' }, h('button', { class: 'btn', type: 'button', style: 'width:100%;margin-top:14px', disabled: !st.slot, onclick: function () { render(card(2, step2())); toTop(); } }, st.slot ? 'Dalej – ' + st.slot.t : 'Wybierz godzinę')),
           h('div', { class: 'hint', style: 'margin-top:8px' }, 'Czas polski (Warszawa)')));
       }
     }
@@ -165,7 +173,7 @@
       if (!form.consent) return render(card(2, step2('Zaznacz zgodę na przetwarzanie danych.')));
       btn.disabled = true; btn.textContent = 'Rezerwuję…';
       api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
-        .then(function (r) { render(card(3, done(r.meeting, r.mailed))); window.scrollTo(0, 0); })
+        .then(function (r) { render(card(3, done(r.meeting, r.mailed))); toTop(); })
         .catch(function (e) {
           if (/zajęt/i.test(e.message)) { st.slot = null; loadSlots(); setTimeout(function () { alertBox(e.message); }, 50); return; }
           render(card(2, step2(e.message)));
