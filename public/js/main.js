@@ -74,7 +74,7 @@ const MODULES = {
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']],
-    more: [['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+    more: [['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'RKDP · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -107,7 +107,7 @@ const I = {
 const TAB_ICONS = {
   moje: I.zlecenia, more: I.wiecej, rozmowy: I.rozmowy, pulpit: I.pulpit, rozliczenia: I.rozliczenia, klienci: I.klienci,
   zgloszenia: I.skrzynka, sprawozdania: I.dokumenty, zespol: I.zespol, 'm2:': I.pulpit, 'm2:sprawy': I.dokumenty, 'm2:klienci': I.klienci,
-  'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
+  'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:zadania': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
   jpk: I.jpk, logout: I.wyloguj, default: I.info,
   zlecenia: I.zlecenia, terminy: I.terminy, rok: I.notatki, informacje: I.rozmowy, oferty: I.notatki, aml: I.aml, raport: I.rozliczenia,
   oaplikacji: I.info, 'm2:czas': I.zegar, spotkania: I.terminy,
@@ -329,6 +329,9 @@ async function route(opts = {}) {
     else if (view === 'o-aplikacji') { const m = await import('./views/oaplikacji.js'); c = await m.renderOAplikacji(layout('oaplikacji'), parts[1]); }
     else if (view === 'wiecej') { const m2 = m2only; renderWiecej(layout(m2 ? 'm2:wiecej' : 'wiecej')); }
     else if (view === 'profil') c = await renderProfil(layout(m2only ? 'm2:profil' : 'profil'));
+    // zadania zespołu – także dla osób tylko z M2 TAX (np. Marcin): mogą dostawać i zlecać zadania
+    else if (view === 'doradztwo' && parts[1] === 'zadania') c = await renderZlecenia(layout('m2:zadania'), parts[2] || null);
+    else if (!hasModule('rozliczenia') && (view === 'zlecenia' || view === 'moje')) { const id = parts[1] || params.get('zl'); history.replaceState(null, '', '#/doradztwo/zadania' + (id ? '/' + id : '')); c = await renderZlecenia(layout('m2:zadania'), id || null); }
     else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) c = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
     else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) c = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
     else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) c = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });

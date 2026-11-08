@@ -2,7 +2,7 @@
 // Zadanie może dodać każdy użytkownik RKDP; widzi je osoba wykonująca, zlecający i administrator. Zlecający (lub administrator) akceptuje wykonanie. Przebieg: nowe → w trakcie → (pytanie) → zgłoszone → zaakceptowane / do poprawy.
 // Każde zlecenie i każda zmiana stanu: powiadomienie na telefon i e-mail (robi to baza – wyzwalacze → funkcje push i mail).
 import { h, toast, fail, modal, icon, ava, infoTip } from '../ui.js';
-import { sb, state, memberById } from '../store.js';
+import { sb, state, memberById, hasModule } from '../store.js';
 import { fileTile, dropZone, pastedFiles, safeName, named, fmtSize } from './zgloszenia.js';
 // bez „null” w treści: puste elementy (null/false) są pomijane
 const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
@@ -124,7 +124,7 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
   if (embed) { put(main, chips, listBox); await reload(); return; }
   put(main, 
     h('div', { class: 'page-head' },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
+      h('div', {}, h('p', { class: 'eyebrow' }, 'Zespół RKDP i M2 TAX'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, admin ? 'Zadania dla zespołu' : 'Zadania', infoTip(HELP, 'Zadania – jak to działa')),
         h('p', { class: 'sub' }, admin ? 'Dodatkowe zadania dla pracowników – z akceptacją wykonania.' : 'Twoje zadania i te, które zleciłeś innym. Gdy skończysz, kliknij „Zrobione – zgłaszam”.')),
       h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newZlecenie(reload) }, icon('plus'), 'Zadanie')),
@@ -134,6 +134,7 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
 }
 
 // ---------- karta na Pulpicie ----------
+const ALL_HREF = () => !hasModule('rozliczenia') ? '#/doradztwo/zadania' : isAdmin() ? '#/moje?f=zespol' : '#/moje';
 export function zleceniaCard() {
   const box = h('section', { class: 'card section zl-card' });
   (async () => {
@@ -144,17 +145,17 @@ export function zleceniaCard() {
     const show = (admin ? [...rep, ...q, ...lt.filter(z => !rep.includes(z) && !q.includes(z))] : act.sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'))).slice(0, 6);
     put(box, 
       h('div', { class: 'section-head' }, h('h2', {}, admin ? `Zadania (${act.length} aktywnych)` : `Zadania (${act.length})`),
-        h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newZlecenie(() => { location.hash = isAdmin() ? '#/moje?f=zespol' : '#/moje'; }) }, icon('plus'), 'Zadanie'),
-          h('a', { class: 'btn btn-ghost btn-sm', href: isAdmin() ? '#/moje?f=zespol' : '#/moje' }, 'Wszystkie →'))),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newZlecenie(() => { location.hash = ALL_HREF(); }) }, icon('plus'), 'Zadanie'),
+          h('a', { class: 'btn btn-ghost btn-sm', href: ALL_HREF() }, 'Wszystkie →'))),
       admin ? h('div', { class: 'zl-sum' }, h('span', { class: rep.length ? 'hot' : '' }, `do sprawdzenia: ${rep.length}`), h('span', { class: q.length ? 'hot' : '' }, `pytania: ${q.length}`), h('span', { class: lt.length ? 'hot' : '' }, `po terminie: ${lt.length}`)) : null,
-      show.length ? h('div', { class: 'zl-list' }, ...show.map(z => row(z, x => openZlecenie(x.id, () => { location.hash = '#/moje'; })))) : h('p', { class: 'hint' }, admin ? 'Nic nie czeka na Ciebie.' : ''));
+      show.length ? h('div', { class: 'zl-list' }, ...show.map(z => row(z, x => openZlecenie(x.id, () => { location.hash = ALL_HREF(); })))) : h('p', { class: 'hint' }, admin ? 'Nic nie czeka na Ciebie.' : ''));
   })();
   return box;
 }
 
 // ---------- nowe zadanie (każdy użytkownik RKDP) ----------
 export async function newZlecenie(onDone, preset = {}) {
-  const team = state.members.filter(m => m.active !== false && (m.role === 'admin' || (m.modules || ['rozliczenia']).includes('rozliczenia'))).sort((a, b) => (a.id === state.me.id) - (b.id === state.me.id));
+  const team = state.members.filter(m => m.active !== false).sort((a, b) => (a.id === state.me.id) - (b.id === state.me.id));
   const pick = new Set(preset.assignee_id ? [preset.assignee_id] : []);
   const people = h('div', { class: 'zl-people' }, ...team.map(m => { const cb = h('input', { type: 'checkbox', checked: pick.has(m.id) }); cb.addEventListener('change', () => cb.checked ? pick.add(m.id) : pick.delete(m.id)); return h('label', { class: 'zl-person-pick' }, cb, ava(m), m.id === state.me.id ? 'Ja (dla siebie)' : m.full_name); }));
   const title = h('input', { class: 'input', maxlength: 200, placeholder: 'Co trzeba zrobić? (krótko)', value: preset.title || '' });
@@ -202,7 +203,7 @@ export async function newZlecenie(onDone, preset = {}) {
 
 // ---------- osoby pracujące razem nad zadaniem ----------
 function peopleDialog(z, onDone) {
-  const team = state.members.filter(m => m.active !== false && m.id !== z.assignee_id && (m.role === 'admin' || (m.modules || ['rozliczenia']).includes('rozliczenia')));
+  const team = state.members.filter(m => m.active !== false && m.id !== z.assignee_id);
   const pick = new Set(helpersOf(z));
   const box = h('div', { class: 'zl-people' }, ...team.map(m => { const cb = h('input', { type: 'checkbox', checked: pick.has(m.id) }); cb.addEventListener('change', () => cb.checked ? pick.add(m.id) : pick.delete(m.id)); return h('label', { class: 'zl-person-pick' }, cb, ava(m), m.id === state.me.id ? 'Ja' : m.full_name); }));
   modal(`Osoby w zadaniu #${z.no}`, h('div', { class: 'zl-form' },

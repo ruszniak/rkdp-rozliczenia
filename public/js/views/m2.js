@@ -22,6 +22,7 @@ import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
 import { clientMeetingsCard, openMeetingDialog } from '../spotkania.js';
 import { gcalAgendaCard } from '../gcal.js';
+import { zleceniaCard } from './zlecenia.js';
 import { pdfText, analyzeLetter } from '../pismo.js';
 
 const BASE = '#/doradztwo';
@@ -283,7 +284,7 @@ async function viewDashboard(main) {
       h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
         h('div', {}, h('b', {}, m.number), ' ', m.title, h('div', { class: 'small muted' }, m.m2_clients?.name || '')), statusPill(m.status)))
         : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')]))),
-    h('div', {}, meetingsCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'))));
+    h('div', {}, meetingsCard(), zleceniaCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'))));
 }
 
 // ================= SPRAWY =================
