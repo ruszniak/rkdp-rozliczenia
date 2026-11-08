@@ -34,8 +34,9 @@ const memberOpts = (firm) => Object.fromEntries(members(firm).map(m => [m.id, m.
 // ---------- wspólne elementy ----------
 function header(active, title, sub, actions) {
   return [
-    h('div', { class: 'page-head', style: { marginTop: '28px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, bothFirms() ? 'Doradztwo podatkowe' : `Doradztwo podatkowe · ${FIRM_LABEL[defaultFirm()]}`), h('h1', { style: { marginTop: '6px' } }, title),
+    // nagłówek strony jak w całej aplikacji (bez dopisku modułu nad tytułem)
+    h('div', { class: 'page-head' },
+      h('div', {}, h('h1', {}, title),
         sub ? h('p', { class: 'sub' }, sub) : null),
       actions ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, ...[].concat(actions)) : null),
   ];

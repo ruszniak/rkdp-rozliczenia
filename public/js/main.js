@@ -72,9 +72,10 @@ const MODULES = {
       ['#/doradztwo/dokumenty', 'Pisma procesowe – wzory (RKDP i M2 TAX)', 'm2:dokumenty'], ['#/doradztwo', 'Pulpit doradcy M2 TAX (spotkania, terminy)', 'm2:', 'm2'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
       ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
-    tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
-      ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']],
-    more: [['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+    // ten sam układ zakładek co w RKDP: Pulpit · Klienci · Sprawy · … · Więcej
+    tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'],
+      ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']],
+    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'RKDP · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -179,7 +180,7 @@ function layout(active) {
 
   const switcher = (() => {
     if (mod === 'rkdp') return null;
-    if (mine.length < 2) return h('span', { class: 'mod-label' }, M.label);
+    if (mine.length < 2) return null;   // jedna aplikacja app.R – bez dopisku modułu przy logo (jak u RKDP)
     const menu = h('div', { class: 'mod-menu', role: 'menu', hidden: true }, ...mine.map(k => h('a', {
       href: MODULES[k].home, role: 'menuitem', class: k === mod ? 'on' : null,
       onclick: () => { remember(k); menu.hidden = true; },
