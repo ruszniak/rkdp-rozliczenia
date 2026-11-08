@@ -192,7 +192,7 @@ function ics(m: any, summary: string, where: string, desc: string, cancelled = f
 type Ctx = { S: any; m: any; type: any; advisors: any[] };
 const CHANNEL: Record<string, string> = { rkdp: 'strona rkdp.pl', m2tax: 'strona m2tax.pl', link: 'link do rezerwacji', app: 'w aplikacji' };
 function whereOf(c: Ctx) { return c.m.mode === 'meet' ? (c.m.meet_url ? `Google Meet: ${c.m.meet_url}` : 'Google Meet (link w wiadomości)') : c.m.mode === 'phone' ? 'Rozmowa telefoniczna' : (c.m.place || ''); }
-async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie' | 'przypomnienie') {
+async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie' | 'przypomnienie' | 'doradca') {
   const { S, m, type, advisors } = c;
   if (!m.client_email || !m.notify_client) return false;
   if (!SMTP_USER || !SMTP_PASS) { console.error('brak SMTP – e-mail nie wysłany'); return false; }
@@ -202,13 +202,14 @@ async function mailClient(c: Ctx, kind: 'potwierdzenie' | 'zmiana' | 'odwolanie'
   const tname = type?.name || m.title || 'Spotkanie';
   const manage = `${S.app_url}/umow/?t=${m.token}`;
   const first = String(m.client_name || '').trim().split(/\s+/)[0];
-  const head = { potwierdzenie: 'Spotkanie potwierdzone', zmiana: 'Zmieniliśmy termin spotkania', odwolanie: 'Spotkanie odwołane', przypomnienie: 'Przypomnienie o jutrzejszym spotkaniu' }[kind];
-  const subj = { potwierdzenie: 'Potwierdzenie', zmiana: 'Nowy termin', odwolanie: 'Odwołane', przypomnienie: 'Przypomnienie' }[kind] + `: spotkanie ${shortDate(s)}, ${hmOf(s)}`;
+  const head = { potwierdzenie: 'Spotkanie potwierdzone', zmiana: 'Zmieniliśmy termin spotkania', odwolanie: 'Spotkanie odwołane', przypomnienie: 'Przypomnienie o jutrzejszym spotkaniu', doradca: 'Zmiana doradcy na spotkaniu' }[kind];
+  const subj = { potwierdzenie: 'Potwierdzenie', zmiana: 'Nowy termin', odwolanie: 'Odwołane', przypomnienie: 'Przypomnienie', doradca: 'Zmiana doradcy' }[kind] + `: spotkanie ${shortDate(s)}, ${hmOf(s)}`;
   const intro = {
     potwierdzenie: 'dziękujemy za umówienie spotkania. Poniżej szczegóły – do zobaczenia!',
     zmiana: 'termin spotkania został zmieniony. Aktualne szczegóły poniżej.',
     odwolanie: 'spotkanie zostało odwołane. Jeśli chcesz umówić nowy termin, skorzystaj z przycisku poniżej.',
     przypomnienie: 'przypominamy o spotkaniu. Szczegóły poniżej.',
+    doradca: 'termin spotkania się nie zmienia, zmieniła się osoba, która z Tobą porozmawia. Aktualne szczegóły poniżej.',
   }[kind];
   const where = whereOf(c);
   const whereHtml = m.mode === 'meet' && m.meet_url ? `<a href="${esc(m.meet_url)}" style="color:#7A5A28;font-weight:bold;">Dołącz przez Google Meet</a>`
@@ -252,6 +253,7 @@ function eventBody(c: Ctx, withMeet: boolean, meetUrl: string | null) {
     start: { dateTime: new Date(Date.parse(m.start_at)).toISOString(), timeZone: TZ }, end: { dateTime: new Date(Date.parse(m.end_at)).toISOString(), timeZone: TZ },
     colorId: m.private ? '8' : '9', visibility: m.private ? 'private' : 'default',
     extendedProperties: { private: { rkdp_meeting: m.id } },
+    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 60 }, { method: 'popup', minutes: 15 }] },
   };
   if (m.client_email && m.notify_client && !m.private) ev.attendees = [{ email: m.client_email, displayName: m.client_name || undefined }];
   if (withMeet) ev.conferenceData = { createRequest: { requestId: m.id.replace(/-/g, ''), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
@@ -286,19 +288,20 @@ async function dropEvents(m: any, memberIds?: string[]) {
   }
 }
 
-async function notifyTeam(id: string, ev: string, actor?: string | null) {
+async function notifyTeam(id: string, ev: string, actor?: string | null, extra: Record<string, unknown> = {}) {
   try {
     const s = await hookSecret();
     if (!s) return;
-    await fetch(`${SB_URL}/functions/v1/push`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-push-secret': s }, body: JSON.stringify({ event: 'spotkanie', id, ev, actor: actor || null }) });
+    await fetch(`${SB_URL}/functions/v1/push`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-push-secret': s }, body: JSON.stringify({ event: 'spotkanie', id, ev, actor: actor || null, ...extra }) });
   } catch (e) { console.error('push', e); }
 }
 async function ctxOf(m: any, S?: any): Promise<Ctx> {
   const [{ data: type }, { data: mm }] = await Promise.all([
     m.type_id ? admin.from('meeting_types').select('*').eq('id', m.type_id).maybeSingle() : Promise.resolve({ data: null }),
-    admin.from('meeting_members').select('member_id').eq('meeting_id', m.id),
+    admin.from('meeting_members').select('member_id,active').eq('meeting_id', m.id),
   ]);
-  const ids = (mm || []).map((x: any) => x.member_id);
+  const act = (mm || []).filter((x: any) => x.active);
+  const ids = (m.status === 'confirmed' && act.length ? act : (mm || [])).map((x: any) => x.member_id);
   const { data: adv } = ids.length ? await admin.from('team_members').select('id,full_name,job_title,email').in('id', ids) : { data: [] };
   const advisors = ids.map((i: string) => (adv || []).find((a: any) => a.id === i)).filter(Boolean);
   return { S: S || await settings(), m, type, advisors };
@@ -350,7 +353,7 @@ async function moveMeeting(m: any, startMs: number, actor: string | null) {
   const during = `[${new Date(startMs).toISOString()},${new Date(endMs).toISOString()})`;
   const { error } = await admin.from('meeting_members').update({ during }).eq('meeting_id', m.id).eq('active', true);
   if (error) { if ((error as any).code === '23P01') throw new Http(409, 'Ten termin został właśnie zajęty – wybierz inną godzinę.'); throw error; }
-  const { data: m2 } = await admin.from('meetings').update({ start_at: new Date(startMs).toISOString(), end_at: new Date(endMs).toISOString(), reminder_sent_at: null, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
+  const { data: m2 } = await admin.from('meetings').update({ start_at: new Date(startMs).toISOString(), end_at: new Date(endMs).toISOString(), reminder_sent_at: null, team_reminder_sent_at: null, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
   const c = await ctxOf(m2);
   const { gcal, meet } = await pushEvents(c, c.advisors.map(a => a.id));
   const { data: m3 } = await admin.from('meetings').update({ gcal, meet_url: meet }).eq('id', m.id).select('*').single();
@@ -358,6 +361,34 @@ async function moveMeeting(m: any, startMs: number, actor: string | null) {
   try { await mailClient(c, 'zmiana'); } catch (e) { console.error('mail', e); }
   await notifyTeam(m.id, 'zmiana', actor);
   return m3;
+}
+
+// zmiana osób na spotkaniu: podmiana doradcy albo dodanie drugiej osoby (oboje uczestniczą)
+async function setMembers(m: any, want: string[], actor: string, notifyClient: boolean) {
+  const { data: rows } = await admin.from('meeting_members').select('member_id,active').eq('meeting_id', m.id);
+  const cur = (rows || []).filter((x: any) => x.active).map((x: any) => x.member_id);
+  const added = want.filter(x => !cur.includes(x)), removed = cur.filter((x: string) => !want.includes(x));
+  if (!added.length && !removed.length) return { meeting: m, added, removed };
+  const during = `[${new Date(Date.parse(m.start_at)).toISOString()},${new Date(Date.parse(m.end_at)).toISOString()})`;
+  for (const mid of added) {
+    const had = (rows || []).some((x: any) => x.member_id === mid);
+    const { error } = had ? await admin.from('meeting_members').update({ active: true, during }).eq('meeting_id', m.id).eq('member_id', mid)
+      : await admin.from('meeting_members').insert({ meeting_id: m.id, member_id: mid, during });
+    if (error) {
+      if ((error as any).code === '23P01') { const { data: p } = await admin.from('team_members').select('full_name').eq('id', mid).maybeSingle(); throw new Http(409, `${p?.full_name || 'Ta osoba'} ma w tym czasie inne spotkanie.`); }
+      throw error;
+    }
+  }
+  if (removed.length) await admin.from('meeting_members').update({ active: false }).eq('meeting_id', m.id).in('member_id', removed);
+  await dropEvents(m, removed);
+  const gcal0 = { ...(m.gcal || {}) }; removed.forEach((r: string) => { delete gcal0[r]; });
+  const c = await ctxOf({ ...m, gcal: gcal0 });
+  const { gcal, meet } = await pushEvents(c, added);
+  const { data: m2 } = await admin.from('meetings').update({ gcal, meet_url: meet, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
+  c.m = m2;
+  if (notifyClient && !m2.private) { try { await mailClient(c, 'doradca'); } catch (e) { console.error('mail', e); } }
+  await notifyTeam(m.id, 'osoby', actor, { added, removed });
+  return { meeting: m2, added, removed };
 }
 
 const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(e);
@@ -469,7 +500,11 @@ Deno.serve(async (req: Request) => {
         if (!fresh) { try { if (await mailClient(await ctxOf(m, S), 'przypomnienie')) sent++; } catch (e) { console.error('reminder', e); continue; } }
         await admin.from('meetings').update({ reminder_sent_at: new Date().toISOString() }).eq('id', m.id);
       }
-      return json({ ok: true, sent });
+      // zespół: przypomnienie w aplikacji (push) ok. godzinę przed spotkaniem – do wszystkich osób na spotkaniu
+      const { data: soon } = await admin.from('meetings').select('id').eq('status', 'confirmed').is('team_reminder_sent_at', null)
+        .gte('start_at', new Date(now).toISOString()).lte('start_at', new Date(now + 65 * 60_000).toISOString());
+      for (const x of soon || []) { await notifyTeam(x.id, 'przypomnienie', null); await admin.from('meetings').update({ team_reminder_sent_at: new Date().toISOString() }).eq('id', x.id); }
+      return json({ ok: true, sent, team: (soon || []).length });
     }
 
     // ===== zespół (zalogowany) =====
@@ -530,6 +565,14 @@ Deno.serve(async (req: Request) => {
         notify_client: !priv && !!email && body.notify_client !== false, created_by: me,
       }, members, me);
       return json({ ok: true, ...r });
+    }
+    if (action === 'members') {
+      const { data: m } = await user.from('meetings').select('*').eq('id', clean(body.id, 40)).maybeSingle();
+      if (!m) throw new Http(404, 'Nie znaleziono spotkania.');
+      if (m.status !== 'confirmed') throw new Http(400, 'To spotkanie jest odwołane.');
+      const want = [...new Set((Array.isArray(body.members) ? body.members : []).map((x: unknown) => clean(x, 40)).filter(Boolean))].slice(0, 8) as string[];
+      if (!want.length) throw new Http(400, 'Na spotkaniu musi być co najmniej jedna osoba.');
+      return json({ ok: true, ...(await setMembers(m, want, me, body.notify_client !== false)) });
     }
     if (action === 'cancel_staff' || action === 'reschedule_staff') {
       const { data: m } = await user.from('meetings').select('*').eq('id', clean(body.id, 40)).maybeSingle();   // RLS: tylko widoczne dla tej osoby

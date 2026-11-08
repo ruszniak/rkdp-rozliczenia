@@ -213,15 +213,30 @@ async function daily() {
 async function onSpotkanie(b: any) {
   const { data: m } = await db.from('meetings').select('id, title, client_name, start_at, source, private, status').eq('id', b.id).maybeSingle();
   if (!m) return 0;
-  const { data: mm } = await db.from('meeting_members').select('member_id').eq('meeting_id', m.id);
-  const to = (mm || []).map((x: any) => x.member_id).filter((x: string) => x && x !== b.actor);
-  if (!to.length) return 0;
-  const when = new Date(m.start_at).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-  const who = m.private ? (m.title || 'Spotkanie') : (m.client_name || m.title || 'Spotkanie');
   const ev = String(b.ev || '');
+  const { data: mm } = await db.from('meeting_members').select('member_id, active').eq('meeting_id', m.id);
+  const act = (mm || []).filter((x: any) => x.active).map((x: any) => x.member_id);
+  const when = new Date(m.start_at).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const hour = new Date(m.start_at).toLocaleTimeString('pl-PL', { timeZone: 'Europe/Warsaw', hour: '2-digit', minute: '2-digit' });
+  const who = m.private ? (m.title || 'Spotkanie') : (m.client_name || m.title || 'Spotkanie');
+  const url = `/#/spotkania/${m.id}`, tag = `mtg-${m.id}`;
+  // zmiana osób: nowe osoby – „przejmujesz / dołączasz”, usunięte – „już nie uczestniczysz”
+  if (ev === 'osoby') {
+    const added = (Array.isArray(b.added) ? b.added : []).filter((x: string) => x !== b.actor);
+    const removed = (Array.isArray(b.removed) ? b.removed : []).filter((x: string) => x !== b.actor);
+    const by = b.actor ? ((await db.from('team_members').select('full_name').eq('id', b.actor).maybeSingle()).data?.full_name || '').split(' ')[0] : '';
+    let n = 0;
+    if (added.length) n += await notify(added, 'spotkania', { title: 'Masz spotkanie' + (by ? ` (od: ${by})` : ''), body: `${short(who, 60)} · ${when}`, url, tag });
+    if (removed.length) n += await notify(removed, 'spotkania', { title: 'Nie uczestniczysz już w spotkaniu', body: `${short(who, 60)} · ${when}` + (by ? ` · zmienił(a): ${by}` : ''), url, tag });
+    return n;
+  }
+  if (ev === 'przypomnienie') return act.length ? notify(act, 'spotkania', { title: `O ${hour}: spotkanie`, body: `${short(who, 60)}` + (act.length > 1 ? ' · uczestniczycie razem' : ''), url, tag }) : 0;
+  const all = ev.startsWith('odwolane') ? (mm || []).map((x: any) => x.member_id) : act;
+  const to = all.filter((x: string) => x && x !== b.actor);
+  if (!to.length) return 0;
   const title = ev === 'nowe' ? (m.source === 'www' ? 'Nowa rezerwacja ze strony' : 'Nowe spotkanie') : ev === 'zmiana' ? 'Zmiana terminu spotkania' : 'Spotkanie odwołane';
   const extra = ev === 'odwolane' ? ' · odwołał klient' : '';
-  return notify(to, 'spotkania', { title, body: `${short(who, 60)} · ${when}${extra}`, url: `/#/spotkania/${m.id}`, tag: `mtg-${m.id}` });
+  return notify(to, 'spotkania', { title, body: `${short(who, 60)} · ${when}${extra}`, url, tag });
 }
 
 Deno.serve(async (req) => {

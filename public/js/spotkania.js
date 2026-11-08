@@ -196,7 +196,7 @@ export async function openMeetingDialog(opts = {}) {
           h('div', { class: 'sp-row2' }, cEmail, cPhone)),
       !st.priv ? h('div', { class: 'field' }, h('span', {}, 'Rodzaj'), typeBox) : null,
       modeBox,
-      h('div', { class: 'field' }, h('span', {}, 'Kto z nas'), memBox),
+      h('div', { class: 'field' }, h('span', {}, 'Kto z nas'), memBox, h('small', { class: 'muted' }, 'Zaznacz kilka osób – spotkanie trafi do kalendarza każdej z nich i każdy dostanie przypomnienie.')),
       h('div', { class: 'field' }, h('span', {}, 'Dzień'), h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, dayIn)),
       h('div', { class: 'field' }, h('span', {}, st.members.length > 1 ? 'Wolne u wszystkich' : 'Wolne godziny'), slotBox,
         h('div', { class: 'small muted', style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' } }, 'albo inna godzina:', manualIn)),
@@ -233,8 +233,11 @@ export async function openMeetingDialog(opts = {}) {
 
 // ======================= Szczegóły spotkania =======================
 async function meetingMembers(ids) {
-  const { data } = await sb.from('meeting_members').select('meeting_id,member_id').in('meeting_id', ids);
-  const by = new Map(); (data || []).forEach(x => by.set(x.meeting_id, [...(by.get(x.meeting_id) || []), x.member_id]));
+  const { data } = await sb.from('meeting_members').select('meeting_id,member_id,active').in('meeting_id', ids);
+  const by = new Map(), act = new Map();
+  (data || []).forEach(x => { by.set(x.meeting_id, [...(by.get(x.meeting_id) || []), x.member_id]); if (x.active) act.set(x.meeting_id, [...(act.get(x.meeting_id) || []), x.member_id]); });
+  // aktywne osoby (po podmianie); przy odwołanym spotkaniu – wszystkie, które były
+  for (const k of by.keys()) if (act.has(k)) by.set(k, act.get(k));
   return by;
 }
 export async function openMeeting(id, onChange) {
@@ -259,9 +262,37 @@ export async function openMeeting(id, onChange) {
     !m.private && m.client_email ? row('Klient wie', m.notify_client ? 'tak – dostał e-mail z potwierdzeniem (i dostanie przypomnienie)' : 'nie wysyłano e-maila') : null);
   modal(m.private ? (m.title || 'Spotkanie') : `Spotkanie – ${m.client_name || t?.name || ''}`, body, close => cancelled || e < new Date() ? [h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij')] : [
     h('button', { class: 'btn btn-ghost btn-sm', style: { color: 'var(--danger,#B3261E)' }, onclick: () => { close(); cancelDialog(m, onChange); } }, 'Odwołaj'),
+    h('button', { class: 'btn btn-outline btn-sm', onclick: () => { close(); membersDialog(m, mm, onChange); } }, 'Zmień osoby'),
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => { close(); rescheduleDialog(m, mm, onChange); } }, 'Zmień termin'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij'),
   ]);
+}
+// podmiana na spotkaniu (ktoś przejmuje) albo dodanie drugiej osoby (oboje uczestniczą)
+async function membersDialog(m, current, onChange) {
+  const adv = await advisorIds();
+  const people = state.members.filter(p => p.active !== false && (adv.includes(p.id) || current.includes(p.id)));
+  const rest = state.members.filter(p => p.active !== false && !people.includes(p));
+  const pick = new Set(current);
+  let showAll = false;
+  const box = h('div', { class: 'sp-chips' });
+  const draw = () => put(box, ...[...people, ...(showAll ? rest : [])].map(p => h('button', { type: 'button', class: 'sp-chip sp-chip-p' + (pick.has(p.id) ? ' on' : ''), onclick: () => { pick.has(p.id) ? pick.delete(p.id) : pick.add(p.id); draw(); } }, avaChip(p), firstName(p.full_name))),
+    !showAll && rest.length ? h('button', { type: 'button', class: 'sp-chip sp-chip-ghost', onclick: () => { showAll = true; draw(); } }, '+ ktoś z zespołu') : null);
+  draw();
+  const notify = h('input', { type: 'checkbox', checked: !!m.client_email && m.notify_client && !m.private });
+  const swap = (a, b) => { pick.delete(a); pick.add(b); draw(); };
+  const quick = current.length === 1 ? people.filter(p => p.id !== current[0]).slice(0, 2).map(p => h('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: () => swap(current[0], p.id) }, `Zastąp: ${firstName(p.full_name)} zamiast ${firstName(memberById(current[0])?.full_name || '')}`)) : [];
+  modal('Kto będzie na spotkaniu?', h('div', { style: { display: 'grid', gap: '12px' } },
+    h('p', { class: 'small muted', style: { margin: 0 } }, `${dayLabel(isoDay(new Date(m.start_at)))}, ${hm(m.start_at)}–${hm(m.end_at)} · ${m.private ? m.title : m.client_name || ''}`),
+    box,
+    quick.length ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, ...quick) : null,
+    h('p', { class: 'hint', style: { margin: 0 } }, 'Zaznacz kilka osób, żeby uczestniczyć razem. Odznacz siebie i zaznacz kogoś innego, żeby się podmienić – spotkanie przeniesie się do jego Kalendarza Google, a on dostanie powiadomienie.'),
+    m.client_email && !m.private ? h('label', { class: 'sp-check' }, notify, 'Wyślij klientowi e-mail z informacją, kto będzie na spotkaniu') : null),
+  close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async (ev) => {
+    if (!pick.size) return toast('Wybierz co najmniej jedną osobę', true);
+    ev.target.disabled = true;
+    try { await call('members', { id: m.id, members: [...pick], notify_client: notify.checked }); close(); toast('Zapisano – kalendarze i powiadomienia zaktualizowane'); onChange?.(); }
+    catch (e) { fail(e); ev.target.disabled = false; }
+  } }, 'Zapisz')]);
 }
 function cancelDialog(m, onChange) {
   const reason = h('input', { class: 'input', placeholder: 'np. choroba – zaproponujemy nowy termin' });
