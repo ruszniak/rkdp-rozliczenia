@@ -32,7 +32,7 @@ const memberOpts = (firm) => Object.fromEntries(members(firm).map(m => [m.id, m.
 function header(active, title, sub, actions) {
   return [
     h('div', { class: 'page-head', style: { marginTop: '28px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, bothFirms() ? 'Doradztwo podatkowe · RKDP i M2 TAX' : `Doradztwo podatkowe · ${FIRM_LABEL[defaultFirm()]}`), h('h1', { style: { marginTop: '6px' } }, title),
+      h('div', {}, h('p', { class: 'eyebrow' }, bothFirms() ? 'Doradztwo podatkowe' : `Doradztwo podatkowe · ${FIRM_LABEL[defaultFirm()]}`), h('h1', { style: { marginTop: '6px' } }, title),
         sub ? h('p', { class: 'sub' }, sub) : null),
       actions ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, ...[].concat(actions)) : null),
   ];
@@ -563,8 +563,8 @@ async function viewClients(main) {
   let st2; search.addEventListener('input', () => { clearTimeout(st2); st2 = setTimeout(render, 180); }); st.addEventListener('change', render);
   const sw = firmSwitch('m2', { m2: clients.filter(c => c.status === 'aktywny').length });
   if (sw) sb.from('clients').select('id', { count: 'exact', head: true }).eq('status', 'aktywny').then(({ count }) => { if (count != null) { const n = sw.querySelector('.firm-rkdp'); n?.append(h('span', { class: 'firm-seg-n' }, String(count))); } }, () => {});
-  main.replaceChildren(...(sw ? [sw] : []), ...header('klienci', bothFirms() ? 'Klienci' : 'Klienci M2 TAX', bothFirms() ? 'Klienci M2 TAX – tylko doradztwo podatkowe: dane, kontakty, stawki, sprawy i AML.' : 'Osobna baza klientów doradztwa – dane, kontakty, stawki i weryfikacja AML.',
-    [h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/aml` }, 'Weryfikacja AML'), h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/klient/nowy` }, icon('plus'), 'Nowy klient')]),
+  main.replaceChildren(...header('klienci', bothFirms() ? 'Klienci' : 'Klienci M2 TAX', bothFirms() ? 'Klienci M2 TAX – tylko doradztwo podatkowe: dane, kontakty, stawki, sprawy i AML.' : 'Osobna baza klientów doradztwa – dane, kontakty, stawki i weryfikacja AML.',
+    [sw, h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/aml` }, 'Weryfikacja AML'), h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/klient/nowy` }, icon('plus'), 'Nowy klient')]),
   h('div', { class: 'toolbar' }, search, st),
   h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
     h('thead', {}, h('tr', {}, ...['Klient', 'Kontakt', 'Rozliczenie', 'AML', 'Otwarte sprawy'].map(t => h('th', {}, t)))), tbody)));

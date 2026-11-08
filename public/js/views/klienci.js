@@ -268,8 +268,8 @@ export async function renderKlienci(main) {
   // RKDP | M2 TAX – osobne listy klientów (tylko dla osób z dostępem do obu firm)
   const sw = firmSwitch('rkdp', { rkdp: clients.filter(c => c.status === 'aktywny').length });
   if (sw) sb.from('m2_clients').select('id', { count: 'exact', head: true }).eq('firm', 'm2').eq('status', 'aktywny').then(({ count }) => { if (count != null) sw.querySelector('.firm-m2')?.append(h('span', { class: 'firm-seg-n' }, String(count))); }, () => {});
-  main.replaceChildren(...[sw].filter(Boolean),
-    h('div', { class: 'kl-head' }, h('h1', {}, 'Klienci'), counter,
+  main.replaceChildren(
+    h('div', { class: 'kl-head' }, h('h1', {}, 'Klienci'), counter, sw,
       h('span', { class: 'kl-acts' }, h('span', { class: 'kl-more' }, moreBtn, menu), addBtn)),
     h('label', { class: 'kl-search' }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' }), search),
     chips,

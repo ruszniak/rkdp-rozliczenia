@@ -178,7 +178,8 @@ function layout(active) {
   const M = MODULES[mod];
 
   const switcher = (() => {
-    if (mine.length < 2 || mod === 'rkdp') return h('span', { class: 'mod-label' }, hasModule('rozliczenia') && hasModule('doradztwo') ? 'RKDP · M2 TAX' : M.label);
+    if (mod === 'rkdp') return null;
+    if (mine.length < 2) return h('span', { class: 'mod-label' }, M.label);
     const menu = h('div', { class: 'mod-menu', role: 'menu', hidden: true }, ...mine.map(k => h('a', {
       href: MODULES[k].home, role: 'menuitem', class: k === mod ? 'on' : null,
       onclick: () => { remember(k); menu.hidden = true; },

@@ -2928,3 +2928,13 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 :root[data-theme="dark"] .kl-spr{background:#0E3A42;color:#A9EEF7}
 .mod-label{white-space:nowrap}
 @media (max-width:820px){.mod-label{font-size:13px}}
+/* przełącznik RKDP | M2 TAX po prawej, obok przycisków */
+.kl-head .firm-seg,.page-head .firm-seg{margin:0 0 0 auto;width:250px;flex:none}
+.kl-head .firm-seg~.kl-acts{margin-left:6px}
+.firm-seg-b{padding:7px 0;font-size:13px}
+@media (max-width:820px){
+  .kl-head{flex-wrap:wrap}
+  .kl-head .firm-seg{order:10;width:100%;margin:6px 0 0}
+  .kl-head .firm-seg~.kl-acts{margin-left:auto}
+  .page-head .firm-seg{width:100%}
+}

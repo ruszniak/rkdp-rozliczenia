@@ -132,12 +132,12 @@ export async function renderM2Dokumenty(main, params) {
     href: `#/doradztwo/dokumenty?wzor=${type}&firma=${f}`, role: 'tab', 'aria-selected': String(f === firm), class: `firm-seg-b firm-${f}${f === firm ? ' on' : ''}` }, FIRM_LABEL[f]))) : null;
 
   drawList(); drawForm(); draw();
-  main.replaceChildren(...[seg].filter(Boolean),
+  main.replaceChildren(
     h('div', { class: 'page-head', style: { marginTop: '28px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, `Doradztwo podatkowe · ${FIRM_LABEL[firm]}`),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Dokumenty – wzory pism', infoTip(HELP, 'Wzory pism – instrukcja')),
         h('p', { class: 'sub' }, `Pisma procesowe na papierze firmowym ${FIRM_LABEL[firm]} – do pobrania w Wordzie i dalszej edycji.`)),
-      h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+      h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } }, seg,
         h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/wzory' : '#/doradztwo/wzory' }, 'Wzory umów i uchwał'),
         h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/kalkulator' : '#/doradztwo/kalkulator' }, 'Kalkulator JDG / spółka'),
         h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/jpk' : '#/doradztwo/jpk' }, 'Podgląd JPK'),
