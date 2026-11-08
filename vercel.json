@@ -154,6 +154,17 @@
   ],
   "redirects": [
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "rozliczenia.rkdp.pl"
+        }
+      ],
+      "destination": "https://app.ruszniak.io/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [
         {

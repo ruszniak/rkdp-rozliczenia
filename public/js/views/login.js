@@ -4,6 +4,7 @@ import { sb } from '../store.js';
 import { deviceToken, saveDeviceToken, deviceLabel, markActive } from '../session.js';
 import { isIOS } from '../push.js';
 import { isPhoneApp, localKey, forgetLocal, loginWithFaceId, markUnlocked } from '../faceid.js';
+const put = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter(x => x != null && x !== false));
 
 const MIN_PASSWORD = 10;
 const PW_RULES = [
@@ -94,7 +95,7 @@ export async function renderLogin(app, initialError = '') {
     const orTxt = lk ? h('p', { class: 'small muted fid-or' }, `${lk.email} · albo e-mail i hasło:`) : null;
     if (lk) email = email || lk.email;
     if (lk) mail.value = email;
-    box.replaceChildren(...head('Aplikacja wewnętrzna', 'Zaloguj się', lk ? 'Bez hasła i kodu – telefon sprawdzi, że to Ty.' : 'Podaj służbowy e-mail i hasło. Potem wyślemy kod na e-mail (chyba że ta przeglądarka jest zapamiętana).'),
+    put(box, ...head('Aplikacja wewnętrzna', 'Zaloguj się', lk ? 'Bez hasła i kodu – telefon sprawdzi, że to Ty.' : 'Podaj służbowy e-mail i hasło. Potem wyślemy kod na e-mail (chyba że ta przeglądarka jest zapamiętana).'),
       bio, orTxt, form, errBox,
       linkBtn('Pierwsze logowanie / ustaw nowe hasło', stepSetupEmail));
     if (!lk) (email ? pass : mail).focus();
@@ -113,7 +114,7 @@ export async function renderLogin(app, initialError = '') {
       if (error) { errBox.textContent = plError(error); return; }
       stepCode('setup');
     } }, mail, btn);
-    box.replaceChildren(...head('Pierwsze logowanie', 'Ustaw hasło',
+    put(box, ...head('Pierwsze logowanie', 'Ustaw hasło',
       'Wyślemy kod na służbowy e-mail, a potem ustawisz własne hasło. Nowe hasło (gdy zapomnisz poprzedniego) da się ustawić tylko za zgodą administratora.'),
       form, errBox, linkBtn('← Mam już hasło', stepPassword));
     mail.focus();
@@ -149,7 +150,7 @@ export async function renderLogin(app, initialError = '') {
     } }, input,
       h('label', { class: 'check small' }, remember, 'Zapamiętaj tę przeglądarkę (nie zaznaczaj na cudzym komputerze)'),
       btn);
-    box.replaceChildren(...head(mode === 'login' ? 'Krok 2 z 2' : 'Krok 2 z 3', 'Wpisz kod', ['Kod wysłaliśmy na ', h('b', {}, email), '. Sprawdź też folder spam.']),
+    put(box, ...head(mode === 'login' ? 'Krok 2 z 2' : 'Krok 2 z 3', 'Wpisz kod', ['Kod wysłaliśmy na ', h('b', {}, email), '. Sprawdź też folder spam.']),
       form, errBox, linkBtn('← Wróć', mode === 'login' ? stepPassword : stepSetupEmail));
     input.focus();
   }
@@ -181,7 +182,7 @@ export async function renderLogin(app, initialError = '') {
       if (data?.device_token) saveDeviceToken(email, data.device_token);
       go();
     } }, p1, p2, rules, btn);
-    box.replaceChildren(...head('Krok 3 z 3', 'Nowe hasło',
+    put(box, ...head('Krok 3 z 3', 'Nowe hasło',
       'Wymyśl własne hasło – nikt inny go nie zna, także administrator. Nie używaj hasła z innych serwisów.'),
       form, errBox);
     p1.focus();
@@ -200,7 +201,7 @@ export async function renderLogin(app, initialError = '') {
       if (error) { errBox.textContent = plError(error); return; }
       legacyCode();
     } }, input, btn);
-    box.replaceChildren(...head('Aplikacja wewnętrzna', 'Zaloguj się', 'Podaj służbowy adres e-mail. Wyślemy na niego jednorazowy kod.'), form, errBox);
+    put(box, ...head('Aplikacja wewnętrzna', 'Zaloguj się', 'Podaj służbowy adres e-mail. Wyślemy na niego jednorazowy kod.'), form, errBox);
     input.focus();
   }
   function legacyCode() {
@@ -213,7 +214,7 @@ export async function renderLogin(app, initialError = '') {
       if (error) { busy(btn, false, 'Zaloguj'); errBox.textContent = plError(error); return; }
       go();
     } }, input, btn);
-    box.replaceChildren(...head('Krok 2 z 2', 'Wpisz kod', ['Kod wysłaliśmy na ', h('b', {}, email), '.']), form, errBox, linkBtn('← Wróć', legacyEmail));
+    put(box, ...head('Krok 2 z 2', 'Wpisz kod', ['Kod wysłaliśmy na ', h('b', {}, email), '.']), form, errBox, linkBtn('← Wróć', legacyEmail));
     input.focus();
   }
 
@@ -226,7 +227,7 @@ export async function renderLogin(app, initialError = '') {
       h('p', { style: { fontSize: '13px' } }, `© ${new Date().getFullYear()} Właściciel oprogramowania: RKDP spółka doradztwa podatkowego sp. z o.o. Wszelkie prawa zastrzeżone.`, h('br'), 'Dane objęte tajemnicą doradcy podatkowego.')),
     h('section', { class: 'login-main' }, box)));
   const side = app.querySelector('.login-side'); if (side) liveNetwork(side);
-  box.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
+  put(box, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   if (await newMode()) stepPassword(); else legacyEmail();
 }
 
