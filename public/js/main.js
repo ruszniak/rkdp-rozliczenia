@@ -67,7 +67,7 @@ function parseHash() {
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'app.R', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
     // RKDP = pełna aplikacja (rozliczenia + doradztwo); M2 TAX to dodatek – jego klienci są w Klientach (przełącznik), sprawy w Sprawach
-    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
     more: [['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
