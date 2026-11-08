@@ -57,7 +57,7 @@
     ok: '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     team: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="3"/><circle cx="16" cy="10" r="2.5"/><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M14.5 15c2.3-.4 4.7.8 5.5 4"/></svg>',
   };
-  var AVC = ['#1F2937', '#7A5A28', '#2563EB', '#0F766E'];
+  var AVC = ['#1F2937', '#374151', '#2563EB', '#0F766E'];
   function close() { if (EMBED && window.parent !== window) window.parent.postMessage({ type: 'rkdp-umow-close' }, '*'); }
   function top(step) {
     return h('div', { class: 'um-top' },
