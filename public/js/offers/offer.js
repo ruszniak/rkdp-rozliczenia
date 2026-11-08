@@ -12,7 +12,7 @@ export const OFFER_BRANDS = {
   rkdp: {
     key: 'rkdp', logo: '/logo-rkdp.png', name: 'RKDP spółka doradztwa podatkowego sp. z o.o.', short: 'RKDP',
     tagline: 'Doradztwo podatkowe i księgowość',
-    address: 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław', email: 'kancelaria@rkdp.pl', phone: FIRM.phones, web: 'www.rkdp.pl',
+    address: 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław', email: 'kancelaria@rkdp.pl', phone: '883 643 565', web: 'www.rkdp.pl',
     foot: 'RKDP spółka doradztwa podatkowego sp. z o.o. · KRS 0000812185 · NIP 8992871126 · wpis do rejestru osób prawnych uprawnionych do doradztwa podatkowego nr 855',
     about: 'RKDP to spółka doradztwa podatkowego z biurem rachunkowym we Wrocławiu. Łączymy prowadzenie księgowości i kadr z wiedzą doradcy podatkowego – Państwa rozliczenia przygotowujemy z myślą o bezpieczeństwie podatkowym, a w razie kontroli czy pytań z urzędu reprezentujemy Państwa przed organami.',
     facts: [['Doradca podatkowy', 'usługi prowadzone pod nadzorem doradcy podatkowego (nr wpisu 15009)'], ['Nr 855', 'wpis do rejestru osób prawnych uprawnionych do doradztwa podatkowego'], ['Wszystko w jednym miejscu', 'księgowość, kadry i doradztwo podatkowe – bez pośredników']],

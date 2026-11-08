@@ -26,7 +26,7 @@ export const RKDP_FIRM = {
   nip: '8992871126',
   krs: '0000812185',
   email: 'kancelaria@rkdp.pl',
-  phones: FIRM.phones,
+  phones: '883 643 565',
   web: 'www.rkdp.pl',
   regon: '384812329',
   court: 'Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',

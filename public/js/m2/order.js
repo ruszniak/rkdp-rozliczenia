@@ -16,7 +16,7 @@ export const M2_BRAND = {
 };
 export const RKDP_BRAND = {
   key: 'rkdp', logo: '/logo-rkdp.png', ratio: 189 / 640, alt: 'RKDP',
-  lines: ['RKDP spółka doradztwa podatkowego sp. z o.o.', 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław · www.rkdp.pl', 'kancelaria@rkdp.pl'],
+  lines: ['RKDP spółka doradztwa podatkowego sp. z o.o.', 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław · www.rkdp.pl', 'kancelaria@rkdp.pl · tel. 883 643 565'],
   foot1: 'KRS 0000812185 · NIP 8992871126 · REGON 384812329 · kapitał zakładowy 50 000 zł',
   foot2: 'Siedziba: ul. Czereśniowa 28d, 55-010 Ozorzyce · Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',
   firmName: 'RKDP spółka doradztwa podatkowego sp. z o.o.', firmAddress: 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław', city: 'Wrocław',

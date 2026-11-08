@@ -876,7 +876,7 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
 }
 
 // PPS-1 dla spraw RKDP: adres do doręczeń i kontakt RKDP
-const RKDP_PPS = { delivery: { country: 'POLSKA', voiv: 'DOLNOŚLĄSKIE', county: 'M. WROCŁAW', commune: 'M. WROCŁAW', street: 'BEATY ARTEMSKIEJ', house: '11', flat: '44', city: 'WROCŁAW', zip: '52-234' }, email: 'kancelaria@rkdp.pl' };
+const RKDP_PPS = { delivery: { country: 'POLSKA', voiv: 'DOLNOŚLĄSKIE', county: 'M. WROCŁAW', commune: 'M. WROCŁAW', street: 'BEATY ARTEMSKIEJ', house: '11', flat: '44', city: 'WROCŁAW', zip: '52-234' }, email: 'kancelaria@rkdp.pl', phone: '883 643 565' };
 let orderCssInjected = false;
 async function viewOrder(main, id, params) {
   if (!orderCssInjected && !document.getElementById('order-css')) { document.head.append(h('style', { id: 'order-css' }, ORDER_CSS)); orderCssInjected = true; }
