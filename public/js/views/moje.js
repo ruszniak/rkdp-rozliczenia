@@ -143,7 +143,7 @@ function card(it, color) {
   return it.swipe ? swipeable(el, it.swipe) : el;
 }
 
-export async function renderMoje(main, params) {
+export async function renderMoje(main, params, { embed = false } = {}) {
   let filter = params?.get('f') || 'all', items = [], closed = null;
   const admin = state.me.role === 'admin';
   if (!['all', 'pilne', 'zlecilem', 'zamkniete', ...(admin ? ['zespol'] : [])].includes(filter)) filter = 'all';
@@ -151,7 +151,7 @@ export async function renderMoje(main, params) {
   const chips = h('div', { class: 'zl-chips mj-chips' }), list = h('div', { class: 'mj-groups' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const order = it => { const d = it.due; return d && d < today() ? 0 : d === today() ? 1 : it.hot ? 2 : d && d <= plus(3) ? 3 : 4; };
   function draw() {
-    const go = k => { filter = k; history.replaceState(null, '', '#/moje' + (k === 'all' ? '' : '?f=' + k)); draw(); };
+    const go = k => { filter = k; history.replaceState(null, '', (embed ? '#/pulpit?widok=sprawy' + (k === 'all' ? '' : '&f=' + k) : '#/moje' + (k === 'all' ? '' : '?f=' + k))); draw(); };
     const urgent = items.filter(i => i.hot || (i.due && i.due < today())).length, mineOut = items.filter(i => i.byMe).length;
     const chip = (k, l, n, pre) => h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : ''), onclick: () => go(k) }, pre || null, l, n != null ? h('span', {}, String(n)) : null);
     list.classList.toggle('mj-team', filter === 'zespol');
@@ -177,6 +177,14 @@ export async function renderMoje(main, params) {
     }));
   }
   reload = async () => { closed = null; try { items = await collect(); } catch (e) { fail(e); items = []; } draw(); };
+  if (embed) {
+    put(main, h('div', { class: 'mj-topbar' }, chips,
+      h('button', { class: 'btn btn-primary mj-add', type: 'button', 'aria-label': 'Nowe zadanie', onclick: () => import('./zlecenia.js').then(m => m.newZlecenie(reload)) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie'))),
+      pushNudge(), list);
+    await reload();
+    if (openId) import('./zlecenia.js').then(m => m.openZlecenie(openId, reload));
+    return;
+  }
   put(main,
     h('div', { class: 'mj-head' },
       h('h1', {}, 'Moje sprawy', infoTip(HELP, 'Moje sprawy')),

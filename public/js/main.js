@@ -23,7 +23,6 @@ const renderRozmowy = lazy(() => import('./views/rozmowy.js'), 'renderRozmowy');
 const renderPulpit = lazy(() => import('./views/pulpit.js'), 'renderPulpit');
 const renderZlecenia = lazy(() => import('./views/zlecenia.js'), 'renderZlecenia');
 const renderCzas = lazy(() => import('./czas.js'), 'renderCzas');
-const renderMoje = lazy(() => import('./views/moje.js'), 'renderMoje');
 const renderOferty = lazy(() => import('./views/oferty.js'), 'renderOferty');
 const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
@@ -65,7 +64,7 @@ function parseHash() {
 
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
-    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/moje', 'Moje sprawy', 'moje'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozmowy', 'Rozmowy', 'rozmowy']],
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozmowy', 'Rozmowy', 'rozmowy']],
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
     more: [['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
@@ -336,9 +335,10 @@ async function route(opts = {}) {
     else if (view === 'aml') c = await renderAml(layout('aml'), 'rkdp');
     else if (view === 'oferty') c = await renderOferty(layout('oferty'), parts[1], 'rkdp');
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
-    else if (view === 'moje') c = await renderMoje(layout('moje'), params);
+    // „Moje sprawy” są teraz zakładką „Sprawy” na Pulpicie – stare linki (powiadomienia, maile) prowadzą tam
+    else if (view === 'moje') { const q = new URLSearchParams(params || ''); q.set('widok', 'sprawy'); history.replaceState(null, '', '#/pulpit?' + q); c = await renderPulpit(layout('pulpit'), q); }
     // „Zadania dla zespołu” połączone z „Moimi sprawami” – stare linki (także z powiadomień) prowadzą tutaj
-    else if (view === 'zlecenia') { const q = new URLSearchParams(state.me.role === 'admin' && !parts[1] ? 'f=zespol' : ''); if (parts[1]) q.set('zl', parts[1]); history.replaceState(null, '', '#/moje' + (q.toString() ? '?' + q : '')); c = await renderMoje(layout('moje'), q); }
+    else if (view === 'zlecenia') { const q = new URLSearchParams(state.me.role === 'admin' && !parts[1] ? 'f=zespol' : ''); if (parts[1]) q.set('zl', parts[1]); q.set('widok', 'sprawy'); history.replaceState(null, '', '#/pulpit?' + q); c = await renderPulpit(layout('pulpit'), q); }
     else if (view === 'czas' && state.me.role === 'admin' && hasModule('doradztwo')) c = await renderCzas(layout('m2:czas'), params);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('terminy'), params);

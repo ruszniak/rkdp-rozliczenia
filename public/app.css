@@ -2890,3 +2890,8 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
   :root[data-theme="dark"] .nav-links a.active .duo,:root[data-theme="dark"] .nav-links .more-btn.active .duo{fill:var(--gm-pill-ink);fill-opacity:.25}
   .nav-links a.active .duo,.nav-links .more-btn.active .duo{fill-opacity:.2}
 }
+/* Pulpit → zakładka „Sprawy”: etykiety i przycisk „+ Zadanie” w jednym rzędzie */
+.mj-topbar{display:flex;align-items:center;gap:10px;margin:4px 0 4px}
+.mj-topbar .mj-chips{flex:1;min-width:0;margin:0}
+.mj-topbar .mj-add{flex:none}
+@media (max-width:600px){.mj-topbar .mj-add{width:40px;height:40px;padding:0;justify-content:center;border-radius:12px;min-height:40px}}

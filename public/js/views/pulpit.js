@@ -244,12 +244,14 @@ const HELP_DZIS = `Dziś – Twoja lista na dzisiaj w jednym miejscu:
 • Kratki do zrobienia u Twoich klientów (od najbliższego terminu) – odhaczasz od razu, bez przechodzenia do rozliczeń. Na telefonie: przesuń wiersz w lewo = „Zrobione”.
 • Zgłoszenia przypisane do Ciebie, terminy obowiązków w 7 dni, braki dokumentów (z prośbą do klienta), terminy spraw M2.`;
 
+const HELP_SPRAWY = `Sprawy – wszystko, co czeka na Ciebie: zadania, pytania klientów i terminy, pogrupowane według tego, co trzeba zrobić (do sprawdzenia, pytania, w toku, nowe, czeka na kogoś, terminy). Kliknij kartę, aby ją otworzyć; na telefonie przesuń kartę w lewo, aby zgłosić wykonanie. Administrator: etykieta „Zespół” – zadania całego zespołu według osób.`;
+
 export async function renderPulpit(main, params) {
   const period = defaultPeriod();
   const admin = state.me.role === 'admin';
   const want = params?.get?.('widok');
-  let view = want && ['dzis', 'moj', 'doradca'].includes(want) && (want !== 'doradca' || admin) ? want
-    : (() => { try { const v = localStorage.getItem(PREF); return v && (v !== 'doradca' || admin) ? v : (admin ? 'doradca' : 'dzis'); } catch { return admin ? 'doradca' : 'dzis'; } })();
+  let view = want && ['sprawy', 'dzis', 'moj', 'doradca'].includes(want) && (want !== 'doradca' || admin) ? want
+    : (() => { try { const v = localStorage.getItem(PREF); return v && (v !== 'doradca' || admin) ? v : 'sprawy'; } catch { return 'sprawy'; } })();
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie pulpitu…'));
   // zadania cykliczne, dane pulpitu, trend 6 miesięcy, monitoring i układ – równolegle
   const tasks = state.taskTypes.filter(t => t.active);
@@ -263,18 +265,19 @@ export async function renderPulpit(main, params) {
   const switcher = h('div', { class: 'tabs', style: { margin: 0 } });
   const editBtn = h('button', { class: 'btn btn-outline btn-sm dash-edit-btn', type: 'button', onclick: () => { editing = !editing; draw(); } });
   const draw = () => {
-    const tabs = [['dzis', 'Dziś'], ['moj', 'Mój pulpit'], ...(admin ? [['doradca', 'Pulpit doradcy']] : [])];
+    const tabs = [['sprawy', 'Sprawy'], ['dzis', 'Dziś'], ['moj', 'Mój pulpit'], ...(admin ? [['doradca', 'Pulpit doradcy']] : [])];
     switcher.replaceChildren(...tabs.map(([k, l]) => h('button', { class: view === k ? 'on' : '', type: 'button', onclick: () => { view = k; editing = false; try { localStorage.setItem(PREF, k); } catch { /* */ } history.replaceState(null, '', '#/pulpit?widok=' + k); draw(); } }, l)));
-    editBtn.hidden = view === 'dzis';
+    editBtn.hidden = view === 'dzis' || view === 'sprawy';
     editBtn.replaceChildren(editing ? '✓ Gotowe' : 'Dostosuj pulpit');
     editBtn.classList.toggle('on', editing);
-    title.replaceChildren(view === 'doradca' ? 'Pulpit doradcy' : `Dzień dobry, ${first(state.me.full_name)}`, infoTip(view === 'doradca' ? HELP_ADMIN : view === 'dzis' ? HELP_DZIS : HELP_ME, 'Pulpit – instrukcja'));
+    title.replaceChildren(view === 'doradca' ? 'Pulpit doradcy' : `Dzień dobry, ${first(state.me.full_name)}`, infoTip(view === 'doradca' ? HELP_ADMIN : view === 'dzis' ? HELP_DZIS : view === 'sprawy' ? HELP_SPRAWY : HELP_ME, 'Pulpit – instrukcja'));
+    if (view === 'sprawy') { body.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…')); import('./moje.js').then(m => m.renderMoje(body, params, { embed: true })); params = null; return; }
     if (view === 'dzis') { body.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…')); renderDzis(body, D); return; }
     const dash = view === 'doradca' ? adminDashboard(D, period, hist, alerts) : myDashboard(D, period, hist);
     const key = 'pulpit_' + view;
     body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.')] : []),
       ...arrange(view, dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
-    if (!editing) body.prepend(pushNudge(), zleceniaCard(), warningsCard());
+    if (!editing) body.prepend(pushNudge(), warningsCard());
   };
   const title = h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } });
   main.replaceChildren(
