@@ -3184,3 +3184,9 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 .meet-card{margin-top:16px}
 .m2-tiles{margin-bottom:18px}
 .pl-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}.pl-main .table-title{margin-top:26px}
+/* własny pasek: przypięte pozycje tylko na komputerze */
+@media (max-width:820px){.nav-links a.nav-pin{display:none!important}}
+.nav-cfg-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);margin-bottom:6px}
+.nav-cfg-row.on{background:var(--panel)}
+.nav-cfg-mv{display:flex;gap:4px}.nav-cfg-mv .icon-btn{width:32px;height:32px}
+.more-menu .mm-cfg{border-top:1px solid var(--line);margin-top:4px;padding-top:10px}

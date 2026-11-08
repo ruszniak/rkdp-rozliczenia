@@ -1,4 +1,5 @@
-import { h, initials, toast, initTooltips, initMobileTables, ava } from './ui.js';
+import { h, initials, toast, initTooltips, initMobileTables, ava, modal } from './ui.js';
+import { loadMemberPrefs, saveMemberPrefs } from './data.js';
 import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
 import { renderLogin } from './views/login.js';
 import { TERMS_VERSION } from './regulamin.js';
@@ -105,6 +106,7 @@ const I = {
   motyw: duo('M12 3a9 9 0 109 9 7 7 0 01-9-9z', 'M12 3a9 9 0 109 9 7 7 0 01-9-9z'),
 };
 const TAB_ICONS = {
+  navcfg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
   moje: I.zlecenia, more: I.wiecej, rozmowy: I.rozmowy, pulpit: I.pulpit, rozliczenia: I.rozliczenia, klienci: I.klienci,
   zgloszenia: I.skrzynka, sprawozdania: I.dokumenty, zespol: I.zespol, 'm2:': I.pulpit, 'm2:sprawy': I.dokumenty, 'm2:klienci': I.klienci,
   'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:zadania': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
@@ -124,13 +126,41 @@ const ICON_NARROW = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
 // menu „Więcej” w pasku zakładek
 let lastMore = [];
 const isPhoneWidth = () => matchMedia('(max-width: 820px)').matches;
+// ---- własny pasek: każdy może przypiąć pozycje z „Więcej” do górnego paska (zapis na koncie, na wszystkich urządzeniach) ----
+let navPins = (() => { try { return JSON.parse(localStorage.getItem('rkdp_member_prefs') || '{}').nav_pins || {}; } catch { return {}; } })();
+let navLoaded = false;   // ustawienia z konta wczytujemy po zalogowaniu (przy pierwszym rysowaniu paska)
+const NOT_PINNABLE = ['logout', 'oaplikacji', 'navcfg'];
+function navDialog(mod, all) {
+  const pins = [...(navPins[mod] || [])].filter(href => all.some(x => x[0] === href));
+  const box = h('div');
+  const draw = () => box.replaceChildren(
+    h('p', { class: 'hint', style: { marginBottom: '12px' } }, 'Zaznacz, co ma być widoczne na górnym pasku (na komputerze). Strzałkami ustawisz kolejność. Reszta zostaje w „Więcej”.'),
+    ...pins.map((href, i) => { const x = all.find(y => y[0] === href);
+      return h('div', { class: 'nav-cfg-row on' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: true, onchange: () => { pins.splice(i, 1); draw(); } }), x[1]),
+        h('span', { class: 'nav-cfg-mv' },
+          h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'W lewo', disabled: i === 0, onclick: () => { pins.splice(i - 1, 0, pins.splice(i, 1)[0]); draw(); } }, '↑'),
+          h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'W prawo', disabled: i === pins.length - 1, onclick: () => { pins.splice(i + 1, 0, pins.splice(i, 1)[0]); draw(); } }, '↓'))); }),
+    ...all.filter(x => !pins.includes(x[0])).map(x => h('div', { class: 'nav-cfg-row' }, h('label', { class: 'check' }, h('input', { type: 'checkbox', onchange: () => { pins.push(x[0]); draw(); } }), x[1]))));
+  draw();
+  modal('Dostosuj pasek', box, close => [
+    h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { pins.length = 0; draw(); } }, 'Przywróć domyślny'),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+      navPins = { ...navPins, [mod]: [...pins] };
+      close(); route();
+      await saveMemberPrefs({ nav_pins: navPins }, state.me.id);
+      toast('Zapisano układ paska');
+    } }, 'Zapisz')]);
+}
+
+let navCfgOpen = null;
 function moreMenu(items, active) {
-  lastMore = items;
+  lastMore = items.filter(x => x[2] !== 'navcfg');
   const ico = h('span', { class: 'tab-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS.more;
   const on = items.some(x => x[2] === active) || /wiecej$/.test(active);
   const item = ([href, label, key]) => {
     const i = h('span', { class: 'mm-ico', 'aria-hidden': 'true' }); i.innerHTML = TAB_ICONS[key] || TAB_ICONS.default;
     if (key === 'logout') return h('a', { href: '#/', role: 'menuitem', class: 'mm-logout', onclick: (e) => { e.preventDefault(); menu.hidden = true; logout(); } }, i, label);
+    if (key === 'navcfg') return h('a', { href: '#', role: 'menuitem', class: 'mm-cfg', onclick: (e) => { e.preventDefault(); menu.hidden = true; navCfgOpen?.(); } }, i, label);
     return h('a', { href, role: 'menuitem', class: key === active ? 'on' : null, onclick: () => { menu.hidden = true; } }, i, label);
   };
   const menu = h('div', { class: 'more-menu', role: 'menu', hidden: true }, ...items.map(item));
@@ -190,6 +220,12 @@ function layout(active) {
     return h('div', { class: 'mod-wrap' }, btn, menu);
   })();
 
+  // pozycje z „Więcej” (z uprawnieniami) i te, które użytkownik przypiął do paska
+  const moreAll = (M.more || []).filter(x => (x[3] !== 'admin' || me.role === 'admin') && (x[3] !== 'm2' || hasModule('doradztwo')) && (x[2] !== 'm2:czas' || hasModule('doradztwo')));
+  const pinnable = moreAll.filter(x => !NOT_PINNABLE.includes(x[2]) && x[0] !== '#/');
+  const pinned = (navPins[mod] || []).map(href => pinnable.find(x => x[0] === href)).filter(Boolean);
+  navCfgOpen = () => navDialog(mod, pinnable);
+  if (!navLoaded) { navLoaded = true; loadMemberPrefs().then(p => { if (p?.nav_pins && JSON.stringify(p.nav_pins) !== JSON.stringify(navPins)) { navPins = p.nav_pins; route(); } }).catch(() => {}); }
   const link = ([href, label, key]) => {
     const ico = h('span', { class: 'tab-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS[key] || TAB_ICONS.default;
     return h('a', { href, class: [active === key ? 'active' : '', /jpk$/.test(key) && !jpkOnly ? 'desk-only' : ''].filter(Boolean).join(' ') || null }, ico, h('span', { class: 'tab-full' }, label), h('span', { class: 'tab-short' }, TAB_SHORT[key] || label));
@@ -201,7 +237,8 @@ function layout(active) {
         switcher),
       h('nav', { class: 'nav-links' },
         ...M.tabs.map(link),
-        (() => { const more = (M.more || []).filter(x => (x[3] !== 'admin' || me.role === 'admin') && (x[3] !== 'm2' || hasModule('doradztwo')) && (x[2] !== 'm2:czas' || hasModule('doradztwo'))); return more.length ? moreMenu(more, active) : null; })()),
+        ...pinned.map(x => { const a = link([x[0], x[1].split(/ – | \(| i |, /)[0], x[2]]); a.classList.add('nav-pin'); a.title = x[1]; return a; }),
+        moreAll.length ? moreMenu([...moreAll.filter(x => !pinned.includes(x)), ...(jpkOnly ? [] : [['#', 'Dostosuj pasek…', 'navcfg']])], active) : null),
       h('div', { class: 'nav-user' },
         jpkOnly ? null : timerPillEl(),
         (() => { const b = h('button', { type: 'button', class: 'hdr-search', onclick: () => openCmdk(), 'aria-label': 'Szukaj (Ctrl K)', 'data-tip': 'Szukaj klienta, sprawy, zgłoszenia, narzędzia' });
