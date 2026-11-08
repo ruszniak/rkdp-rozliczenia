@@ -1,13 +1,14 @@
-// M2 TAX – zakładka „Dokumenty”: wzory pism procesowych na papierze firmowym, z wyborem pełnomocnika. Pobierane jako Word (do dalszej edycji) albo PDF.
+// Pisma procesowe RKDP i M2 TAX: wzory na papierze firmowym wybranej firmy, z wyborem pełnomocnika. Pobierane jako Word (do dalszej edycji) albo PDF.
 import { h, toast, fail, icon, infoTip, printHtml } from '../ui.js';
-import { sb } from '../store.js';
+import { sb, state, hasModule } from '../store.js';
+import { myFirms, bothFirms, defaultFirm, rkdpClientChoices, FIRM_LABEL } from '../firma.js';
 import { fetchAll } from './rozliczenia.js';
 import { PISMA, pismoBlocks, pismoBrand } from '../m2/pisma.js';
 import { orderHtml, printableHtml, buildOrderDocx, ORDER_CSS } from '../m2/order.js';
 
-const HELP = `Wzory pism procesowych M2 TAX na papierze firmowym:
-• Wybierz rodzaj pisma, pełnomocnika (Marcin, Michał albo obaj) i – opcjonalnie – sprawę lub klienta. Dane strony, organ i sygnatura wpiszą się same.
-• Wybrany pełnomocnik pojawia się pod danymi strony („reprezentowana przez Doradcę Podatkowego …”) i w podpisie. Nagłówek to papier firmowy M2 TAX.
+const HELP = `Wzory pism procesowych na papierze firmowym RKDP albo M2 TAX:
+• Wybierz firmę (RKDP / M2 TAX), rodzaj pisma, pełnomocnika i – opcjonalnie – sprawę lub klienta. Dane strony, organ i sygnatura wpiszą się same.
+• Wybrany pełnomocnik pojawia się pod danymi strony („reprezentowana przez Doradcę Podatkowego …”) i w podpisie. Nagłówek to papier firmowy wybranej firmy; adres do doręczeń – biuro tej firmy.
 • Miejsca do uzupełnienia są oznaczone [w nawiasach] – w Wordzie mają żółte wyróżnienie, więc łatwo je znaleźć i dopisać treść.
 • „Pobierz Word” – dalsza praca nad pismem poza aplikacją. „PDF” – szybki wydruk.
 • Organ podaj tak, jak ma się znaleźć w adresie (np. „Naczelnik Pierwszego Urzędu Skarbowego we Wrocławiu”), a organ, który wydał akt – w dopełniaczu (np. „Naczelnika Pierwszego Urzędu Skarbowego we Wrocławiu”).`;
@@ -17,13 +18,23 @@ const LBL = { ref: 'Znak sprawy / sygnatura', actOrg: 'Organ, który wydał akt 
 
 export async function renderM2Dokumenty(main, params) {
   if (!document.getElementById('order-css')) document.head.append(h('style', { id: 'order-css' }, ORDER_CSS));
-  const [signers, clients, matters] = await Promise.all([
+  const [allSigners, allMatters] = await Promise.all([
     fetchAll(() => sb.from('m2_signers').select('*').eq('active', true).order('sort')),
-    fetchAll(() => sb.from('m2_clients').select('id,name,address,nip,kind').order('name')),
-    fetchAll(() => sb.from('m2_matters').select('id,number,title,client_id,authority,case_ref,tax_kind,tax_period,matter_type').order('opened_at', { ascending: false })),
+    fetchAll(() => sb.from('m2_matters').select('id,number,title,client_id,firm,authority,case_ref,tax_kind,tax_period,matter_type').order('opened_at', { ascending: false })),
   ]);
+  // firma pisma: z adresu (firma=), ze sprawy albo domyślna; przy dwóch firmach – przełącznik
+  const fromMatter = allMatters.find(m => m.id === params.get('sprawa'))?.firm;
+  const firm = myFirms().includes(params.get('firma')) ? params.get('firma') : (fromMatter && myFirms().includes(fromMatter) ? fromMatter : defaultFirm());
+  const clients = firm === 'rkdp'
+    ? (await rkdpClientChoices()).map(c => ({ id: c.id, name: c.name, address: c.address, nip: c.nip, kind: c.kind }))
+    : await fetchAll(() => sb.from('m2_clients').select('id,name,address,nip,kind').eq('firm', 'm2').order('name'));
+  const matters = allMatters.filter(m => (m.firm || 'm2') === firm);
+  // pełnomocnicy RKDP – doradcy z zespołu RKDP (gdy nikogo nie ma na liście – wszyscy)
+  const rkNames = new Set(state.members.filter(m => m.active && (m.modules || []).includes('rozliczenia')).map(m => m.full_name));
+  const signers = firm === 'rkdp' && allSigners.some(s => rkNames.has(s.full_name)) ? allSigners.filter(s => rkNames.has(s.full_name)) : allSigners;
   let type = PISMA[params.get('wzor')] ? params.get('wzor') : 'pismo';
-  const d = { date: today(), place: 'Wrocław', poaWhere: 'akta', client: null, who: signers[0] ? [signers[0].id] : [] };
+  const mine = signers.find(s => s.full_name === state.me.full_name) || signers[0];
+  const d = { firm, date: today(), place: 'Wrocław', poaWhere: 'akta', client: null, who: mine ? [mine.id] : [] };
   const chosen = () => signers.filter(s => d.who.includes(s.id));
 
   const applyMatter = id => {
@@ -32,6 +43,7 @@ export async function renderM2Dokumenty(main, params) {
     if (!m) return;
     const c = clients.find(x => x.id === m.client_id);
     if (c) d.client = { ...c };
+    else if (firm === 'rkdp') { const p = clients.find(x => x.id === 'rk:' + m.client_id); if (p) d.client = { ...p }; }
     if (m.case_ref) d.ref = m.case_ref;
     const subj = [m.tax_kind, m.tax_period ? `za ${m.tax_period}` : ''].filter(Boolean).join(' ');
     if (subj) d.subject = subj;
@@ -40,7 +52,8 @@ export async function renderM2Dokumenty(main, params) {
   else if (params.get('klient')) { const c = clients.find(x => x.id === params.get('klient')); if (c) d.client = { ...c }; }
 
   const preview = h('div', { class: 'paper' });
-  const draw = () => { preview.innerHTML = orderHtml(pismoBlocks(type, d, chosen()), '/m2tax-logo.png', pismoBrand(chosen())); };
+  const brand = pismoBrand(null, firm);
+  const draw = () => { preview.innerHTML = orderHtml(pismoBlocks(type, d, chosen()), brand.logo, brand); };
   const fileBase = () => `${PISMA[type].label.replace(/[^\p{L}\p{N}]+/gu, '_')}${d.client?.name ? '_' + d.client.name.replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 40) : ''}`;
 
   // ---- lista wzorów ----
@@ -50,7 +63,7 @@ export async function renderM2Dokumenty(main, params) {
     list.replaceChildren(...groups.map(g => h('div', { class: 'pz-group' }, h('p', { class: 'eyebrow' }, g),
       ...Object.entries(PISMA).filter(([, p]) => p.group === g).map(([k, p]) => h('button', { type: 'button', class: 'pz-item' + (k === type ? ' on' : ''), onclick: () => {
         type = k; delete d.addr; delete d.via; delete d.actOrg; drawList(); drawForm(); draw();
-        history.replaceState(null, '', `#/doradztwo/dokumenty?wzor=${k}${d.matter ? `&sprawa=${d.matter}` : ''}`);
+        history.replaceState(null, '', `#/doradztwo/dokumenty?wzor=${k}&firma=${firm}${d.matter ? `&sprawa=${d.matter}` : ''}`);
       } }, h('b', {}, p.label), h('span', { class: 'small muted' }, p.desc))))));
   };
 
@@ -107,24 +120,27 @@ export async function renderM2Dokumenty(main, params) {
 
   async function word() {
     try {
-      const bytes = await buildOrderDocx(pismoBlocks(type, d, chosen()), pismoBrand(chosen()));
+      const bytes = await buildOrderDocx(pismoBlocks(type, d, chosen()), brand);
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
       a.download = fileBase() + '.docx'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       toast('Pobrano plik Word');
     } catch (e) { fail(e, 'Nie udało się przygotować pliku Word'); }
   }
-  const pdf = () => printHtml(printableHtml(pismoBlocks(type, d, chosen()), fileBase(), location.origin + '/m2tax-logo.png', pismoBrand(chosen())));
+  const pdf = () => printHtml(printableHtml(pismoBlocks(type, d, chosen()), fileBase(), location.origin + brand.logo, brand));
+  const rk = hasModule('rozliczenia');
+  const seg = bothFirms() ? h('div', { class: 'firm-seg', role: 'tablist', 'aria-label': 'Papier firmowy' }, ...['rkdp', 'm2'].map(f => h('a', {
+    href: `#/doradztwo/dokumenty?wzor=${type}&firma=${f}`, role: 'tab', 'aria-selected': String(f === firm), class: `firm-seg-b firm-${f}${f === firm ? ' on' : ''}` }, FIRM_LABEL[f]))) : null;
 
   drawList(); drawForm(); draw();
-  main.replaceChildren(
+  main.replaceChildren(...[seg].filter(Boolean),
     h('div', { class: 'page-head', style: { marginTop: '28px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'Doradztwo podatkowe · M2 TAX'),
+      h('div', {}, h('p', { class: 'eyebrow' }, `Doradztwo podatkowe · ${FIRM_LABEL[firm]}`),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Dokumenty – wzory pism', infoTip(HELP, 'Wzory pism – instrukcja')),
-        h('p', { class: 'sub' }, 'Pisma procesowe na papierze firmowym M2 TAX – do pobrania w Wordzie i dalszej edycji.')),
+        h('p', { class: 'sub' }, `Pisma procesowe na papierze firmowym ${FIRM_LABEL[firm]} – do pobrania w Wordzie i dalszej edycji.`)),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-        h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/wzory' }, 'Wzory umów i uchwał'),
-        h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/kalkulator' }, 'Kalkulator JDG / spółka'),
-        h('a', { class: 'btn btn-outline btn-sm', href: '#/doradztwo/jpk' }, 'Podgląd JPK'),
+        h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/wzory' : '#/doradztwo/wzory' }, 'Wzory umów i uchwał'),
+        h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/kalkulator' : '#/doradztwo/kalkulator' }, 'Kalkulator JDG / spółka'),
+        h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/jpk' : '#/doradztwo/jpk' }, 'Podgląd JPK'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: pdf }, icon('download'), 'PDF'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: word }, icon('download'), 'Pobierz Word'))),
     h('div', { class: 'pz-layout' },

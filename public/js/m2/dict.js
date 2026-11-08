@@ -14,6 +14,7 @@ export const FIRM = {
   court: 'Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',
   city: 'Wrocław',
   abbr: 'M2 TAX',
+  office: 'ul. Zwycięska 3, 53-033 Wrocław',
   seat: 'z siedzibą we Wrocławiu, ul. Zwycięska 3, 53-033 Wrocław',
   extra: '',
 };
@@ -31,6 +32,7 @@ export const RKDP_FIRM = {
   court: 'Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',
   city: 'Wrocław',
   abbr: 'RKDP',
+  office: 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław',
   seat: 'z siedzibą w Ozorzycach, ul. Czereśniowa 28d, 55-010 Ozorzyce',
   extra: ', kapitał zakładowy 50 000 zł, wpisaną do rejestru osób prawnych uprawnionych do wykonywania doradztwa podatkowego pod nr 855',
 };

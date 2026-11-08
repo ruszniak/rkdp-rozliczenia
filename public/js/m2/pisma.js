@@ -1,7 +1,7 @@
-// Wzory pism procesowych M2 TAX – na papierze firmowym, z wybranym pełnomocnikiem.
+// Wzory pism procesowych – na papierze firmowym RKDP albo M2 TAX (d.firm), z wybranym pełnomocnikiem.
 // Pola do uzupełnienia oznaczone są [w nawiasach kwadratowych] – w Wordzie mają żółte wyróżnienie.
-import { FIRM } from './dict.js';
-import { M2_BRAND, dateLong, accName } from './order.js';
+import { firmData } from './dict.js';
+import { brandOf, dateLong, accName } from './order.js';
 
 const F = t => `[${t}]`;
 const OP = 'ustawy z dnia 29 sierpnia 1997 r. – Ordynacja podatkowa (t.j. Dz.U. z [rok] r. poz. [……] ze zm.; dalej: „Ordynacja podatkowa” lub „o.p.”)';
@@ -69,7 +69,7 @@ export const PISMA = {
       { t: 'title', text: 'WNIOSEK O UDOSTĘPNIENIE AKT SPRAWY' },
       { t: 'p', text: `Działając w imieniu i na rzecz Strony, na podstawie pełnomocnictwa ${X.poaTxt}, na podstawie art. 178 § 1 ${OP}, ${X.v('wnoszę', 'wnosimy')} o umożliwienie zapoznania się z aktami ${d.subject ? `postępowania ${d.subject}` : `sprawy ${F('oznaczenie postępowania')}`} oraz sporządzenia z nich notatek, kopii i odpisów, w tym przy użyciu własnych urządzeń utrwalających obraz.` },
       { t: 'p', text: `Jednocześnie, na podstawie art. 178 § 2 o.p., ${X.v('wnoszę', 'wnosimy')} o wydanie uwierzytelnionych kopii ${F('wskazanie dokumentów')}.` },
-      { t: 'p', text: `${X.v('Proszę', 'Prosimy')} o wyznaczenie terminu przeglądania akt i przekazanie informacji pod adresem e-mail ${FIRM.email} lub telefonicznie: ${FIRM.phones}.` },
+      { t: 'p', text: `${X.v('Proszę', 'Prosimy')} o wyznaczenie terminu przeglądania akt i przekazanie informacji pod adresem e-mail ${X.firm.email} lub telefonicznie: ${X.firm.phones}.` },
     ],
   },
   przywrocenie: {
@@ -290,6 +290,7 @@ export function pismoBlocks(type, d, signers) {
   const sg = signers.length ? signers : [{ full_name: '[……]', license_no: '[……]' }];
   const many = sg.length > 1;
   const X = {
+    firm: firmData(d.firm),
     v: (one, more) => many ? more : one,
     date: iso => iso ? dateLong(iso) : '[data]',
     poaTxt: T.court
@@ -308,7 +309,7 @@ export function pismoBlocks(type, d, signers) {
   B.push({ t: 'party', lead: `${fem ? 'reprezentowana' : 'reprezentowany'} przez`, bold: [0, ...sg.map((_, i) => i + 1)], lines: [
     many ? 'Doradców Podatkowych' : 'Doradcę Podatkowego',
     ...sg.map(s => s.name_acc || accName(s.full_name)),
-    FIRM.address,
+    X.firm.office,
     !many && sg[0].ae_address ? `adres do doręczeń elektronicznych: ${sg[0].ae_address}` : null,
   ].filter(Boolean) });
   if (T.organParty) B.push({ t: 'party', label: 'Organ', lines: [d.actOrgNom || (type === 'nsa' ? 'Dyrektor Izby Administracji Skarbowej we Wrocławiu' : (d.actOrg ? d.actOrg.replace(/^Dyrektora/, 'Dyrektor').replace(/^Naczelnika/, 'Naczelnik') : '[organ]'))] });
@@ -327,7 +328,7 @@ export function pismoBlocks(type, d, signers) {
   return B;
 }
 
-// papier firmowy M2 TAX (bez nazwisk pełnomocników w nagłówku)
-export function pismoBrand() {
-  return M2_BRAND;
+// papier firmowy RKDP albo M2 TAX (bez nazwisk pełnomocników w nagłówku)
+export function pismoBrand(signers, firm = 'm2') {
+  return brandOf(firm);
 }

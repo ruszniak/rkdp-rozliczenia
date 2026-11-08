@@ -58,9 +58,9 @@ export async function renderDokumenty(main) {
       tile('Raport rozliczeń', 'Stan rozliczeń klientów za miesiąc – w zakładce Rozliczenia przycisk „Pobierz”.', '#/rozliczenia', ['PDF', 'Excel', 'CSV']),
       tile('Lista obecności', 'Ewidencja czasu pracy za miesiąc – Twoja albo zespołu.', '#/obecnosc', ['PDF', 'Excel']),
       tile('Lista klientów', 'Eksport kartoteki klientów – w zakładce Klienci przycisk eksportu.', '#/klienci', ['Excel'])),
-    hasModule('doradztwo') ? group('M2 TAX',
-      tile('Wzory pism procesowych', 'Pisma do US, odwołania, zażalenia, skargi do WSA i NSA, wnioski o interpretację – na papierze M2 TAX z wybranym pełnomocnikiem.', '#/doradztwo/dokumenty', ['Word', 'PDF']),
-      tile('Zlecenie / umowa M2 TAX', 'Zlecenie, umowa o doradztwo, pełnomocnictwa i PPS-1 dla klientów M2 TAX.', '#/doradztwo/zlecenia', ['PDF', 'Word']),
-      tile('Oferta M2 TAX', 'Oferta doradztwa podatkowego na papierze M2 TAX.', '#/doradztwo/oferty', ['PDF']),
-      tile('Raport sprawy', 'Podsumowanie sprawy, same godziny albo sam dziennik – otwórz sprawę i kliknij „Raport PDF”.', '#/doradztwo/sprawy', ['PDF'])) : null);
+    group('Doradztwo podatkowe (RKDP i M2 TAX)',
+      tile('Wzory pism procesowych', 'Pisma do US, odwołania, zażalenia, skargi do WSA i NSA, wnioski o interpretację – na papierze RKDP albo M2 TAX, z wybranym pełnomocnikiem.', '#/doradztwo/dokumenty', ['Word', 'PDF']),
+      tile('Zlecenia i umowy', 'Zlecenie, umowa o doradztwo, pełnomocnictwa i PPS-1 – na papierze firmy, do której należy klient.', '#/doradztwo/zlecenia', ['PDF', 'Word']),
+      hasModule('doradztwo') ? tile('Oferta M2 TAX', 'Oferta doradztwa podatkowego na papierze M2 TAX.', '#/doradztwo/oferty', ['PDF']) : null,
+      tile('Raport sprawy', 'Podsumowanie sprawy, same godziny albo sam dziennik – otwórz sprawę i kliknij „Raport PDF”.', '#/doradztwo/sprawy', ['PDF'])));
 }
