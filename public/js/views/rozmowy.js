@@ -79,7 +79,7 @@ export async function renderRozmowy(main, params) {
 
   main.replaceChildren(
     h('div', { class: 'page-head' },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
+      h('div', {},
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Rozmowy', infoTip(HELP, 'Rozmowy – jak to działa')),
         h('p', { class: 'sub' }, 'Uwagi i pytania o klientach – w jednym miejscu.'))),
     h('div', { class: 'rz-bar' }, search, h('label', { class: 'check' }, mineCb, 'Tylko moi klienci (księgowa / kadry)')),

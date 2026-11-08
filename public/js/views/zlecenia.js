@@ -123,7 +123,7 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
   if (embed) { put(main, chips, listBox); await reload(); return; }
   put(main, 
     h('div', { class: 'page-head' },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'Zespół RKDP i M2 TAX'),
+      h('div', {},
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, admin ? 'Zadania dla zespołu' : 'Zadania', infoTip(HELP, 'Zadania – jak to działa')),
         h('p', { class: 'sub' }, admin ? 'Dodatkowe zadania dla pracowników – z akceptacją wykonania.' : 'Twoje zadania i te, które zleciłeś innym. Gdy skończysz, kliknij „Zrobione – zgłaszam”.')),
       h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newZlecenie(reload) }, icon('plus'), 'Zadanie')),

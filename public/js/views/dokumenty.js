@@ -32,7 +32,7 @@ export async function renderDokumenty(main) {
 
   main.replaceChildren(
     h('div', { class: 'page-head' },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP'),
+      h('div', {},
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Generowanie dokumentów', infoTip(HELP, 'Generowanie dokumentów – instrukcja')),
         h('p', { class: 'sub' }, 'Umowy, pełnomocnictwa, protokoły, oferty i raporty – wszystko w jednym miejscu.'))),
     group('Umowy i oferty',

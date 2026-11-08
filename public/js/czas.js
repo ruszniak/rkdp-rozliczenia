@@ -215,7 +215,7 @@ export async function renderCzas(main, params) {
   sb.from('app_settings').select('value').eq('key', 'target_hourly_rate').maybeSingle().then(({ data }) => { targetIn.value = data?.value || '250'; });
   monIn.addEventListener('change', () => { if (monIn.value) { ym = monIn.value; history.replaceState(null, '', '#/czas?m=' + ym); draw(); } });
   put(main, 
-    h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'M2 TAX'), h('h1', { style: { marginTop: '6px' } }, 'Czas pracy i rentowność'), h('p', { class: 'sub' }, 'Ile czasu zajmują klienci, wykorzystanie pakietów godzin i stawka efektywna.')),
+    h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Czas pracy i rentowność'), h('p', { class: 'sub' }, 'Ile czasu zajmują klienci, wykorzystanie pakietów godzin i stawka efektywna.')),
       h('div', { class: 'row-btns' }, monIn, targetIn, h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { const v = parseFloat(targetIn.value.replace(',', '.')); if (!(v > 0)) return toast('Podaj stawkę', true); const { error } = await sb.from('app_settings').upsert({ key: 'target_hourly_rate', value: String(v) }); if (error) return fail(error); toast('Zapisano próg'); draw(); } }, 'Zapisz próg zł/h'))),
     box);
   draw();

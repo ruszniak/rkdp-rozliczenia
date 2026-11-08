@@ -253,8 +253,7 @@ async function viewDashboard(main, params) {
   main.replaceChildren(
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
-        h('h1', { style: { marginTop: '6px' } }, `Dzień dobry, ${state.me.short_name || (state.me.full_name || '').split(' ')[0]}`),
-        h('p', { class: 'sub' }, 'Doradztwo podatkowe · M2 TAX'))),
+        h('h1', { style: { marginTop: '6px' } }, `Dzień dobry, ${state.me.short_name || (state.me.full_name || '').split(' ')[0]}`))),
     h('div', { class: 'pl-grid' },
       h('aside', { class: 'pl-side' }, meetingsCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2')),
       h('div', { class: 'pl-main' },
