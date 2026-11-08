@@ -278,15 +278,19 @@ export async function renderPulpit(main, params) {
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })), title,
         h('p', { class: 'sub' }, `Bieżący miesiąc rozliczeniowy: ${periodLabel(period).toLowerCase()}.`))),
-    sprawy,
-    team ? h('div', { class: 'pl-head' }, h('h2', {}, 'Zadania zespołu')) : null, team,
+    ...(admin ? [
+      h('div', { class: 'pl-head pl-first' }, h('h2', {}, 'Zadania zespołu'),
+        h('button', { class: 'btn btn-primary mj-add', type: 'button', style: { marginLeft: 'auto' }, onclick: () => import('./zlecenia.js').then(m => m.newZlecenie(() => draw0())) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie'))),
+      team,
+      h('div', { class: 'pl-head' }, h('h2', {}, 'Terminy i pytania')), sprawy] : [sprawy]),
     dzis,
     h('div', { class: 'pl-head' }, h('h2', {}, admin ? 'Biuro' : 'Mój pulpit'), editBtn),
     body].filter(Boolean));
   const wantF = params?.get?.('f'), zl = params?.get?.('zl');
   const sp = new URLSearchParams(); if (wantF && wantF !== 'zespol') sp.set('f', wantF); if (zl) sp.set('zl', zl);
-  import('./moje.js').then(m => m.renderMoje(sprawy, sp, { embed: true }));
-  if (team) import('./zlecenia.js').then(m => m.renderZlecenia(team, null, { embed: true })).then(() => { if (wantF === 'zespol') team.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  import('./moje.js').then(m => m.renderMoje(sprawy, sp, { embed: true, noTasks: admin }));
+  const draw0 = () => import('./zlecenia.js').then(m => m.renderZlecenia(team, zl && admin ? zl : null, { embed: true }));
+  if (team) draw0();
   if (dzis) renderDzis(dzis, D, { lite: true });
   draw();
 }

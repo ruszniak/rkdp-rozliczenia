@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.1', '7 listopada 2026', [
+    'Pulpit szefa: zadania tylko raz – według pracowników, a pod nimi osobno terminy i pytania.',
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',
     'Zakładka „Rozmowy” zniknęła z menu – rozmowę otwierasz z karty klienta lub przy uwagach w Rozliczeniach; nieprzeczytane są pod ikoną dymka w nagłówku, a pełna lista w „Więcej” → Rozmowy.',

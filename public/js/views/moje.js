@@ -143,7 +143,7 @@ function card(it, color) {
   return it.swipe ? swipeable(el, it.swipe) : el;
 }
 
-export async function renderMoje(main, params, { embed = false } = {}) {
+export async function renderMoje(main, params, { embed = false, noTasks = false } = {}) {
   let filter = params?.get('f') || 'all', items = [], closed = null;
   const admin = state.me.role === 'admin';
   if (!['all', 'pilne', 'zlecilem', 'zamkniete', ...(admin ? ['zespol'] : [])].includes(filter)) filter = 'all';
@@ -167,7 +167,7 @@ export async function renderMoje(main, params, { embed = false } = {}) {
     }
     const rows = items.filter(i => filter === 'all' || (filter === 'pilne' ? i.hot || (i.due && i.due < today()) : i.byMe))
       .sort((a, b) => order(a) - order(b) || (a.due || '9999').localeCompare(b.due || '9999') || (b.created || '').localeCompare(a.created || ''));
-    if (!rows.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, 'Nic na Ciebie nie czeka. 👍')); return; }
+    if (!rows.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, noTasks ? 'Brak terminów i pytań do Ciebie. 👍' : 'Nic na Ciebie nie czeka. 👍')); return; }
     put(list, ...GROUPS.map(g => {
       const gr = rows.filter(r => (r.group || 'new') === g[0]);
       if (!gr.length) return null;
@@ -176,7 +176,14 @@ export async function renderMoje(main, params, { embed = false } = {}) {
         ...gr.map(it => card(it, g[0] === 'new' && it.kind !== 'zlecenie' ? '#8AA0A5' : g[2])));
     }));
   }
-  reload = async () => { closed = null; try { items = await collect(); } catch (e) { fail(e); items = []; } draw(); };
+  // szef: zadania zespołu są w osobnej części (według pracowników) – tu tylko terminy, pytania i zgłoszenia przy klientach
+  reload = async () => { closed = null; try { items = await collect(); if (noTasks) items = items.filter(i => i.kind !== 'zlecenie'); } catch (e) { fail(e); items = []; } draw(); };
+  if (embed && noTasks) {
+    put(main, list);
+    await reload();
+    if (openId) import('./zlecenia.js').then(m => m.openZlecenie(openId, reload));
+    return;
+  }
   if (embed) {
     put(main, h('div', { class: 'mj-topbar' }, chips,
       h('button', { class: 'btn btn-primary mj-add', type: 'button', 'aria-label': 'Nowe zadanie', onclick: () => import('./zlecenia.js').then(m => m.newZlecenie(reload)) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie'))),
