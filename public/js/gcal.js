@@ -108,7 +108,7 @@ export function gcalAgendaCard({ days = 7 } = {}) {
     const todayK = new Date().toLocaleDateString('sv-SE');
     const tom = new Date(Date.now() + 86400000).toLocaleDateString('sv-SE');
     const label = k => k === todayK ? 'Dziś' : k === tom ? 'Jutro' : DAY.format(new Date(k + 'T12:00:00'));
-    const list = h('div', { class: 'gc-days' }, ...(items.length ? [...byDay.entries()].slice(0, 6).map(([k, es]) => h('div', { class: 'gc-day' + (k === todayK ? ' today' : '') },
+    const list = h('div', { class: 'gc-days' }, ...(items.length ? [...byDay.entries()].slice(0, 8).map(([k, es]) => h('div', { class: 'gc-day' + (k === todayK ? ' today' : '') },
       h('div', { class: 'gc-dl' }, label(k)),
       h('div', { class: 'gc-evs' }, ...es.map(e => h('a', { class: 'gc-ev', href: e.link || '#', target: '_blank', rel: 'noopener' },
         h('span', { class: 'gc-t' }, e.allDay ? 'cały dzień' : HM.format(new Date(e.start))),

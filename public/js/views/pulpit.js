@@ -279,7 +279,9 @@ export async function renderPulpit(main, params) {
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })), title,
         h('p', { class: 'sub' }, `Bieżący miesiąc rozliczeniowy: ${periodLabel(period).toLowerCase()}.`))),
-    gcalAgendaCard(),
+    h('div', { class: 'pl-grid' },
+      h('aside', { class: 'pl-side' }, gcalAgendaCard()),
+      h('div', { class: 'pl-main' }, ...[
     ...(admin ? [
       h('div', { class: 'pl-head pl-first' }, h('h2', {}, 'Zadania zespołu'),
         h('button', { class: 'btn btn-primary mj-add', type: 'button', style: { marginLeft: 'auto' }, onclick: () => import('./zlecenia.js').then(m => m.newZlecenie(() => draw0())) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie'))),
@@ -287,7 +289,7 @@ export async function renderPulpit(main, params) {
       h('div', { class: 'pl-head' }, h('h2', {}, 'Terminy i pytania')), sprawy] : [sprawy]),
     dzis,
     h('div', { class: 'pl-head' }, h('h2', {}, admin ? 'Biuro' : 'Mój pulpit'), editBtn),
-    body].filter(Boolean));
+    body].filter(Boolean)))].filter(Boolean));
   const wantF = params?.get?.('f'), zl = params?.get?.('zl');
   const sp = new URLSearchParams(); if (wantF && wantF !== 'zespol') sp.set('f', wantF); if (zl) sp.set('zl', zl);
   import('./moje.js').then(m => m.renderMoje(sprawy, sp, { embed: true, noTasks: admin }));
