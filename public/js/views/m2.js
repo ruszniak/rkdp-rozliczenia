@@ -20,7 +20,8 @@ import { renderM2Dokumenty } from './m2pisma.js';
 import { amlCard, renderAml, amlDashCard } from '../aml/aml.js';
 import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
-import { clientMeetingsCard } from '../spotkania.js';
+import { clientMeetingsCard, openMeetingDialog } from '../spotkania.js';
+import { gcalAgendaCard } from '../gcal.js';
 import { pdfText, analyzeLetter } from '../pismo.js';
 
 const BASE = '#/doradztwo';
@@ -282,7 +283,7 @@ async function viewDashboard(main) {
       h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
         h('div', {}, h('b', {}, m.number), ' ', m.title, h('div', { class: 'small muted' }, m.m2_clients?.name || '')), statusPill(m.status)))
         : [h('p', { class: 'empty' }, 'Nie prowadzisz otwartych spraw.')]))),
-    h('div', {}, meetingsCard(settings), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'))));
+    h('div', {}, meetingsCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2'))));
 }
 
 // ================= SPRAWY =================
@@ -598,7 +599,7 @@ async function viewClient(main, id) {
       ['status', 'Status', 'select', { aktywny: 'Aktywny', archiwum: 'Archiwum' }], ['nip', 'NIP', 'text'], ['regon', 'REGON', 'text'], ['krs', 'KRS', 'text'],
       ['address', 'Adres', 'text', null, true], ['mail_address', 'Adres do korespondencji (jeśli inny)', 'text', null, true],
       ['industry', 'Branża', 'list', ['budowlana', 'medyczna', 'beauty', 'produkcyjna', 'nieruchomości', 'handel', 'usługi', 'osoba prywatna']],
-      ['source', 'Skąd klient', 'list', ['polecenie', 'strona m2tax.pl', 'podatkiwroclaw.pl', 'Zoho Bookings', 'RKDP', 'KIDP']]]],
+      ['source', 'Skąd klient', 'list', ['polecenie', 'strona m2tax.pl', 'podatkiwroclaw.pl', 'rezerwacja online', 'Zoho Bookings', 'RKDP', 'KIDP']]]],
     ['Kontakt', [['contact_person', 'Osoba kontaktowa', 'text'], ['email', 'E-mail', 'email'], ['phone', 'Telefon', 'tel']]],
     ['Stawki', [['billing_type', 'Rozliczenie', 'select', BILLING_TYPE], ['hourly_rate', 'Stawka godzinowa (zł netto)', 'number'],
       ['subscription', 'Pakiet abonamentu', 'list', SUBSCRIPTIONS], ['monthly_fee', 'Abonament (zł netto / mies.)', 'number'], ['rate_notes', 'Ustalenia dot. wynagrodzenia', 'textarea']]],
@@ -662,19 +663,16 @@ async function viewClient(main, id) {
     h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
-// ================= SPOTKANIA Z KLIENTAMI (Zoho Bookings) – karta na pulpicie =================
-function meetingsCard(settings) {
-  const zoho = settings.m2_zoho_bookings_url || '';
-  const bookDialog = () => uiModal('Umów spotkanie – Zoho Bookings', h('div', {},
-    h('iframe', { class: 'zoho', src: zoho, title: 'Zoho Bookings M2 TAX', loading: 'lazy' })),
-  close => [h('a', { class: 'btn btn-ghost btn-sm', href: zoho, target: '_blank', rel: 'noopener' }, 'Otwórz w nowej karcie'), h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij')], { wide: true });
-  return h('section', { class: 'card section meet-card' },
-    h('div', { class: 'section-head' }, h('h2', {}, 'Spotkania z klientami')),
-    h('p', { class: 'small', style: { marginBottom: '12px' } }, 'Klienci umawiają się sami przez Zoho Bookings (link na stronie m2tax.pl). Spotkanie umówione telefonicznie wpisz tutaj w imieniu klienta.'),
-    zoho ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-      h('button', { class: 'btn btn-primary btn-sm', onclick: bookDialog }, icon('plus'), 'Umów spotkanie'),
-      h('button', { class: 'btn btn-outline btn-sm', onclick: () => { navigator.clipboard?.writeText(zoho).then(() => toast('Skopiowano link do rezerwacji')); } }, 'Kopiuj link dla klienta'))
-      : h('p', { class: 'hint' }, 'Brak adresu Zoho Bookings – ustaw go w Zespół i ustawienia.'));
+// ================= SPOTKANIA Z KLIENTAMI – karta na pulpicie (własny system rezerwacji, jak na pulpicie RKDP) =================
+function meetingsCard() {
+  const link = 'https://app.ruszniak.io/umow/?motyw=m2tax';
+  return h('div', {}, gcalAgendaCard(),
+    h('section', { class: 'card section meet-card' },
+      h('div', { class: 'section-head' }, h('h2', {}, 'Spotkania z klientami'), h('a', { class: 'small', href: '#/spotkania' }, 'Wszystkie →')),
+      h('p', { class: 'small', style: { marginBottom: '12px' } }, 'Klienci umawiają się sami na stronie m2tax.pl albo z linku. Spotkanie umówione telefonicznie dodaj tutaj – klient dostanie potwierdzenie e-mailem.'),
+      h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+        h('button', { class: 'btn btn-primary btn-sm', onclick: () => openMeetingDialog({}) }, icon('plus'), 'Umów spotkanie'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => { navigator.clipboard?.writeText(link).then(() => toast('Skopiowano link do rezerwacji')); } }, 'Kopiuj link dla klienta'))));
 }
 
 // ================= ZLECENIA I UMOWY =================

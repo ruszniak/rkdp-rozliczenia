@@ -34,7 +34,7 @@ export async function downloadBackup(onProgress = () => {}) {
     const cols = [...new Set(rows.flatMap(r => Object.keys(r)))];
     return { name: table, rows: [cols.map(c => ({ v: c, s: 'header' })), ...rows.map(r => cols.map(c => cellOf(r[c])))], widths: cols.map(() => 18) };
   });
-  const readme = `Kopia danych aplikacji RKDP Rozliczenia z ${stamp.replace('_', ' ')}.\n\n` +
+  const readme = `Kopia danych aplikacji app.R z ${stamp.replace('_', ' ')}.\n\n` +
     `dane.json  – pełne dane wszystkich tabel (do odtworzenia bazy)\n` +
     `dane.xlsx  – te same dane do przeglądania, jedna tabela na arkusz\n\n` +
     Object.entries(data).map(([t, r]) => `${t}: ${r.length} ${plural(r.length)}`).join('\n') +

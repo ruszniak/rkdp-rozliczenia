@@ -7,7 +7,7 @@ import { openCmdk, initShortcuts } from './cmdk.js';
 import { getTheme, toggleTheme, onThemeChange, ICON_MOON, ICON_SUN } from './motyw.js';
 import { initPanelLinks, closePanel } from './panel.js';
 // logo w aplikacji: RKDP – granatowe (logotyp aplikacji), M2 TAX – zwykłe; w motywie ciemnym rozjaśniane w CSS
-const LIGHT_LOGO = src => src.replace('/logo-rkdp.png', '/logo-app.svg');
+const LIGHT_LOGO = src => src.replace('/logo-rkdp.png', '/logo-app.svg').replace('/m2tax-logo.png', '/logo-app.svg');
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
 const renderRozliczenia = lazy(() => import('./views/rozliczenia.js'), 'renderRozliczenia');
@@ -63,7 +63,7 @@ function parseHash() {
 }
 
 const MODULES = {
-  rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
+  rkdp: { label: 'RKDP', full: 'RKDP · app.R', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
     // RKDP = pełna aplikacja (rozliczenia + doradztwo); M2 TAX to dodatek – jego klienci są w Klientach (przełącznik), sprawy w Sprawach
     tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
