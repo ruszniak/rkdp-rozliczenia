@@ -297,6 +297,47 @@ ${kind !== 'odwolanie' && kind !== 'platnosc' ? `<p style="font-size:12.5px;colo
   return true;
 }
 
+// ---------- e-mail do osób z zespołu: ktoś umówił im spotkanie w aplikacji albo dodał je do spotkania ----------
+async function mailTeam(c: Ctx, ids: string[], actor: string | null, kind: 'nowe' | 'dodany') {
+  const to = [...new Set(ids)].filter(x => x && x !== actor);
+  if (!to.length || !SMTP_USER || !SMTP_PASS) return 0;
+  const { S, m, type } = c;
+  const [{ data: ms }, { data: pf }, { data: by }] = await Promise.all([
+    admin.from('team_members').select('id, full_name, email').in('id', to),
+    admin.from('member_profiles').select('member_id, notify_email').in('member_id', to),
+    actor ? admin.from('team_members').select('full_name').eq('id', actor).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  const s = Date.parse(m.start_at), e = Date.parse(m.end_at);
+  const when = m.all_day ? `${longDate(s)} – cały dzień` : `${longDate(s)}, ${hmOf(s)}–${hmOf(e)}`;
+  const who = m.private ? (m.title || 'Spotkanie') : (m.client_name || m.title || 'Spotkanie');
+  const byName = (by as any)?.full_name || 'Ktoś z zespołu';
+  const others = c.advisors.map((a: any) => a.full_name).join(', ');
+  const link = `${S.app_url}/#/spotkania/${m.id}`;
+  const where = m.mode === 'meet' ? (m.meet_url || 'Google Meet') : m.mode === 'phone' ? `telefon${m.client_phone ? ' ' + m.client_phone : ''}` : (m.place || '');
+  const head = kind === 'nowe' ? `${byName} umówił(a) Ci spotkanie` : `${byName} dodał(a) Cię do spotkania`;
+  const subject = `${kind === 'nowe' ? 'Nowe spotkanie' : 'Dodano Cię do spotkania'}: ${who} – ${shortDate(s)}${m.all_day ? '' : ', ' + hmOf(s)}`.slice(0, 200);
+  const rows: [string, string][] = [['Termin', when], ['Klient', m.private ? '' : (m.client_name || '')], ['Rodzaj', m.private ? 'wewnętrzne' : (type?.name || m.title || '')],
+    ['Gdzie', where], ['Kto', others], ['Temat', m.topic || ''], ['Kontakt', [m.client_email, m.client_phone].filter(Boolean).join(' · ')]].filter(r => r[1]) as [string, string][];
+  const text = [head, '', ...rows.map(([k, v]) => `${k}: ${v}`), '', `W aplikacji: ${link}`, '', 'Spotkanie jest też w Twoim Kalendarzu Google (jeśli jest połączony).'].join('\n');
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px">`
+    + `<p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Spotkanie · app.R</p>`
+    + `<h2 style="margin:0 0 12px;font-size:19px">${esc(head)}</h2>`
+    + `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#F3F4F6;border-radius:12px;width:100%"><tr><td style="padding:12px 16px"><table cellpadding="0" cellspacing="0">`
+    + rows.map(([k, v]) => `<tr><td style="padding:5px 14px 5px 0;color:#6B7280;font-size:13px;vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:5px 0;font-size:14px;font-weight:bold">${k === 'Gdzie' && /^https?:/.test(v) ? `<a href="${esc(v)}" style="color:#2563EB">Google Meet</a>` : esc(v)}</td></tr>`).join('')
+    + `</table></td></tr></table>`
+    + `<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Otwórz spotkanie w app.R</a></p>`
+    + `<p style="color:#6B7280;font-size:12px">Wiadomość wysłana automatycznie z app.R. Spotkanie jest też w Twoim Kalendarzu Google (jeśli jest połączony).</p></div>`;
+  let n = 0;
+  for (const x of ms || []) {
+    const pr = (pf || []).find((r: any) => r.member_id === x.id);
+    const addr = pr?.notify_email && emailOk(String(pr.notify_email)) ? String(pr.notify_email) : String(x.email || '');
+    if (!emailOk(addr)) continue;
+    try { await transport().sendMail({ from: { name: 'app.R – spotkania', address: S.from_email || SMTP_USER }, to: addr, subject, text, html }); n++; }
+    catch (err) { console.error('mail zespół', x.id, err); }
+  }
+  return n;
+}
+
 // ---------- Kalendarz Google: wydarzenia doradców ----------
 function eventBody(c: Ctx, withMeet: boolean, meetUrl: string | null) {
   const { S, m, type } = c;
@@ -423,6 +464,8 @@ async function createMeeting(S: any, row: any, memberIds: string[], actor: strin
   let mailed = false;
   try { mailed = await mailClient(c, 'potwierdzenie'); } catch (e) { console.error('mail', e); }
   await notifyTeam(m.id, 'nowe', actor);
+  // umówione w aplikacji dla kogoś innego – e-mail do tej osoby (nie każdy ma włączone powiadomienia w aplikacji)
+  if (actor) { try { await mailTeam(c, memberIds, actor, 'nowe'); } catch (e) { console.error('mail zespół', e); } }
   return { meeting: m2, mailed, google: Object.keys(gcal).length };
 }
 async function cancelMeeting(m: any, reason: string | null, actor: string | null, notifyClient: boolean) {
@@ -475,6 +518,7 @@ async function setMembers(m: any, want: string[], actor: string, notifyClient: b
   c.m = m2;
   if (notifyClient && !m2.private) { try { await mailClient(c, 'doradca'); } catch (e) { console.error('mail', e); } }
   await notifyTeam(m.id, 'osoby', actor, { added, removed });
+  if (added.length) { try { await mailTeam(c, added, actor, 'dodany'); } catch (e) { console.error('mail zespół', e); } }
   return { meeting: m2, added, removed };
 }
 
