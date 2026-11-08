@@ -67,14 +67,14 @@ const MODULES = {
     // RKDP = pełna aplikacja (rozliczenia + doradztwo); M2 TAX to dodatek – jego klienci są w Klientach (przełącznik), sprawy w Sprawach
     tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
-    more: [['#/doradztwo/zlecenia', 'Zlecenia i umowy (doradztwo)', 'm2:zlecenia'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
+    more: [['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/doradztwo/zlecenia', 'Zlecenia i umowy (doradztwo)', 'm2:zlecenia'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
       ['#/doradztwo/dokumenty', 'Pisma procesowe – wzory (RKDP i M2 TAX)', 'm2:dokumenty'], ['#/doradztwo', 'Pulpit doradcy M2 TAX (spotkania, terminy)', 'm2:', 'm2'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
       ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
       ['#/doradztwo/dokumenty', 'Dokumenty', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia', 'm2:zlecenia']],
-    more: [['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+    more: [['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'RKDP · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -110,7 +110,7 @@ const TAB_ICONS = {
   'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
   jpk: I.jpk, logout: I.wyloguj, default: I.info,
   zlecenia: I.zlecenia, terminy: I.terminy, rok: I.notatki, informacje: I.rozmowy, oferty: I.notatki, aml: I.aml, raport: I.rozliczenia,
-  oaplikacji: I.info, 'm2:czas': I.zegar,
+  oaplikacji: I.info, 'm2:czas': I.zegar, spotkania: I.terminy,
 };
 TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
 const TAB_SHORT = { moje: 'Sprawy', 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
@@ -336,6 +336,7 @@ async function route(opts = {}) {
     else if (view === 'doradztwo' && !parts[1] && !hasModule('doradztwo') && canDor) { history.replaceState(null, '', '#/doradztwo/sprawy'); c = await renderM2(layout('m2:sprawy'), ['doradztwo', 'sprawy'], params); }
     else if (view === 'doradztwo' && parts[1] === 'klienci' && !hasModule('doradztwo') && canDor) { history.replaceState(null, '', '#/klienci'); c = await renderKlienci(layout('klienci'), params); }
     else if (view === 'doradztwo' && canDor && (hasModule('doradztwo') || !['zgloszenia', 'aml', 'oferty'].includes(parts[1]))) c = await renderM2(layout(m2key), parts, params);
+    else if (view === 'spotkania') { const m = await import('./spotkania.js'); c = await m.renderSpotkania(layout('spotkania'), parts, params); }
     else if (!hasModule('rozliczenia') && view !== 'zespol') c = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'jpk') c = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
     else if (view === 'klienci') c = await renderKlienci(layout('klienci'), params);

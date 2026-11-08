@@ -4,7 +4,7 @@
   "framework": null,
   "headers": [
     {
-      "source": "/((?!vendor/|assets/|.*\\.png$|.*\\.svg$).*)",
+      "source": "/((?!vendor/|assets/|umow/|.*\\.png$|.*\\.svg$).*)",
       "headers": [
         {
           "key": "X-Robots-Tag",
@@ -37,6 +37,39 @@
         {
           "key": "Cache-Control",
           "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/umow/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'self' https://rkdp.pl https://www.rkdp.pl https://m2tax.pl https://www.m2tax.pl https://podatkiwroclaw.pl https://www.podatkiwroclaw.pl https://mdotax.pl https://www.mdotax.pl https://*.vercel.app; base-uri 'self'; form-action 'self'; object-src 'none'"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
         }
       ]
     },

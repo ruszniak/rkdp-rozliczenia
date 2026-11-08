@@ -11,6 +11,7 @@ import { dokumentyDialog } from '../rkdp/docs.js';
 import { threadCard } from '../watek.js';
 import { zusCard, showsZus } from '../zus.js';
 import { doradztwoCard } from '../firma.js';
+import { clientMeetingsCard } from '../spotkania.js';
 import { poaCard } from '../pelnomocnictwa.js';
 import { amlCard } from '../aml/aml.js';
 import { archiveCard } from '../archiwum.js';
@@ -341,7 +342,7 @@ export async function renderKlient(main, id) {
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => dokumentyDialog({ client: { ...c, ...draft } }).catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'))),
     h('div', { class: 'two' },
       h('div', {}, editHint, form, savebar),
-      h('div', {}, threadCard(c), doradztwoCard(c), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
+      h('div', {}, threadCard(c), clientMeetingsCard({ client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }), doradztwoCard(c), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);

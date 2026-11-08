@@ -209,6 +209,21 @@ async function daily() {
   return sent;
 }
 
+// spotkania: nowe (ze strony albo od kolegi), zmiana terminu, odwołanie
+async function onSpotkanie(b: any) {
+  const { data: m } = await db.from('meetings').select('id, title, client_name, start_at, source, private, status').eq('id', b.id).maybeSingle();
+  if (!m) return 0;
+  const { data: mm } = await db.from('meeting_members').select('member_id').eq('meeting_id', m.id);
+  const to = (mm || []).map((x: any) => x.member_id).filter((x: string) => x && x !== b.actor);
+  if (!to.length) return 0;
+  const when = new Date(m.start_at).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const who = m.private ? (m.title || 'Spotkanie') : (m.client_name || m.title || 'Spotkanie');
+  const ev = String(b.ev || '');
+  const title = ev === 'nowe' ? (m.source === 'www' ? 'Nowa rezerwacja ze strony' : 'Nowe spotkanie') : ev === 'zmiana' ? 'Zmiana terminu spotkania' : 'Spotkanie odwołane';
+  const extra = ev === 'odwolane' ? ' · odwołał klient' : '';
+  return notify(to, 'spotkania', { title, body: `${short(who, 60)} · ${when}${extra}`, url: `/#/spotkania/${m.id}`, tag: `mtg-${m.id}` });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Metoda niedozwolona' }, 405);
@@ -227,6 +242,7 @@ Deno.serve(async (req) => {
       if (body.event === 'docs_uploaded' || body.event === 'docs_remind') return json({ sent: await onDocs(String(body.request_id || ''), body.event === 'docs_remind', +body.count || 0) });
       if (body.event === 'monitor_alert') return json({ sent: await onMonitor(body) });
       if (body.event === 'zlecenie') return json({ sent: await onZlecenie(body) });
+      if (body.event === 'spotkanie') return json({ sent: await onSpotkanie(body) });
       if (body.event === 'flush') return json({ sent: await flush() });
       return json({ error: 'Nieznane zdarzenie' }, 400);
     }

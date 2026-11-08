@@ -18,9 +18,13 @@ const admin = createClient(SB_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
 const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
 const REDIRECT = `${SB_URL}/functions/v1/gcal/callback`;
-const APP_URL = 'https://rozliczenia.rkdp.pl';
+// adres aplikacji (app_settings.app_url) – do linków w wydarzeniach i powrotu z Google
+let APP_URL = 'https://rozliczenia.rkdp.pl';
+async function loadAppUrl() { try { const { data } = await admin.from('app_settings').select('value').eq('key', 'app_url').maybeSingle(); if (data?.value) APP_URL = data.value.replace(/\/$/, ''); } catch { /* */ } }
 const API = 'https://www.googleapis.com/calendar/v3';
-const SCOPES = 'openid email https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.events.readonly';
+// calendar.events – zapis spotkań w kalendarzu doradcy; freebusy – zajętość do wolnych terminów; calendarlist – wybór kalendarzy
+const SCOPES = 'openid email https://www.googleapis.com/auth/calendar.app.created https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+const canBook = (sc: string | null) => /calendar\.events(\s|$)/.test(sc || '');
 const CAL_NAME = 'RKDP – terminy i zadania';
 const TZ = 'Europe/Warsaw';
 
@@ -37,7 +41,7 @@ async function exchangeCode(code: string) {
     body: new URLSearchParams({ code, client_id: CLIENT_ID, client_secret: CLIENT_SECRET, redirect_uri: REDIRECT, grant_type: 'authorization_code' }) });
   const j = await r.json();
   if (!r.ok) throw new Error('Google nie wydał tokenu: ' + (j.error_description || j.error || r.status));
-  return j as { access_token: string; refresh_token?: string; id_token?: string; expires_in: number };
+  return j as { access_token: string; refresh_token?: string; id_token?: string; expires_in: number; scope?: string };
 }
 const tokenCache = new Map<string, { token: string; exp: number }>();
 async function accessToken(memberId: string) {
@@ -68,7 +72,7 @@ async function ensureCalendar(memberId: string, token: string, current: string |
     const g = await gapi(token, 'GET', `/calendars/${encodeURIComponent(current)}`);
     if (g.ok) return current;
   }
-  const c = await gapi(token, 'POST', '/calendars', { summary: CAL_NAME, description: 'Terminy spraw, zadania i pytania z aplikacji RKDP (rozliczenia.rkdp.pl). Aktualizuje się samo – zmiany wprowadzaj w aplikacji.', timeZone: TZ });
+  const c = await gapi(token, 'POST', '/calendars', { summary: CAL_NAME, description: 'Terminy spraw, zadania i pytania z aplikacji app.R. Aktualizuje się samo – zmiany wprowadzaj w aplikacji.', timeZone: TZ });
   if (!c.ok) throw new Error('Nie udało się założyć kalendarza w Google: ' + (c.data?.error?.message || c.status));
   await admin.from('gcal_links').update({ calendar_id: c.data.id }).eq('member_id', memberId);
   await admin.from('gcal_items').delete().eq('member_id', memberId);
@@ -195,14 +199,20 @@ async function events(memberId: string, days: number) {
   const token = await accessToken(memberId);
   const from = new Date(); from.setHours(0, 0, 0, 0);
   const to = new Date(from.getTime() + Math.min(31, Math.max(1, days)) * 86400000);
+  const { data: bm } = await admin.from('booking_members').select('write_calendar,busy_calendars').eq('member_id', memberId).maybeSingle();
+  const calIds = [...new Set(['primary', ...(bm?.busy_calendars || []), bm?.write_calendar || 'primary'])].slice(0, 6);
   const q = new URLSearchParams({ timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '60', timeZone: TZ });
-  const r = await gapi(token, 'GET', `/calendars/primary/events?${q}`);
-  if (!r.ok) throw new Error('Google: ' + (r.data?.error?.message || r.status));
-  return (r.data.items || []).filter((e: any) => e.status !== 'cancelled').map((e: any) => ({
-    id: e.id, title: e.summary || '(bez tytułu)', start: e.start?.dateTime || e.start?.date, end: e.end?.dateTime || e.end?.date,
+  const lists = await Promise.all(calIds.map(async id => {
+    const r = await gapi(token, 'GET', `/calendars/${encodeURIComponent(id)}/events?${q}`);
+    if (!r.ok) { if (id === 'primary') throw new Error('Google: ' + (r.data?.error?.message || r.status)); return []; }
+    return r.data.items || [];
+  }));
+  const seen = new Set<string>();
+  return lists.flat().filter((e: any) => e.status !== 'cancelled' && !seen.has(e.iCalUID || e.id) && seen.add(e.iCalUID || e.id)).map((e: any) => ({
+    id: e.id, title: e.summary || '(zajęty)', start: e.start?.dateTime || e.start?.date, end: e.end?.dateTime || e.end?.date,
     allDay: !!e.start?.date, location: e.location || null, link: e.htmlLink || null,
     meet: e.hangoutLink || e.conferenceData?.entryPoints?.find((p: any) => p.entryPointType === 'video')?.uri || null,
-  }));
+  })).sort((a: any, b: any) => String(a.start).localeCompare(String(b.start)));
 }
 
 // Supabase nie wyświetla stron HTML z funkcji – po powrocie z Google przekierowujemy do profilu w aplikacji z wynikiem
@@ -212,6 +222,7 @@ const page = (title: string, text: string, ok: boolean) => new Response(null, { 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   const url = new URL(req.url);
+  await loadAppUrl();
   try {
     // powrót z Google po zgodzie użytkownika
     if (req.method === 'GET' && url.pathname.endsWith('/callback')) {
@@ -224,7 +235,7 @@ Deno.serve(async (req: Request) => {
       const tok = await exchangeCode(code);
       let email: string | null = null;
       try { email = JSON.parse(atob(tok.id_token!.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).email || null; } catch { /* */ }
-      await admin.from('gcal_links').upsert({ member_id: st.member_id, google_email: email, connected_at: new Date().toISOString(), last_error: null });
+      await admin.from('gcal_links').upsert({ member_id: st.member_id, google_email: email, connected_at: new Date().toISOString(), last_error: null, scopes: tok.scope || null });
       if (tok.refresh_token) await admin.rpc('gcal_store_token', { p_member: st.member_id, p_token: tok.refresh_token });
       else {
         const { data: old } = await admin.rpc('gcal_token', { p_member: st.member_id });
@@ -261,8 +272,9 @@ Deno.serve(async (req: Request) => {
     const configured = !!(CLIENT_ID && CLIENT_SECRET);
 
     if (action === 'status') {
-      const { data: link } = await admin.from('gcal_links').select('google_email,calendar_id,connected_at,last_sync_at,last_error').eq('member_id', memberId).maybeSingle();
-      return json({ configured, connected: !!link, ...(link || {}), calendar_name: CAL_NAME });
+      const { data: link } = await admin.from('gcal_links').select('google_email,calendar_id,connected_at,last_sync_at,last_error,scopes').eq('member_id', memberId).maybeSingle();
+      const { scopes, ...rest } = (link || {}) as any;
+      return json({ configured, connected: !!link, ...rest, can_book: !!link && canBook(scopes), calendar_name: CAL_NAME });
     }
     if (!configured) return json({ configured: false, error: 'Połączenie z Google nie jest jeszcze skonfigurowane (brak danych klienta OAuth w ustawieniach serwera).' }, 400);
     if (action === 'connect') {
@@ -284,6 +296,15 @@ Deno.serve(async (req: Request) => {
         return json(mine);
       }
       return json(await syncMember(memberId));
+    }
+    // kalendarze dostępne na połączonym koncie (do ustawień spotkań) – osoba sama albo administrator dla kogoś
+    if (action === 'calendars') {
+      let who = memberId;
+      if (body.member && body.member !== memberId) { const { data: isAdm } = await user.rpc('is_admin'); if (!isAdm) return json({ error: 'Brak dostępu' }, 403); who = String(body.member); }
+      const token = await accessToken(who);
+      const r = await gapi(token, 'GET', '/users/me/calendarList?minAccessRole=freeBusyReader&maxResults=100');
+      if (!r.ok) return json({ error: r.status === 403 ? 'Połącz konto Google ponownie, aby wybrać kalendarze.' : 'Google: ' + (r.data?.error?.message || r.status) }, 400);
+      return json({ items: (r.data.items || []).map((c: any) => ({ id: c.primary ? 'primary' : c.id, email: c.id, name: c.summaryOverride || c.summary, primary: !!c.primary, role: c.accessRole })) });
     }
     if (action === 'events') return json({ items: await events(memberId, Number(body.days) || 7) });
     if (action === 'disconnect') {

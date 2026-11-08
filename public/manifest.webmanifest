@@ -1,6 +1,6 @@
 {
-  "name": "RKDP · M2 TAX – aplikacja wewnętrzna",
-  "short_name": "RKDP",
+  "name": "app.R – RKDP · M2 TAX",
+  "short_name": "app.R",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

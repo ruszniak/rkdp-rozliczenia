@@ -95,6 +95,9 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.2', '8 listopada 2026', [
+    'Nowa nazwa: app.R. Spotkania zamiast Zoho: rezerwacja na stronie (rozliczenia… /umow), „Umów spotkanie” w aplikacji (z klientem albo prywatne), grafik przyjęć na każdy tydzień, rodzaje spotkań, e-maile do klientów z potwierdzeniem i przypomnieniem, wszystko w Kalendarzu Google.',
+  ]],
   ['2.1', '7 listopada 2026', [
     'Kalendarz Google: w profilu „Połącz z Google” – terminy spraw, zadania z terminem i pytania do Ciebie trafiają do osobnego kalendarza z przypomnieniami, a na Pulpicie widać najbliższe spotkania. Ciemny górny pasek na komputerze.',
     'Nowa kolorystyka „Grafit” – grafit i biel z niebieskim akcentem – oraz nowe logo: litera R ze strzałką w górę (także ikona na telefonie i w przeglądarce).',

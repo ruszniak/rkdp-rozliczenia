@@ -12,6 +12,7 @@ const call = async (action, extra = {}) => {
   if (data?.error) throw new Error(data.error);
   return data;
 };
+const put = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter(x => x != null && x !== false));
 let statusP = null;
 export const gcalStatus = (fresh = false) => (statusP && !fresh ? statusP : (statusP = call('status').catch(() => ({ configured: false, connected: false }))));
 
@@ -41,7 +42,7 @@ export function gcalCard() {
     const st = await gcalStatus(fresh);
     const head = h('div', { class: 'section-head' }, h('h2', {}, 'Kalendarz Google'), st.connected ? h('span', { class: 'badge ok' }, 'połączony') : null);
     if (!st.configured) {
-      box.replaceChildren(head, h('p', { class: 'hint' }, 'Połączenie z Kalendarzem Google nie jest jeszcze włączone przez administratora.'));
+      put(box, head, h('p', { class: 'hint' }, 'Połączenie z Kalendarzem Google nie jest jeszcze włączone przez administratora.'));
       return;
     }
     if (!st.connected) {
@@ -49,13 +50,16 @@ export function gcalCard() {
         btn.disabled = true;
         try { const r = await call('connect', { email: state.me.email }); location.href = r.url; } catch (e) { btn.disabled = false; fail(e); }
       } }, icon('plus'), 'Połącz z Google');
-      box.replaceChildren(head,
+      put(box, head,
         h('p', { style: { margin: '0 0 10px', lineHeight: 1.55 } }, 'Po połączeniu w Twoim Google pojawi się osobny kalendarz ', h('b', {}, st.calendar_name || 'RKDP – terminy i zadania'),
           ' z terminami spraw, zadaniami z terminem i pytaniami do Ciebie – z przypomnieniami dzień wcześniej o 9:00 (terminy procesowe także 3 dni wcześniej). Zrobione pozycje same znikają. Na Pulpicie zobaczysz najbliższe spotkania z Twojego kalendarza.'),
         h('p', { class: 'hint', style: { margin: '0 0 12px' } }, 'Google może pokazać ostrzeżenie „aplikacja niezweryfikowana” – to nasza wewnętrzna aplikacja; wybierz „Zaawansowane” → „Przejdź do…”, potem zaznacz zgody na kalendarz.'),
         btn);
       return;
     }
+    const reconnect = !st.can_book ? h('div', { class: 'gc-err', style: { background: '#EEF4FF', color: '#1E3A8A' } },
+      h('b', {}, 'Połącz ponownie, aby umawiać spotkania. '), 'Aplikacja potrzebuje dodatkowej zgody: dodawania spotkań do Twojego kalendarza i sprawdzania, kiedy jesteś zajęty. ',
+      h('button', { class: 'btn btn-primary btn-sm', style: { marginTop: '8px' }, onclick: async (e) => { e.target.disabled = true; try { const r = await call('connect', { email: state.me.email }); location.href = r.url; } catch (er) { e.target.disabled = false; fail(er); } } }, 'Połącz ponownie z Google')) : null;
     const syncBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
       syncBtn.disabled = true;
       try { const r = await call('sync'); toast(`Kalendarz zaktualizowany (${r.total} pozycji${r.added || r.changed || r.removed ? `: +${r.added} / zmienione ${r.changed} / usunięte ${r.removed}` : ''})`); draw(true); }
@@ -65,16 +69,17 @@ export function gcalCard() {
       if (!confirm('Odłączyć Kalendarz Google? Kalendarz „RKDP – terminy i zadania” zostanie usunięty z Twojego Google (Twoje inne wydarzenia zostają).')) return;
       try { await call('disconnect'); toast('Odłączono Kalendarz Google'); draw(true); } catch (e) { fail(e); }
     } }, 'Odłącz');
-    box.replaceChildren(head,
+    put(box, head,
       h('div', { class: 'gc-rows' },
         h('div', {}, h('span', { class: 'muted small' }, 'Konto'), h('b', {}, st.google_email || '—')),
         h('div', {}, h('span', { class: 'muted small' }, 'Kalendarz z aplikacji'), h('b', {}, st.calendar_name)),
         h('div', {}, h('span', { class: 'muted small' }, 'Ostatnia synchronizacja'), h('b', {}, ago(st.last_sync_at)))),
+      reconnect,
       st.last_error ? h('p', { class: 'gc-err' }, '⚠ ', st.last_error) : null,
       h('p', { class: 'hint', style: { margin: '10px 0 12px' } }, 'Aktualizuje się samo co 10 minut i zaraz po zmianach w aplikacji. Zmieniaj terminy i zadania w aplikacji – zmiany zrobione w Google zostaną nadpisane.'),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, syncBtn, offBtn));
   };
-  draw(false).catch(e => box.replaceChildren(h('p', { class: 'hint' }, 'Nie udało się wczytać: ' + (e.message || e))));
+  draw(false).catch(e => put(box, h('p', { class: 'hint' }, 'Nie udało się wczytać: ' + (e.message || e))));
   return box;
 }
 
@@ -90,14 +95,17 @@ export function gcalAgendaCard({ days = 7 } = {}) {
       let hide = false; try { hide = localStorage.getItem('rkdp_gcal_cta') === '0'; } catch { /* */ }
       if (hide) { box.remove(); return; }
       box.classList.add('gc-cta');
-      box.replaceChildren(h('span', { class: 'gc-ico', html: CAL_SVG }), h('div', { style: { flex: 1 } }, h('b', {}, 'Połącz Kalendarz Google'),
+      put(box, h('span', { class: 'gc-ico', html: CAL_SVG }), h('div', { style: { flex: 1 } }, h('b', {}, 'Połącz Kalendarz Google'),
         h('div', { class: 'small muted' }, 'Terminy i zadania z przypomnieniami w Twoim kalendarzu, a tutaj – Twoje najbliższe spotkania.')),
       h('a', { class: 'btn btn-primary btn-sm', href: '#/profil' }, 'Połącz'),
       h('button', { class: 'icon-btn', 'aria-label': 'Ukryj', onclick: () => { try { localStorage.setItem('rkdp_gcal_cta', '0'); } catch { /* */ } box.remove(); } }, '✕'));
       return;
     }
-    box.replaceChildren(h('div', { class: 'gc-head' }, h('span', { class: 'gc-ico', html: CAL_SVG }), h('h2', {}, 'Kalendarz'), h('span', { class: 'small muted' }, 'najbliższe ' + days + ' dni'),
-      h('a', { class: 'small', href: 'https://calendar.google.com', target: '_blank', rel: 'noopener', style: { marginLeft: 'auto' } }, 'Otwórz Google →')), h('p', { class: 'hint' }, 'Wczytywanie…'));
+    put(box, h('div', { class: 'gc-head' }, h('span', { class: 'gc-ico', html: CAL_SVG }), h('h2', {}, 'Kalendarz'), h('span', { class: 'small muted' }, 'najbliższe ' + days + ' dni'),
+      h('span', { style: { marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' } },
+        h('a', { class: 'small', href: '#/spotkania' }, 'Spotkania'),
+        h('button', { class: 'btn btn-primary btn-sm gc-add', type: 'button', onclick: () => import('./spotkania.js').then(m => m.openMeetingDialog({ onDone: () => location.reload() })) }, '+ Umów'))),
+      h('p', { class: 'hint' }, 'Wczytywanie…'));
     const { items } = await call('events', { days });
     const byDay = new Map();
     for (const e of items) {
@@ -116,7 +124,7 @@ export function gcalAgendaCard({ days = 7 } = {}) {
         e.meet ? h('span', { class: 'gc-meet' }, 'Meet') : null)))))
       : [h('p', { class: 'hint', style: { padding: '6px 0' } }, 'Brak wydarzeń w najbliższych dniach. 🙂')]));
     box.lastChild.replaceWith(list);
-  })().catch(e => { box.replaceChildren(h('p', { class: 'hint' }, 'Kalendarz Google: ' + (e.message || e) + ' ', h('a', { href: '#/profil' }, 'Profil →'))); });
+  })().catch(e => { put(box, h('p', { class: 'hint' }, 'Kalendarz Google: ' + (e.message || e) + ' ', h('a', { href: '#/profil' }, 'Profil →'))); });
   return box;
 }
 const CAL_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';

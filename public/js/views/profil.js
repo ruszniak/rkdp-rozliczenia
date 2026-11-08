@@ -32,7 +32,7 @@ function appSection() {
   offInstall?.(); offInstall = onInstallChange(drawInstall);
 
   const pushBox = h('div', {}, h('p', { class: 'hint' }, 'Sprawdzanie…'));
-  const LABELS = [['zgloszenia', 'Zadania i zgłoszenia: nowe, przypisane do mnie, pytania i odpowiedzi'], ['komentarze', 'Komentarze i wykonanie w moich zgłoszeniach'], ['terminy', 'Poranny plan dnia (dni robocze): zgłoszenia na dziś, po terminie, terminy spraw M2 TAX']];
+  const LABELS = [['zgloszenia', 'Zadania i zgłoszenia: nowe, przypisane do mnie, pytania i odpowiedzi'], ['komentarze', 'Komentarze i wykonanie w moich zgłoszeniach'], ['terminy', 'Poranny plan dnia (dni robocze): zgłoszenia na dziś, po terminie, terminy spraw M2 TAX'], ['spotkania', 'Spotkania: nowe rezerwacje ze strony, zmiany terminu i odwołania']];
   async function drawPush() {
     if (isIOS() && !isStandalone()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Na iPhonie i iPadzie powiadomienia działają tylko w aplikacji dodanej do ekranu początkowego (iOS 16.4 lub nowszy). Dodaj ją (instrukcja wyżej), otwórz z ikony i włącz powiadomienia tutaj.'), await mailToggle(false));
     if (!pushSupported()) return pushBox.replaceChildren(h('p', { class: 'small muted' }, 'Ta przeglądarka nie obsługuje powiadomień. Użyj Chrome, Edge, Firefox albo Safari w aktualnej wersji.'), await mailToggle(false));

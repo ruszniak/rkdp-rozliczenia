@@ -20,6 +20,7 @@ import { renderM2Dokumenty } from './m2pisma.js';
 import { amlCard, renderAml, amlDashCard } from '../aml/aml.js';
 import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
+import { clientMeetingsCard } from '../spotkania.js';
 import { pdfText, analyzeLetter } from '../pismo.js';
 
 const BASE = '#/doradztwo';
@@ -651,7 +652,7 @@ async function viewClient(main, id) {
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa'))),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
-    h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
+    h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
 // ================= SPOTKANIA Z KLIENTAMI (Zoho Bookings) – karta na pulpicie =================
