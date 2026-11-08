@@ -281,15 +281,6 @@ async function viewDashboard(main, params) {
       h('aside', { class: 'pl-side' }, meetingsCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2')),
       h('div', { class: 'pl-main' },
         ...teamBlocks({ zl: params?.get?.('zl') || null }),
-        h('div', { class: 'pl-head' }, h('h2', {}, 'Doradztwo M2 TAX'),
-          h('div', { style: { marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-            h('button', { class: 'btn btn-outline btn-sm', onclick: () => newMatterDialog() }, icon('plus'), 'Nowa sprawa'),
-            h('button', { class: 'btn btn-primary btn-sm', onclick: () => deadlineDialog({ onSaved: () => viewDashboard(main, params) }) }, icon('plus'), 'Nowy termin'))),
-        h('div', { class: 'tiles m2-tiles' },
-          tile(late.length, 'Terminy po czasie', `${BASE}/sprawy`, late.length > 0),
-          tile(week.length, 'Terminy w 7 dni', `${BASE}/sprawy`),
-          tile(open.length, 'Otwarte sprawy', `${BASE}/sprawy`),
-          tile(orders.filter(o => o.status === 'projekt' || o.status === 'wyslane').length, 'Zlecenia niepodpisane', `${BASE}/zlecenia`)),
         h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list,
         h('div', { class: 'table-title', style: { marginTop: '22px' } }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
         h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },
@@ -565,31 +556,48 @@ async function viewMatter(main, id, params) {
 async function viewClients(main) {
   const [clients, matters] = await Promise.all([
     fetchAll(() => sb.from('m2_clients').select('*').eq('firm', 'm2').order('name')),
-    fetchAll(() => sb.from('m2_matters').select('client_id,status').eq('firm', 'm2')),
+    fetchAll(() => sb.from('m2_matters').select('client_id,status,lead_id,second_id,assistant_id').eq('firm', 'm2')),
   ]);
   const openCount = new Map(); matters.forEach(m => { if (OPEN_STATUSES.includes(m.status)) openCount.set(m.client_id, (openCount.get(m.client_id) || 0) + 1); });
-  const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj: nazwa, NIP, e-mail, telefon…' });
-  const st = h('select', { class: 'select' }, h('option', { value: 'aktywny' }, 'Aktywni'), h('option', { value: 'archiwum' }, 'Archiwum'), h('option', { value: '' }, 'Wszyscy'));
+  // ten sam wygląd co lista klientów RKDP: nagłówek z licznikiem i przełącznikiem firmy, wyszukiwarka, etykiety, tabela
+  const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj po nazwie, NIP, e-mailu, telefonie…', 'aria-label': 'Szukaj' });
+  const f = { st: 'aktywny', who: '' };
+  const isMine = c => matters.some(m => m.client_id === c.id && OPEN_STATUSES.includes(m.status) && [m.lead_id, m.second_id, m.assistant_id].includes(state.me.id));
+  const counter = h('span', { class: 'kl-count' });
+  const chips = h('div', { class: 'zl-chips kl-chips' });
+  const statusSel = h('select', { class: 'select', 'aria-label': 'Status' }, h('option', { value: 'aktywny' }, 'Aktywny'), h('option', { value: 'archiwum' }, 'Archiwum'), h('option', { value: '' }, 'Wszyscy'));
+  statusSel.addEventListener('change', () => { f.st = statusSel.value; render(); });
   const tbody = h('tbody');
   const render = () => {
     const q = search.value.toLowerCase();
-    const rows = clients.filter(c => (!st.value || c.status === st.value) && (!q || [c.name, c.nip, c.email, c.phone, c.contact_person].some(v => (v || '').toLowerCase().includes(q))));
+    const base = clients.filter(c => !f.st || c.status === f.st);
+    const noAml = base.filter(c => !c.aml_verified_at);
+    const chip = (k, l, n) => h('button', { type: 'button', class: 'zl-chip' + (f.who === k ? ' on' : ''), onclick: () => { f.who = k; render(); } }, l, h('span', {}, String(n)));
+    chips.replaceChildren(chip('', 'Wszyscy', base.length), chip('moi', 'Moi', base.filter(isMine).length), noAml.length || f.who === 'aml' ? chip('aml', 'Brak AML', noAml.length) : null, h('label', { class: 'kl-sel' }, statusSel));
+    [...chips.childNodes].forEach(n => { if (n.nodeType === 3) n.remove(); });
+    const rows = base.filter(c => (f.who !== 'moi' || isMine(c)) && (f.who !== 'aml' || !c.aml_verified_at) && (!q || [c.name, c.nip, c.email, c.phone, c.contact_person].some(v => (v || '').toLowerCase().includes(q))));
+    counter.textContent = String(rows.length);
     tbody.replaceChildren(...(rows.length ? rows.map(c => h('tr', { class: 'click', onclick: () => { location.hash = `${BASE}/klient/${c.id}`; } },
-      h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, c.kind === 'osoba' ? 'osoba fizyczna' : 'firma', c.nip ? ` · NIP ${c.nip}` : '')),
-      h('td', { class: 'small' }, c.contact_person || '', c.phone ? h('div', {}, c.phone) : null, c.email ? h('div', {}, c.email) : null),
-      h('td', { class: 'small' }, BILLING_TYPE[c.billing_type] || '—', c.hourly_rate ? h('div', {}, money(c.hourly_rate) + ' / h') : null, c.monthly_fee ? h('div', {}, money(c.monthly_fee) + ' / mies.') : null),
+      h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, c.nip ? `NIP ${c.nip}` : '')),
+      h('td', { class: 'small' }, c.kind === 'osoba' ? 'osoba fizyczna' : 'firma'),
+      h('td', { class: 'small' }, BILLING_TYPE[c.billing_type] || '—', c.hourly_rate ? h('div', { class: 'muted' }, money(c.hourly_rate) + ' / h') : null, c.monthly_fee ? h('div', { class: 'muted' }, money(c.monthly_fee) + ' / mies.') : null),
+      h('td', { class: 'small' }, c.contact_person || '', c.phone ? h('div', {}, c.phone) : null, c.email ? h('div', { class: 'muted' }, c.email) : null),
       h('td', {}, c.aml_verified_at ? h('span', { class: 'badge ok', 'data-tip': `Ryzyko: ${AML_RISK[c.aml_risk] || '—'}` }, 'AML ' + fmtDate(c.aml_verified_at)) : h('span', { class: 'badge warn' }, 'brak AML')),
       h('td', { class: 'small' }, String(openCount.get(c.id) || 0))))
-      : [h('tr', {}, h('td', { colspan: 5, class: 'empty' }, clients.length ? 'Brak wyników.' : 'Dodaj pierwszego klienta M2 TAX.'))]));
+      : [h('tr', {}, h('td', { colspan: 6, class: 'empty' }, clients.length ? 'Brak wyników.' : 'Dodaj pierwszego klienta M2 TAX.'))]));
   };
-  let st2; search.addEventListener('input', () => { clearTimeout(st2); st2 = setTimeout(render, 180); }); st.addEventListener('change', render);
+  let st2; search.addEventListener('input', () => { clearTimeout(st2); st2 = setTimeout(render, 180); });
   const sw = firmSwitch('m2', { m2: clients.filter(c => c.status === 'aktywny').length });
   if (sw) sb.from('clients').select('id', { count: 'exact', head: true }).eq('status', 'aktywny').then(({ count }) => { if (count != null) { const n = sw.querySelector('.firm-rkdp'); n?.append(h('span', { class: 'firm-seg-n' }, String(count))); } }, () => {});
-  main.replaceChildren(...header('klienci', bothFirms() ? 'Klienci' : 'Klienci M2 TAX', bothFirms() ? 'Klienci M2 TAX – tylko doradztwo podatkowe: dane, kontakty, stawki, sprawy i AML.' : 'Osobna baza klientów doradztwa – dane, kontakty, stawki i weryfikacja AML.',
-    [sw, h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/aml` }, 'Weryfikacja AML'), h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/klient/nowy` }, icon('plus'), 'Nowy klient')]),
-  h('div', { class: 'toolbar' }, search, st),
-  h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-    h('thead', {}, h('tr', {}, ...['Klient', 'Kontakt', 'Rozliczenie', 'AML', 'Otwarte sprawy'].map(t => h('th', {}, t)))), tbody)));
+  main.replaceChildren(
+    h('div', { class: 'kl-head' }, h('h1', {}, 'Klienci'), counter, sw,
+      h('span', { class: 'kl-acts' },
+        h('a', { class: 'btn btn-outline', href: `${BASE}/aml` }, 'Weryfikacja AML'),
+        h('a', { class: 'btn btn-primary kl-add', href: `${BASE}/klient/nowy`, 'aria-label': 'Dodaj klienta' }, icon('plus'), h('span', { class: 'kl-add-t' }, 'Dodaj klienta')))),
+    h('label', { class: 'kl-search' }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' }), search),
+    chips,
+    h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
+      h('thead', {}, h('tr', {}, ...['Klient', 'Forma', 'Rozliczenie', 'Kontakt', 'AML', 'Otwarte sprawy'].map(t => h('th', {}, t)))), tbody)));
   render();
 }
 

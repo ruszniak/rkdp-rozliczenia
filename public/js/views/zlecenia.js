@@ -141,7 +141,9 @@ export function teamBlocks({ zl = null } = {}) {
   import('./moje.js').then(m => m.renderMoje(sprawy, new URLSearchParams(), { embed: true, noTasks: true }));
   return [
     h('div', { class: 'pl-head pl-first' }, h('h2', {}, 'Zadania zespołu'),
-      h('button', { class: 'btn btn-primary mj-add', type: 'button', style: { marginLeft: 'auto' }, onclick: () => newZlecenie(() => draw0()) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie'))),
+      h('div', { class: 'pl-acts' },
+        h('button', { class: 'btn btn-outline mj-add', type: 'button', onclick: () => import('./m2.js').then(m => m.newMatterDialog()) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Sprawa')),
+        h('button', { class: 'btn btn-primary mj-add', type: 'button', onclick: () => newZlecenie(() => draw0()) }, icon('plus'), h('span', { class: 'mj-add-t' }, 'Zadanie')))),
     team,
     h('div', { class: 'pl-head' }, h('h2', {}, 'Terminy i pytania')), sprawy];
 }
