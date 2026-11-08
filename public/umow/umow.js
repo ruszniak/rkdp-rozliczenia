@@ -103,7 +103,7 @@
       h('p', { class: 'lbl' }, 'Rodzaj spotkania'),
       h('div', { class: 'typs' }, types.map(function (t) {
         return h('button', { type: 'button', class: 'typ' + (st.type && st.type.id === t.id ? ' on' : ''), onclick: function () { st.type = t; st.day = null; st.slot = null; loadSlots(); } },
-          h('img', { class: 'ph', src: '/umow/img/' + (t.mode === 'office' ? 'stacjonarne' : 'online') + '.jpg', alt: '', width: 48, height: 48, loading: 'lazy' }),
+          h('span', { class: 'ic', html: ICON[t.mode] || ICON.meet }),
           h('span', null, h('b', null, t.name), h('small', null, (t.duration_min >= 60 ? (t.duration_min / 60 + ' godz.').replace('.5', ',5') : t.duration_min + ' min') + ' · ' + (t.mode === 'office' ? (t.place || 'stacjonarnie').replace(/^RKDP Doradztwo Podatkowe, /, '') : t.mode === 'phone' ? 'telefonicznie' : 'online (Google Meet)'))),
           priceOf(t) > 0 ? h('span', { class: 'free price' }, zl(priceOf(t))) : h('span', { class: 'free' }, '0 zł'));
       })),
