@@ -1,4 +1,4 @@
-import { h, toast, fail, infoTip } from '../ui.js';
+import { h, toast, fail, infoTip, modal } from '../ui.js';
 import { sb, state } from '../store.js';
 import { ROLE, RULE } from '../dict.js';
 import { fetchAll } from './rozliczenia.js';
@@ -19,62 +19,69 @@ export async function renderZespol(main) {
     if (error) throw error; state.members = data;
   };
 
-  // ---------- zespół ----------
-  const teamBody = h('tbody');
+  // ---------- zespół: lista osób + karta osoby (zamiast szerokiej tabeli) ----------
+  const teamList = h('div', { class: 'tm-list' });
   const assignPanel = h('div');
+  let tf = { q: '', st: 'aktywni' };
+  let openId = null, closeCard = null;
+  const firmLabel = m => { const md = m.modules || ['rozliczenia']; return md.includes('jpk') ? ['Tylko JPK'] : [md.includes('rozliczenia') && 'RKDP', md.includes('doradztwo') && 'M2 TAX'].filter(Boolean); };
+  const avatar = m => h('span', { class: 'tm-av' }, m.avatar ? h('img', { src: m.avatar, alt: '' }) : (m.full_name || '?').split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase());
+  const sw = (checked, disabled, onchange, label, tip) => h('label', { class: 'tm-sw', 'data-tip': tip || null }, h('input', { type: 'checkbox', checked, disabled, onchange: e => onchange(e.target.checked) }), h('span', { class: 'tm-sw-ui', 'aria-hidden': 'true' }), h('span', {}, label));
+  const seg = (opts, value, disabled, onpick) => h('div', { class: 'tm-seg' + (disabled ? ' dis' : '') }, ...opts.map(([k, l, tip]) => h('button', { type: 'button', class: k === value ? 'on' : '', disabled, 'data-tip': tip || null, onclick: () => onpick(k) }, l)));
   function renderTeam() {
-    teamBody.replaceChildren(...state.members.map(m => {
-      const role = h('select', { class: 'select', disabled: m.id === state.me.id }, Object.entries(ROLE).map(([k, v]) => h('option', { value: k }, v)));
-      role.value = m.role;
-      role.addEventListener('change', () => update(m, { role: role.value }));
-      const active = h('input', { type: 'checkbox', checked: m.active, disabled: m.id === state.me.id });
-      active.addEventListener('change', () => update(m, { active: active.checked }));
-      const att = h('input', { type: 'checkbox', checked: !!m.attendance });
-      att.addEventListener('change', () => update(m, { attendance: att.checked }));
-      const mods = m.modules || ['rozliczenia'];
-      const modBox = (key, label) => {
-        const cb = h('input', { type: 'checkbox', checked: mods.includes(key), disabled: m.id === state.me.id });
-        cb.addEventListener('change', () => {
-          // „Tylko podgląd JPK” wyklucza pozostałe moduły i zawsze oznacza dostęp ograniczony
-          if (key === 'jpk') return update(m, cb.checked ? { modules: ['jpk'], role: 'limited' } : { modules: ['rozliczenia'] });
-          const next = cb.checked ? [...new Set([...mods.filter(x => x !== 'jpk'), key])] : mods.filter(x => x !== key);
-          update(m, { modules: next.length ? next : ['jpk'] });
-        });
-        return h('label', { class: 'check small' }, cb, label);
-      };
-      const count = assigns.filter(a => a.member_id === m.id).length;
-      let loginCell = h('td', { class: 'small muted' }, '—');
-      if (devices !== null) {
-        const allow = h('input', { type: 'checkbox', checked: !!m.can_set_password });
-        allow.addEventListener('change', () => update(m, { can_set_password: allow.checked }));
-        const mine = devices.filter(d => d.member_id === m.id && new Date(d.expires_at) > new Date());
-        const revoke = h('button', { class: 'btn btn-ghost btn-sm', 'data-tip': 'Zapomina zapamiętane przeglądarki i kończy sesje tej osoby na innych urządzeniach (przy następnym wejściu musi podać hasło i kod).',
-          onclick: async () => {
-            if (!confirm(`Wylogować ${m.full_name} ze wszystkich urządzeń i zapomnieć zapamiętane przeglądarki?`)) return;
-            const { error } = await sb.rpc('admin_revoke_member', { p_member: m.id });
-            if (error) return fail(error);
-            toast('Wylogowano ze wszystkich urządzeń'); await loadDevices(); renderTeam();
-          } }, 'Wyloguj wszędzie');
-        loginCell = h('td', { class: 'small' },
-          m.password_set_at ? h('div', {}, `hasło ustawione ${fmtD(m.password_set_at)}`) : h('div', { class: 'muted' }, 'hasło nieustawione'),
-          h('label', { class: 'check small', 'data-tip': 'Pozwala jeden raz ustawić nowe hasło przez „Pierwsze logowanie / ustaw nowe hasło” (np. gdy ktoś zapomniał hasła). Po ustawieniu zgoda sama się wyłącza.' },
-            allow, 'zgoda na nowe hasło'),
-          h('div', { class: 'muted', 'data-tip': mine.map(d => `${d.label || 'przeglądarka'} – od ${fmtD(d.created_at)}, ostatnio ${fmtD(d.last_used_at || d.created_at)}`).join(' · ') || null },
-            `zapamiętane przeglądarki: ${mine.length}`),
-          revoke);
-      }
+    const q = tf.q.toLowerCase();
+    const list = state.members.filter(m => (tf.st === 'wszyscy' || (tf.st === 'aktywni' ? m.active : !m.active)) && (!q || `${m.full_name} ${m.email} ${m.short_name}`.toLowerCase().includes(q)));
+    teamList.replaceChildren(...(list.length ? list.map(m => {
       const nAcc = clients.filter(c => c.accountant_id === m.id).length, nHr = clients.filter(c => c.hr_id === m.id).length;
-      return h('tr', {},
-        h('td', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, m.email)),
-        h('td', {}, m.short_name),
-        h('td', {}, h('span', { 'data-tip': 'RKDP – cała aplikacja: rozliczenia, klienci RKDP, sprawy doradcze RKDP. Zakres (wszyscy klienci / tylko swoi) ustawia rola.' }, modBox('rozliczenia', 'RKDP')), h('br'), h('span', { 'data-tip': 'M2 TAX – tylko doradztwo: klienci M2 TAX, ich sprawy, zlecenia, umowy i pisma.' }, modBox('doradztwo', 'M2 TAX (doradztwo)')), h('br'), h('span', { 'data-tip': 'Konto, które widzi wyłącznie zakładkę JPK (podgląd plików JPK_CIT). Nie ma dostępu do klientów, rozliczeń ani M2 TAX.' }, modBox('jpk', 'Tylko podgląd JPK'))),
-        h('td', {}, role),
-        h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany'),
-          h('label', { class: 'check small', 'data-tip': 'Czy ta osoba prowadzi listę obecności (widżet „Moja obecność dziś”, listy obecności, „Obecność dziś” na pulpicie).' }, att, 'lista obecności')),
-        loginCell,
-        h('td', { class: 'small' }, `księgowość: ${nAcc}`, h('br'), `kadry: ${nHr}`),
-        h('td', {}, h('button', { class: 'btn btn-ghost btn-sm', onclick: () => renderAssign(m) }, `Dodatkowy dostęp (${count})`)));
-    }));
+      const extra = assigns.filter(a => a.member_id === m.id).length;
+      return h('button', { type: 'button', class: 'tm-row' + (m.active ? '' : ' off'), onclick: () => openCard(m.id) },
+        avatar(m),
+        h('span', { class: 'tm-who' }, h('b', {}, m.full_name, m.id === state.me.id ? h('small', { class: 'tm-me' }, 'Ty') : null), h('small', {}, m.email)),
+        h('span', { class: 'tm-tags' }, ...firmLabel(m).map(f => h('span', { class: 'tm-tag' + (f === 'M2 TAX' ? ' m2' : f === 'Tylko JPK' ? ' jpk' : '') }, f))),
+        h('span', { class: 'tm-role' }, ROLE[m.role] || m.role),
+        h('span', { class: 'tm-meta' }, nAcc || nHr ? `prowadzi ${nAcc + nHr}` : '', extra ? ` · +${extra} wgląd` : ''),
+        h('span', { class: 'tm-state' + (m.active ? '' : ' off') }, m.active ? 'aktywny' : 'zablokowany'),
+        h('span', { class: 'tm-go', 'aria-hidden': 'true' }, '›'));
+    }) : [h('p', { class: 'hint', style: { padding: '18px' } }, 'Nikogo nie znaleziono.')]));
+    if (openId) drawCard();
+  }
+  const cardBody = h('div', { class: 'tm-card' });
+  function openCard(id) {
+    openId = id; drawCard();
+    closeCard = modal(state.members.find(x => x.id === id)?.full_name || 'Osoba', cardBody, close => [h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); } }, 'Gotowe')]);
+  }
+  function drawCard() {
+    const m = state.members.find(x => x.id === openId);
+    if (!m) return;
+    const self = m.id === state.me.id;
+    const mods = m.modules || ['rozliczenia'];
+    const firm = mods.includes('jpk') ? 'jpk' : mods.includes('rozliczenia') && mods.includes('doradztwo') ? 'oba' : mods.includes('doradztwo') ? 'doradztwo' : 'rozliczenia';
+    const setFirm = k => update(m, k === 'jpk' ? { modules: ['jpk'], role: 'limited' } : { modules: k === 'oba' ? ['rozliczenia', 'doradztwo'] : [k] });
+    const nAcc = clients.filter(c => c.accountant_id === m.id).length, nHr = clients.filter(c => c.hr_id === m.id).length;
+    const extra = assigns.filter(a => a.member_id === m.id).length;
+    const mine = (devices || []).filter(d => d.member_id === m.id && new Date(d.expires_at) > new Date());
+    cardBody.replaceChildren(
+      h('div', { class: 'tm-head' }, avatar(m), h('div', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, `${m.email} · skrót: ${m.short_name || '—'}${m.job_title ? ' · ' + m.job_title : ''}`))),
+      h('section', { class: 'tm-sec' }, h('h3', {}, 'Dostęp'),
+        h('div', { class: 'tm-field' }, h('span', {}, 'Firma'), seg([['rozliczenia', 'RKDP', 'Cała aplikacja: rozliczenia, klienci RKDP, sprawy doradcze RKDP'], ['doradztwo', 'M2 TAX', 'Tylko doradztwo: klienci M2 TAX, sprawy, zlecenia, umowy, pisma'], ['oba', 'Obie'], ['jpk', 'Tylko JPK', 'Widzi wyłącznie podgląd plików JPK']], firm, self, setFirm)),
+        h('div', { class: 'tm-field' }, h('span', {}, 'Zakres'), seg(Object.entries(ROLE).map(([k, v]) => [k, v]), m.role, self || firm === 'jpk', k => update(m, { role: k }))),
+        self ? h('p', { class: 'small muted', style: { margin: '4px 0 0' } }, 'Swojego dostępu nie możesz zmienić.') : null),
+      h('section', { class: 'tm-sec' }, h('h3', {}, 'Konto'),
+        sw(m.active, self, v => update(m, { active: v }), m.active ? 'Konto aktywne' : 'Konto zablokowane', 'Zablokowanie działa natychmiast'),
+        sw(!!m.attendance, false, v => update(m, { attendance: v }), 'Prowadzi listę obecności')),
+      devices !== null ? h('section', { class: 'tm-sec' }, h('h3', {}, 'Logowanie'),
+        h('p', { class: 'small', style: { margin: '0 0 8px' } }, m.password_set_at ? `Hasło ustawione ${fmtD(m.password_set_at)}` : h('span', { class: 'muted' }, 'Hasło jeszcze nieustawione'),
+          ` · zapamiętane przeglądarki: ${mine.length}`),
+        sw(!!m.can_set_password, false, v => update(m, { can_set_password: v }), 'Zgoda na ustawienie nowego hasła', 'Jednorazowo – np. gdy ktoś zapomniał hasła. Po ustawieniu zgoda sama się wyłącza.'),
+        h('button', { class: 'btn btn-outline btn-sm', style: { marginTop: '8px' }, onclick: async () => {
+          if (!confirm(`Wylogować ${m.full_name} ze wszystkich urządzeń i zapomnieć zapamiętane przeglądarki?`)) return;
+          const { error } = await sb.rpc('admin_revoke_member', { p_member: m.id });
+          if (error) return fail(error);
+          toast('Wylogowano ze wszystkich urządzeń'); await loadDevices(); renderTeam();
+        } }, 'Wyloguj ze wszystkich urządzeń')) : null,
+      h('section', { class: 'tm-sec' }, h('h3', {}, 'Klienci'),
+        h('div', { class: 'tm-stats' }, h('div', {}, h('b', {}, String(nAcc)), h('small', {}, 'księgowość')), h('div', {}, h('b', {}, String(nHr)), h('small', {}, 'kadry')), h('div', {}, h('b', {}, String(extra)), h('small', {}, 'dodatkowy wgląd'))),
+        h('button', { class: 'btn btn-outline btn-sm', style: { marginTop: '10px' }, onclick: () => { closeCard?.(); openId = null; renderAssign(m); } }, 'Ustaw dodatkowy wgląd do klientów')));
   }
   async function update(m, patch) {
     const { error } = await sb.from('team_members').update(patch).eq('id', m.id);
@@ -82,26 +89,31 @@ export async function renderZespol(main) {
     await reloadMembers(); renderTeam();
   }
 
-  const addForm = (() => {
-    const email = h('input', { class: 'input', type: 'email', placeholder: 'adres@rkdp.pl', required: true });
-    const name = h('input', { class: 'input', placeholder: 'Imię i nazwisko', required: true });
-    const short = h('input', { class: 'input', placeholder: 'Skrót (np. Kuba)', required: true });
-    const role = h('select', { class: 'select' }, Object.entries(ROLE).map(([k, v]) => h('option', { value: k }, v)));
-    role.value = 'limited';
-    const mod = h('select', { class: 'select', 'aria-label': 'Moduł' }, h('option', { value: 'rozliczenia' }, 'Firma: RKDP (cała aplikacja)'),
-      h('option', { value: 'doradztwo' }, 'Firma: M2 TAX (doradztwo)'), h('option', { value: 'oba' }, 'Obie firmy: RKDP i M2 TAX'), h('option', { value: 'jpk' }, 'Tylko podgląd JPK'));
-    mod.addEventListener('change', () => { if (mod.value === 'jpk') role.value = 'limited'; });
-    return h('form', { class: 'toolbar', style: { marginTop: '14px' }, onsubmit: async (e) => {
-      e.preventDefault();
-      const modules = mod.value === 'oba' ? ['rozliczenia', 'doradztwo'] : [mod.value];
-      // konto „tylko JPK” zawsze z dostępem ograniczonym – nie widzi żadnych klientów
-      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: mod.value === 'jpk' ? 'limited' : role.value, modules });
+  const addPerson = () => {
+    const email = h('input', { class: 'input', type: 'email', placeholder: 'adres@rkdp.pl' });
+    const name = h('input', { class: 'input', placeholder: 'Imię i nazwisko' });
+    const short = h('input', { class: 'input', placeholder: 'np. Kuba' });
+    let firm = 'rozliczenia', role = 'limited';
+    const fBox = h('div'), rBox = h('div');
+    const draw = () => { fBox.replaceChildren(seg([['rozliczenia', 'RKDP'], ['doradztwo', 'M2 TAX'], ['oba', 'Obie'], ['jpk', 'Tylko JPK']], firm, false, k => { firm = k; if (k === 'jpk') role = 'limited'; draw(); }));
+      rBox.replaceChildren(seg(Object.entries(ROLE).map(([k, v]) => [k, v]), role, firm === 'jpk', k => { role = k; draw(); })); };
+    draw();
+    modal('Dodaj osobę', h('div', { class: 'form-grid' },
+      h('label', { class: 'field wide' }, h('span', {}, 'E-mail (login)'), email), h('label', { class: 'field' }, h('span', {}, 'Imię i nazwisko'), name), h('label', { class: 'field' }, h('span', {}, 'Skrót'), short),
+      h('div', { class: 'field wide' }, h('span', {}, 'Firma'), fBox), h('div', { class: 'field wide' }, h('span', {}, 'Zakres'), rBox),
+      h('p', { class: 'hint wide', style: { margin: 0 } }, 'Ta osoba zaloguje się przez „Pierwsze logowanie”: kod z e-maila, potem własne hasło.')),
+    close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async () => {
+      if (!email.value.trim() || !name.value.trim() || !short.value.trim()) return toast('Uzupełnij e-mail, imię i nazwisko oraz skrót', true);
+      const modules = firm === 'oba' ? ['rozliczenia', 'doradztwo'] : [firm];
+      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: firm === 'jpk' ? 'limited' : role, modules });
       if (error) return fail(error);
-      toast('Dodano. Ta osoba loguje się przez „Pierwsze logowanie”: kod z e-maila, potem własne hasło.');
-      e.target.reset(); role.value = 'limited';
-      await reloadMembers(); renderTeam();
-    } }, email, name, short, role, mod, h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, 'Dodaj osobę'));
-  })();
+      close(); toast('Dodano osobę'); await reloadMembers(); renderTeam();
+    } }, 'Dodaj')]);
+  };
+  const search = h('input', { class: 'input', type: 'search', placeholder: 'Szukaj osoby…', oninput: e => { tf.q = e.target.value; renderTeam(); } });
+  const stChips = h('div', { class: 'firm-chips' });
+  const drawSt = () => stChips.replaceChildren(...[['aktywni', 'Aktywni'], ['zablokowani', 'Zablokowani'], ['wszyscy', 'Wszyscy']].map(([k, l]) => h('button', { type: 'button', class: 'chip' + (tf.st === k ? ' on' : ''), onclick: () => { tf.st = k; drawSt(); renderTeam(); } }, l)));
+  drawSt();
 
   function renderAssign(m) {
     const mine = new Set(assigns.filter(a => a.member_id === m.id).map(a => a.client_id));
@@ -176,11 +188,10 @@ export async function renderZespol(main) {
     h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'Administracja'), h('h1', { style: { marginTop: '6px' } }, 'Zespół i ustawienia'),
       h('p', { class: 'sub' }, 'Kto ma dostęp do aplikacji i których klientów widzi.'))),
     h('section', { class: 'card section' },
-      h('div', { class: 'section-head' }, h('h2', {}, 'Zespół')),
-      h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-        h('thead', {}, h('tr', {}, ['Osoba', 'Skrót', 'Moduły', 'Dostęp (Rozliczenia)', 'Konto', 'Logowanie', 'Prowadzi', 'Wgląd do innych'].map(t => h('th', {}, t)))), teamBody)),
-      addForm,
-      h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Logować się mogą wyłącznie aktywne adresy z tej listy: hasłem i kodem z e-maila (albo hasłem w zapamiętanej przeglądarce). Zablokowanie konta działa natychmiast.')),
+      h('div', { class: 'section-head' }, h('h2', {}, 'Zespół'), h('button', { class: 'btn btn-primary btn-sm', onclick: addPerson }, '+ Dodaj osobę')),
+      h('div', { class: 'tm-tools' }, search, stChips),
+      teamList,
+      h('p', { class: 'hint', style: { marginTop: '10px' } }, 'Kliknij osobę, żeby zmienić dostęp, konto i logowanie. Logować się mogą wyłącznie aktywne adresy z tej listy: hasłem i kodem z e-maila (albo hasłem w zapamiętanej przeglądarce). Zablokowanie konta działa natychmiast.')),
     assignPanel,
     h('section', { class: 'card section', style: { marginTop: '16px' } },
       h('div', { class: 'section-head' }, h('h2', {}, 'Kolumny listy kontrolnej'), addTask),

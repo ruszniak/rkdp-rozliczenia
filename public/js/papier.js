@@ -33,6 +33,6 @@ export function paper({ title, subtitle = '', body, landscape = false, extraCss 
 <style>@page{size:A4 ${landscape ? 'landscape' : 'portrait'};margin:12mm 12mm 16mm}${PAPER_CSS}${extraCss}</style></head><body>
 <div class="ph"><div><h1>${esc(title)}</h1><p>${esc(subtitle)}${subtitle ? ' · ' : ''}wygenerowano ${esc(now)}</p></div><img src="${location.origin}/logo-rkdp.png" alt="RKDP"></div>
 ${body}
-<div class="pf"><span>RKDP spółka doradztwa podatkowego sp. z o.o. · dokument wewnętrzny – dane objęte tajemnicą doradcy podatkowego</span><span>rozliczenia.rkdp.pl</span></div>
+<div class="pf"><span>RKDP spółka doradztwa podatkowego sp. z o.o. · dokument wewnętrzny – dane objęte tajemnicą doradcy podatkowego</span><span>app.ruszniak.io</span></div>
 </body></html>`;
 }

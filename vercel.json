@@ -44,6 +44,10 @@
       "source": "/umow/(.*)",
       "headers": [
         {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
           "key": "X-Content-Type-Options",
           "value": "nosniff"
         },
@@ -146,6 +150,19 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "rozliczenia.rkdp.pl"
+        }
+      ],
+      "destination": "https://app.ruszniak.io/:path*",
+      "permanent": true
     }
   ]
 }

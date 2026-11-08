@@ -1,4 +1,4 @@
-// Wersja demonstracyjna aplikacji (rozliczenia.rkdp.pl/demo/) – WYŁĄCZNIE FIKCYJNE DANE generowane w przeglądarce.
+// Wersja demonstracyjna aplikacji (app.ruszniak.io/demo/) – WYŁĄCZNIE FIKCYJNE DANE generowane w przeglądarce.
 // Nic nie łączy się z prawdziwą bazą; zmiany trwają do odświeżenia strony.
 (function () {
   // ---- osobna „pamięć przeglądarki” dla wersji demo (żeby nie mieszała się z prawdziwą aplikacją na tym samym adresie) ----

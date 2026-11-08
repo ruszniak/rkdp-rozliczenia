@@ -13,7 +13,7 @@ const CONTACT = 'kancelaria@rkdp.pl';
 // ---------- treści ----------
 export const PRIVACY = [
   ['1. Czego dotyczy polityka', [
-    'Polityka opisuje, jakie informacje zapisuje i przetwarza aplikacja „RKDP Rozliczenia” (rozliczenia.rkdp.pl) – w przeglądarce, w aplikacji zainstalowanej na komputerze lub telefonie oraz na serwerach.',
+    'Polityka opisuje, jakie informacje zapisuje i przetwarza aplikacja „RKDP Rozliczenia” (app.ruszniak.io) – w przeglądarce, w aplikacji zainstalowanej na komputerze lub telefonie oraz na serwerach.',
     `Właścicielem aplikacji jest ${OWNER} (dalej „RKDP”).`,
     'Aplikacja jest narzędziem wewnętrznym – korzystają z niej wyłącznie osoby, którym RKDP nadało dostęp. Nie służy do sprzedaży, reklamy ani profilowania.',
   ]],
@@ -27,7 +27,7 @@ export const PRIVACY = [
     'Aplikacja nie używa plików cookies do celów reklamowych ani statystycznych i nie korzysta z narzędzi analitycznych (np. Google Analytics). Nie wyświetla banera cookies, bo zapisuje wyłącznie informacje niezbędne do działania.',
     'W pamięci przeglądarki (localStorage) zapisywane są: dane sesji logowania, znacznik „zapamiętanej przeglądarki” (jeśli go wybrano), preferencje widoku (motyw jasny/ciemny, układ tabel, filtry), czas ostatniej aktywności (do automatycznego wylogowania) oraz identyfikator klucza Face ID na tym telefonie.',
     'Aplikacja zainstalowana na urządzeniu zapisuje kopię plików strony (service worker), aby szybko się uruchamiała i pokazywała komunikat przy braku internetu. Dane klientów nie są w tej kopii zapisywane.',
-    'Wylogowanie usuwa dane sesji z urządzenia. Pełne wyczyszczenie: ustawienia przeglądarki → dane witryny rozliczenia.rkdp.pl.',
+    'Wylogowanie usuwa dane sesji z urządzenia. Pełne wyczyszczenie: ustawienia przeglądarki → dane witryny app.ruszniak.io.',
   ]],
   ['4. Logowanie, Face ID i powiadomienia', [
     'Logowanie wymaga hasła i jednorazowego kodu wysyłanego na służbowy e-mail. Hasła są przechowywane wyłącznie w postaci zabezpieczonego skrótu – nikt, także administrator, ich nie zna.',

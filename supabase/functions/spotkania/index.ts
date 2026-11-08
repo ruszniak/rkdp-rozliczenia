@@ -67,7 +67,7 @@ async function settings() {
     admin.from('booking_settings').select('*').eq('id', 1).single(),
     admin.from('app_settings').select('value').eq('key', 'app_url').maybeSingle(),
   ]);
-  return { ...(s || {}), app_url: (u?.value || 'https://rozliczenia.rkdp.pl').replace(/\/$/, '') } as any;
+  return { ...(s || {}), app_url: (u?.value || 'https://app.ruszniak.io').replace(/\/$/, '') } as any;
 }
 async function hookSecret() { const { data } = await admin.rpc('push_get_config'); return data?.push_hook_secret || ''; }
 
@@ -155,6 +155,8 @@ async function computeSlots(S: any, o: Opts) {
     for (const m of o.members) {
       const ov = (days || []).find((x: any) => x.member_id === m && x.day === d);
       const ranges: string[][] = ov ? ov.ranges : holiday ? [] : ((hours || []).find((x: any) => x.member_id === m && x.weekday === weekday(d))?.ranges || []);
+      // na stronie: tylko doradcy z połączonym Kalendarzem Google (inaczej nie znamy ich zajętości)
+      if (!o.staff && !google[m]) continue;
       const bz = busy.get(m) || [];
       const count = bz.filter(b => b.mid && dayOf(b.s) === d).length;
       if (!o.staff && count >= (S.max_per_day || 99)) continue;

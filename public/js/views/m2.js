@@ -325,8 +325,9 @@ async function viewMatters(main, params) {
         h('td', { class: 'small' }, m.authority || '', m.case_ref ? h('div', { class: 'muted' }, m.case_ref) : null),
         h('td', {}, statusPill(m.status)),
         h('td', {}, personChips([m.lead_id, m.second_id, m.assistant_id])),
+        h('td', { class: 'small' }, m.due_date ? h('span', { class: m.due_date < today && OPEN_STATUSES.includes(m.status) ? 'err' : '', title: m.due_approx ? 'Termin orientacyjny' : 'Termin realizacji' }, h('b', {}, (m.due_approx ? 'ok. ' : '') + fmtDate(m.due_date)), m.due_approx ? h('div', { class: 'muted' }, 'orientacyjnie') : null) : h('span', { class: 'muted' }, '—')),
         h('td', { class: 'small' }, n ? h('span', { class: n.due_date < today ? 'err' : '' }, h('b', {}, fmtDate(n.due_date)), h('div', { class: 'muted' }, n.title)) : h('span', { class: 'muted' }, '—')));
-    }) : [h('tr', {}, h('td', { colspan: 7, class: 'empty' }, matters.length ? 'Brak spraw dla wybranych filtrów.' : 'Nie ma jeszcze spraw. Sprawa zakłada się automatycznie przy nowym zleceniu lub umowie.'))]));
+    }) : [h('tr', {}, h('td', { colspan: 8, class: 'empty' }, matters.length ? 'Brak spraw dla wybranych filtrów.' : 'Nie ma jeszcze spraw. Sprawa zakłada się automatycznie przy nowym zleceniu lub umowie.'))]));
   };
   let st1; search.addEventListener('input', () => { clearTimeout(st1); st1 = setTimeout(() => { f.q = search.value; render(); }, 180); });
   st.addEventListener('change', () => { f.status = st.value; render(); });
@@ -336,7 +337,7 @@ async function viewMatters(main, params) {
     h('button', { class: 'btn btn-primary btn-sm', onclick: () => newMatterDialog({ firm: f.firm || null }) }, icon('plus'), 'Nowa sprawa')),
   ...[chips].filter(Boolean), h('div', { class: 'toolbar' }, search, st, ty, pe),
   h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
-    h('thead', {}, h('tr', {}, ...['Nr', 'Sprawa', 'Klient', 'Organ / sygnatura', 'Status', 'Zespół', 'Najbliższy termin'].map(t => h('th', {}, t)))), tbody)));
+    h('thead', {}, h('tr', {}, ...['Nr', 'Sprawa', 'Klient', 'Organ / sygnatura', 'Status', 'Zespół', 'Termin realizacji', 'Najbliższy termin'].map(t => h('th', {}, t)))), tbody)));
   render();
 }
 
@@ -397,6 +398,7 @@ async function viewMatter(main, id, params) {
     ['lead_id', 'Doradca prowadzący', 'select', memberOpts(m.firm)], ['second_id', 'Drugi doradca', 'select', memberOpts(m.firm)], ['assistant_id', 'Asystent(ka)', 'select', memberOpts(m.firm)],
     ['poa_type', 'Pełnomocnictwo (np. PPS-1, UPL-1)', 'text'], ['poa_date', 'Data pełnomocnictwa', 'date'],
     ['opened_at', 'Data rozpoczęcia', 'date'], ['closed_at', 'Data zakończenia', 'date'],
+    ['due_date', 'Termin realizacji sprawy (planowany)', 'date'], ['due_approx', 'Ten termin jest', 'select', { false: 'dokładny', true: 'orientacyjny (ok.)' }],
     ['fee_type', 'Wynagrodzenie', 'select', FEE_TYPE], ['fee_amount', 'Kwota / stawka (zł netto)', 'number'], ['estimated_hours', 'Szacowany czas (h)', 'number'],
     ['description', 'Opis sprawy, stan faktyczny', 'textarea'], ['outcome', 'Rozstrzygnięcie / wynik', 'textarea'],
   ];
@@ -404,6 +406,7 @@ async function viewMatter(main, id, params) {
   async function save() {
     if (!draft.title || !draft.order_id) return toast('Podaj tytuł i wybierz zlecenie lub umowę', true);
     const row = {}; defs.forEach(([k]) => { row[k] = draft[k] ?? null; });
+    row.due_approx = String(row.due_approx) === 'true';
     if (row.status === 'zakonczona' && !row.closed_at) row.closed_at = todayIso();
     saveBtn.disabled = true;
     const q = isNew ? sb.from('m2_matters').insert(row).select('id').single() : sb.from('m2_matters').update(row).eq('id', id).select('id').single();
@@ -437,8 +440,12 @@ async function viewMatter(main, id, params) {
   const client = (await sb.from('m2_clients').select('id,name,hourly_rate,billing_type').eq('id', m.client_id).maybeSingle()).data;
   const reload = () => viewMatter(main, id, params);
 
+  const dueLate = m.due_date && m.due_date < todayIso() && OPEN_STATUSES.includes(m.status);
   const dlCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Terminy'),
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => deadlineDialog({ matter: m, onSaved: reload }) }, '+ Termin')),
+  h('div', { class: 'm2-due' + (dueLate ? ' late' : '') }, h('span', { class: 'muted small' }, 'Termin realizacji sprawy'),
+    m.due_date ? h('b', {}, (m.due_approx ? 'ok. ' : '') + fmtDate(m.due_date), m.due_approx ? h('span', { class: 'muted small', style: { fontWeight: 500 } }, ' · orientacyjnie') : null, dueLate ? h('span', { class: 'small', style: { fontWeight: 600 } }, ' · minął') : null)
+      : h('span', { class: 'muted' }, 'nie ustalono – wpisz w „Dane sprawy”')),
   ...(deadlines.length ? deadlines.map(d => deadlineRow(d, new Map([[m.id, null]]), reload)) : [h('p', { class: 'hint' }, 'Brak terminów. Dodaj termin – kalkulator policzy go od daty doręczenia.')]));
 
   // czas pracy

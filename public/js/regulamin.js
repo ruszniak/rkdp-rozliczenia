@@ -9,7 +9,7 @@ const M2 = 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska z sied
 
 export const TERMS = [
   ['§ 1. Postanowienia ogólne', [
-    'Regulamin określa zasady korzystania z aplikacji internetowej „RKDP Rozliczenia”, dostępnej pod adresem rozliczenia.rkdp.pl (dalej „Aplikacja”).',
+    'Regulamin określa zasady korzystania z aplikacji internetowej „RKDP Rozliczenia”, dostępnej pod adresem app.ruszniak.io (dalej „Aplikacja”).',
     `Właścicielem Aplikacji i podmiotem uprawnionym z autorskich praw majątkowych do Aplikacji jest ${OWNER} (dalej „Właściciel”).`,
     'Aplikacja jest narzędziem wewnętrznym wspierającym organizację pracy: ewidencję rozliczeń klientów, zgłoszenia i zadania, obsługę spraw doradczych, generowanie dokumentów, listę obecności, weryfikację klientów, podgląd plików JPK oraz narzędzia pomocnicze (wzory dokumentów, kalkulator formy opodatkowania).',
     `Z Aplikacji korzystają osoby, którym Właściciel nadał dostęp (dalej „Użytkownik”), w szczególności pracownicy i współpracownicy Właściciela, ${M2} (dalej „M2 TAX”) oraz jej pracownicy i współpracownicy – na podstawie udostępnienia Aplikacji przez Właściciela – a także osoby z dostępem ograniczonym, np. wyłącznie do podglądu plików JPK.`,
@@ -82,7 +82,7 @@ export async function termsHash() {
 export function termsBlocks() {
   const B = [
     { t: 'title', text: 'REGULAMIN KORZYSTANIA Z APLIKACJI' },
-    { t: 'subtitle', text: '„RKDP Rozliczenia” (rozliczenia.rkdp.pl)' },
+    { t: 'subtitle', text: '„RKDP Rozliczenia” (app.ruszniak.io)' },
     { t: 'meta', text: `Wersja ${TERMS_VERSION} · obowiązuje od 23 października 2026 r.` },
   ];
   for (const [hd, items] of TERMS) {
