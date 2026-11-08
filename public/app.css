@@ -3215,3 +3215,6 @@ html body .avatar .av-img{width:100%;height:100%;object-fit:cover;border-radius:
 /* menu „Więcej”: przy długiej liście przewijane wewnątrz, nie wychodzi poza ekran */
 @media (min-width:821px){.more-menu{max-height:calc(100vh - 90px);max-height:calc(100dvh - 90px);overflow-y:auto;overscroll-behavior:contain}}
 .more-menu .mm-logout,.more-menu .mm-cfg{flex:none}
+/* zdjęcia wgrane jako okrągłe (białe rogi w pliku) – miniatura zawsze w kółku, lekko powiększona, żeby rogi i krawędź nie prześwitywały */
+html body .avatar:has(.av-img),html body .site-header .avatar:has(.av-img),html body .av:has(.av-img){border-radius:50%!important;overflow:hidden}
+html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scale(1.06)}
