@@ -463,6 +463,7 @@ async function unreadMenu(anchor) {
       h('span', { class: 'wt-uname' }, u.name, u.mentioned ? h('span', { class: 'wt-at' }, ' @Ty') : null),
       h('span', { class: 'small muted' }, `${u.n} nowych · ${new Date(u.last_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`)))
       : [h('p', { class: 'hint', style: { padding: '6px 10px' } }, 'Wszystko przeczytane. 👍')]),
+    h('a', { class: 'opt', href: '#/rozmowy', onclick: () => closePop() }, 'Wszystkie rozmowy →'),
     lastUnread.length ? h('button', { class: 'opt', onclick: async () => { closePop(); const now = new Date().toISOString(); await sb.from('thread_reads').upsert(lastUnread.map(u => ({ member_id: state.me.id, client_id: u.client_id, read_at: now })), { onConflict: 'member_id,client_id' }); refreshUnread(); } }, 'Oznacz wszystkie jako przeczytane') : null));
 }
 
