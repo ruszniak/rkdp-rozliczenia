@@ -10,7 +10,6 @@ import { settledHistory, lastPeriods, loadMemberPrefs, saveMemberPrefs, fetchSof
 import { sparkline, delta } from '../wykres.js';
 import { renderDzis } from './dzis.js';
 import { obligationsCard } from './terminy.js';
-import { zleceniaCard } from './zlecenia.js';
 import { warningsCard } from '../limity.js';
 import { pushNudge } from '../pushnudge.js';
 
@@ -249,9 +248,6 @@ const HELP_SPRAWY = `Sprawy – wszystko, co czeka na Ciebie: zadania, pytania k
 export async function renderPulpit(main, params) {
   const period = defaultPeriod();
   const admin = state.me.role === 'admin';
-  const want = params?.get?.('widok');
-  let view = want && ['sprawy', 'dzis', 'moj', 'doradca'].includes(want) && (want !== 'doradca' || admin) ? want
-    : (() => { try { const v = localStorage.getItem(PREF); return v && (v !== 'doradca' || admin) ? v : 'sprawy'; } catch { return 'sprawy'; } })();
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie pulpitu…'));
   // zadania cykliczne, dane pulpitu, trend 6 miesięcy, monitoring i układ – równolegle
   const tasks = state.taskTypes.filter(t => t.active);
@@ -260,31 +256,37 @@ export async function renderPulpit(main, params) {
     fetchSoft(() => sb.from('monitor_alerts').select('id,client_id,summary,created_at,resolved_at').eq('module', 'rkdp').is('resolved_at', null).order('created_at', { ascending: false })),
     loadMemberPrefs()]);
   if (created > 0) D = await loadData(period);
+  // Jeden pulpit bez zakładek: na górze „Sprawy” (to, co czeka na Ciebie), niżej –
+  // pracownik: jego kratki, terminy i braki + jego sekcje; szef (administrator): zadania całego zespołu + podsumowanie biura.
   const body = h('div');
+  const sprawy = h('div', { class: 'pl-sprawy' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
+  const team = admin ? h('section', { class: 'pl-team' }) : null;
+  const dzis = !admin ? h('div', { class: 'pl-dzis' }) : null;
   let editing = false;
-  const switcher = h('div', { class: 'tabs', style: { margin: 0 } });
   const editBtn = h('button', { class: 'btn btn-outline btn-sm dash-edit-btn', type: 'button', onclick: () => { editing = !editing; draw(); } });
+  const key = admin ? 'pulpit_doradca' : 'pulpit_moj';
   const draw = () => {
-    const tabs = [['sprawy', 'Sprawy'], ['dzis', 'Dziś'], ['moj', 'Mój pulpit'], ...(admin ? [['doradca', 'Pulpit doradcy']] : [])];
-    switcher.replaceChildren(...tabs.map(([k, l]) => h('button', { class: view === k ? 'on' : '', type: 'button', onclick: () => { view = k; editing = false; try { localStorage.setItem(PREF, k); } catch { /* */ } history.replaceState(null, '', '#/pulpit?widok=' + k); draw(); } }, l)));
-    editBtn.hidden = view === 'dzis' || view === 'sprawy';
-    editBtn.replaceChildren(editing ? '✓ Gotowe' : 'Dostosuj pulpit');
+    editBtn.replaceChildren(editing ? '✓ Gotowe' : 'Dostosuj sekcje');
     editBtn.classList.toggle('on', editing);
-    title.replaceChildren(view === 'doradca' ? 'Pulpit doradcy' : `Dzień dobry, ${first(state.me.full_name)}`, infoTip(view === 'doradca' ? HELP_ADMIN : view === 'dzis' ? HELP_DZIS : view === 'sprawy' ? HELP_SPRAWY : HELP_ME, 'Pulpit – instrukcja'));
-    if (view === 'sprawy') { body.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…')); import('./moje.js').then(m => m.renderMoje(body, params, { embed: true })); params = null; return; }
-    if (view === 'dzis') { body.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…')); renderDzis(body, D); return; }
-    const dash = view === 'doradca' ? adminDashboard(D, period, hist, alerts) : myDashboard(D, period, hist);
-    const key = 'pulpit_' + view;
+    const dash = admin ? adminDashboard(D, period, hist, alerts) : myDashboard(D, period, hist);
     body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.')] : []),
-      ...arrange(view, dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
-    if (!editing) body.prepend(pushNudge(), warningsCard());
+      ...arrange(admin ? 'doradca' : 'moj', dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
+    if (!editing) body.prepend(warningsCard());
   };
-  const title = h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } });
-  main.replaceChildren(
+  const title = h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, `Dzień dobry, ${first(state.me.full_name)}`, infoTip(admin ? HELP_SPRAWY + '\n\n' + HELP_ADMIN : HELP_SPRAWY + '\n\n' + HELP_DZIS, 'Pulpit – instrukcja'));
+  main.replaceChildren(...[
     h('div', { class: 'page-head' },
       h('div', {}, h('p', { class: 'eyebrow' }, new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })), title,
-        h('p', { class: 'sub' }, `Bieżący miesiąc rozliczeniowy: ${periodLabel(period).toLowerCase()}.`)),
-      h('div', { class: 'ph-actions' }, editBtn, switcher)),
-    body);
+        h('p', { class: 'sub' }, `Bieżący miesiąc rozliczeniowy: ${periodLabel(period).toLowerCase()}.`))),
+    sprawy,
+    team ? h('div', { class: 'pl-head' }, h('h2', {}, 'Zadania zespołu')) : null, team,
+    dzis,
+    h('div', { class: 'pl-head' }, h('h2', {}, admin ? 'Biuro' : 'Mój pulpit'), editBtn),
+    body].filter(Boolean));
+  const wantF = params?.get?.('f'), zl = params?.get?.('zl');
+  const sp = new URLSearchParams(); if (wantF && wantF !== 'zespol') sp.set('f', wantF); if (zl) sp.set('zl', zl);
+  import('./moje.js').then(m => m.renderMoje(sprawy, sp, { embed: true }));
+  if (team) import('./zlecenia.js').then(m => m.renderZlecenia(team, null, { embed: true })).then(() => { if (wantF === 'zespol') team.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  if (dzis) renderDzis(dzis, D, { lite: true });
   draw();
 }

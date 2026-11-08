@@ -336,9 +336,9 @@ async function route(opts = {}) {
     else if (view === 'oferty') c = await renderOferty(layout('oferty'), parts[1], 'rkdp');
     else if (view === 'pulpit') c = await renderPulpit(layout('pulpit'), params);
     // „Moje sprawy” są teraz zakładką „Sprawy” na Pulpicie – stare linki (powiadomienia, maile) prowadzą tam
-    else if (view === 'moje') { const q = new URLSearchParams(params || ''); q.set('widok', 'sprawy'); history.replaceState(null, '', '#/pulpit?' + q); c = await renderPulpit(layout('pulpit'), q); }
+    else if (view === 'moje') { const q = new URLSearchParams(params || ''); history.replaceState(null, '', '#/pulpit' + (q.toString() ? '?' + q : '')); c = await renderPulpit(layout('pulpit'), q); }
     // „Zadania dla zespołu” połączone z „Moimi sprawami” – stare linki (także z powiadomień) prowadzą tutaj
-    else if (view === 'zlecenia') { const q = new URLSearchParams(state.me.role === 'admin' && !parts[1] ? 'f=zespol' : ''); if (parts[1]) q.set('zl', parts[1]); q.set('widok', 'sprawy'); history.replaceState(null, '', '#/pulpit?' + q); c = await renderPulpit(layout('pulpit'), q); }
+    else if (view === 'zlecenia') { const q = new URLSearchParams(state.me.role === 'admin' && !parts[1] ? 'f=zespol' : ''); if (parts[1]) q.set('zl', parts[1]); history.replaceState(null, '', '#/pulpit' + (q.toString() ? '?' + q : '')); c = await renderPulpit(layout('pulpit'), q); }
     else if (view === 'czas' && state.me.role === 'admin' && hasModule('doradztwo')) c = await renderCzas(layout('m2:czas'), params);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('terminy'), params);

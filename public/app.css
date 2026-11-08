@@ -2895,3 +2895,8 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 .mj-topbar .mj-chips{flex:1;min-width:0;margin:0}
 .mj-topbar .mj-add{flex:none}
 @media (max-width:600px){.mj-topbar .mj-add{width:40px;height:40px;padding:0;justify-content:center;border-radius:12px;min-height:40px}}
+/* Pulpit bez zakładek: nagłówki kolejnych części */
+.pl-head{display:flex;align-items:center;gap:12px;margin:26px 0 8px}
+.pl-head h2{margin:0;font-family:'Plus Jakarta Sans',var(--sans);font-weight:800;font-size:22px}
+.pl-head .dash-edit-btn{margin-left:auto}
+.pl-dzis{margin-top:18px}

@@ -99,7 +99,7 @@ const NEWS = [
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',
     'Zakładka „Rozmowy” zniknęła z menu – rozmowę otwierasz z karty klienta lub przy uwagach w Rozliczeniach; nieprzeczytane są pod ikoną dymka w nagłówku, a pełna lista w „Więcej” → Rozmowy.',
-    '„Moje sprawy” przeniesione na Pulpit jako pierwsza zakładka „Sprawy” (obok Dziś / Mój pulpit / Pulpit doradcy) – o jedną zakładkę mniej w menu; stare linki i powiadomienia prowadzą na Pulpit → Sprawy.',
+    'Jeden Pulpit bez zakładek: na górze Twoje sprawy (zadania, pytania, terminy), niżej – pracownik: jego kratki, terminy w 7 dni i braki oraz jego sekcje; szef: zadania całego zespołu według osób i podsumowanie biura. Stare linki „Moje sprawy” prowadzą na Pulpit.',
     'Tryb ciemny jak w Gmailu: neutralna czerń i szarości zamiast granatowo-turkusowych teł, turkus tylko jako akcent; pasek stanu telefonu w kolorze tła.',
     'Telefon: pływający pasek zakładek jak w aplikacji Facebook – same ikony, podświetlenie przesuwa się płynnie, przy przewijaniu w dół pasek się zmniejsza, w górę wraca.',
     '„Zadania dla zespołu” połączone z „Moimi sprawami” – administrator ma tam etykietę „Zespół” (wszystkie zadania według osób); stare linki i powiadomienia prowadzą do Moich spraw. Dolne menu na telefonie przyklejone do dołu ekranu.',
