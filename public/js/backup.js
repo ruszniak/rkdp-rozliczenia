@@ -78,7 +78,7 @@ export async function downloadFilesBackup(onProgress = () => {}) {
     files.push({ name, data: new Uint8Array(await data.arrayBuffer()) });
   }
   const stamp = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Warsaw' }).replace(' ', '_').replace(/:/g, '-').slice(0, 16);
-  const readme = `Kopia plików aplikacji RKDP z ${stamp.replace('_', ' ')}.\nPlików: ${files.length}` + (errs.length ? `\n\nNie udało się pobrać (${errs.length}):\n${errs.join('\n')}` : '') +
+  const readme = `Kopia plików app.R z ${stamp.replace('_', ' ')}.\nPlików: ${files.length}` + (errs.length ? `\n\nNie udało się pobrać (${errs.length}):\n${errs.join('\n')}` : '') +
     `\n\nPliki zawierają dane klientów – przechowuj kopię na zaszyfrowanym dysku i nie wysyłaj e-mailem.\n`;
   const blob = new Blob([zip([{ name: 'CZYTAJ.txt', data: readme }, ...files])], { type: 'application/zip' });
   const a = document.createElement('a');

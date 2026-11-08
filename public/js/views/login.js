@@ -95,7 +95,7 @@ export async function renderLogin(app, initialError = '') {
     const orTxt = lk ? h('p', { class: 'small muted fid-or' }, `${lk.email} · albo e-mail i hasło:`) : null;
     if (lk) email = email || lk.email;
     if (lk) mail.value = email;
-    put(box, ...head('Aplikacja wewnętrzna', 'Zaloguj się', lk ? 'Bez hasła i kodu – telefon sprawdzi, że to Ty.' : 'Podaj służbowy e-mail i hasło. Potem wyślemy kod na e-mail (chyba że ta przeglądarka jest zapamiętana).'),
+    put(box, ...head('app.R', 'Zaloguj się', lk ? 'Bez hasła i kodu – telefon sprawdzi, że to Ty.' : 'Podaj służbowy e-mail i hasło. Potem wyślemy kod na e-mail (chyba że ta przeglądarka jest zapamiętana).'),
       bio, orTxt, form, errBox,
       linkBtn('Pierwsze logowanie / ustaw nowe hasło', stepSetupEmail));
     if (!lk) (email ? pass : mail).focus();
@@ -201,7 +201,7 @@ export async function renderLogin(app, initialError = '') {
       if (error) { errBox.textContent = plError(error); return; }
       legacyCode();
     } }, input, btn);
-    put(box, ...head('Aplikacja wewnętrzna', 'Zaloguj się', 'Podaj służbowy adres e-mail. Wyślemy na niego jednorazowy kod.'), form, errBox);
+    put(box, ...head('app.R', 'Zaloguj się', 'Podaj służbowy adres e-mail. Wyślemy na niego jednorazowy kod.'), form, errBox);
     input.focus();
   }
   function legacyCode() {

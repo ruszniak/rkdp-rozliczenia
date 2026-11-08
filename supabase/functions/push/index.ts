@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
     const { data: me } = await db.from('team_members').select('id, full_name, active').eq('email', email).maybeSingle();
     if (!me?.active) return json({ error: 'Brak dostępu' }, 403);
     if (body.event === 'test') {
-      const sent = await notify([me.id], 'test', { title: 'Powiadomienia działają', body: `Cześć ${me.full_name.split(' ')[0]}! Tak będą wyglądały powiadomienia z aplikacji RKDP.`, url: '/#/profil', tag: 'test' }, true);
+      const sent = await notify([me.id], 'test', { title: 'Powiadomienia działają', body: `Cześć ${me.full_name.split(' ')[0]}! Tak będą wyglądały powiadomienia z app.R.`, url: '/#/profil', tag: 'test' }, true);
       return json({ sent });
     }
     return json({ error: 'Nieznane zdarzenie' }, 400);

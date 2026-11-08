@@ -307,7 +307,7 @@ export async function renderAml(main, module) {
   draw();
   main.replaceChildren(
     h('div', { class: 'page-head', style: isM2 ? { marginTop: '28px' } : null },
-      h('div', {}, h('p', { class: 'eyebrow' }, isM2 ? 'Doradztwo podatkowe · M2 TAX' : 'RKDP · Klienci'),
+      h('div', {}, 
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Weryfikacja AML', infoTip(HELP, 'Procedura AML')),
         h('p', { class: 'sub' }, `${isM2 ? 'M2 TAX Doradcy Podatkowi' : 'RKDP spółka doradztwa podatkowego'} – osobna instytucja obowiązana. Nowi i dotychczasowi klienci.`)),
       h('div', { class: 'ob-actions' }, prog, runAll)),

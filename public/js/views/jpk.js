@@ -799,6 +799,6 @@ table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1D1A1
 td{padding:3px 5px;border-bottom:.4pt solid #e3d9ca;vertical-align:top}th.n,td.n{text-align:right;white-space:nowrap}tr{break-inside:avoid}tr.tot td{font-weight:700;border-top:1pt solid #1D1A16}
 .jr{break-inside:avoid;margin-bottom:6px}.jh{background:#F3EEE6;padding:3px 6px;display:flex;gap:4px}.jh span{margin-left:auto;font-weight:700}
 .foot{margin-top:10px;font-size:7pt;color:#8a8178}.note{font-size:7.6pt;color:#7d7368;margin:0 0 6px}.iss{padding:4px 8px;margin:0 0 4px;border-left:3px solid #B08D57;background:#F7F3EC}.iss.error{border-color:#A4462F;background:#FBEDE7}.iss .acc{font-size:7.6pt;color:#4a433b;margin-top:2px}
-</style></head><body>${parts.join('')}<div class="foot">Raport z pliku ${esc(m.fileName)} · wygenerowano ${esc(now)} w aplikacji RKDP / M2 TAX</div></body></html>`;
+</style></head><body>${parts.join('')}<div class="foot">Raport z pliku ${esc(m.fileName)} · wygenerowano ${esc(now)} w app.R</div></body></html>`;
   printHtml(html, baseName(m));
 }

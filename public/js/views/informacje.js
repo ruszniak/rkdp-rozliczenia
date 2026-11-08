@@ -184,7 +184,7 @@ export async function renderInformacje(main) {
   put(main, 
     h('a', { href: '#/klienci', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Klienci'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'RKDP · Klienci'),
+      h('div', {}, 
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Informacja do klientów', infoTip(HELP, 'Informacja do klientów – jak to działa')),
         h('p', { class: 'sub' }, 'Jedna wiadomość do wielu klientów z kancelaria@rkdp.pl – odbiorcy w ukrytej kopii (UDW).'))),
     h('div', { class: 'inf-grid' },

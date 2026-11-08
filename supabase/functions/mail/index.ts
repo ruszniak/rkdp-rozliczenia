@@ -291,7 +291,7 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }): Promise
     + (['nowe', 'dodany'].includes(ev) && steps.length ? `<p style="white-space:pre-wrap">${escH(steps.join('\n'))}</p>` : '')
     + (note ? `<p style="white-space:pre-wrap;background:#F5E7CF;padding:10px 12px;border-radius:8px">${escH(note)}</p>` : '')
     + `<p style="margin:18px 0"><a href="${link}" style="background:#2D4A8A;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">Otwórz zadanie</a></p>`
-    + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z aplikacji RKDP. <b>Nie odpowiadaj na tego maila</b> – odpowiedzi nie trafiają do aplikacji. Pytania, komentarze i zgłoszenie wykonania wpisuj w zadaniu w aplikacji (przycisk wyżej).</p></div>`;
+    + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z app.R. <b>Nie odpowiadaj na tego maila</b> – odpowiedzi nie trafiają do aplikacji. Pytania, komentarze i zgłoszenie wykonania wpisuj w zadaniu w aplikacji (przycisk wyżej).</p></div>`;
   // poza godzinami powiadomień odbiorcy – do kolejki (przyjdzie zbiorczo)
   if (!windowOpen(pr?.notify_window)) {
     await admin.from('notify_queue').insert({ member_id: to.id, channel: 'mail', category: 'zadania', title: subject, body: text, html, url: link });
@@ -323,7 +323,7 @@ async function flushMail(cfg: { sub: string; from: string }) {
       if (items.length === 1) await sendMail(cfg, 'RKDP | Zadania', addr, items[0].title, items[0].body || '', items[0].html || undefined);
       else {
         const when = (d: string) => new Date(d).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-        const subject = `Powiadomienia z aplikacji RKDP (${items.length})`;
+        const subject = `Powiadomienia z app.R (${items.length})`;
         const text = ['Powiadomienia, które przyszły poza Twoimi godzinami powiadomień:', '', ...items.map((i: any) => `• ${when(i.created_at)} – ${i.title}\n  ${i.url || APP_URL}`), '', 'Godziny powiadomień zmienisz w aplikacji: Mój profil.'].join('\n');
         const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;max-width:560px">`
           + `<p style="margin:0 0 6px;color:#2D4A8A;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Zestawienie powiadomień</p>`

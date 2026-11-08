@@ -6,8 +6,8 @@ import { lookupNip, validNip } from '../nip.js';
 import { OFFER_BRANDS, PEOPLE, BOOK_FORMS, PARTNER_FEATURES, offerDefaults, serviceDefaults, offerHtml, autoTitle, autoIntro, monthlyEstimate, money, activeServices } from '../offers/offer.js';
 
 const CFG = {
-  rkdp: { base: '#/oferty', back: ['#/klienci', '← Klienci'], clientTable: 'clients', clientField: 'client_id', eyebrow: 'RKDP · Oferty' },
-  m2: { base: '#/doradztwo/oferty', back: ['#/doradztwo/zlecenia', '← Zlecenia i umowy'], clientTable: 'm2_clients', clientField: 'm2_client_id', eyebrow: 'M2 TAX · Oferty' },
+  rkdp: { base: '#/oferty', back: ['#/klienci', '← Klienci'], clientTable: 'clients', clientField: 'client_id', eyebrow: '' },
+  m2: { base: '#/doradztwo/oferty', back: ['#/doradztwo/zlecenia', '← Zlecenia i umowy'], clientTable: 'm2_clients', clientField: 'm2_client_id', eyebrow: '' },
 };
 const STATUS = { projekt: 'Projekt', wyslana: 'Wysłana', zaakceptowana: 'Zaakceptowana', odrzucona: 'Odrzucona' };
 const STATUS_CLS = { projekt: 'unk', wyslana: 'wait', zaakceptowana: 'done', odrzucona: 'no' };
@@ -29,7 +29,7 @@ export async function renderOferty(main, id, brand = 'rkdp') {
   main.replaceChildren(
     h('a', { href: C.back[0], class: 'small', style: { fontWeight: 600, textDecoration: 'none', display: 'inline-block', marginTop: brand === 'm2' ? '28px' : 0 } }, C.back[1]),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, C.eyebrow),
+      h('div', {}, C.eyebrow ? h('p', { class: 'eyebrow' }, C.eyebrow) : null,
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Oferty', infoTip(HELP, 'Oferty – instrukcja')),
         h('p', { class: 'sub' }, 'Profesjonalne oferty na doradztwo podatkowe, księgowość i kadry – w PDF, z cennikiem z naszych umów.')),
       h('div', { class: 'row-btns' },
