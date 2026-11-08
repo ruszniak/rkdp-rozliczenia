@@ -1,7 +1,8 @@
 // Spotkania: umawianie (z klientem albo prywatne), lista, grafik przyjęć, rodzaje spotkań, kalendarze Google, okienko na stronę.
 // Zapis spotkań przez funkcję „spotkania” (Kalendarz Google + e-mail do klienta); grafik i rodzaje – bezpośrednio w bazie (RLS).
 import { h, toast, fail, icon, modal, ava } from './ui.js';
-import { sb, state, isAdmin, memberById } from './store.js';
+import { sb, state, isAdmin, memberById, hasModule, canEditClients } from './store.js';
+import { lookupNip, validNip, cleanNip } from './nip.js';
 
 const call = async (action, extra = {}) => {
   const { data, error } = await sb.functions.invoke('spotkania', { body: { action, ...extra } });
@@ -35,6 +36,9 @@ const dayLabel = s => new Date(s + 'T12:00:00').toLocaleDateString('pl-PL', { we
 const hm = iso => new Date(iso).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
 const fmtRanges = r => (r || []).map(([a, b]) => `${a.replace(/^0/, '')}–${b.replace(/^0/, '')}`).join(', ');
 const firstName = n => String(n || '').split(/\s+/)[0];
+const canNotes = () => ['admin', 'full'].includes(state.me?.role);
+const money = v => (v == null || v === '' ? '' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł');
+const PAY = { gotowka: 'gotówka', przelew: 'przelew', karta: 'karta / BLIK' };
 
 let typesP = null;
 const loadTypes = (fresh) => (typesP && !fresh ? typesP : (typesP = sb.from('meeting_types').select('*').order('sort').then(r => r.data || [])));
@@ -56,6 +60,7 @@ export async function openMeetingDialog(opts = {}) {
     members: [adv.includes(me) || !adv.length ? me : adv[0]], day: opts.day || today(), start: null, manual: '',
     client: { id: opts.client_id || null, m2: opts.m2_client_id || null, name: opts.name || '', email: opts.email || '', phone: opts.phone || '' },
     notify: true, title: '', topic: '', matter: opts.matter_id || null,
+    kind: 'meet', from: '09:00', to: '12:00', dayTo: opts.day || today(),
   };
   // klienci do podpowiedzi (RKDP + M2 TAX widoczni dla tej osoby)
   let clients = [];
@@ -131,9 +136,21 @@ export async function openMeetingDialog(opts = {}) {
     !showAll && others.length ? h('button', { type: 'button', class: 'sp-chip sp-chip-ghost', onclick: () => { showAll = true; drawMembers(); } }, '+ ktoś z zespołu') : null);
   };
 
+  // --- prywatne: spotkanie / blokada godzin / cały dzień ---
+  const kindBox = h('div', { class: 'sp-chips' });
+  const drawKind = () => put(kindBox, ...[['meet', 'Spotkanie'], ['block', 'Blokada godzin'], ['allday', 'Cały dzień / kilka dni']].map(([k, l]) =>
+    h('button', { type: 'button', class: 'sp-chip' + (st.kind === k ? ' on' : ''), onclick: () => { st.kind = k; if (k !== 'meet' && !titleIn.value) { titleIn.value = k === 'allday' ? 'Niedostępny' : 'Zajęty'; st.title = titleIn.value; } draw(); } }, l)));
+  const fromIn = h('input', { class: 'input', type: 'time', step: 300, value: st.from, style: { width: '130px' } });
+  const toIn = h('input', { class: 'input', type: 'time', step: 300, value: st.to, style: { width: '130px' } });
+  fromIn.addEventListener('change', () => { st.from = fromIn.value; });
+  toIn.addEventListener('change', () => { st.to = toIn.value; });
+  const dayToIn = h('input', { class: 'input', type: 'date', value: st.dayTo, min: st.day });
+  dayToIn.addEventListener('change', () => { st.dayTo = dayToIn.value || st.day; });
+  const isBlock = () => st.priv && st.kind !== 'meet';
+
   // --- dzień i godzina ---
   const dayIn = h('input', { class: 'input', type: 'date', value: st.day, min: today() });
-  dayIn.addEventListener('change', () => { st.day = dayIn.value || today(); loadDay(); });
+  dayIn.addEventListener('change', () => { st.day = dayIn.value || today(); if (st.dayTo < st.day) { st.dayTo = st.day; dayToIn.value = st.day; } dayToIn.min = st.day; loadDay(); });
   const navDay = n => { st.day = addDays(st.day, n); if (st.day < today()) st.day = today(); dayIn.value = st.day; loadDay(); };
   const slotBox = h('div', { class: 'sp-slots' }, h('p', { class: 'hint' }, 'Wczytywanie…'));
   const manualIn = h('input', { class: 'input', type: 'time', step: 300, style: { width: '120px' } });
@@ -188,17 +205,24 @@ export async function openMeetingDialog(opts = {}) {
   };
 
   function draw() {
-    drawSeg(); drawTypes(); drawMode(); drawMembers(); drawNotify();
+    drawSeg(); drawTypes(); drawMode(); drawMembers(); drawNotify(); drawKind();
+    saveBtn.textContent = isBlock() ? 'Zablokuj czas' : 'Umów spotkanie';
     put(left, 
       seg,
+      st.priv ? h('div', { class: 'field' }, h('span', {}, 'Co'), kindBox) : null,
       st.priv ? h('label', { class: 'field' }, h('span', {}, 'Tytuł'), titleIn)
         : h('div', { class: 'field sp-client' }, h('span', {}, 'Klient'), h('div', { style: { position: 'relative' } }, cName, sugg),
           h('div', { class: 'sp-row2' }, cEmail, cPhone)),
       !st.priv ? h('div', { class: 'field' }, h('span', {}, 'Rodzaj'), typeBox) : null,
-      modeBox,
-      h('div', { class: 'field' }, h('span', {}, 'Kto z nas'), memBox, h('small', { class: 'muted' }, 'Zaznacz kilka osób – spotkanie trafi do kalendarza każdej z nich i każdy dostanie przypomnienie.')),
-      h('div', { class: 'field' }, h('span', {}, 'Dzień'), h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, dayIn)),
-      h('div', { class: 'field' }, h('span', {}, st.members.length > 1 ? 'Wolne u wszystkich' : 'Wolne godziny'), slotBox,
+      isBlock() ? null : modeBox,
+      h('div', { class: 'field' }, h('span', {}, isBlock() ? 'Dla kogo' : 'Kto z nas'), memBox, h('small', { class: 'muted' }, isBlock() ? 'W tym czasie nikt nie umówi się do tych osób – ani na stronie, ani w aplikacji.' : 'Zaznacz kilka osób – spotkanie trafi do kalendarza każdej z nich i każdy dostanie przypomnienie.')),
+      st.priv && st.kind === 'allday'
+        ? h('div', { class: 'sp-row2' }, h('label', { class: 'field' }, h('span', {}, 'Od dnia'), dayIn), h('label', { class: 'field' }, h('span', {}, 'Do dnia (włącznie)'), dayToIn))
+        : h('div', { class: 'field' }, h('span', {}, 'Dzień'), h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, dayIn)),
+      st.priv && st.kind === 'block'
+        ? h('div', { class: 'field' }, h('span', {}, 'Godziny'), h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, 'od', fromIn, 'do', toIn))
+        : null,
+      isBlock() ? null : h('div', { class: 'field' }, h('span', {}, st.members.length > 1 ? 'Wolne u wszystkich' : 'Wolne godziny'), slotBox,
         h('div', { class: 'small muted', style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' } }, 'albo inna godzina:', manualIn)),
       h('label', { class: 'field' }, h('span', {}, st.priv ? 'Notatka' : 'Temat'), topicIn),
       notifyBox);
@@ -206,6 +230,21 @@ export async function openMeetingDialog(opts = {}) {
     if (st.priv && !st.type) { /* bez rodzaju */ }
   }
   async function save() {
+    if (isBlock()) {
+      const title = titleIn.value.trim() || (st.kind === 'allday' ? 'Niedostępny' : 'Zajęty');
+      let extra;
+      if (st.kind === 'allday') extra = { all_day: true, day: st.day, day_to: st.dayTo < st.day ? st.day : st.dayTo };
+      else {
+        if (!st.from || !st.to || st.to <= st.from) return toast('Podaj godziny „od” i „do”', true);
+        extra = { start: new Date(`${st.day}T${st.from}:00`).toISOString(), end: new Date(`${st.day}T${st.to}:00`).toISOString() };
+      }
+      saveBtn.disabled = true; saveBtn.textContent = 'Zapisuję…';
+      try {
+        await call('create', { private: true, block: true, members: st.members, title, topic: topicIn.value.trim(), mode: 'office', ...extra });
+        closeFn(); toast('Zablokowano czas – jest też w Kalendarzu Google'); opts.onDone?.();
+      } catch (e) { fail(e); saveBtn.disabled = false; saveBtn.textContent = 'Zablokuj czas'; }
+      return;
+    }
     let start = st.start;
     if (!start && st.manual) start = new Date(`${st.day}T${st.manual}:00`).toISOString();
     if (!start) return toast('Wybierz godzinę', true);
@@ -251,15 +290,19 @@ export async function openMeeting(id, onChange) {
   const clientLink = m.client_id ? h('a', { href: `#/klient/${m.client_id}` }, m.client_name || 'karta klienta') : m.m2_client_id ? h('a', { href: `#/doradztwo/klient/${m.m2_client_id}` }, m.client_name || 'karta klienta') : (m.client_name || null);
   const body = h('div', { class: 'sp-detail' },
     cancelled ? h('p', { class: 'sp-warn' }, 'Spotkanie odwołane' + (m.cancel_reason ? ` – ${m.cancel_reason}` : '')) : null,
-    row('Termin', `${dayLabel(isoDay(s))}, ${hm(m.start_at)}–${hm(m.end_at)}`),
+    row('Termin', m.all_day ? (isoDay(s) === isoDay(new Date(e - 1)) ? `${dayLabel(isoDay(s))} – cały dzień` : `${dayLabel(isoDay(s))} – ${dayLabel(isoDay(new Date(e - 1)))} (całe dni)`) : `${dayLabel(isoDay(s))}, ${hm(m.start_at)}–${hm(m.end_at)}`),
     row('Rodzaj', m.private ? 'Prywatne / wewnętrzne' : (t?.name || m.title)),
-    row('Forma', m.mode === 'meet' ? (m.meet_url ? h('a', { href: m.meet_url, target: '_blank', rel: 'noopener' }, 'Google Meet – dołącz') : 'Google Meet') : m.mode === 'office' ? [m.place || 'Stacjonarnie', t?.map_url ? h('a', { href: t.map_url, target: '_blank', rel: 'noopener', style: { marginLeft: '8px' } }, 'mapa') : null] : 'Telefon'),
+    m.private && m.mode === 'office' && !m.place ? null : row('Forma', m.mode === 'meet' ? (m.meet_url ? h('a', { href: m.meet_url, target: '_blank', rel: 'noopener' }, 'Google Meet – dołącz') : 'Google Meet') : m.mode === 'office' ? [m.place || 'Stacjonarnie', t?.map_url ? h('a', { href: t.map_url, target: '_blank', rel: 'noopener', style: { marginLeft: '8px' } }, 'mapa') : null] : 'Telefon'),
     row('Klient', clientLink),
+    row('NIP', m.client_nip || null),
+    !m.private && !m.client_id && !m.m2_client_id && (canEditClients() || hasModule('doradztwo')) && m.client_name
+      ? h('div', { class: 'sp-kv' }, h('span', {}, ''), h('div', {}, h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => newClientFromMeeting(m, () => openMeeting(m.id, onChange)) }, icon('plus'), 'Załóż klienta z tego spotkania'))) : null,
     row('Kontakt', [m.client_email ? h('a', { href: `mailto:${m.client_email}` }, m.client_email) : null, m.client_phone ? h('a', { href: `tel:${m.client_phone.replace(/\s/g, '')}`, style: { marginLeft: '10px' } }, m.client_phone) : null].filter(Boolean)),
     row('Temat', m.topic),
     row('Kto', h('div', { class: 'sp-chips' }, ...mm.map(memberById).filter(Boolean).map(p => h('span', { class: 'sp-chip sp-chip-p on' }, avaChip(p), firstName(p.full_name))))),
     row('Skąd', m.source === 'www' ? `Klient umówił się sam – ${CHANNEL[m.channel] || 'przez stronę'}` : `Umówione w aplikacji${m.created_by ? ' – ' + (memberById(m.created_by)?.full_name || '') : ''}`),
     !m.private && m.client_email ? row('Klient wie', m.notify_client ? 'tak – dostał e-mail z potwierdzeniem (i dostanie przypomnienie)' : 'nie wysyłano e-maila') : null);
+  if (canNotes()) body.append(notesBox(m));
   modal(m.private ? (m.title || 'Spotkanie') : `Spotkanie – ${m.client_name || t?.name || ''}`, body, close => cancelled || e < new Date() ? [h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij')] : [
     h('button', { class: 'btn btn-ghost btn-sm', style: { color: 'var(--danger,#B3261E)' }, onclick: () => { close(); cancelDialog(m, onChange); } }, 'Odwołaj'),
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => { close(); membersDialog(m, mm, onChange); } }, 'Zmień osoby'),
@@ -267,6 +310,81 @@ export async function openMeeting(id, onChange) {
     h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Zamknij'),
   ]);
 }
+// ---- notatka wewnętrzna: opis spotkania, koszt wizyty, płatność, faktura (administratorzy i pełny dostęp) ----
+function notesBox(m) {
+  const box = h('section', { class: 'sp-notes' }, h('p', { class: 'hint' }, 'Wczytywanie notatki…'));
+  (async () => {
+    const { data: n0 } = await sb.from('meeting_notes').select('*').eq('meeting_id', m.id).maybeSingle();
+    const n = { body: '', fee: '', paid: false, paid_method: '', invoiced: false, invoice_no: '', ...(n0 || {}) };
+    const body = h('textarea', { class: 'input', rows: 4, placeholder: 'Opis spotkania – ustalenia, co dalej, co przygotować…' }); body.value = n.body || '';
+    const fee = h('input', { class: 'input', type: 'number', min: 0, step: '0.01', placeholder: '0,00', style: { maxWidth: '140px' } }); fee.value = n.fee ?? '';
+    const paid = h('input', { type: 'checkbox', checked: !!n.paid });
+    const method = h('select', { class: 'select', style: { maxWidth: '170px' } }, h('option', { value: '' }, '— sposób —'), ...Object.entries(PAY).map(([k, v]) => h('option', { value: k }, v))); method.value = n.paid_method || '';
+    const inv = h('input', { type: 'checkbox', checked: !!n.invoiced });
+    const invNo = h('input', { class: 'input', placeholder: 'nr faktury', style: { maxWidth: '170px' } }); invNo.value = n.invoice_no || '';
+    const who = n0?.updated_by ? h('span', { class: 'small muted' }, `ostatnio: ${firstName(memberById(n0.updated_by)?.full_name || '')}, ${new Date(n0.updated_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`) : null;
+    const save = h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: async () => {
+      save.disabled = true;
+      const row = { meeting_id: m.id, body: body.value.trim() || null, fee: fee.value === '' ? null : Number(fee.value), paid: paid.checked, paid_method: paid.checked ? (method.value || null) : null,
+        invoiced: inv.checked, invoice_no: inv.checked ? (invNo.value.trim() || null) : null, updated_by: state.me.id, updated_at: new Date().toISOString() };
+      const { error } = await sb.from('meeting_notes').upsert(row);
+      save.disabled = false;
+      if (error) return fail(error);
+      toast('Zapisano notatkę');
+    } }, 'Zapisz notatkę');
+    put(box,
+      h('div', { class: 'sp-notes-h' }, h('b', {}, 'Notatka wewnętrzna'), h('span', { class: 'small muted' }, 'widzą tylko osoby z pełnym dostępem')),
+      body,
+      h('div', { class: 'sp-notes-row' },
+        h('label', { class: 'field' }, h('span', {}, 'Koszt wizyty (zł)'), fee),
+        h('div', { class: 'sp-notes-pay' },
+          h('label', { class: 'sp-check' }, paid, 'Opłacone'), method,
+          h('label', { class: 'sp-check' }, inv, 'Faktura wystawiona'), invNo)),
+      h('div', { class: 'sp-notes-foot' }, who, save));
+  })().catch(e => put(box, h('p', { class: 'hint' }, e.message)));
+  return box;
+}
+
+// ---- nowy klient na podstawie spotkania (RKDP albo M2 TAX) ----
+function newClientFromMeeting(m, onDone) {
+  const firms = [canEditClients() ? ['rkdp', 'RKDP (księgowość / doradztwo)'] : null, hasModule('doradztwo') ? ['m2', 'M2 TAX (doradztwo)'] : null].filter(Boolean);
+  const f = { firm: firms[0][0], name: m.client_name || '', nip: m.client_nip || '', email: m.client_email || '', phone: m.client_phone || '', address: '', regon: '', krs: '', kind: m.client_nip ? 'firma' : 'osoba' };
+  const box = h('div', { style: { display: 'grid', gap: '10px' } });
+  const inp = (k, label, ph) => { const el = h('input', { class: 'input', placeholder: ph || '' }); el.value = f[k] || ''; el.addEventListener('input', () => { f[k] = el.value; }); return h('label', { class: 'field' }, h('span', {}, label), el); };
+  const info = h('p', { class: 'small muted', style: { margin: 0 } });
+  const draw = () => put(box,
+    firms.length > 1 ? h('label', { class: 'field' }, h('span', {}, 'Klient której firmy'), (() => { const s = h('select', { class: 'select' }, ...firms.map(([k, l]) => h('option', { value: k }, l))); s.value = f.firm; s.addEventListener('change', () => { f.firm = s.value; }); return s; })()) : null,
+    h('div', { style: { display: 'flex', gap: '8px', alignItems: 'flex-end' } }, inp('nip', 'NIP (opcjonalnie)', '10 cyfr'),
+      h('button', { class: 'btn btn-outline btn-sm', type: 'button', style: { marginBottom: '2px' }, onclick: async () => {
+        if (!validNip(f.nip)) return toast('Nieprawidłowy NIP', true);
+        try { const r = await lookupNip(f.nip); if (r.found) { Object.assign(f, { name: r.name, nip: r.nip, regon: r.regon || '', krs: r.krs || '', address: r.address || '', kind: 'firma' }); info.textContent = 'Dane pobrane z Białej listy VAT.'; draw(); } else info.textContent = 'Nie znaleziono tego NIP w wykazie VAT.'; }
+        catch (e) { fail(e); }
+      } }, 'Pobierz dane')),
+    info,
+    inp('name', 'Nazwa / imię i nazwisko'), inp('address', 'Adres'),
+    h('div', { class: 'sp-row2' }, inp('email', 'E-mail'), inp('phone', 'Telefon')));
+  draw();
+  modal('Nowy klient ze spotkania', box, close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async (ev) => {
+    if (!f.name.trim()) return toast('Podaj nazwę klienta', true);
+    ev.target.disabled = true;
+    try {
+      const nip = cleanNip(f.nip) || null;
+      if (f.firm === 'rkdp') {
+        const { data, error } = await sb.from('clients').insert({ name: f.name.trim(), nip, regon: f.regon || null, krs: f.krs || null, address: f.address || null, email: f.email || null, phone: f.phone || null, contact_person: m.client_name || null }).select('id').single();
+        if (error) throw error;
+        const { error: e2 } = await sb.rpc('meeting_link_client', { p_meeting: m.id, p_client: data.id, p_m2_client: null }); if (e2) throw e2;
+        close(); toast('Założono klienta RKDP'); location.hash = `#/klient/${data.id}`;
+      } else {
+        const { data, error } = await sb.from('m2_clients').insert({ firm: 'm2', status: 'aktywny', kind: nip ? 'firma' : 'osoba', name: f.name.trim(), nip, address: f.address || null, email: f.email || null, phone: f.phone || null, contact_person: m.client_name || null }).select('id').single();
+        if (error) throw error;
+        const { error: e2 } = await sb.rpc('meeting_link_client', { p_meeting: m.id, p_client: null, p_m2_client: data.id }); if (e2) throw e2;
+        close(); toast('Założono klienta M2 TAX'); location.hash = `#/doradztwo/klient/${data.id}`;
+      }
+      onDone?.();
+    } catch (e) { fail(e); ev.target.disabled = false; }
+  } }, 'Załóż klienta')]);
+}
+
 // podmiana na spotkaniu (ktoś przejmuje) albo dodanie drugiej osoby (oboje uczestniczą)
 async function membersDialog(m, current, onChange) {
   const adv = await advisorIds();
@@ -342,7 +460,7 @@ export async function renderSpotkania(main, parts = [], params) {
   let tab = params?.get('f') || 'nadchodzace', scope = 'moje';
   const box = h('div');
   const head = h('div', { class: 'page-head' },
-    h('div', {}, h('p', { class: 'eyebrow' }, 'Kalendarz'), h('h1', {}, 'Spotkania'),
+    h('div', {}, h('h1', {}, 'Spotkania'),
       h('p', { class: 'sub' }, 'Rezerwacje ze strony i spotkania umówione w aplikacji. Wszystko trafia też do Kalendarza Google.')),
     h('div', { class: 'page-actions', style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
       h('a', { class: 'btn btn-outline btn-sm', href: '#/spotkania/ustawienia' }, 'Grafik i ustawienia'),
@@ -366,6 +484,10 @@ export async function renderSpotkania(main, parts = [], params) {
     const mm = data.length ? await meetingMembers(data.map(x => x.id)) : new Map();
     const list = data.filter(x => scope === 'wszystkie' || (mm.get(x.id) || []).includes(state.me.id) || x.created_by === state.me.id);
     const types = await loadTypes();
+    const notes = new Map();
+    if (canNotes() && list.length) { const { data: ns } = await sb.from('meeting_notes').select('meeting_id,fee,paid,invoiced').in('meeting_id', list.map(x => x.id)); (ns || []).forEach(n => notes.set(n.meeting_id, n)); }
+    const payTag = x => { const n = notes.get(x.id); if (!n || (!n.fee && !n.paid && !n.invoiced)) return null;
+      return h('span', { class: 'sp-tag ' + (n.paid ? 'paid' : 'unpaid'), title: [n.fee ? money(n.fee) : '', n.paid ? 'opłacone' : 'nieopłacone', n.invoiced ? 'faktura wystawiona' : 'bez faktury'].filter(Boolean).join(' · ') }, n.paid ? '✓ opłacone' : 'do zapłaty', n.invoiced ? ' · FV' : ''); };
     if (!list.length) return put(box, h('div', { class: 'card', style: { padding: '28px', textAlign: 'center' } }, h('p', { class: 'muted', style: { margin: 0 } }, tab === 'nadchodzace' ? 'Brak zaplanowanych spotkań.' : 'Brak spotkań.')));
     const byDay = new Map(); list.forEach(x => { const k = isoDay(new Date(x.start_at)); byDay.set(k, [...(byDay.get(k) || []), x]); });
     put(box, ...[...byDay.entries()].map(([d, xs]) => h('section', { class: 'sp-day' },
@@ -373,10 +495,11 @@ export async function renderSpotkania(main, parts = [], params) {
       h('div', { class: 'card sp-list' }, ...xs.map(x => {
         const t = types.find(y => y.id === x.type_id);
         return h('button', { type: 'button', class: 'sp-item' + (x.status === 'cancelled' ? ' off' : ''), onclick: () => openMeeting(x.id, load) },
-          h('span', { class: 'sp-time' }, hm(x.start_at), h('small', {}, hm(x.end_at))),
+          h('span', { class: 'sp-time' }, x.all_day ? 'cały' : hm(x.start_at), h('small', {}, x.all_day ? 'dzień' : hm(x.end_at))),
           h('span', { class: 'sp-main' }, h('b', {}, x.private ? (x.title || 'Spotkanie') : (x.client_name || x.title)),
             h('small', {}, [x.private ? 'prywatne' : (t?.name || x.title), MODE[x.mode] || '', x.topic ? x.topic.slice(0, 80) : ''].filter(Boolean).join(' · '))),
           x.source === 'www' ? h('span', { class: 'sp-tag' + (x.channel === 'm2tax' ? ' m2' : '') }, CHANNEL[x.channel] || 'ze strony') : null,
+          payTag(x),
           x.mode === 'meet' && x.meet_url && x.status !== 'cancelled' ? h('a', { class: 'sp-tag meet', href: x.meet_url, target: '_blank', rel: 'noopener', onclick: e => e.stopPropagation() }, 'Meet') : null,
           h('span', { class: 'sp-avs' }, ...(mm.get(x.id) || []).map(memberById).filter(Boolean).map(avaChip)));
       })))));

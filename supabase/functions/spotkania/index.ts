@@ -250,10 +250,12 @@ function eventBody(c: Ctx, withMeet: boolean, meetUrl: string | null) {
   const ev: any = {
     summary: who, description: lines.join('\n').trim(),
     location: m.mode === 'office' ? (m.place || '') : m.mode === 'phone' ? (m.client_phone ? `Telefon ${m.client_phone}` : 'Telefon') : (meetUrl && !withMeet ? meetUrl : ''),
-    start: { dateTime: new Date(Date.parse(m.start_at)).toISOString(), timeZone: TZ }, end: { dateTime: new Date(Date.parse(m.end_at)).toISOString(), timeZone: TZ },
+    start: m.all_day ? { date: dayOf(Date.parse(m.start_at)) } : { dateTime: new Date(Date.parse(m.start_at)).toISOString(), timeZone: TZ },
+    end: m.all_day ? { date: dayOf(Date.parse(m.end_at)) } : { dateTime: new Date(Date.parse(m.end_at)).toISOString(), timeZone: TZ },
+    transparency: 'opaque',
     colorId: m.private ? '8' : '9', visibility: m.private ? 'private' : 'default',
     extendedProperties: { private: { rkdp_meeting: m.id } },
-    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 60 }, { method: 'popup', minutes: 15 }] },
+    reminders: m.all_day ? { useDefault: false, overrides: [] } : { useDefault: false, overrides: [{ method: 'popup', minutes: 60 }, { method: 'popup', minutes: 15 }] },
   };
   if (m.client_email && m.notify_client && !m.private) ev.attendees = [{ email: m.client_email, displayName: m.client_name || undefined }];
   if (withMeet) ev.conferenceData = { createRequest: { requestId: m.id.replace(/-/g, ''), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
@@ -454,7 +456,8 @@ Deno.serve(async (req: Request) => {
       // nowa rezerwacja ze strony
       if (clean(body.hp, 100)) return json({ ok: true });                         // pole-pułapka dla botów
       if (Number(body.ms) > 0 && Number(body.ms) < 2500) throw new Http(400, 'Spróbuj jeszcze raz.');
-      const name = clean(body.name, 120), email = clean(body.email, 160).toLowerCase(), phone = clean(body.phone, 40), topic = clean(body.topic, 1500);
+      const name = clean(body.name, 120), email = clean(body.email, 160).toLowerCase(), phone = clean(body.phone, 40), topic = clean(body.topic, 1500), nip = clean(body.nip, 20).replace(/\D/g, '');
+      if (nip && nip.length !== 10) throw new Http(400, 'NIP powinien mieć 10 cyfr – popraw go albo zostaw puste.');
       if (name.length < 3) throw new Http(400, 'Podaj imię i nazwisko.');
       if (!emailOk(email)) throw new Http(400, 'Podaj poprawny adres e-mail.');
       if (phone && phone.replace(/\D/g, '').length < 9) throw new Http(400, 'Numer telefonu wygląda na niepełny – popraw go albo zostaw puste.');
@@ -472,7 +475,7 @@ Deno.serve(async (req: Request) => {
       const match = await matchClient(email);
       const r = await createMeeting(S, {
         type_id: type.id, title: type.name, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + type.duration_min * 60000).toISOString(),
-        source: 'www', channel: ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link', mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone || null, topic, ...match, notify_client: true,
+        source: 'www', channel: ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link', mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone || null, client_nip: nip || null, topic, ...match, notify_client: true,
       }, [who], null);
       return json({ ok: true, mailed: r.mailed, meeting: await publicMeeting(r.meeting) });
     }
@@ -545,12 +548,25 @@ Deno.serve(async (req: Request) => {
     if (action === 'create') {
       const members = [...new Set((Array.isArray(body.members) ? body.members : [me]).map((x: unknown) => clean(x, 40)).filter(Boolean))].slice(0, 8) as string[];
       if (!members.length) throw new Http(400, 'Wybierz osoby.');
-      const startMs = Date.parse(String(body.start || ''));
-      const dur = Math.max(10, Math.min(480, Number(body.duration) || 60));
+      // blokada czasu: godziny od–do albo cały dzień / kilka dni
+      const allDay = !!body.all_day;
+      let startMs = Date.parse(String(body.start || ''));
+      let dur = Math.max(10, Math.min(480, Number(body.duration) || 60));
+      if (allDay) {
+        const d0 = /^\d{4}-\d{2}-\d{2}$/.test(body.day) ? body.day : '';
+        const d1 = /^\d{4}-\d{2}-\d{2}$/.test(body.day_to) && body.day_to >= d0 ? body.day_to : d0;
+        if (!d0) throw new Http(400, 'Wybierz dzień.');
+        if (d1 > addDays(d0, 60)) throw new Http(400, 'Blokada może trwać najwyżej 60 dni.');
+        startMs = localToUtc(d0, '00:00'); dur = (localToUtc(addDays(d1, 1), '00:00') - startMs) / 60000;
+      } else if (body.end) {
+        const endMs = Date.parse(String(body.end));
+        if (!startMs || !endMs || endMs <= startMs) throw new Http(400, 'Godzina „do” musi być późniejsza niż „od”.');
+        dur = Math.min(24 * 60, Math.round((endMs - startMs) / 60000));
+      }
       if (!startMs) throw new Http(400, 'Wybierz dzień i godzinę.');
       let type: any = null;
       if (body.type_id) { const { data } = await admin.from('meeting_types').select('*').eq('id', clean(body.type_id, 40)).maybeSingle(); type = data; }
-      const priv = !!body.private;
+      const priv = !!body.private || !!body.block || allDay;
       const email = clean(body.client_email, 160).toLowerCase();
       if (!priv && email && !emailOk(email)) throw new Http(400, 'Nieprawidłowy e-mail klienta.');
       const mode = ['meet', 'office', 'phone'].includes(body.mode) ? body.mode : (type?.mode || 'office');
@@ -558,8 +574,8 @@ Deno.serve(async (req: Request) => {
       let cid = body.client_id ? clean(body.client_id, 40) : null, m2id = body.m2_client_id ? clean(body.m2_client_id, 40) : null;
       if (!priv && email && !cid && !m2id) { const mc = await matchClient(email); cid = mc.client_id; m2id = mc.m2_client_id; }
       const r = await createMeeting(S, {
-        type_id: type?.id || null, title, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(), source: 'app', channel: 'app', private: priv,
-        mode, place: mode === 'office' ? (clean(body.place, 300) || type?.place || null) : null,
+        type_id: type?.id || null, title, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + dur * 60000).toISOString(), source: 'app', channel: 'app', private: priv, all_day: allDay,
+        mode, place: mode === 'office' && !body.block ? (clean(body.place, 300) || type?.place || null) : null,
         client_name: priv ? null : clean(body.client_name, 160) || null, client_email: priv ? null : email || null, client_phone: priv ? null : clean(body.client_phone, 40) || null,
         topic: clean(body.topic, 2000) || null, client_id: priv ? null : cid, m2_client_id: priv ? null : m2id, matter_id: body.matter_id ? clean(body.matter_id, 40) : null,
         notify_client: !priv && !!email && body.notify_client !== false, created_by: me,

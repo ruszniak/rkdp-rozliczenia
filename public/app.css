@@ -3190,3 +3190,14 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 .nav-cfg-row.on{background:var(--panel)}
 .nav-cfg-mv{display:flex;gap:4px}.nav-cfg-mv .icon-btn{width:32px;height:32px}
 .more-menu .mm-cfg{border-top:1px solid var(--line);margin-top:4px;padding-top:10px}
+/* notatka wewnętrzna spotkania */
+.sp-notes{margin-top:16px;padding:14px;border-radius:14px;background:var(--panel);display:grid;gap:10px}
+.sp-notes-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sp-notes-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+.sp-notes-pay{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sp-notes-foot{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sp-tag.paid{background:#E4EDDF;color:#3E6B47}.sp-tag.unpaid{background:#FEF3C7;color:#92400E}
+/* kalendarz na pulpicie: przełącznik Mój / udostępnione */
+.gc-seg{display:flex;gap:4px;background:var(--panel);border-radius:999px;padding:3px;margin:4px 0 10px;width:max-content;max-width:100%;overflow:auto}
+.gc-seg button{border:0;background:none;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.gc-seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}

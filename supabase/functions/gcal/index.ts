@@ -1,7 +1,7 @@
 // Kalendarz Google – połączenie konta każdej osoby (OAuth) i dwukierunkowa współpraca z aplikacją:
 //  • do osobnego kalendarza „RKDP – terminy i zadania” trafiają: terminy spraw doradczych, zadania z terminem,
 //    pytania w rozmowach (z przypomnieniami); po zrobieniu znikają,
-//  • na Pulpicie widać najbliższe wydarzenia z głównego kalendarza Google.
+//  • na Pulpicie widać najbliższe wydarzenia z głównego kalendarza Google (własnego albo udostępnionego, np. Michała).
 // Sekrety funkcji: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (ustawiane w panelu Supabase, nigdy w kodzie).
 // Token odświeżania Google trzymany jest w Vault (funkcje gcal_store_token / gcal_token – tylko dla roli serwisowej).
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -274,7 +274,12 @@ Deno.serve(async (req: Request) => {
     if (action === 'status') {
       const { data: link } = await admin.from('gcal_links').select('google_email,calendar_id,connected_at,last_sync_at,last_error,scopes').eq('member_id', memberId).maybeSingle();
       const { scopes, ...rest } = (link || {}) as any;
-      return json({ configured, connected: !!link, ...rest, can_book: !!link && canBook(scopes), calendar_name: CAL_NAME });
+      // kalendarze udostępnione tej osobie przez innych (np. kalendarz Michała dla zespołu RKDP)
+      const { data: sh } = await admin.from('calendar_shares').select('owner_id').eq('viewer_id', memberId);
+      const owners = (sh || []).map((x: any) => x.owner_id);
+      const { data: ol } = owners.length ? await admin.from('gcal_links').select('member_id').in('member_id', owners) : { data: [] };
+      const { data: on } = owners.length ? await admin.from('team_members').select('id,full_name').in('id', (ol || []).map((x: any) => x.member_id)) : { data: [] };
+      return json({ configured, connected: !!link, ...rest, can_book: !!link && canBook(scopes), calendar_name: CAL_NAME, shared: (on || []).map((x: any) => ({ id: x.id, name: x.full_name })) });
     }
     if (!configured) return json({ configured: false, error: 'Połączenie z Google nie jest jeszcze skonfigurowane (brak danych klienta OAuth w ustawieniach serwera).' }, 400);
     if (action === 'connect') {
@@ -306,7 +311,16 @@ Deno.serve(async (req: Request) => {
       if (!r.ok) return json({ error: r.status === 403 ? 'Połącz konto Google ponownie, aby wybrać kalendarze.' : 'Google: ' + (r.data?.error?.message || r.status) }, 400);
       return json({ items: (r.data.items || []).map((c: any) => ({ id: c.primary ? 'primary' : c.id, email: c.id, name: c.summaryOverride || c.summary, primary: !!c.primary, role: c.accessRole })) });
     }
-    if (action === 'events') return json({ items: await events(memberId, Number(body.days) || 7) });
+    if (action === 'events') {
+      let who = memberId;
+      if (body.member && body.member !== memberId) {
+        const { data: isAdm } = await user.rpc('is_admin');
+        const { data: sh } = await admin.from('calendar_shares').select('owner_id').eq('owner_id', String(body.member)).eq('viewer_id', memberId).maybeSingle();
+        if (!isAdm && !sh) return json({ error: 'Brak dostępu do tego kalendarza' }, 403);
+        who = String(body.member);
+      }
+      return json({ items: await events(who, Number(body.days) || 7) });
+    }
     if (action === 'disconnect') {
       const { data: link } = await admin.from('gcal_links').select('calendar_id').eq('member_id', memberId).maybeSingle();
       try {

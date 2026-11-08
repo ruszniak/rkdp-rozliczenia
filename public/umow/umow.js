@@ -140,7 +140,7 @@
   function card(step, body) { return h('div', { class: 'um-card' }, top(step), body); }
 
   // ---------- krok 2: dane ----------
-  var form = { name: '', email: '', phone: '', topic: '', consent: false };
+  var form = { name: '', email: '', phone: '', nip: '', topic: '', consent: false };
   function summary() {
     var d = new Date(st.slot.start), end = new Date(d.getTime() + st.type.duration_min * 60000);
     var advId = st.adv !== 'any' ? st.adv : (st.slot.advisors.length === 1 ? st.slot.advisors[0] : null);
@@ -164,7 +164,7 @@
       e.preventDefault();
       if (!form.consent) return render(card(2, step2('Zaznacz zgodę na przetwarzanie danych.')));
       btn.disabled = true; btn.textContent = 'Rezerwuję…';
-      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, topic: form.topic, consent: true, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
+      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
         .then(function (r) { render(card(3, done(r.meeting, r.mailed))); window.scrollTo(0, 0); })
         .catch(function (e) {
           if (/zajęt/i.test(e.message)) { st.slot = null; loadSlots(); setTimeout(function () { alertBox(e.message); }, 50); return; }
@@ -175,6 +175,7 @@
       inp('name', 'Imię i nazwisko', 'text', 'name'),
       inp('email', 'E-mail', 'email', 'email'),
       inp('phone', 'Telefon (opcjonalnie)', 'tel', 'tel'),
+      inp('nip', 'NIP firmy (opcjonalnie)', 'text', 'off', 'jeśli spotkanie dotyczy firmy'),
       inp('topic', 'W jakiej sprawie? (krótko – pomoże nam się przygotować)', null, null, 'np. sprzedaż mieszkania, kontrola z urzędu skarbowego, wybór formy opodatkowania'),
       hp,
       h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.consent, onchange: function (e) { form.consent = e.target.checked; } }),

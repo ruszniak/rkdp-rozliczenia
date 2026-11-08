@@ -91,7 +91,10 @@ export function gcalAgendaCard({ days = 7 } = {}) {
   (async () => {
     const st = await gcalStatus();
     if (!st.configured) { box.remove(); return; }
-    if (!st.connected) {
+    const shared = st.shared || [];
+    // kalendarze do wyboru: mój (jeśli połączony) i udostępnione mi przez innych (np. kalendarz Michała)
+    const opts = [...(st.connected ? [{ id: null, name: 'Mój' }] : []), ...shared.map(x => ({ id: x.id, name: x.name.split(/\s+/)[0] }))];
+    if (!opts.length) {
       let hide = false; try { hide = localStorage.getItem('rkdp_gcal_cta') === '0'; } catch { /* */ }
       if (hide) { box.remove(); return; }
       box.classList.add('gc-cta');
@@ -101,29 +104,37 @@ export function gcalAgendaCard({ days = 7 } = {}) {
       h('button', { class: 'icon-btn', 'aria-label': 'Ukryj', onclick: () => { try { localStorage.setItem('rkdp_gcal_cta', '0'); } catch { /* */ } box.remove(); } }, '✕'));
       return;
     }
-    put(box, h('div', { class: 'gc-head' }, h('span', { class: 'gc-ico', html: CAL_SVG }), h('h2', {}, 'Kalendarz'), h('span', { class: 'small muted' }, 'najbliższe ' + days + ' dni'),
+    let cur = opts[0].id;
+    try { const saved = localStorage.getItem('rkdp_gcal_view'); if (saved !== null && opts.some(o => String(o.id) === saved)) cur = saved === 'null' ? null : saved; } catch { /* */ }
+    const seg = h('div', { class: 'gc-seg' });
+    const head = h('div', { class: 'gc-head' }, h('span', { class: 'gc-ico', html: CAL_SVG }), h('h2', {}, 'Kalendarz'), h('span', { class: 'small muted' }, 'najbliższe ' + days + ' dni'),
       h('span', { style: { marginLeft: 'auto', display: 'flex', gap: '6px', alignItems: 'center' } },
         h('a', { class: 'small', href: '#/spotkania' }, 'Spotkania'),
-        h('button', { class: 'btn btn-primary btn-sm gc-add', type: 'button', onclick: () => import('./spotkania.js').then(m => m.openMeetingDialog({ onDone: () => location.reload() })) }, '+ Umów'))),
-      h('p', { class: 'hint' }, 'Wczytywanie…'));
-    const { items } = await call('events', { days });
-    const byDay = new Map();
-    for (const e of items) {
-      const k = e.allDay ? e.start : new Date(e.start).toLocaleDateString('sv-SE');
-      if (!byDay.has(k)) byDay.set(k, []);
-      byDay.get(k).push(e);
-    }
-    const todayK = new Date().toLocaleDateString('sv-SE');
-    const tom = new Date(Date.now() + 86400000).toLocaleDateString('sv-SE');
-    const label = k => k === todayK ? 'Dziś' : k === tom ? 'Jutro' : DAY.format(new Date(k + 'T12:00:00'));
-    const list = h('div', { class: 'gc-days' }, ...(items.length ? [...byDay.entries()].slice(0, 8).map(([k, es]) => h('div', { class: 'gc-day' + (k === todayK ? ' today' : '') },
-      h('div', { class: 'gc-dl' }, label(k)),
-      h('div', { class: 'gc-evs' }, ...es.map(e => h('a', { class: 'gc-ev', href: e.link || '#', target: '_blank', rel: 'noopener' },
-        h('span', { class: 'gc-t' }, e.allDay ? 'cały dzień' : HM.format(new Date(e.start))),
-        h('span', { class: 'gc-n' }, e.title, e.location ? h('small', {}, e.location) : null),
-        e.meet ? h('span', { class: 'gc-meet' }, 'Meet') : null)))))
-      : [h('p', { class: 'hint', style: { padding: '6px 0' } }, 'Brak wydarzeń w najbliższych dniach. 🙂')]));
-    box.lastChild.replaceWith(list);
+        h('button', { class: 'btn btn-primary btn-sm gc-add', type: 'button', onclick: () => import('./spotkania.js').then(m => m.openMeetingDialog({ onDone: () => location.reload() })) }, '+ Umów')));
+    const listBox = h('div', {}, h('p', { class: 'hint' }, 'Wczytywanie…'));
+    put(box, head, opts.length > 1 ? seg : null, listBox);
+    const load = async () => {
+      put(seg, ...opts.map(o => h('button', { type: 'button', class: String(o.id) === String(cur) ? 'on' : '', onclick: () => { cur = o.id; try { localStorage.setItem('rkdp_gcal_view', String(cur)); } catch { /* */ } load(); } }, o.name)));
+      put(listBox, h('p', { class: 'hint' }, 'Wczytywanie…'));
+      const { items } = await call('events', cur ? { days, member: cur } : { days });
+      const byDay = new Map();
+      for (const e of items) {
+        const k = e.allDay ? e.start : new Date(e.start).toLocaleDateString('sv-SE');
+        if (!byDay.has(k)) byDay.set(k, []);
+        byDay.get(k).push(e);
+      }
+      const todayK = new Date().toLocaleDateString('sv-SE');
+      const tom = new Date(Date.now() + 86400000).toLocaleDateString('sv-SE');
+      const label = k => k === todayK ? 'Dziś' : k === tom ? 'Jutro' : DAY.format(new Date(k + 'T12:00:00'));
+      put(listBox, h('div', { class: 'gc-days' }, ...(items.length ? [...byDay.entries()].slice(0, 8).map(([k, es]) => h('div', { class: 'gc-day' + (k === todayK ? ' today' : '') },
+        h('div', { class: 'gc-dl' }, label(k)),
+        h('div', { class: 'gc-evs' }, ...es.map(e => h(cur ? 'div' : 'a', cur ? { class: 'gc-ev' } : { class: 'gc-ev', href: e.link || '#', target: '_blank', rel: 'noopener' },
+          h('span', { class: 'gc-t' }, e.allDay ? 'cały dzień' : HM.format(new Date(e.start))),
+          h('span', { class: 'gc-n' }, e.title, e.location ? h('small', {}, e.location) : null),
+          e.meet ? h('a', { class: 'gc-meet', href: e.meet, target: '_blank', rel: 'noopener', onclick: ev => ev.stopPropagation() }, 'Meet') : null)))))
+        : [h('p', { class: 'hint', style: { padding: '6px 0' } }, 'Brak wydarzeń w najbliższych dniach. 🙂')])));
+    };
+    await load().catch(e => put(listBox, h('p', { class: 'hint' }, 'Kalendarz Google: ' + (e.message || e) + ' ', h('a', { href: '#/profil' }, 'Profil →'))));
   })().catch(e => { put(box, h('p', { class: 'hint' }, 'Kalendarz Google: ' + (e.message || e) + ' ', h('a', { href: '#/profil' }, 'Profil →'))); });
   return box;
 }
