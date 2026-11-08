@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.1', '7 listopada 2026', [
+    'RKDP i M2 TAX w jednej aplikacji – bez przełączania. W Klientach przełącznik RKDP | M2 TAX (osobne listy). RKDP prowadzi też sprawy doradcze: zlecenia i umowy na papierze RKDP, sekcja „Doradztwo podatkowe” na karcie klienta, zakładka Sprawy dla zespołu RKDP. Dostęp do firmy pilnuje baza.',
     'Pulpit szefa: zadania tylko raz – według pracowników, a pod nimi osobno terminy i pytania.',
     'Nowy wygląd: jasny nagłówek, kafelki z kolorowymi ikonami i kołem postępu w Rozliczeniach, czytelniejsza tabela, na telefonie pływające menu na dole.',
     'Zdjęcia profilowe zespołu RKDP.',

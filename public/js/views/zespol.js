@@ -67,7 +67,7 @@ export async function renderZespol(main) {
       return h('tr', {},
         h('td', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, m.email)),
         h('td', {}, m.short_name),
-        h('td', {}, modBox('rozliczenia', 'Rozliczenia'), h('br'), modBox('doradztwo', 'Doradztwo M2 TAX'), h('br'), h('span', { 'data-tip': 'Konto, które widzi wyłącznie zakładkę JPK (podgląd plików JPK_CIT). Nie ma dostępu do klientów, rozliczeń ani M2 TAX.' }, modBox('jpk', 'Tylko podgląd JPK'))),
+        h('td', {}, h('span', { 'data-tip': 'RKDP – cała aplikacja: rozliczenia, klienci RKDP, sprawy doradcze RKDP. Zakres (wszyscy klienci / tylko swoi) ustawia rola.' }, modBox('rozliczenia', 'RKDP')), h('br'), h('span', { 'data-tip': 'M2 TAX – tylko doradztwo: klienci M2 TAX, ich sprawy, zlecenia, umowy i pisma.' }, modBox('doradztwo', 'M2 TAX (doradztwo)')), h('br'), h('span', { 'data-tip': 'Konto, które widzi wyłącznie zakładkę JPK (podgląd plików JPK_CIT). Nie ma dostępu do klientów, rozliczeń ani M2 TAX.' }, modBox('jpk', 'Tylko podgląd JPK'))),
         h('td', {}, role),
         h('td', {}, h('label', { class: 'check' }, active, m.active ? 'aktywny' : 'zablokowany'),
           h('label', { class: 'check small', 'data-tip': 'Czy ta osoba prowadzi listę obecności (widżet „Moja obecność dziś”, listy obecności, „Obecność dziś” na pulpicie).' }, att, 'lista obecności')),
@@ -88,8 +88,8 @@ export async function renderZespol(main) {
     const short = h('input', { class: 'input', placeholder: 'Skrót (np. Kuba)', required: true });
     const role = h('select', { class: 'select' }, Object.entries(ROLE).map(([k, v]) => h('option', { value: k }, v)));
     role.value = 'limited';
-    const mod = h('select', { class: 'select', 'aria-label': 'Moduł' }, h('option', { value: 'rozliczenia' }, 'Moduł: Rozliczenia'),
-      h('option', { value: 'doradztwo' }, 'Moduł: Doradztwo M2 TAX'), h('option', { value: 'oba' }, 'Moduł: oba'), h('option', { value: 'jpk' }, 'Tylko podgląd JPK'));
+    const mod = h('select', { class: 'select', 'aria-label': 'Moduł' }, h('option', { value: 'rozliczenia' }, 'Firma: RKDP (cała aplikacja)'),
+      h('option', { value: 'doradztwo' }, 'Firma: M2 TAX (doradztwo)'), h('option', { value: 'oba' }, 'Obie firmy: RKDP i M2 TAX'), h('option', { value: 'jpk' }, 'Tylko podgląd JPK'));
     mod.addEventListener('change', () => { if (mod.value === 'jpk') role.value = 'limited'; });
     return h('form', { class: 'toolbar', style: { marginTop: '14px' }, onsubmit: async (e) => {
       e.preventDefault();

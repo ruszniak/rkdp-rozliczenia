@@ -1,6 +1,6 @@
 // M2 TAX – raporty sprawy do PDF: pełne podsumowanie, samo zestawienie godzin, sam dziennik.
 import { printHtml } from '../ui.js';
-import { printableHtml, M2_BRAND, dateLong } from './order.js';
+import { printableHtml, M2_BRAND, brandOf, dateLong } from './order.js';
 import { MATTER_TYPE, MATTER_STATUS, FEE_TYPE, DEADLINE_KIND, JOURNAL_KIND, fmtDate, money, hours, todayIso } from './dict.js';
 import { state, memberById } from '../store.js';
 
@@ -79,12 +79,12 @@ export function matterReportBlocks(kind, { m, client, ord, deadlines = [], journ
     if (kind === 'godziny') B.push({ t: 'h', text: 'Czas pracy' + (billableOnly ? ' (do rozliczenia)' : '') }, ...timeBlocks(time, rate, { from, to, billableOnly }));
     else B.push({ t: 'h', text: 'Wpisy' }, ...journalBlocks(journal, { from, to }));
   }
-  B.push({ t: 'gap' }, { t: 'small', text: `Wygenerowano ${new Date().toLocaleString('pl-PL')} · ${state.me?.full_name || ''} · ${M2_BRAND.firmName}` });
+  B.push({ t: 'gap' }, { t: 'small', text: `Wygenerowano ${new Date().toLocaleString('pl-PL')} · ${state.me?.full_name || ''} · ${brandOf(m?.firm).firmName}` });
   return B;
 }
 
 export function printMatterReport(kind, data) {
   const blocks = matterReportBlocks(kind, data);
   const name = { pelny: 'Raport', godziny: 'Godziny', dziennik: 'Dziennik' }[kind];
-  return printHtml(printableHtml(blocks, `${name}_${(data.m.number || 'sprawa').replace(/\//g, '-')}`, location.origin + M2_BRAND.logo, M2_BRAND));
+  return printHtml(printableHtml(blocks, `${name}_${(data.m.number || 'sprawa').replace(/\//g, '-')}`, location.origin + brandOf(data.m?.firm).logo, brandOf(data.m?.firm)));
 }

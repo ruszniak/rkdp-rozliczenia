@@ -78,13 +78,14 @@ function staticItems() {
   const out = [];
   if (isJpkOnly()) out.push(tool('Podgląd JPK_CIT', '#/jpk'), go('Regulamin', '#/regulamin'));
   else {
+    if (hasModule('rozliczenia') || hasModule('doradztwo')) out.push(go('Sprawy doradcze', '#/doradztwo/sprawy', 'Doradztwo'), go('Zlecenia i umowy', '#/doradztwo/zlecenia', 'Doradztwo'));
     if (hasModule('rozliczenia')) out.push(go('Dziś – moja lista na dzisiaj', '#/pulpit?widok=dzis', 'RKDP'), go('Kalendarz obowiązków klientów', '#/terminy', 'RKDP'), go('Zamknięcie roku', '#/zamkniecie-roku', 'RKDP'),
       ...(state.me?.role === 'admin' ? [go('Raport miesięczny dla zarządu', '#/raport', 'RKDP')] : []),
       { group: 'Akcje', label: 'Nowe zgłoszenie', meta: 'albo: nowe zgłoszenie <klient>', icon: 'bolt', run: async () => { const z = await import('./views/zgloszenia.js'); z.newTicketDialog().catch(fail); } },
       go('Pulpit', '#/pulpit', 'RKDP'), go('Rozliczenia', '#/rozliczenia', 'RKDP'), go('Klienci', '#/klienci', 'RKDP'), go('Rozmowy', '#/rozmowy', 'RKDP'), go('Zadania zespołu', '#/pulpit?f=zespol', 'RKDP'), ...(state.me?.role === 'admin' ? [go('Czas pracy i rentowność', '#/czas', 'M2 TAX')] : []), go('Informacja do klientów (e-mail zbiorczy)', '#/informacje', 'RKDP'), go('Dokumenty', '#/dokumenty', 'RKDP'),
       tool('Protokół ZZW – zatwierdzenie sprawozdania', '#/sprawozdania/nowy'), tool('Oferta na usługi', '#/oferty/nowa'), tool('Weryfikacja AML', '#/aml'));
-    if (hasModule('doradztwo')) out.push(go('Pulpit M2 TAX', '#/doradztwo', 'M2 TAX'), go('Sprawy', '#/doradztwo/sprawy', 'M2 TAX'), go('Klienci M2 TAX', '#/doradztwo/klienci', 'M2 TAX'),
-      go('Dokumenty – wzory pism', '#/doradztwo/dokumenty', 'M2 TAX'), go('Zlecenia i umowy', '#/doradztwo/zlecenia', 'M2 TAX'), go('Zgłoszenia M2 TAX', '#/doradztwo/zgloszenia', 'M2 TAX'));
+    if (hasModule('doradztwo')) out.push(go('Pulpit M2 TAX', '#/doradztwo', 'M2 TAX'), go('Klienci M2 TAX', '#/doradztwo/klienci', 'M2 TAX'),
+      go('Dokumenty – wzory pism', '#/doradztwo/dokumenty', 'M2 TAX'), go('Zgłoszenia M2 TAX', '#/doradztwo/zgloszenia', 'M2 TAX'));
     out.push(tool('Kalkulator: JDG czy spółka z o.o.?', hasModule('rozliczenia') ? '#/kalkulator' : '#/doradztwo/kalkulator'), tool('Wzory umów i uchwał', hasModule('rozliczenia') ? '#/wzory' : '#/doradztwo/wzory'),
       tool('Podgląd JPK_CIT', hasModule('rozliczenia') ? '#/jpk' : '#/doradztwo/jpk'), go('Lista obecności', '#/obecnosc'), go('Mój profil i powiadomienia', '#/profil'), go('Regulamin', '#/regulamin'), go('O aplikacji i RODO', '#/o-aplikacji'), go('Polityka prywatności', '#/o-aplikacji/prywatnosc'), go('Klauzula informacyjna RODO', '#/o-aplikacji/rodo'));
     if (state.me?.role === 'admin') out.push(go('Zespół i ustawienia', '#/zespol'));
@@ -102,14 +103,14 @@ async function loadData() {
   const q = [];
   const rk = hasModule('rozliczenia') && !isJpkOnly(), m2 = hasModule('doradztwo');
   q.push(rk ? sb.from('clients').select('id,name,nip,status,email').order('name').limit(2000) : null);
-  q.push(m2 ? sb.from('m2_clients').select('id,name,nip').order('name').limit(2000) : null);
-  q.push(m2 ? sb.from('m2_matters').select('id,number,title,status').order('opened_at', { ascending: false }).limit(1000) : null);
+  q.push(m2 ? sb.from('m2_clients').select('id,name,nip').eq('firm', 'm2').order('name').limit(2000) : null);
+  q.push(m2 || rk ? sb.from('m2_matters').select('id,number,title,status,firm').order('opened_at', { ascending: false }).limit(1000) : null);
   q.push(rk || m2 ? sb.from('rkdp_tickets').select('id,no,title,module,status').order('created_at', { ascending: false }).limit(600) : null);
   const [c, mc, mm, tk] = await Promise.all(q.map(p => p ? p.then(r => r.data || [], () => []) : Promise.resolve([])));
   const out = [
     ...c.map(x => ({ group: 'Klienci RKDP', label: x.name, meta: x.nip ? `NIP ${x.nip}` : (x.status || ''), extra: x.nip, email: x.email, icon: 'client', href: `#/klient/${x.id}`, panel: x.id })),
     ...mc.map(x => ({ group: 'Klienci M2 TAX', label: x.name, meta: x.nip ? `NIP ${x.nip}` : '', extra: x.nip, icon: 'client', href: `#/doradztwo/klient/${x.id}` })),
-    ...mm.map(x => ({ group: 'Sprawy M2 TAX', label: `${x.number} – ${x.title}`, meta: x.status || '', icon: 'matter', href: `#/doradztwo/sprawa/${x.id}` })),
+    ...mm.map(x => ({ group: 'Sprawy doradcze', label: `${x.number} – ${x.title}`, meta: `${x.firm === 'rkdp' ? 'RKDP' : 'M2 TAX'} · ${x.status || ''}`, icon: 'matter', href: `#/doradztwo/sprawa/${x.id}` })),
     ...tk.filter(x => (x.module === 'm2' ? m2 : rk)).map(x => ({ group: 'Zgłoszenia', label: `#${x.no} ${x.title}`, meta: x.status === 'zrobione' ? 'zrobione' : (x.module === 'm2' ? 'M2 TAX' : 'RKDP'), icon: 'ticket', href: x.module === 'm2' ? `#/doradztwo/zgloszenia/${x.id}` : `#/zgloszenia/${x.id}` })),
   ];
   out.forEach(o => { o._n = norm(`${o.label} ${o.extra || ''}`); });
@@ -117,7 +118,7 @@ async function loadData() {
   return out;
 }
 
-const LIMITS = { 'Polecenia': 6, 'Ostatnio otwierane': 6, 'Przejdź do': 6, 'Narzędzia': 6, 'Akcje': 3, 'Klienci RKDP': 7, 'Klienci M2 TAX': 6, 'Sprawy M2 TAX': 6, 'Zgłoszenia': 6 };
+const LIMITS = { 'Polecenia': 6, 'Ostatnio otwierane': 6, 'Przejdź do': 6, 'Narzędzia': 6, 'Akcje': 3, 'Klienci RKDP': 7, 'Klienci M2 TAX': 6, 'Sprawy doradcze': 6, 'Zgłoszenia': 6 };
 function search(items, query) {
   const toks = norm(query).split(/\s+/).filter(Boolean);
   if (!toks.length) return items.filter(i => !i.href || false);

@@ -62,9 +62,9 @@ async function collect() {
     kind: 'pytanie', group: 'ask', label: 'Pytanie w rozmowie', id: q.id, title: q.body.length > 120 ? q.body.slice(0, 119) + '…' : q.body, created: q.created_at, sub: `${cname.get(q.client_id) || 'klient'} · ${fmtD(q.created_at)}`,
     href: `#/watek/${q.client_id}?okres=${String(q.period).slice(0, 7)}` }));
   // terminy: sprawy M2 TAX (moje) i pełnomocnictwa moich klientów (administrator – wszystkie) w ciągu 14 dni
-  if (hasModule('doradztwo')) {
-    const dl = await soft(sb.from('m2_deadlines').select('id,matter_id,title,due_date,assignee_id,done').eq('done', false).lte('due_date', plus(14)).eq('assignee_id', me));
-    dl.forEach(d => out.push({ kind: 'termin', group: 'dl', label: 'Termin · M2 TAX', id: d.id, title: d.title || 'Termin w sprawie', due: d.due_date, sub: 'sprawa M2 TAX', href: `#/doradztwo/sprawa/${d.matter_id}`,
+  if (hasModule('doradztwo') || hasModule('rozliczenia')) {
+    const dl = await soft(sb.from('m2_deadlines').select('id,matter_id,title,due_date,assignee_id,done,m2_matters(number,firm)').eq('done', false).lte('due_date', plus(14)).eq('assignee_id', me));
+    dl.forEach(d => out.push({ kind: 'termin', group: 'dl', label: `Termin · ${d.m2_matters?.firm === 'rkdp' ? 'RKDP' : 'M2 TAX'}`, id: d.id, title: d.title || 'Termin w sprawie', due: d.due_date, sub: `sprawa ${d.m2_matters?.number || ''}`.trim(), href: `#/doradztwo/sprawa/${d.matter_id}`,
       actions: [{ label: '✓ Zrealizowano', cls: 'ok', fn: async () => { const { error } = await sb.from('m2_deadlines').update({ done: true, done_at: new Date().toISOString() }).eq('id', d.id); if (error) return fail(error); toast('Oznaczono jako zrealizowane'); reload(); } }] }));
   }
   const poa = await soft(sb.from('client_poa').select('id,client_id,kind,valid_to,revoked_at').is('revoked_at', null).not('valid_to', 'is', null).gte('valid_to', plus(-30)).lte('valid_to', plus(14)));

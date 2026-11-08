@@ -64,10 +64,12 @@ function parseHash() {
 
 const MODULES = {
   rkdp: { label: 'RKDP', full: 'RKDP · Rozliczenia', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/pulpit', need: 'rozliczenia',
-    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/klienci', 'Klienci', 'klienci']],
+    // RKDP = pełna aplikacja (rozliczenia + doradztwo); M2 TAX to dodatek – jego klienci są w Klientach (przełącznik), sprawy w Sprawach
+    tabs: [['#/pulpit', 'Pulpit', 'pulpit'], ['#/klienci', 'Klienci', 'klienci'], ['#/rozliczenia', 'Rozliczenia', 'rozliczenia'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
-    more: [['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
+    more: [['#/doradztwo/zlecenia', 'Zlecenia i umowy (doradztwo)', 'm2:zlecenia'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
+      ['#/doradztwo/dokumenty', 'Pisma M2 TAX (wzory pism, pełnomocnictwa)', 'm2:dokumenty', 'm2'], ['#/doradztwo', 'Pulpit doradcy M2 TAX (spotkania, terminy)', 'm2:', 'm2'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
       ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'M2 TAX · Doradztwo podatkowe', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'],
@@ -168,13 +170,15 @@ function layout(active) {
   const me = state.me;
   const jpkOnly = isJpkOnly();
   const mine = jpkOnly ? ['jpk'] : Object.keys(MODULES).filter(k => k !== 'jpk' && hasModule(MODULES[k].need));
-  let mod = jpkOnly ? 'jpk' : active.startsWith('m2:') ? 'm2' : active === 'zespol' ? (remembered() || mine[0]) : 'rkdp';
+  let mod = jpkOnly ? 'jpk' : hasModule('rozliczenia') ? 'rkdp' : active.startsWith('m2:') ? 'm2' : active === 'zespol' ? (remembered() || mine[0]) : 'rkdp';
+  // jedna aplikacja: widoki doradztwa podświetlają zakładki RKDP
+  if (mod === 'rkdp' && active.startsWith('m2:')) active = active === 'm2:klienci' ? 'klienci' : ['m2:zlecenia', 'm2:dokumenty', 'm2:', 'm2:czas'].includes(active) ? active : 'm2:sprawy';
   if (!mine.includes(mod)) mod = mine[0] || 'rkdp';
   if (active !== 'zespol' && !jpkOnly) remember(mod);
   const M = MODULES[mod];
 
   const switcher = (() => {
-    if (mine.length < 2) return h('span', { class: 'mod-label' }, M.label);
+    if (mine.length < 2 || mod === 'rkdp') return h('span', { class: 'mod-label' }, hasModule('rozliczenia') && hasModule('doradztwo') ? 'RKDP · M2 TAX' : M.label);
     const menu = h('div', { class: 'mod-menu', role: 'menu', hidden: true }, ...mine.map(k => h('a', {
       href: MODULES[k].home, role: 'menuitem', class: k === mod ? 'on' : null,
       onclick: () => { remember(k); menu.hidden = true; },
@@ -196,7 +200,7 @@ function layout(active) {
         switcher),
       h('nav', { class: 'nav-links' },
         ...M.tabs.map(link),
-        (() => { const more = (M.more || []).filter(x => x[3] !== 'admin' || me.role === 'admin'); return more.length ? moreMenu(more, active) : null; })()),
+        (() => { const more = (M.more || []).filter(x => (x[3] !== 'admin' || me.role === 'admin') && (x[3] !== 'm2' || hasModule('doradztwo')) && (x[2] !== 'm2:czas' || hasModule('doradztwo'))); return more.length ? moreMenu(more, active) : null; })()),
       h('div', { class: 'nav-user' },
         jpkOnly ? null : timerPillEl(),
         (() => { const b = h('button', { type: 'button', class: 'hdr-search', onclick: () => openCmdk(), 'aria-label': 'Szukaj (Ctrl K)', 'data-tip': 'Szukaj klienta, sprawy, zgłoszenia, narzędzia' });
@@ -313,19 +317,24 @@ async function route(opts = {}) {
     try { c = await renderJpk(layout('jpk'), { mod: 'rkdp' }); } catch (err) { console.error(err); toast('Nie udało się wczytać: ' + (err.message || err), true); }
     return done();
   }
-  const startMod = remembered() === 'm2' && hasModule('doradztwo') ? 'doradztwo' : null;
+  const m2only = remembered() === 'm2' && hasModule('doradztwo') && !hasModule('rozliczenia');
+  const startMod = m2only ? 'doradztwo' : null;
+  const canDor = hasModule('doradztwo') || hasModule('rozliczenia');
   const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'pulpit' : 'doradztwo');
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');
   try {
-    if (view === 'obecnosc') c = await renderObecnosc(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
+    if (view === 'obecnosc') c = await renderObecnosc(layout(m2only ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
     else if (view === 'regulamin') c = await renderRegulamin(layout('regulamin'));
     else if (view === 'o-aplikacji') { const m = await import('./views/oaplikacji.js'); c = await m.renderOAplikacji(layout('oaplikacji'), parts[1]); }
-    else if (view === 'wiecej') { const m2 = remembered() === 'm2' && hasModule('doradztwo'); renderWiecej(layout(m2 ? 'm2:wiecej' : 'wiecej')); }
-    else if (view === 'profil') c = await renderProfil(layout(remembered() === 'm2' && hasModule('doradztwo') ? 'm2:profil' : 'profil'));
+    else if (view === 'wiecej') { const m2 = m2only; renderWiecej(layout(m2 ? 'm2:wiecej' : 'wiecej')); }
+    else if (view === 'profil') c = await renderProfil(layout(m2only ? 'm2:profil' : 'profil'));
     else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) c = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
     else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) c = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
     else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) c = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });
-    else if (view === 'doradztwo' && hasModule('doradztwo')) c = await renderM2(layout(m2key), parts, params);
+    // pulpit doradcy M2 – dla zespołu RKDP bez M2 TAX zamiast niego lista spraw
+    else if (view === 'doradztwo' && !parts[1] && !hasModule('doradztwo') && canDor) { history.replaceState(null, '', '#/doradztwo/sprawy'); c = await renderM2(layout('m2:sprawy'), ['doradztwo', 'sprawy'], params); }
+    else if (view === 'doradztwo' && parts[1] === 'klienci' && !hasModule('doradztwo') && canDor) { history.replaceState(null, '', '#/klienci'); c = await renderKlienci(layout('klienci'), params); }
+    else if (view === 'doradztwo' && canDor && (hasModule('doradztwo') || !['dokumenty', 'zgloszenia', 'aml', 'oferty'].includes(parts[1]))) c = await renderM2(layout(m2key), parts, params);
     else if (!hasModule('rozliczenia') && view !== 'zespol') c = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'jpk') c = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
     else if (view === 'klienci') c = await renderKlienci(layout('klienci'), params);

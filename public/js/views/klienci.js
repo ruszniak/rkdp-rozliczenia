@@ -5,6 +5,9 @@ import { LEGAL_SHORT, FORM_GROUP, VAT_SHORT, PIT_SHORT, CIT_SHORT, ZUS_SHORT, CL
 import { fetchAll } from './rozliczenia.js';
 import { lookupNip, validNip, cleanNip } from '../nip.js';
 import { dokumentyDialog } from '../rkdp/docs.js';
+import { firmSwitch } from '../firma.js';
+
+const OPEN_MATTER = ['nowa', 'w_toku', 'oczekuje_organ', 'oczekuje_klient', 'zawieszona'];
 
 const PREF_KEY = 'rkdp-klienci-filtry';
 const loadPrefs = () => { try { return JSON.parse(localStorage.getItem(PREF_KEY)) || {}; } catch { return {}; } };
@@ -39,10 +42,15 @@ export async function renderKlienci(main) {
   const prefs = { q: '', status: 'aktywny', group: '', who: '', ...loadPrefs() };
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie klientów…'));
   const period = defaultPeriod();
-  const [clients, entries] = await Promise.all([
+  const [clients, entries, matters] = await Promise.all([
     fetchAll(() => sb.from('clients').select('*, client_assignments(member_id), client_partners(id)').order('name')),
     fetchAll(() => sb.from('checklist_entries').select('client_id,task_code,status').eq('period', period + '-01')).catch(() => []),
+    // sprawy doradcze RKDP (otwarte) – znaczek ⚖ przy kliencie
+    fetchAll(() => sb.from('m2_matters').select('status,m2_clients!inner(rkdp_client_id)').eq('firm', 'rkdp')).catch(() => []),
   ]);
+  const sprawy = new Map();
+  matters.forEach(m => { const id = m.m2_clients?.rkdp_client_id; if (id && OPEN_MATTER.includes(m.status)) sprawy.set(id, (sprawy.get(id) || 0) + 1); });
+  const sprEl = c => sprawy.get(c.id) ? h('span', { class: 'kl-spr', 'data-tip': 'Otwarte sprawy doradcze' }, '⚖ ' + sprawy.get(c.id)) : null;
   // pasek rozliczeń bieżącego miesiąca: zrobione / do zrobienia (bez „nie dotyczy”); „do uwagi” – braki dokumentów, przypomnienia, po terminie
   const counts = new Set(state.taskTypes.filter(t => t.counts_to_settled !== false).map(t => t.code));
   const prog = new Map();
@@ -122,7 +130,7 @@ export async function renderKlienci(main) {
         const meta = [LEGAL_SHORT[c.legal_form], taxSummary(c) || (c.nip ? 'NIP ' + c.nip : '')].filter(Boolean).join(' · ');
         return h('a', { class: 'kl-row', href: `#/klient/${c.id}` },
           h('span', { class: 'kl-ini', style: { background: bg, color: fg } }, initials(c.name).slice(0, 2)),
-          h('span', { class: 'kl-t' }, h('b', {}, c.name), h('span', { class: 'kl-m' }, c.status !== 'aktywny' ? CLIENT_STATUS[c.status] + ' · ' + meta : meta)),
+          h('span', { class: 'kl-t' }, h('b', {}, c.name), h('span', { class: 'kl-m' }, c.status !== 'aktywny' ? CLIENT_STATUS[c.status] + ' · ' + meta : meta, sprEl(c))),
           progEl(c));
       })))) : [h('p', { class: 'hint', style: { padding: '18px 4px' } }, prefs.who === 'uwaga' ? 'Nikt nie wymaga uwagi. 👍' : 'Brak klientów pasujących do filtrów.')]));
     idx.replaceChildren(...[...groups.keys()].map(l => h('button', { type: 'button', onclick: () => document.getElementById('kl-l-' + l)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, l)));
@@ -134,7 +142,7 @@ export async function renderKlienci(main) {
       const [bg, fg] = tint(c.name);
       return h('tr', { class: 'click', onclick: () => { location.hash = `#/klient/${c.id}`; } },
         h('td', {}, h('span', { class: 'kl-name' }, h('span', { class: 'kl-ini sm', style: { background: bg, color: fg } }, initials(c.name).slice(0, 2)),
-          h('span', {}, h('a', { href: `#/klient/${c.id}`, style: { fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' } }, c.name),
+          h('span', {}, h('a', { href: `#/klient/${c.id}`, style: { fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' } }, c.name), sprEl(c),
             c.status !== 'aktywny' ? h('div', {}, h('span', { class: 'badge warn' }, CLIENT_STATUS[c.status])) : null))),
         h('td', {}, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?')),
         h('td', { class: 'small' }, taxSummary(c) || h('span', { class: 'muted' }, '—')),
@@ -257,7 +265,10 @@ export async function renderKlienci(main) {
   document.addEventListener('click', closeMenu);
   window.addEventListener('hashchange', () => document.removeEventListener('click', closeMenu), { once: true });
   if (addBtn) { addBtn.classList.add('kl-add'); addBtn.setAttribute('aria-label', 'Dodaj klienta'); addBtn.replaceChildren(icon('plus'), h('span', { class: 'kl-add-t' }, 'Dodaj klienta')); }
-  main.replaceChildren(
+  // RKDP | M2 TAX – osobne listy klientów (tylko dla osób z dostępem do obu firm)
+  const sw = firmSwitch('rkdp', { rkdp: clients.filter(c => c.status === 'aktywny').length });
+  if (sw) sb.from('m2_clients').select('id', { count: 'exact', head: true }).eq('firm', 'm2').eq('status', 'aktywny').then(({ count }) => { if (count != null) sw.querySelector('.firm-m2')?.append(h('span', { class: 'firm-seg-n' }, String(count))); }, () => {});
+  main.replaceChildren(...[sw].filter(Boolean),
     h('div', { class: 'kl-head' }, h('h1', {}, 'Klienci'), counter,
       h('span', { class: 'kl-acts' }, h('span', { class: 'kl-more' }, moreBtn, menu), addBtn)),
     h('label', { class: 'kl-search' }, h('span', { html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' }), search),

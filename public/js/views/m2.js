@@ -2,12 +2,13 @@
 import { timeCard, timerButton } from '../czas.js';
 import { todayWidget as obTodayWidget, teamTodayCard, canSeeTeam } from './obecnosc.js';
 import { h, toast, fail, icon, initials, MONTHS, printHtml, ava } from '../ui.js';
-import { sb, state, memberById, isAdmin } from '../store.js';
+import { sb, state, memberById, isAdmin, hasModule } from '../store.js';
+import { myFirms, bothFirms, defaultFirm, firmTag, firmSwitch, firmChips, rkdpProfile, rkdpClientChoices, FIRM_LABEL } from '../firma.js';
 import {
   MATTER_TYPE, MATTER_STATUS, OPEN_STATUSES, AUTHORITIES, TAX_KINDS, FEE_TYPE, BILLING_TYPE, SUBSCRIPTIONS, AML_RISK,
   DEADLINE_KIND, JOURNAL_KIND, ORDER_STATUS, DEADLINE_RULES, computeDeadline, limitationDate, fmtDate, todayIso, addDaysIso, money, hours,
 } from '../m2/dict.js';
-import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
+import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, brandOf, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
@@ -22,15 +23,16 @@ import { renderOferty } from './oferty.js';
 import { pdfText, analyzeLetter } from '../pismo.js';
 
 const BASE = '#/doradztwo';
-const members = () => state.members.filter(m => m.active && (m.modules || []).includes('doradztwo'));
+// zespół do spraw: M2 TAX – osoby z modułem doradztwa, RKDP – zespół RKDP (bez firmy: obie)
+const members = (firm) => state.members.filter(m => m.active && (m.modules || []).some(x => firm ? x === (firm === 'rkdp' ? 'rozliczenia' : 'doradztwo') : ['doradztwo', 'rozliczenia'].includes(x)));
 const who = id => memberById(id)?.short_name || '';
-const memberOpts = () => Object.fromEntries(members().map(m => [m.id, m.full_name]));
+const memberOpts = (firm) => Object.fromEntries(members(firm).map(m => [m.id, m.full_name]));
 
 // ---------- wspólne elementy ----------
 function header(active, title, sub, actions) {
   return [
     h('div', { class: 'page-head', style: { marginTop: '28px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'Doradztwo podatkowe · M2 TAX'), h('h1', { style: { marginTop: '6px' } }, title),
+      h('div', {}, h('p', { class: 'eyebrow' }, bothFirms() ? 'Doradztwo podatkowe · RKDP i M2 TAX' : `Doradztwo podatkowe · ${FIRM_LABEL[defaultFirm()]}`), h('h1', { style: { marginTop: '6px' } }, title),
         sub ? h('p', { class: 'sub' }, sub) : null),
       actions ? h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, ...[].concat(actions)) : null),
   ];
@@ -161,7 +163,7 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
   const syncForm = () => formBox.replaceChildren(fieldsGrid([
     ['title', 'Czego dotyczy', 'text', null, true], ['due_date', 'Termin', 'date'], ['due_time', 'Godzina (opcjonalnie)', 'time'],
     ['kind', 'Rodzaj', 'select', Object.fromEntries(Object.entries(DEADLINE_KIND).map(([k, v]) => [k, v.label]))],
-    ['assignee_id', 'Odpowiada', 'select', memberOpts()], ['notes', 'Notatka', 'textarea'],
+    ['assignee_id', 'Odpowiada', 'select', memberOpts(matter?.firm)], ['notes', 'Notatka', 'textarea'],
   ], d, (k) => { if (k === 'title') d._auto = false; }));
   syncForm();
   modal(matter ? `Nowy termin – ${matter.number}` : 'Nowy termin', h('div', {}, calcBox, formBox), (close) => [
@@ -211,19 +213,35 @@ const DOC = { zlecenie: 'Zlecenie', umowa: 'Umowa' };
 const docLabel = o => `${DOC[o.doc_type] || 'Zlecenie'} ${o.number || ''}`.trim();
 
 // Każda sprawa musi należeć do zlecenia albo umowy
-async function newMatterDialog({ clientId = null } = {}) {
-  const orders = await fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,status,m2_clients(name)').neq('status', 'anulowane').order('order_date', { ascending: false }));
-  const list = clientId ? orders.filter(o => o.client_id === clientId) : orders;
-  const sel = h('select', { class: 'select', style: { width: '100%' } }, ...list.map(o => h('option', { value: o.id }, `${docLabel(o)} · ${o.m2_clients?.name || ''} · ${o.subject}`)));
-  const q = clientId ? `&klient=${clientId}` : '';
+export async function newMatterDialog({ clientId = null, firm = null, rkdpClientId = null } = {}) {
+  const orders = await fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,status,firm,m2_clients(name,rkdp_client_id)').neq('status', 'anulowane').order('order_date', { ascending: false }));
+  let f = rkdpClientId ? 'rkdp' : (firm || defaultFirm());
+  const firmSel = bothFirms() && !clientId && !rkdpClientId ? h('select', { class: 'select', style: { width: '100%' } }, h('option', { value: 'rkdp' }, 'RKDP spółka doradztwa podatkowego'), h('option', { value: 'm2' }, 'M2 TAX Doradcy Podatkowi')) : null;
+  if (firmSel) firmSel.value = f;
+  const sel = h('select', { class: 'select', style: { width: '100%' } });
+  const listBox = h('div');
+  const q = () => (clientId ? `&klient=${clientId}` : '') + (rkdpClientId ? `&rkdp=${rkdpClientId}` : '') + `&firma=${f}`;
+  const newBtns = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  let list = [];
+  const fill = () => {
+    list = orders.filter(o => (o.firm || 'm2') === f && (!clientId || o.client_id === clientId) && (!rkdpClientId || o.m2_clients?.rkdp_client_id === rkdpClientId));
+    sel.replaceChildren(...list.map(o => h('option', { value: o.id }, `${docLabel(o)} · ${o.m2_clients?.name || ''} · ${o.subject}`)));
+    listBox.replaceChildren(list.length ? h('label', { class: 'field wide' }, h('span', {}, 'Zlecenie / umowa'), sel) : h('p', { class: 'empty', style: { padding: '10px 0' } }, 'Brak zleceń i umów' + (clientId || rkdpClientId ? ' tego klienta.' : '.')));
+    addBtn.hidden = !list.length;
+  };
+  const addBtn = h('button', { class: 'btn btn-primary btn-sm', onclick: () => { closeFn(); location.hash = `${BASE}/sprawa/nowa?zlecenie=${sel.value}`; } }, 'Dodaj sprawę do wybranego');
+  let closeFn = () => {};
+  firmSel?.addEventListener('change', () => { f = firmSel.value; fill(); });
+  fill();
   modal('Nowa sprawa', h('div', {},
     h('p', { class: 'hint', style: { marginBottom: '12px' } }, 'Każda sprawa należy do zlecenia albo umowy. Wybierz istniejące albo utwórz nowe – sprawa założy się wtedy automatycznie.'),
-    list.length ? h('label', { class: 'field wide' }, h('span', {}, 'Zlecenie / umowa'), sel) : h('p', { class: 'empty', style: { padding: '10px 0' } }, 'Brak zleceń i umów' + (clientId ? ' tego klienta.' : '.'))),
-  (close) => [
-    h('a', { class: 'btn btn-ghost btn-sm', href: `${BASE}/zlecenie/nowe?typ=zlecenie${q}`, onclick: close }, '+ Nowe zlecenie'),
-    h('a', { class: 'btn btn-ghost btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa${q}`, onclick: close }, '+ Nowa umowa'),
-    list.length ? h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); location.hash = `${BASE}/sprawa/nowa?zlecenie=${sel.value}`; } }, 'Dodaj sprawę do wybranego') : null,
-  ].filter(Boolean));
+    firmSel ? h('label', { class: 'field wide', style: { marginBottom: '10px' } }, h('span', {}, 'Firma'), firmSel) : null,
+    listBox),
+  (close) => { closeFn = close; return [
+    h('a', { class: 'btn btn-ghost btn-sm', href: '#', onclick: (e) => { e.preventDefault(); close(); location.hash = `${BASE}/zlecenie/nowe?typ=zlecenie${q()}`; } }, '+ Nowe zlecenie'),
+    h('a', { class: 'btn btn-ghost btn-sm', href: '#', onclick: (e) => { e.preventDefault(); close(); location.hash = `${BASE}/zlecenie/nowe?typ=umowa${q()}`; } }, '+ Nowa umowa'),
+    addBtn,
+  ]; });
 }
 
 // ================= PULPIT =================
@@ -271,7 +289,9 @@ async function viewMatters(main, params) {
     fetchAll(() => sb.from('m2_deadlines').select('matter_id,due_date,title').eq('done', false).order('due_date')),
   ]);
   const next = new Map(); deadlines.forEach(d => { if (d.matter_id && !next.has(d.matter_id)) next.set(d.matter_id, d); });
-  const f = { q: params.get('q') || '', status: 'otwarte', type: '', person: '' };
+  const f = { q: params.get('q') || '', status: 'otwarte', type: '', person: '', firm: params.get('firma') || '' };
+  const both = bothFirms();
+  const chips = firmChips(f.firm, (v) => { f.firm = v; render(); });
   const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj: numer, tytuł, klient, sygnatura…' });
   const st = h('select', { class: 'select' }, h('option', { value: 'otwarte' }, 'Otwarte'), h('option', { value: '' }, 'Wszystkie'),
     ...Object.entries(MATTER_STATUS).map(([k, v]) => h('option', { value: k }, v.label)));
@@ -285,6 +305,7 @@ async function viewMatters(main, params) {
       if (f.status === 'otwarte' && !OPEN_STATUSES.includes(m.status)) return false;
       if (f.status && f.status !== 'otwarte' && m.status !== f.status) return false;
       if (f.type && m.matter_type !== f.type) return false;
+      if (f.firm && (m.firm || 'm2') !== f.firm) return false;
       const ids = [m.lead_id, m.second_id, m.assistant_id];
       if (f.person === 'me' && !ids.includes(state.me.id)) return false;
       if (f.person && f.person !== 'me' && !ids.includes(f.person)) return false;
@@ -295,7 +316,7 @@ async function viewMatters(main, params) {
     tbody.replaceChildren(...(rows.length ? rows.map(m => {
       const n = next.get(m.id);
       return h('tr', { class: 'click', onclick: () => { location.hash = `${BASE}/sprawa/${m.id}`; } },
-        h('td', {}, h('b', {}, m.number)),
+        h('td', {}, h('b', {}, m.number), both ? h('div', { style: { marginTop: '4px' } }, firmTag(m.firm || 'm2')) : null),
         h('td', {}, h('div', { style: { fontWeight: 600 } }, m.title), h('div', { class: 'small muted' }, MATTER_TYPE[m.matter_type] || m.matter_type, m.m2_orders ? ` · ${docLabel(m.m2_orders)}` : '')),
         h('td', {}, m.m2_clients?.name || ''),
         h('td', { class: 'small' }, m.authority || '', m.case_ref ? h('div', { class: 'muted' }, m.case_ref) : null),
@@ -309,8 +330,8 @@ async function viewMatters(main, params) {
   ty.addEventListener('change', () => { f.type = ty.value; render(); });
   pe.addEventListener('change', () => { f.person = pe.value; render(); });
   main.replaceChildren(...header('sprawy', 'Sprawy', 'Postępowania, kontrole, interpretacje, optymalizacje – z terminami i czasem pracy.',
-    h('button', { class: 'btn btn-primary btn-sm', onclick: () => newMatterDialog() }, icon('plus'), 'Nowa sprawa')),
-  h('div', { class: 'toolbar' }, search, st, ty, pe),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: () => newMatterDialog({ firm: f.firm || null }) }, icon('plus'), 'Nowa sprawa')),
+  ...[chips].filter(Boolean), h('div', { class: 'toolbar' }, search, st, ty, pe),
   h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
     h('thead', {}, h('tr', {}, ...['Nr', 'Sprawa', 'Klient', 'Organ / sygnatura', 'Status', 'Zespół', 'Najbliższy termin'].map(t => h('th', {}, t)))), tbody)));
   render();
@@ -342,7 +363,7 @@ async function viewMatter(main, id, params) {
   const isNew = id === 'nowa';
   // zlecenia i sprawa pobierane równolegle
   const [orders, mRes] = await Promise.all([
-    fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,fee_type,fee_amount,m2_clients(name)').order('order_date', { ascending: false })),
+    fetchAll(() => sb.from('m2_orders').select('id,number,subject,doc_type,client_id,fee_type,fee_amount,firm,m2_clients(name)').order('order_date', { ascending: false })),
     isNew ? Promise.resolve(null) : sb.from('m2_matters').select('*').eq('id', id).maybeSingle(),
   ]);
   let m;
@@ -354,7 +375,7 @@ async function viewMatter(main, id, params) {
       newMatterDialog({ clientId: params.get('klient') });
       return;
     }
-    m = { order_id: ord.id, client_id: ord.client_id, title: '', matter_type: 'konsultacja', status: 'nowa', lead_id: state.me.id, opened_at: todayIso(), fee_type: ord.fee_type, fee_amount: ord.fee_amount };
+    m = { order_id: ord.id, client_id: ord.client_id, firm: ord.firm, title: '', matter_type: 'konsultacja', status: 'nowa', lead_id: state.me.id, opened_at: todayIso(), fee_type: ord.fee_type, fee_amount: ord.fee_amount };
   } else {
     const { data, error } = mRes;
     if (error) throw error;
@@ -362,7 +383,7 @@ async function viewMatter(main, id, params) {
     m = data;
   }
   const draft = { ...m };
-  const orderOpts = Object.fromEntries(orders.map(o => [o.id, `${docLabel(o)} · ${o.m2_clients?.name || ''} · ${o.subject}`]));
+  const orderOpts = Object.fromEntries(orders.filter(o => (o.firm || 'm2') === (m.firm || 'm2')).map(o => [o.id, `${docLabel(o)} · ${o.m2_clients?.name || ''} · ${o.subject}`]));
   const defs = [
     ['title', 'Tytuł sprawy', 'text', null, true],
     ['order_id', 'Zlecenie / umowa (klient sprawy = klient zlecenia)', 'select', orderOpts, true], ['matter_type', 'Rodzaj', 'select', MATTER_TYPE],
@@ -370,7 +391,7 @@ async function viewMatter(main, id, params) {
     ['authority', 'Organ', 'list', AUTHORITIES], ['case_ref', 'Sygnatura / znak sprawy', 'text'],
     ['tax_kind', 'Podatek', 'list', TAX_KINDS], ['tax_period', 'Okres', 'text'],
     ['value_in_dispute', 'Kwota sporu (zł)', 'number'],
-    ['lead_id', 'Doradca prowadzący', 'select', memberOpts()], ['second_id', 'Drugi doradca', 'select', memberOpts()], ['assistant_id', 'Asystent(ka)', 'select', memberOpts()],
+    ['lead_id', 'Doradca prowadzący', 'select', memberOpts(m.firm)], ['second_id', 'Drugi doradca', 'select', memberOpts(m.firm)], ['assistant_id', 'Asystent(ka)', 'select', memberOpts(m.firm)],
     ['poa_type', 'Pełnomocnictwo (np. PPS-1, UPL-1)', 'text'], ['poa_date', 'Data pełnomocnictwa', 'date'],
     ['opened_at', 'Data rozpoczęcia', 'date'], ['closed_at', 'Data zakończenia', 'date'],
     ['fee_type', 'Wynagrodzenie', 'select', FEE_TYPE], ['fee_amount', 'Kwota / stawka (zł netto)', 'number'], ['estimated_hours', 'Szacowany czas (h)', 'number'],
@@ -521,8 +542,8 @@ async function viewMatter(main, id, params) {
 // ================= KLIENCI =================
 async function viewClients(main) {
   const [clients, matters] = await Promise.all([
-    fetchAll(() => sb.from('m2_clients').select('*').order('name')),
-    fetchAll(() => sb.from('m2_matters').select('client_id,status')),
+    fetchAll(() => sb.from('m2_clients').select('*').eq('firm', 'm2').order('name')),
+    fetchAll(() => sb.from('m2_matters').select('client_id,status').eq('firm', 'm2')),
   ]);
   const openCount = new Map(); matters.forEach(m => { if (OPEN_STATUSES.includes(m.status)) openCount.set(m.client_id, (openCount.get(m.client_id) || 0) + 1); });
   const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj: nazwa, NIP, e-mail, telefon…' });
@@ -540,7 +561,9 @@ async function viewClients(main) {
       : [h('tr', {}, h('td', { colspan: 5, class: 'empty' }, clients.length ? 'Brak wyników.' : 'Dodaj pierwszego klienta M2 TAX.'))]));
   };
   let st2; search.addEventListener('input', () => { clearTimeout(st2); st2 = setTimeout(render, 180); }); st.addEventListener('change', render);
-  main.replaceChildren(...header('klienci', 'Klienci M2 TAX', 'Osobna baza klientów doradztwa – dane, kontakty, stawki i weryfikacja AML.',
+  const sw = firmSwitch('m2', { m2: clients.filter(c => c.status === 'aktywny').length });
+  if (sw) sb.from('clients').select('id', { count: 'exact', head: true }).eq('status', 'aktywny').then(({ count }) => { if (count != null) { const n = sw.querySelector('.firm-rkdp'); n?.append(h('span', { class: 'firm-seg-n' }, String(count))); } }, () => {});
+  main.replaceChildren(...(sw ? [sw] : []), ...header('klienci', bothFirms() ? 'Klienci' : 'Klienci M2 TAX', bothFirms() ? 'Klienci M2 TAX – tylko doradztwo podatkowe: dane, kontakty, stawki, sprawy i AML.' : 'Osobna baza klientów doradztwa – dane, kontakty, stawki i weryfikacja AML.',
     [h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/aml` }, 'Weryfikacja AML'), h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/klient/nowy` }, icon('plus'), 'Nowy klient')]),
   h('div', { class: 'toolbar' }, search, st),
   h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
@@ -555,6 +578,8 @@ async function viewClient(main, id) {
     const { data, error } = await sb.from('m2_clients').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
     if (!data) { main.replaceChildren(h('div', { class: 'card empty' }, 'Nie znaleziono klienta.')); return; }
+    // klient RKDP – jedna karta: Klienci → karta klienta RKDP (sekcja „Doradztwo podatkowe”)
+    if (data.firm === 'rkdp' && data.rkdp_client_id) { location.replace(`#/klient/${data.rkdp_client_id}`); return; }
     c = data;
   }
   const draft = { ...c };
@@ -651,7 +676,9 @@ async function viewOrders(main, params) {
   ]);
   const sg = new Map(signers.map(s => [s.id, s]));
   const cnt = new Map(); matters.forEach(m => cnt.set(m.order_id, (cnt.get(m.order_id) || 0) + 1));
-  const f = { q: '', type: params.get('typ') || '', status: '' };
+  const f = { q: '', type: params.get('typ') || '', status: '', firm: params.get('firma') || '' };
+  const both = bothFirms();
+  const chips = firmChips(f.firm, (v) => { f.firm = v; render(); });
   const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj: numer, klient, przedmiot…' });
   const ty = h('select', { class: 'select' }, h('option', { value: '' }, 'Zlecenia i umowy'), h('option', { value: 'zlecenie' }, 'Tylko zlecenia'), h('option', { value: 'umowa' }, 'Tylko umowy'));
   ty.value = f.type;
@@ -660,10 +687,10 @@ async function viewOrders(main, params) {
   const signerNames = o => (o.doc_type === 'umowa' ? (o.signer_ids || []) : [o.signer_id]).map(i => sg.get(i)?.full_name).filter(Boolean).join(', ');
   const render = () => {
     const q = f.q.toLowerCase();
-    const rows = orders.filter(o => (!f.type || (o.doc_type || 'zlecenie') === f.type) && (!f.status || o.status === f.status)
+    const rows = orders.filter(o => (!f.type || (o.doc_type || 'zlecenie') === f.type) && (!f.status || o.status === f.status) && (!f.firm || (o.firm || 'm2') === f.firm)
       && (!q || [o.number, o.subject, o.m2_clients?.name].some(v => (v || '').toLowerCase().includes(q))));
     tbody.replaceChildren(...(rows.length ? rows.map(o => h('tr', { class: 'click', onclick: () => { location.hash = `${BASE}/zlecenie/${o.id}`; } },
-      h('td', {}, h('b', {}, o.number)), h('td', {}, h('span', { class: 'badge' + (o.doc_type === 'umowa' ? ' ok' : '') }, DOC[o.doc_type] || 'Zlecenie')),
+      h('td', {}, h('b', {}, o.number), both ? h('div', { style: { marginTop: '4px' } }, firmTag(o.firm || 'm2')) : null), h('td', {}, h('span', { class: 'badge' + (o.doc_type === 'umowa' ? ' ok' : '') }, DOC[o.doc_type] || 'Zlecenie')),
       h('td', { class: 'small' }, fmtDate(o.order_date)), h('td', {}, o.m2_clients?.name || ''),
       h('td', { class: 'small' }, o.subject), h('td', { class: 'small' }, String(cnt.get(o.id) || 0)),
       h('td', { class: 'small' }, FEE_TYPE[o.fee_type] || '', o.fee_amount ? h('div', {}, money(o.fee_amount)) : null),
@@ -677,17 +704,24 @@ async function viewOrders(main, params) {
       } }, '✕')) : null))
       : [h('tr', {}, h('td', { colspan: isAdmin() ? 10 : 9, class: 'empty' }, orders.length ? 'Brak wyników.' : 'Brak zleceń i umów. Utwórz pierwsze przyciskiem powyżej.'))]));
   };
+  // nowe zlecenie / umowa: przy dwóch firmach pytamy, dla której (chyba że filtr już ją wskazuje)
+  const newOrder = (typ) => {
+    const go = firm => { location.hash = `${BASE}/zlecenie/nowe?typ=${typ}&firma=${firm}`; };
+    if (!both || f.firm) return go(f.firm || defaultFirm());
+    modal(typ === 'umowa' ? 'Nowa umowa – dla której firmy?' : 'Nowe zlecenie – dla której firmy?', h('p', { class: 'hint' }, 'Dokument powstanie na papierze firmowym wybranej firmy, a klienta wybierzesz z jej listy.'),
+      (close) => [h('button', { class: 'btn btn-outline btn-sm', onclick: () => { close(); go('m2'); } }, 'M2 TAX'), h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); go('rkdp'); } }, 'RKDP')]);
+  };
   let t1; search.addEventListener('input', () => { clearTimeout(t1); t1 = setTimeout(() => { f.q = search.value; render(); }, 180); });
   ty.addEventListener('change', () => { f.type = ty.value; render(); });
   st.addEventListener('change', () => { f.status = st.value; render(); });
   main.replaceChildren(...header('zlecenia', 'Zlecenia i umowy',
-    'Zlecenie – krótkie, na jedną stronę, do mniejszych tematów. Umowa – pełny wzór M2 TAX. Oba na papierze firmowym, do pobrania jako PDF lub Word.',
-    [h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=zlecenie` }, icon('plus'), 'Nowe zlecenie'),
-      h('a', { class: 'btn btn-primary btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa` }, icon('plus'), 'Nowa umowa'),
-      h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/oferty` }, 'Oferty'),
-      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ kind: 'pps1' }) }, 'Pełnomocnictwo PPS-1'),
-      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ kind: 'procesowe' }) }, 'Pełnomocnictwo procesowe')]),
-  h('div', { class: 'toolbar' }, search, ty, st),
+    'Zlecenie – krótkie, na jedną stronę, do mniejszych tematów. Umowa – pełny wzór umowy doradczej. Oba na papierze firmowym właściwej firmy (RKDP albo M2 TAX), do pobrania jako PDF lub Word.',
+    [h('button', { class: 'btn btn-outline btn-sm', onclick: () => newOrder('zlecenie') }, icon('plus'), 'Nowe zlecenie'),
+      h('button', { class: 'btn btn-primary btn-sm', onclick: () => newOrder('umowa') }, icon('plus'), 'Nowa umowa'),
+      hasModule('doradztwo') ? h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/oferty` }, 'Oferty') : null,
+      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ kind: 'pps1', firm: f.firm || null }) }, 'Pełnomocnictwo PPS-1'),
+      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ kind: 'procesowe', firm: f.firm || null }) }, 'Pełnomocnictwo procesowe')]),
+  ...[chips].filter(Boolean), h('div', { class: 'toolbar' }, search, ty, st),
   h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
     h('thead', {}, h('tr', {}, ...['Nr', 'Rodzaj', 'Data', 'Klient', 'Przedmiot', 'Sprawy', 'Wynagrodzenie', 'Podpisuje', 'Status', isAdmin() ? '' : null].filter(x => x !== null).map(t => h('th', {}, t)))), tbody)));
   render();
@@ -727,10 +761,12 @@ function rowsEditor(P, key, autoFn, onChange) {
 
 // ---- Pełnomocnictwo: PPS-1 (urzędowy formularz) albo szczególne / procesowe na papierze firmowym M2 TAX ----
 // Można je wygenerować ze sprawy, z umowy/zlecenia albo samodzielnie (zakładka Zlecenia) – wtedy wybierasz klienta.
-async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerId = null, kind = 'pps1' } = {}) {
+async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerId = null, kind = 'pps1', firm = null } = {}) {
+  firm = firm || client?.firm || defaultFirm();
+  const brand = brandOf(firm);
   const [signers, clients] = await Promise.all([
     fetchAll(() => sb.from('m2_signers').select('*').eq('active', true).order('sort')),
-    client ? Promise.resolve([client]) : fetchAll(() => sb.from('m2_clients').select('*').eq('status', 'aktywny').order('name')),
+    client ? Promise.resolve([client]) : firm === 'rkdp' ? rkdpClientChoices() : fetchAll(() => sb.from('m2_clients').select('*').eq('firm', 'm2').eq('status', 'aktywny').order('name')),
   ]);
   const mine = signers.find(x => x.full_name === state.me.full_name);
   const first = signers.find(x => x.id === defaultSignerId) || mine || signers[0];
@@ -749,13 +785,13 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
     const fill = () => { sel.replaceChildren(h('option', { value: '' }, '— wybierz klienta —'), ...clients.map(c => h('option', { value: c.id }, c.name + (c.nip ? ` (NIP ${c.nip})` : '')))); sel.value = cl?.id || ''; };
     fill();
     sel.addEventListener('change', () => { cl = clients.find(c => c.id === sel.value) || null; reset(); build(); });
-    const add = h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => quickClientDialog((c) => {
+    const add = firm === 'rkdp' ? null : h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => quickClientDialog((c) => {
       clients.push(c); clients.sort((a, b) => a.name.localeCompare(b.name, 'pl')); cl = c; fill(); reset(); build();
     }) }, icon('plus'), 'Nowy klient');
     return h('label', { class: 'field wide', style: { marginBottom: '12px' } }, h('span', {}, 'Mocodawca (klient)'), h('div', { style: { display: 'flex', gap: '8px' } }, sel, add));
   })();
 
-  const KINDS = { pps1: 'PPS-1 – urzędowy formularz (organy podatkowe)', szczegolne: 'Szczególne – na papierze firmowym M2 TAX', procesowe: 'Procesowe – na papierze firmowym M2 TAX (WSA, NSA)' };
+  const KINDS = { pps1: 'PPS-1 – urzędowy formularz (organy podatkowe)', szczegolne: `Szczególne – na papierze firmowym ${FIRM_LABEL[firm]}`, procesowe: `Procesowe – na papierze firmowym ${FIRM_LABEL[firm]} (WSA, NSA)` };
   function build() {
     const pps = d.kind === 'pps1';
     if (!pps && d.scope === pps1Scope(params)) d.scope = '';
@@ -815,7 +851,7 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
     const o = { order_date: d.date, params: { ...params, authority: d.organ, client_reps: d.reps,
       poa_type: d.kind === 'procesowe' ? 'procesowe (art. 35 p.p.s.a.)' : 'szczególne',
       poa_scope: scope && scope !== pps1Scope(params) ? scope.replace(/^(do\s+)?reprezentowania\s+Mocodawcy\s*/i, '') : null } };
-    return poaBlocks(o, cl, chosen, { standalone: true });
+    return poaBlocks(o, cl, chosen, { standalone: true, brand });
   };
   const ready = () => {
     if (!cl) { toast('Wybierz albo dodaj klienta (mocodawcę)', true); return false; }
@@ -827,32 +863,45 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
     h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
       if (!ready()) return;
       if (d.kind === 'pps1') return toast('Formularz PPS-1 pobierasz jako PDF', true);
-      const bytes = await buildOrderDocx(firmDoc());
+      const bytes = await buildOrderDocx(firmDoc(), brand);
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
       a.download = fileBase() + '.docx'; document.body.append(a); a.click(); a.remove();
     } }, icon('download'), 'Word'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: () => {
       if (!ready()) return;
-      if (d.kind === 'pps1') { if (!printPps1(d, signers.find(x => x.id === d.who))) toast('Zezwól na wyskakujące okna, aby zapisać PDF', true); return; }
-      printHtml(printableHtml(firmDoc(), fileBase(), location.origin + '/m2tax-logo.png'));
+      if (d.kind === 'pps1') { if (!printPps1(d, signers.find(x => x.id === d.who), firm === 'rkdp' ? RKDP_PPS : {})) toast('Zezwól na wyskakujące okna, aby zapisać PDF', true); return; }
+      printHtml(printableHtml(firmDoc(), fileBase(), location.origin + brand.logo, brand));
     } }, icon('download'), 'PDF'),
   ]);
 }
 
+// PPS-1 dla spraw RKDP: adres do doręczeń i kontakt RKDP
+const RKDP_PPS = { delivery: { country: 'POLSKA', voiv: 'DOLNOŚLĄSKIE', county: 'M. WROCŁAW', commune: 'M. WROCŁAW', street: 'BEATY ARTEMSKIEJ', house: '11', flat: '44', city: 'WROCŁAW', zip: '52-234' }, email: 'kancelaria@rkdp.pl' };
 let orderCssInjected = false;
 async function viewOrder(main, id, params) {
   if (!orderCssInjected && !document.getElementById('order-css')) { document.head.append(h('style', { id: 'order-css' }, ORDER_CSS)); orderCssInjected = true; }
   const isNew = id === 'nowe';
+  let existing = null;
+  if (!isNew) {
+    const { data, error } = await sb.from('m2_orders').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    if (!data) { main.replaceChildren(h('div', { class: 'card empty' }, 'Nie znaleziono zlecenia ani umowy.')); return; }
+    existing = data;
+  }
+  // firma dokumentu: RKDP (klienci z listy RKDP, papier RKDP) albo M2 TAX
+  const firm = existing ? (existing.firm || 'm2') : (params.get('rkdp') ? 'rkdp' : (myFirms().includes(params.get('firma')) ? params.get('firma') : defaultFirm()));
+  const brand = brandOf(firm);
   const [clients, signers] = await Promise.all([
-    fetchAll(() => sb.from('m2_clients').select('*').order('name')),
+    firm === 'rkdp' ? rkdpClientChoices() : fetchAll(() => sb.from('m2_clients').select('*').eq('firm', 'm2').order('name')),
     fetchAll(() => sb.from('m2_signers').select('*').eq('active', true).order('sort')),
   ]);
   const mySigner = signers.find(x => x.full_name === state.me.full_name) || signers[0];
   let o;
   if (isNew) {
     const type = params.get('typ') === 'umowa' ? 'umowa' : 'zlecenie';
-    o = { doc_type: type, order_date: todayIso(), status: 'projekt', payment_days: 14, signer_id: mySigner?.id,
-      signer_ids: signers.map(x => x.id), client_id: params.get('klient') || '', params: type === 'umowa' ? { ...CONTRACT_DEFAULTS } : {} };
+    const rkId = params.get('rkdp');
+    o = { doc_type: type, firm, order_date: todayIso(), status: 'projekt', payment_days: 14, signer_id: mySigner?.id,
+      signer_ids: (firm === 'rkdp' ? signers.filter(x => members('rkdp').some(m => m.full_name === x.full_name)) : signers).map(x => x.id), client_id: (rkId ? clients.find(c => c.rkdp_client_id === rkId)?.id : params.get('klient')) || '', params: type === 'umowa' ? { ...CONTRACT_DEFAULTS } : {} };
     const cl = clients.find(c => c.id === o.client_id);
     if (cl && type === 'zlecenie') {
       if (cl.billing_type === 'godzinowa') Object.assign(o, { fee_type: 'godzinowa', fee_amount: cl.hourly_rate });
@@ -860,10 +909,7 @@ async function viewOrder(main, id, params) {
     }
     if (cl && type === 'umowa') Object.assign(o.params, { client_party: defaultClientParty(cl), contact_person: cl.contact_person, client_email: cl.email, client_phone: cl.phone, ...(cl.hourly_rate ? { hourly_rate: cl.hourly_rate } : {}) });
   } else {
-    const { data, error } = await sb.from('m2_orders').select('*').eq('id', id).maybeSingle();
-    if (error) throw error;
-    if (!data) { main.replaceChildren(h('div', { class: 'card empty' }, 'Nie znaleziono zlecenia ani umowy.')); return; }
-    o = data;
+    o = existing;
   }
   const draft = { ...o, params: { ...(o.params || {}) } };
   const P = draft.params;
@@ -878,7 +924,7 @@ async function viewOrder(main, id, params) {
 
   // ---- podgląd ----
   const preview = h('div', { class: 'paper' });
-  const renderPreview = () => { preview.innerHTML = orderHtml(docBlocks(draft, client(), chosenSigners()), '/m2tax-logo.png'); };
+  const renderPreview = () => { preview.innerHTML = orderHtml(docBlocks(draft, client(), chosenSigners()), brand.logo, brand); };
 
   // ---- przedmiot umowy z danych kontroli ----
   const autoSubject = () => {
@@ -906,7 +952,7 @@ async function viewOrder(main, id, params) {
     buildForm(); renderPreview();
   };
   clientSel.addEventListener('change', () => { const prev = draft.client_id; draft.client_id = clientSel.value || null; applyClient(prev); });
-  const newClientBtn = h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => quickClientDialog((c) => {
+  const newClientBtn = firm === 'rkdp' ? h('a', { class: 'btn btn-outline btn-sm', href: '#/klienci', 'data-tip': 'Klienta RKDP dodajesz w Klientach – potem wybierzesz go tutaj' }, icon('plus'), 'Nowy klient RKDP') : h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => quickClientDialog((c) => {
     clients.push(c); clients.sort((a, b) => a.name.localeCompare(b.name, 'pl'));
     const prev = draft.client_id; draft.client_id = c.id; fillClients(); applyClient(prev);
   }) }, icon('plus'), 'Nowy klient');
@@ -932,14 +978,14 @@ async function viewOrder(main, id, params) {
         ['fee_type', 'Wynagrodzenie', 'select', FEE_TYPE], ['fee_amount', 'Kwota (zł netto)', 'number'], ['payment_days', 'Termin płatności (dni)', 'number'],
         ['fee_notes', 'Dodatkowe zasady wynagrodzenia (opcjonalnie)', 'textarea'],
         ['extra_terms', 'Dodatkowe postanowienia (opcjonalnie)', 'textarea'],
-        ['signer_id', 'Podpisuje w imieniu M2 TAX', 'select', signerOpts],
+        ['signer_id', `Podpisuje w imieniu ${FIRM_LABEL[firm]}`, 'select', signerOpts],
       ];
       const extra = isNew && !draft.id ? fieldsGrid([['matter_type', 'Rodzaj sprawy (założy się automatycznie)', 'select', MATTER_TYPE]], { get matter_type() { return matterType; }, set matter_type(v) { matterType = v || 'konsultacja'; } }) : null;
       formBox.replaceChildren(h('div', { class: 'form-grid' }, clientBox), fieldsGrid(defs, draft, onAny), extra || '');
       return;
     }
     autoSubject();
-    const signerBoxes = h('div', { class: 'field wide' }, h('span', {}, 'Podpisują w imieniu M2 TAX'),
+    const signerBoxes = h('div', { class: 'field wide' }, h('span', {}, `Podpisują w imieniu ${FIRM_LABEL[firm]}`),
       h('div', { style: { display: 'flex', gap: '18px', flexWrap: 'wrap' } }, ...signers.map(x => {
         const cb = h('input', { type: 'checkbox', checked: (draft.signer_ids || []).includes(x.id) });
         cb.addEventListener('change', () => {
@@ -962,7 +1008,7 @@ async function viewOrder(main, id, params) {
     const ed1 = rowsEditor(P, 'att1', () => att1AutoRows(draft, client(), chosenSigners()), renderPreview);
     const ed2 = rowsEditor(P, 'att2', () => att2AutoRows(draft), renderPreview);
     refreshEditors = () => { ed1.refresh(); ed2.refresh(); };
-    const att4Sel = h('select', { class: 'select' }, ...Object.entries({ firmowe: 'Pełnomocnictwo na papierze firmowym M2 TAX (do podpisu klienta)', urzedowy: 'Urzędowy formularz (np. PPS-1) – dołączany odrębnie', brak: 'Bez załącznika nr 4' }).map(([k, v]) => h('option', { value: k }, v)));
+    const att4Sel = h('select', { class: 'select' }, ...Object.entries({ firmowe: `Pełnomocnictwo na papierze firmowym ${FIRM_LABEL[firm]} (do podpisu klienta)`, urzedowy: 'Urzędowy formularz (np. PPS-1) – dołączany odrębnie', brak: 'Bez załącznika nr 4' }).map(([k, v]) => h('option', { value: k }, v)));
     att4Sel.value = att4Mode(P);
     const poaScope = h('textarea', { class: 'input', rows: 3, placeholder: poaDefaultScope(P) }, P.poa_scope || '');
     poaScope.addEventListener('input', () => { P.poa_scope = poaScope.value.trim() || null; renderPreview(); });
@@ -1046,6 +1092,17 @@ async function viewOrder(main, id, params) {
   }
   async function save(silent) {
     if (!draft.client_id) { if (!silent) toast('Wybierz albo dodaj klienta', true); return false; }
+    // klient RKDP: profil doradczy zakładany (i odświeżany z karty RKDP) przy zapisie
+    if (firm === 'rkdp') {
+      const cur = client();
+      if (cur?.rkdp_client_id) {
+        try {
+          const prof = await rkdpProfile(cur.rkdp_client_id);
+          const i = clients.indexOf(cur); if (i >= 0) clients[i] = prof;
+          draft.client_id = prof.id;
+        } catch (e) { fail(e); return false; }
+      }
+    }
     if (!draft.subject) { if (!silent) toast(isUmowa() ? 'Uzupełnij przedmiot (podatek i okres kontroli)' : 'Podaj przedmiot zlecenia', true); return false; }
     if (isUmowa() && !(draft.signer_ids || []).length) { if (!silent) toast('Zaznacz, kto podpisuje umowę', true); return false; }
     const row = rowOf();
@@ -1056,7 +1113,7 @@ async function viewOrder(main, id, params) {
     Object.assign(draft, data, { params: { ...(data.params || {}) } }); Object.assign(P, draft.params); draft.params = P;
     if (first) {
       // automatyczna sprawa do nowego zlecenia / umowy
-      const memberOf = sgn => members().find(mm => mm.full_name === sgn?.full_name)?.id || null;
+      const memberOf = sgn => members(firm).find(mm => mm.full_name === sgn?.full_name)?.id || null;
       const sgs = chosenSigners();
       const lead = memberOf(sgs[0]) || state.me.id;
       const matter = {
@@ -1081,12 +1138,12 @@ async function viewOrder(main, id, params) {
   const pdfBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (draft.id && !(await save(true))) return;
     if (!draft.id) return toast('Najpierw zapisz dokument', true);
-    if (!printOrder(docBlocks(draft, client(), chosenSigners()), fileName('pdf').replace(/\.pdf$/, ''))) toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
+    if (!printOrder(docBlocks(draft, client(), chosenSigners()), fileName('pdf').replace(/\.pdf$/, ''), brand)) toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
   } }, icon('download'), 'PDF');
   const docxBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (draft.id && !(await save(true))) return;
     if (!draft.id) return toast('Najpierw zapisz dokument', true);
-    await downloadOrderDocx(docBlocks(draft, client(), chosenSigners()), fileName('docx'));
+    await downloadOrderDocx(docBlocks(draft, client(), chosenSigners()), fileName('docx'), brand);
   } }, icon('download'), 'Word (.docx)');
   const delBtn = draft.id && isAdmin() ? h('button', { class: 'btn btn-danger btn-sm', onclick: async () => {
     const { data: ms } = await sb.from('m2_matters').select('id').eq('order_id', draft.id);
@@ -1109,10 +1166,10 @@ async function viewOrder(main, id, params) {
 
   buildForm(); renderPreview();
   const title = draft.id ? docLabel(draft) : (isUmowa() ? 'Nowa umowa' : 'Nowe zlecenie');
-  const subTitle = draft.id ? `Klient: ${client()?.name || '—'}` : 'Wybierz rodzaj dokumentu. Po zapisaniu automatycznie założy się sprawa – możesz ją potem edytować.';
+  const subTitle = (bothFirms() ? `${FIRM_LABEL[firm]} · ` : '') + (draft.id ? `Klient: ${client()?.name || '—'}` : 'Wybierz rodzaj dokumentu. Po zapisaniu automatycznie założy się sprawa – możesz ją potem edytować.');
   main.replaceChildren(...header('zlecenia', title, subTitle,
     [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn,
-      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id, kind: isUmowa() && /procesow|p\.p\.s\.a/i.test(P.poa_type || matterTemplate(P.matter_type).poa) ? 'procesowe' : 'pps1' }) }, 'Pełnomocnictwo'),
+      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ firm, client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id, kind: isUmowa() && /procesow|p\.p\.s\.a/i.test(P.poa_type || matterTemplate(P.matter_type).poa) ? 'procesowe' : 'pps1' }) }, 'Pełnomocnictwo'),
       delBtn].filter(Boolean)),
   typeSwitch || '',
   h('div', { class: 'order-layout' }, h('div', {}, h('section', { class: 'card section' }, formBox), mattersCard || ''), h('div', { class: 'paper-wrap' }, preview)));

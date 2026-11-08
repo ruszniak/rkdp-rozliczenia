@@ -21,7 +21,7 @@ export async function renderDzis(box, D, { lite = false } = {}) {
     fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,period').eq('period', pdate)),
     fetchSoft(() => sb.from('doc_requests').select('id,client_id,period,files_count,sent_at,closed_at,expires_at,created_at').eq('period', pdate)),
     fetchSoft(() => sb.from('monitor_alerts').select('id,client_id,summary,created_at,resolved_at').eq('module', 'rkdp').is('resolved_at', null)),
-    hasModule('doradztwo') ? fetchSoft(() => sb.from('m2_deadlines').select('id,title,due_date,matter_id,assignee_id,done').eq('done', false).lte('due_date', in7).order('due_date')) : [],
+    (hasModule('doradztwo') || hasModule('rozliczenia')) ? fetchSoft(() => sb.from('m2_deadlines').select('id,title,due_date,matter_id,assignee_id,done').eq('done', false).lte('due_date', in7).order('due_date')) : [],
     fetchSoft(() => sb.from('year_close_entries').select('client_id,year,task_code,status').gte('year', +today.slice(0, 4) - 1)),
   ]);
   const tasks = state.taskTypes.filter(t => t.active);
@@ -145,7 +145,7 @@ export async function renderDzis(box, D, { lite = false } = {}) {
           : [h('p', { class: 'hint' }, 'Nie masz otwartych zgłoszeń.')])),
       sec('Terminy w 7 dni', h('a', { class: 'small', href: '#/terminy?kto=moi' }, 'Kalendarz →'),
         ...(obl7.length ? groupObl(obl7) : [h('p', { class: 'hint' }, 'Brak niezrobionych terminów u Twoich klientów w najbliższym tygodniu.')])),
-      myM2.length && !lite ? sec('Terminy spraw M2', h('a', { class: 'small', href: '#/doradztwo' }, 'Pulpit M2 →'),
+      myM2.length && !lite ? sec('Terminy spraw doradczych', h('a', { class: 'small', href: '#/doradztwo/sprawy' }, 'Sprawy →'),
         ...myM2.map(d => h('a', { class: 'tk-mini', href: `#/doradztwo/sprawa/${d.matter_id}` }, h('span', {}, d.title), h('b', { class: d.due_date < today ? 'late-t' : '' }, fmtShort(d.due_date))))) : null,
       missing.length ? sec(`Braki dokumentów (${missing.length})`, null, ...missing.map(c => {
         const r = reqs.filter(x => x.client_id === c.id && !x.closed_at).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];

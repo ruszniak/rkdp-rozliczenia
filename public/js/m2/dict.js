@@ -13,7 +13,28 @@ export const FIRM = {
   regon: '54465563600000',
   court: 'Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',
   city: 'Wrocław',
+  abbr: 'M2 TAX',
+  seat: 'z siedzibą we Wrocławiu, ul. Zwycięska 3, 53-033 Wrocław',
+  extra: '',
 };
+// RKDP – ta sama struktura danych, gdy sprawa / zlecenie / umowa należy do RKDP
+export const RKDP_FIRM = {
+  name: 'RKDP spółka doradztwa podatkowego sp. z o.o.',
+  short: 'RKDP',
+  address: 'ul. Czereśniowa 28d, 55-010 Ozorzyce',
+  nip: '8992871126',
+  krs: '0000812185',
+  email: 'kancelaria@rkdp.pl',
+  phones: FIRM.phones,
+  web: 'www.rkdp.pl',
+  regon: '384812329',
+  court: 'Sąd Rejonowy dla Wrocławia-Fabrycznej we Wrocławiu, VI Wydział Gospodarczy KRS',
+  city: 'Wrocław',
+  abbr: 'RKDP',
+  seat: 'z siedzibą w Ozorzycach, ul. Czereśniowa 28d, 55-010 Ozorzyce',
+  extra: ', kapitał zakładowy 50 000 zł, wpisaną do rejestru osób prawnych uprawnionych do wykonywania doradztwa podatkowego pod nr 855',
+};
+export const firmData = f => f === 'rkdp' ? RKDP_FIRM : FIRM;
 
 export const MATTER_TYPE = {
   konsultacja: 'Konsultacja / opinia podatkowa',

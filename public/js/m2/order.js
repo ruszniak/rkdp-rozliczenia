@@ -1,7 +1,8 @@
 // Dokumenty M2 TAX na papierze firmowym: ZLECENIE (krótkie, 1 strona) i UMOWA (wg wzoru kancelarii).
 // Jedna treść (lista bloków) → podgląd, PDF (druk) i Word (.docx).
 import { printHtml } from '../ui.js';
-import { FIRM, MATTER_TYPE } from './dict.js';
+import { FIRM as M2_FIRM, MATTER_TYPE, firmData } from './dict.js';
+const FIRM = M2_FIRM;
 import { zip } from '../xlsx.js';
 
 const P = '[……]';
@@ -72,10 +73,14 @@ export function accName(full) {
 }
 const signerAcc = s => `${s.name_acc || accName(s.full_name)} – ${s.role_acc || 'partnera zarządzającego'}, doradcę podatkowego (nr wpisu ${s.license_no || P})`;
 const signerCap = s => `${s.full_name} – ${(s.role_label || 'partner zarządzający').toLowerCase()}`;
+// zarząd RKDP (reprezentacja w umowach RKDP)
+const RKDP_BOARD = [{ full_name: 'Michał Ruszniak', license_no: '15009', role_acc: 'Prezesa Zarządu', role_label: 'Prezes Zarządu' }];
+const rkdpBoard = sg => RKDP_BOARD.map(b => ({ ...(sg.find(x => x.full_name === b.full_name) || {}), ...b }));
 const listPl = arr => arr.length <= 1 ? (arr[0] || '') : arr.slice(0, -1).join(', ') + ' lub ' + arr[arr.length - 1];
 
 // ===================== ZLECENIE (minimum, 1 strona) =====================
 export function orderBlocks(o, client, signer) {
+  const FIRM = firmData(o.firm);
   const c = client || {};
   const B = [];
   B.push({ t: 'title', text: 'ZLECENIE' });
@@ -238,6 +243,7 @@ export function contractSubject(p) {
 }
 
 export function contractBlocks(o, client, signers) {
+  const FIRM = firmData(o.firm);
   const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
   const tpl = matterTemplate(p.matter_type);
   const c = client || {};
@@ -256,9 +262,11 @@ export function contractBlocks(o, client, signers) {
 
   B.push({ t: 'title', text: 'UMOWA O ŚWIADCZENIE USŁUG DORADZTWA PODATKOWEGO' });
   intro(`zawarta w dniu ${dateLong(o.order_date)} ${p.place === 'Wrocław' ? 'we Wrocławiu' : `w miejscowości ${p.place || P}`} (dalej: Umowa) pomiędzy:`);
-  intro(`${FIRM.name} z siedzibą we Wrocławiu, ${FIRM.address}, wpisaną do rejestru przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez ${FIRM.court}, pod nr KRS ${FIRM.krs}, NIP ${FIRM.nip}, REGON ${FIRM.regon}, reprezentowaną przez:`);
-  sg.forEach(x => B.push({ t: 'bullet', text: signerAcc(x) + ',' }));
-  intro('zwaną dalej Zleceniobiorcą lub M2 TAX,');
+  intro(`${FIRM.name} ${FIRM.seat}, wpisaną do rejestru przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez ${FIRM.court}, pod nr KRS ${FIRM.krs}, NIP ${FIRM.nip}, REGON ${FIRM.regon}${FIRM.extra}, reprezentowaną przez:`);
+  // RKDP (sp. z o.o.) reprezentuje zarząd; M2 TAX (sp. p.) – partnerzy podpisujący umowę
+  const reps0 = o.firm === 'rkdp' ? rkdpBoard(sg) : sg;
+  reps0.forEach(x => B.push({ t: 'bullet', text: signerAcc(x) + ',' }));
+  intro(`zwaną dalej Zleceniobiorcą lub ${FIRM.abbr},`);
   B.push({ t: 'center', text: 'a' });
   const party = (p.client_party || defaultClientParty(c) || P).trim().replace(/[,.\s]+$/, '');
   if (c.kind === 'osoba') { intro(`${party},`); intro('zwanym dalej Zleceniodawcą,'); }
@@ -272,7 +280,7 @@ export function contractBlocks(o, client, signers) {
     'Sprawie – rozumie się przez to sprawę podatkową Zleceniodawcy określoną w Załączniku nr 1, w szczególności postępowanie, kontrolę, czynności sprawdzające, postępowanie przed sądem administracyjnym lub inną czynność doradztwa podatkowego.',
     'Organie – rozumie się przez to organ podatkowy, organ Krajowej Administracji Skarbowej, Dyrektora Krajowej Informacji Skarbowej lub inny organ właściwy w Sprawie, a w postępowaniu sądowoadministracyjnym – także sąd administracyjny.',
     'Zakresie Sprawy – rozumie się przez to podatek (podatki), okres (okresy) rozliczeniowe i czynności objęte Sprawą, określone w Załączniku nr 1.',
-    'Doradcy – rozumie się przez to doradcę podatkowego będącego partnerem Zleceniobiorcy lub zatrudnionego przez Zleceniobiorcę, wpisanego na listę doradców podatkowych.',
+    `Doradcy – rozumie się przez to doradcę podatkowego będącego ${o.firm === 'rkdp' ? 'członkiem zarządu Zleceniobiorcy, zatrudnionego przez Zleceniobiorcę lub z nim współpracującego' : 'partnerem Zleceniobiorcy lub zatrudnionego przez Zleceniobiorcę'}, wpisanego na listę doradców podatkowych.`,
     'Dniach roboczych – rozumie się przez to dni od poniedziałku do piątku, z wyłączeniem dni ustawowo wolnych od pracy.',
     'Ordynacji podatkowej – rozumie się przez to ustawę z dnia 29 sierpnia 1997 r. – Ordynacja podatkowa (t.j. z uwzględnieniem zmian).',
     'Formie dokumentowej – rozumie się przez to korespondencję prowadzoną na adresy e-mail wskazane w § 13 ust. 2.',
@@ -352,7 +360,7 @@ export function contractBlocks(o, client, signers) {
   ]);
   ust('Roszczenia z tytułu nienależytego wykonania Umowy Zleceniodawca zgłasza na piśmie, niezwłocznie po powzięciu wiadomości o szkodzie.');
   ust('Ograniczenia z ust. 3 i 4 nie dotyczą szkody wyrządzonej umyślnie.');
-  ust('Strony przyjmują do wiadomości, że zgodnie z art. 95 Kodeksu spółek handlowych partner nie ponosi odpowiedzialności za zobowiązania spółki powstałe w związku z wykonywaniem przez pozostałych partnerów wolnego zawodu.');
+  if (o.firm !== 'rkdp') ust('Strony przyjmują do wiadomości, że zgodnie z art. 95 Kodeksu spółek handlowych partner nie ponosi odpowiedzialności za zobowiązania spółki powstałe w związku z wykonywaniem przez pozostałych partnerów wolnego zawodu.');
 
   sec('Tajemnica zawodowa i poufność');
   ust('Zleceniobiorca, Doradcy oraz osoby, przy pomocy których Zleceniobiorca wykonuje Umowę, są obowiązani do zachowania w tajemnicy faktów i informacji, z którymi zapoznali się w związku z wykonywaniem Umowy, na zasadach art. 37 ustawy o doradztwie podatkowym. Obowiązek ten trwa bezterminowo, także po rozwiązaniu Umowy.');
@@ -399,7 +407,7 @@ export function contractBlocks(o, client, signers) {
   ust('Umowę sporządzono w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej ze Stron, albo w formie elektronicznej opatrzonej kwalifikowanymi podpisami elektronicznymi Stron.');
 
   B.push({ t: 'sign2',
-    left: { label: 'ZLECENIOBIORCA', firm: null, people: sg.map(signerCap) },
+    left: { label: 'ZLECENIOBIORCA', firm: o.firm === 'rkdp' ? FIRM.name : null, people: reps0.map(signerCap) },
     right: { label: 'ZLECENIODAWCA', firm: c.kind === 'osoba' ? null : (c.name || P), people: c.kind === 'osoba' ? [c.name || P] : (reps.length ? reps : [`${P} – ${P}`]) } });
 
   // Załączniki
@@ -421,7 +429,7 @@ export function contractBlocks(o, client, signers) {
   ].forEach((x, i) => B.push({ t: 'ust', n: `${i + 1}.`, text: x }));
   const poa = p.poa_type || tpl.poa;
   const att4 = att4Mode(p);
-  if (att4 === 'firmowe') { B.push({ t: 'pb' }); B.push(...poaBlocks(o, c, sg)); }
+  if (att4 === 'firmowe') { B.push({ t: 'pb' }); B.push(...poaBlocks(o, c, sg, { brand: brandOf(o.firm) })); }
   else if (att4 === 'urzedowy') {
     B.push({ t: 'gap' });
     B.push({ t: 'att', text: `Załącznik nr 4 – Pełnomocnictwo ${poa}` });
@@ -458,7 +466,7 @@ export function att1AutoRows(o, client, signers) {
 export function att2AutoRows(o) {
   const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
   return [
-    ['Godzina pracy partnera / doradcy podatkowego', zl(p.rate_partner) || P],
+    [o.firm === 'rkdp' ? 'Godzina pracy doradcy podatkowego' : 'Godzina pracy partnera / doradcy podatkowego', zl(p.rate_partner) || P],
     ['Godzina pracy konsultanta podatkowego', zl(p.rate_consultant) || P],
     ['Udział w czynnościach poza Wrocławiem', `${zl(p.rate_partner) || P} za godzinę + koszty z § 6 ust. 6`],
   ];
@@ -634,8 +642,9 @@ ${ORDER_CSS}
 <tbody><tr><td>${bodyHtml(blocks)}</td></tr></tbody></table></div></body></html>`;
 }
 
-export function printOrder(blocks, title) {
-  return printHtml(printableHtml(blocks, title, location.origin + '/m2tax-logo.png'));
+export const brandOf = f => f === 'rkdp' ? RKDP_BRAND : M2_BRAND;
+export function printOrder(blocks, title, brand = M2_BRAND) {
+  return printHtml(printableHtml(blocks, title, location.origin + brand.logo, brand));
 }
 
 // ===================== Word (.docx) =====================
@@ -753,8 +762,8 @@ export async function buildOrderDocx(blocks, brand = M2_BRAND) {
   return zip(files);
 }
 
-export async function downloadOrderDocx(blocks, filename) {
-  const bytes = await buildOrderDocx(blocks);
+export async function downloadOrderDocx(blocks, filename, brand = M2_BRAND) {
+  const bytes = await buildOrderDocx(blocks, brand);
   const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = filename;
