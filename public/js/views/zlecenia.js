@@ -69,7 +69,7 @@ async function loadAll() {
   return data || [];
 }
 
-const ST_COLOR = { nowe: '#8AA0A5', w_toku: '#007A8C', pytanie: '#6B4FC4', zgloszone: '#D08A00', zaakceptowane: '#2E9E5B', anulowane: '#A3B1B4' };
+const ST_COLOR = { nowe: '#9CA3AF', w_toku: '#2563EB', pytanie: '#6B4FC4', zgloszone: '#D08A00', zaakceptowane: '#2E9E5B', anulowane: '#A1A1AA' };
 // karta zadania – ten sam wygląd co w „Moich sprawach”
 function row(z, onOpen) {
   const st = stepsOf(z), done = st.filter(s => s.done).length, me = state.me.id;
@@ -85,7 +85,7 @@ function row(z, onOpen) {
     st.length || people.length ? h('div', { class: 'mj-foot' },
       st.length ? h('span', { class: 'mj-steps' }, h('span', { class: 'mj-bar' }, h('i', { style: { width: Math.round(done / st.length * 100) + '%' } })), `${done}/${st.length} kroki`) : null,
       people.length ? h('span', { class: 'mj-avs' }, ...people.slice(0, 4).map(p => h('span', { class: 'avatar mj-av', title: p.full_name }, ava(p)))) : null) : null);
-  el.style.setProperty('--k', ST_COLOR[z.status] || '#8AA0A5');
+  el.style.setProperty('--k', ST_COLOR[z.status] || '#9CA3AF');
   return el;
 }
 

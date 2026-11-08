@@ -4,6 +4,6 @@
   try { t = localStorage.getItem('rkdp_theme'); } catch (e) { /* tryb prywatny */ }
   if (t !== 'dark' && t !== 'light') t = 'light';
   document.documentElement.setAttribute('data-theme', t);
-  var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#1F1F1F' : '#EAF0F1');
+  var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dark' ? '#1F1F1F' : '#F6F6F7');
   try { if (localStorage.getItem('rkdp_density') === 'compact') document.documentElement.setAttribute('data-density', 'compact'); } catch (e) { /* */ }
 })();

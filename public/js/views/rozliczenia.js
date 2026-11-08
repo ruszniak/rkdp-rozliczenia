@@ -333,7 +333,7 @@ export async function renderRozliczenia(main, params) {
   };
   const tileIcon = k => h('span', { class: 'tile-ic tic-' + (k || 'cal'), 'aria-hidden': 'true', html: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TILE_ICONS[k] || TILE_ICONS.cal}</svg>` });
   const tileSub = (k, n) => !n ? null : h('span', { class: 'tile-more' }, k === 'braki' ? 'Pokaż i przypomnij →' : k === 'uwagi' ? 'Pokaż klientów →' : k === 'do_wyslania' ? 'Pokaż do wysłania →' : null);
-  const ring = pct => h('span', { class: 'tile-ring', 'aria-hidden': 'true', html: `<svg viewBox="0 0 160 160"><circle cx="80" cy="80" r="64" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="16"/><circle cx="80" cy="80" r="64" fill="none" stroke="#7FD6E2" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(pct / 100 * 402.1).toFixed(1)} 403" transform="rotate(-90 80 80)"/><text x="80" y="92" text-anchor="middle" fill="#fff" font-family="Plus Jakarta Sans,Inter,sans-serif" font-weight="800" font-size="36">${pct}%</text></svg>` });
+  const ring = pct => h('span', { class: 'tile-ring', 'aria-hidden': 'true', html: `<svg viewBox="0 0 160 160"><circle cx="80" cy="80" r="64" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="16"/><circle cx="80" cy="80" r="64" fill="none" stroke="#7AA4E7" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(pct / 100 * 402.1).toFixed(1)} 403" transform="rotate(-90 80 80)"/><text x="80" y="92" text-anchor="middle" fill="#fff" font-family="Plus Jakarta Sans,Inter,sans-serif" font-weight="800" font-size="36">${pct}%</text></svg>` });
 
   function renderTiles() {
     const area = prefs.area;

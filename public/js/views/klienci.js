@@ -96,7 +96,7 @@ export async function renderKlienci(main) {
     });
   };
 
-  const PAL = [['#E1F1F3', '#064B58'], ['#EEEAFB', '#5B3FB0'], ['#FBEFD9', '#A05E00'], ['#E3F5EA', '#1E7A44'], ['#FCE6E3', '#B3261E'], ['#E6ECF7', '#2D4E8A']];
+  const PAL = [['#EEF0F2', '#1F2937'], ['#EEEAFB', '#5B3FB0'], ['#FBEFD9', '#A05E00'], ['#E3F5EA', '#1E7A44'], ['#FCE6E3', '#B3261E'], ['#E6ECF7', '#2D4E8A']];
   const tint = name => { let n = 0; for (const ch of name || '') n = (n * 31 + ch.charCodeAt(0)) >>> 0; return PAL[n % PAL.length]; };
   const progEl = c => {
     const p = prog.get(c.id);

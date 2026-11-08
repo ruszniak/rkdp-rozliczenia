@@ -94,9 +94,9 @@ let reload = () => {};
 const GROUPS = [
   ['check', 'Do sprawdzenia', '#D08A00', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 1a6 6 0 0 1 0 12z" fill="currentColor"/>'],
   ['ask', 'Pytania do Ciebie', '#6B4FC4', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2"/><text x="7" y="10.4" text-anchor="middle" font-size="9" font-weight="800" fill="currentColor" font-family="Inter,sans-serif">?</text>'],
-  ['prog', 'W toku', '#007A8C', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 1a6 6 0 0 1 6 6H7z" fill="currentColor"/>'],
-  ['new', 'Nowe', '#8AA0A5', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/>'],
-  ['wait', 'Czeka na kogoś', '#6A8086', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 4v3.2l2 1.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'],
+  ['prog', 'W toku', '#2563EB', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 1a6 6 0 0 1 6 6H7z" fill="currentColor"/>'],
+  ['new', 'Nowe', '#9CA3AF', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/>'],
+  ['wait', 'Czeka na kogoś', '#6B7280', '<circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 4v3.2l2 1.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'],
   ['dl', 'Terminy', '#C77800', '<rect x="1.5" y="2.5" width="11" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M1.5 6h11" stroke="currentColor" stroke-width="1.6"/>'],
 ];
 const gIcon = g => h('span', { class: 'mj-gi', style: { color: g[2] }, html: `<svg width="15" height="15" viewBox="0 0 14 14" aria-hidden="true">${g[3]}</svg>` });
@@ -173,7 +173,7 @@ export async function renderMoje(main, params, { embed = false, noTasks = false 
       if (!gr.length) return null;
       const late = gr.filter(r => r.due && r.due < today()).length;
       return h('section', { class: 'mj-group' }, h('h3', { class: 'mj-gh' }, gIcon(g), g[1], h('span', { class: 'n' }, String(gr.length)), late ? h('span', { class: 'mj-gl' }, `${late} po terminie`) : null),
-        ...gr.map(it => card(it, g[0] === 'new' && it.kind !== 'zlecenie' ? '#8AA0A5' : g[2])));
+        ...gr.map(it => card(it, g[0] === 'new' && it.kind !== 'zlecenie' ? '#9CA3AF' : g[2])));
     }));
   }
   // szef: zadania zespołu są w osobnej części (według pracowników) – tu tylko terminy, pytania i zgłoszenia przy klientach

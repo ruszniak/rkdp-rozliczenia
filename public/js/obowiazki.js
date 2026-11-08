@@ -22,13 +22,13 @@ const hasZusOwner = c => zusOwner(c) && c.zus_type && c.zus_type !== 'brak';
 
 // Rodzaje obowiązków – kod, nazwa, kratka miesięczna w rozliczeniach (status)
 export const KINDS = {
-  vat:     { label: 'VAT i JPK_V7', short: 'JPK_V7', task: 'jpk', color: '#167B8F' },
-  vat_ue:  { label: 'VAT-UE', short: 'VAT-UE', color: '#4498A9' },
+  vat:     { label: 'VAT i JPK_V7', short: 'JPK_V7', task: 'jpk', color: '#1F2937' },
+  vat_ue:  { label: 'VAT-UE', short: 'VAT-UE', color: '#3B82F6' },
   pit:     { label: 'Zaliczka PIT / ryczałt', short: 'PIT', task: 'pit_cit', color: '#1F7A52' },
   cit:     { label: 'Zaliczka CIT', short: 'CIT', task: 'pit_cit', color: '#1F7A52' },
-  zus:     { label: 'ZUS (DRA)', short: 'ZUS', task: 'zus_wyslany', area: 'kadry', color: '#17515D' },
+  zus:     { label: 'ZUS (DRA)', short: 'ZUS', task: 'zus_wyslany', area: 'kadry', color: '#0E1015' },
   pit4:    { label: 'PIT-4 – zaliczki od wynagrodzeń', short: 'PIT-4', task: 'pit4', area: 'kadry', color: '#7B5FD6' },
-  roczne:  { label: 'Obowiązek roczny', short: 'Rok', color: '#16203A' },
+  roczne:  { label: 'Obowiązek roczny', short: 'Rok', color: '#111827' },
 };
 
 // Zamknięcie roku: kratki dla roku podatkowego `year` (terminy w roku year+1, chyba że opisano inaczej)

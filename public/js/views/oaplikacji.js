@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.1', '7 listopada 2026', [
+    'Nowa kolorystyka „Grafit” – grafit i biel z niebieskim akcentem – oraz nowe logo: litera R ze strzałką w górę (także ikona na telefonie i w przeglądarce).',
     'Wzory pism procesowych także na papierze RKDP – przełącznik RKDP | M2 TAX nad wzorami, zespół RKDP ma je w „Więcej”.',
     'RKDP i M2 TAX w jednej aplikacji – bez przełączania. W Klientach przełącznik RKDP | M2 TAX (osobne listy). RKDP prowadzi też sprawy doradcze: zlecenia i umowy na papierze RKDP, sekcja „Doradztwo podatkowe” na karcie klienta, zakładka Sprawy dla zespołu RKDP. Dostęp do firmy pilnuje baza.',
     'Pulpit szefa: zadania tylko raz – według pracowników, a pod nimi osobno terminy i pytania.',
@@ -227,7 +228,7 @@ export async function renderOAplikacji(main, sub) {
       h('p', { class: 'sub' }, 'Wersja, dokumenty i pomoc.'))),
     h('div', { class: 'oa-grid' },
       h('section', { class: 'card section oa-app' },
-        h('img', { src: '/icon-192-v5.png', alt: '', class: 'oa-logo', width: 72, height: 72 }),
+        h('img', { src: '/icon-192-v6.png', alt: '', class: 'oa-logo', width: 72, height: 72 }),
         h('h2', {}, 'RKDP Rozliczenia'),
         h('p', { class: 'muted' }, `Wersja ${APP_VERSION} · ${new Date(APP_DATE + 'T12:00:00').toLocaleDateString('pl-PL')}`),
         h('p', { class: 'small muted', style: { marginTop: '10px' } }, 'Właściciel: RKDP spółka doradztwa podatkowego sp. z o.o.', h('br'), 'Dane objęte tajemnicą doradcy podatkowego.'),
