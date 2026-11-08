@@ -44,7 +44,8 @@
     el.appendChild(typeof c === 'object' ? c : document.createTextNode(String(c)));
   }
   function api(action, body) {
-    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action: action }, body || {})) })
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },  // „prosty” POST – bez dodatkowego zapytania CORS przed każdym wywołaniem
+      body: JSON.stringify(Object.assign({ action: action }, body || {})) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.error) throw new Error(j.error || 'Błąd połączenia – spróbuj ponownie.'); return j; }); });
   }
   var pad = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -136,12 +137,24 @@
     }
     return h('div', { class: 'um-grid' }, side, main);
   }
-  function loadSlots() {
-    st.loading = true; st.days = {}; st.month = null; st.day = null;
-    render(card(1, step1()));
+  // wolne terminy: pamiętamy wyniki (2 min) i pobieramy je z wyprzedzeniem dla wszystkich rodzajów spotkań – kliknięcie pokazuje kalendarz od razu
+  var slotCache = {};
+  function fetchSlots(typeId, adv) {
+    var k = typeId + '|' + adv, c = slotCache[k];
+    if (c && Date.now() - c.at < 120000) return c.p;
     var t0 = isoDay(new Date());
     var to = new Date(); to.setDate(to.getDate() + (cfg.max_days || 28));
-    api('slots', { type_id: st.type.id, advisor: st.adv, from: t0, to: isoDay(to) }).then(function (r) {
+    var p = api('slots', { type_id: typeId, advisor: adv, from: t0, to: isoDay(to) });
+    slotCache[k] = { at: Date.now(), p: p };
+    p.catch(function () { delete slotCache[k]; });
+    return p;
+  }
+  function loadSlots() {
+    var want = st.type.id + '|' + st.adv;
+    st.loading = true; st.days = {}; st.month = null; st.day = null;
+    render(card(1, step1()));
+    fetchSlots(st.type.id, st.adv).then(function (r) {
+      if (!st.type || st.type.id + '|' + st.adv !== want) return;   // klient zdążył wybrać coś innego
       st.days = r.days || {}; st.loading = false; render(card(1, step1()));
     }).catch(function (e) { st.loading = false; fail(e.message); });
   }
@@ -278,5 +291,6 @@
     if (wantT) st.type = cfg.types.filter(function (t) { return t.id === q.get('typ') || norm(t.name).indexOf(wantT) >= 0; })[0] || null;
     if (wantA) { var a = cfg.advisors.filter(function (x) { return x.id === q.get('doradca') || norm(x.name).indexOf(wantA) >= 0; })[0]; if (a) st.adv = a.id; }
     if (st.type) loadSlots(); else render(card(1, step1()));
+    cfg.types.forEach(function (t) { fetchSlots(t.id, st.adv).catch(function () {}); });
   }).catch(function (e) { fail(e.message); });
 })();
