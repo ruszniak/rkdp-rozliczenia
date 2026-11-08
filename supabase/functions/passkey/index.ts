@@ -12,9 +12,11 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse,
 } from 'npm:@simplewebauthn/server@13';
 
-const RP_ID = 'rozliczenia.rkdp.pl';
-const ORIGIN = 'https://rozliczenia.rkdp.pl';
-const CORS = {
+// aplikacja działa pod app.ruszniak.io (nowy adres) i rozliczenia.rkdp.pl (stary) – Face ID jest przypisane do adresu
+const ORIGINS = ['https://app.ruszniak.io', 'https://rozliczenia.rkdp.pl'];
+let ORIGIN = ORIGINS[0];
+let RP_ID = new URL(ORIGIN).hostname;
+const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -71,6 +73,8 @@ async function checkAssertion(response: any, challenge: string, memberId?: strin
 }
 
 Deno.serve(async (req) => {
+  const o = req.headers.get('origin') || '';
+  ORIGIN = ORIGINS.includes(o) ? o : ORIGINS[0]; RP_ID = new URL(ORIGIN).hostname; CORS['Access-Control-Allow-Origin'] = ORIGIN;
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   try {
     const body = await req.json().catch(() => ({}));

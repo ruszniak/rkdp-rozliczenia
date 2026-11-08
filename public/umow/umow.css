@@ -92,3 +92,4 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
   .sticky{position:sticky;bottom:0;background:#fff;padding:12px 0 calc(12px + env(safe-area-inset-bottom));margin:0 -16px;padding-left:16px;padding-right:16px;border-top:1px solid #EFEAE0}
 }
 .kv a{color:var(--gold-d)}
+body.bare .um-top{display:none}body.bare .um-grid{min-height:0}

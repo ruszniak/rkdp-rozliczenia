@@ -8,6 +8,7 @@
   var EMBED = q.get('embed') === '1';
   var TOKEN = q.get('t');
   if (EMBED) document.body.classList.add('embed');
+  if (q.get('bare') === '1') document.body.classList.add('bare');   // w okienku strony, która ma własny nagłówek
   var root = document.getElementById('um');
   var openedAt = Date.now();
 
@@ -165,7 +166,7 @@
       inp('topic', 'W jakiej sprawie? (krótko – pomoże nam się przygotować)', null, null, 'np. sprzedaż mieszkania, kontrola z urzędu skarbowego, wybór formy opodatkowania'),
       hp,
       h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.consent, onchange: function (e) { form.consent = e.target.checked; } }),
-        'Zgadzam się na przetwarzanie moich danych w celu umówienia i przeprowadzenia spotkania. Administratorem danych jest kancelaria doradcy podatkowego, z którym odbędzie się spotkanie (RKDP spółka doradztwa podatkowego sp. z o.o. albo M2 TAX Doradcy Podatkowi). Dane nie są wykorzystywane do marketingu.'),
+        'Zgadzam się na przetwarzanie moich danych w celu umówienia i przeprowadzenia spotkania. Administratorem danych jest kancelaria doradcy podatkowego, z którym odbędzie się spotkanie (RKDP spółka doradztwa podatkowego sp. z o.o. albo M2 TAX Doradcy Podatkowi). Dane nie są wykorzystywane do marketingu. ', h('a', { href: 'https://rkdp.pl/polityka-prywatnosci.html', target: '_blank', rel: 'noopener' }, 'Polityka prywatności')),
       h('div', { class: 'sticky' }, btn));
     return h('div', { class: 'form' }, f, summary());
   }

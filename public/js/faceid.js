@@ -54,7 +54,7 @@ function plBioError(e) {
   const n = e?.name || '';
   if (n === 'NotAllowedError' || n === 'AbortError') return 'Anulowano albo nie rozpoznano twarzy. Spróbuj ponownie.';
   if (n === 'InvalidStateError') return 'Face ID jest już włączone na tym telefonie.';
-  if (n === 'SecurityError') return 'Face ID działa tylko w aplikacji pod adresem rozliczenia.rkdp.pl.';
+  if (n === 'SecurityError') return 'Face ID działa tylko w aplikacji pod adresem app.ruszniak.io.';
   return e?.message || 'Nie udało się.';
 }
 
