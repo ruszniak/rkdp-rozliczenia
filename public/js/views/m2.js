@@ -186,6 +186,23 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
     } }, 'Zapisz termin')]);
 }
 
+// ---------- zadanie do sprawy (bez kalkulatora): np. „wysłać klientowi projekt umowy” ----------
+export function taskDialog({ matter = null, clientId = null, onSaved }) {
+  const d = { title: '', due_date: todayIso(), due_time: '', assignee_id: state.me.id, notes: '' };
+  modal(matter ? `Nowe zadanie – ${matter.number}` : 'Nowe zadanie', fieldsGrid([
+    ['title', 'Co trzeba zrobić', 'text', null, true], ['due_date', 'Do kiedy', 'date'], ['due_time', 'Godzina (opcjonalnie)', 'time'],
+    ['assignee_id', 'Kto', 'select', memberOpts(matter?.firm)], ['notes', 'Szczegóły (opcjonalnie)', 'textarea'],
+  ], d), (close) => [
+    h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+      if (!d.title?.trim() || !d.due_date) return toast('Wpisz, co trzeba zrobić, i do kiedy', true);
+      const { error } = await sb.from('m2_deadlines').insert({ title: d.title.trim(), due_date: d.due_date, due_time: d.due_time || null, kind: 'wewnetrzny',
+        assignee_id: d.assignee_id || null, notes: d.notes || null, matter_id: matter?.id || null, client_id: matter?.client_id || clientId || null });
+      if (error) return fail(error);
+      toast('Dodano zadanie'); close(); onSaved?.();
+    } }, 'Zapisz zadanie')]);
+}
+
 function deadlineRow(dl, matters, onChange) {
   const today = todayIso();
   const late = !dl.done && dl.due_date < today;
@@ -205,6 +222,7 @@ function deadlineRow(dl, matters, onChange) {
     h('div', { class: 'dl-date' }, h('b', {}, fmtDate(dl.due_date)), dl.due_time ? h('span', { class: 'small muted' }, dl.due_time.slice(0, 5)) : null),
     h('span', { class: 'dot', style: { background: k.color }, 'data-tip': k.label }),
     h('div', { class: 'dl-main' }, h('div', {}, dl.title),
+      dl.notes && dl.kind === 'wewnetrzny' ? h('div', { class: 'small muted', style: { whiteSpace: 'pre-line' } }, dl.notes) : null,
       h('div', { class: 'small muted' }, m ? h('a', { href: `${BASE}/sprawa/${m.id}` }, `${m.number} · ${m.title}`) : null,
         dl.basis ? h('span', { 'data-tip': dl.basis }, (m ? ' · ' : '') + dl.basis) : null)),
     h('div', { class: 'small' }, who(dl.assignee_id)),
@@ -446,11 +464,13 @@ async function viewMatter(main, id, params) {
 
   const dueLate = m.due_date && m.due_date < todayIso() && OPEN_STATUSES.includes(m.status);
   const dlCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Terminy'),
-    h('button', { class: 'btn btn-outline btn-sm', onclick: () => deadlineDialog({ matter: m, onSaved: reload }) }, '+ Termin')),
+    h('div', { style: { display: 'flex', gap: '8px' } },
+      h('button', { class: 'btn btn-outline btn-sm', onclick: () => taskDialog({ matter: m, onSaved: reload }) }, '+ Zadanie'),
+      h('button', { class: 'btn btn-outline btn-sm', onclick: () => deadlineDialog({ matter: m, onSaved: reload }) }, '+ Termin'))),
   h('div', { class: 'm2-due' + (dueLate ? ' late' : '') }, h('span', { class: 'muted small' }, 'Termin realizacji sprawy'),
     m.due_date ? h('b', {}, (m.due_approx ? 'ok. ' : '') + fmtDate(m.due_date), m.due_approx ? h('span', { class: 'muted small', style: { fontWeight: 500 } }, ' · orientacyjnie') : null, dueLate ? h('span', { class: 'small', style: { fontWeight: 600 } }, ' · minął') : null)
       : h('span', { class: 'muted' }, 'nie ustalono – wpisz w „Dane sprawy”')),
-  ...(deadlines.length ? deadlines.map(d => deadlineRow(d, new Map([[m.id, null]]), reload)) : [h('p', { class: 'hint' }, 'Brak terminów. Dodaj termin – kalkulator policzy go od daty doręczenia.')]));
+  ...(deadlines.length ? deadlines.map(d => deadlineRow(d, new Map([[m.id, null]]), reload)) : [h('p', { class: 'hint' }, 'Brak terminów i zadań. „+ Zadanie” – np. wysłać coś klientowi; „+ Termin” – kalkulator policzy termin od daty doręczenia.')]));
 
   // czas pracy
   const totalMin = time.reduce((n, t) => n + t.minutes, 0);
