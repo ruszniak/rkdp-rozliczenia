@@ -164,16 +164,28 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
     h('div', { class: 'form-grid' }, h('label', { class: 'field wide' }, h('span', {}, 'Czynność'), ruleSel), servedLbl, customLbl, yearLbl), result);
 
   const formBox = h('div');
-  const syncForm = () => formBox.replaceChildren(fieldsGrid([
+  let other = false;
+  const tabs = h('div', { class: 'seg', style: { display: 'flex', gap: '6px', marginBottom: '14px' } });
+  const setMode = o => {
+    other = o; calcBox.hidden = o;
+    if (o) { Object.assign(d, { kind: 'wewnetrzny', basis: null, served_at: null }); if (d._auto) { d.title = ''; d._auto = false; } letter = null; if (!d.due_date) d.due_date = todayIso(); }
+    else if (d.kind === 'wewnetrzny') d.kind = 'procesowy';
+    tabs.replaceChildren(...[[false, 'Termin urzędowy'], [true, 'Inny termin']].map(([v, t]) => h('button', { type: 'button', class: 'btn btn-sm ' + (v === o ? 'btn-primary' : 'btn-outline'), onclick: () => setMode(v) }, t)));
+    syncForm();
+  };
+  const syncForm = () => formBox.replaceChildren(other ? fieldsGrid([
+    ['title', 'Treść – co trzeba zrobić', 'text', null, true], ['due_date', 'Termin', 'date'], ['due_time', 'Godzina (opcjonalnie)', 'time'],
+    ['assignee_id', 'Odpowiada', 'select', memberOpts(matter?.firm)], ['notes', 'Szczegóły (opcjonalnie)', 'textarea'],
+  ], d) : fieldsGrid([
     ['title', 'Czego dotyczy', 'text', null, true], ['due_date', 'Termin', 'date'], ['due_time', 'Godzina (opcjonalnie)', 'time'],
     ['kind', 'Rodzaj', 'select', Object.fromEntries(Object.entries(DEADLINE_KIND).map(([k, v]) => [k, v.label]))],
     ['assignee_id', 'Odpowiada', 'select', memberOpts(matter?.firm)], ['notes', 'Notatka', 'textarea'],
   ], d, (k) => { if (k === 'title') d._auto = false; }));
-  syncForm();
-  modal(matter ? `Nowy termin – ${matter.number}` : 'Nowy termin', h('div', {}, calcBox, formBox), (close) => [
+  setMode(false);
+  modal(matter ? `Nowy termin – ${matter.number}` : 'Nowy termin', h('div', {}, tabs, calcBox, formBox), (close) => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
-      if (!d.title || !d.due_date) return toast('Podaj czego dotyczy termin i datę', true);
+      if (!d.title || !d.due_date) return toast(other ? 'Wpisz treść i datę' : 'Podaj czego dotyczy termin i datę', true);
       const row = { title: d.title, due_date: d.due_date, due_time: d.due_time || null, kind: d.kind || 'wewnetrzny', assignee_id: d.assignee_id || null,
         notes: d.notes || null, basis: d.basis, served_at: d.served_at, matter_id: matter?.id || null, client_id: matter?.client_id || clientId || null };
       const { data: ins, error } = await sb.from('m2_deadlines').insert(row).select('id').single();
@@ -185,22 +197,6 @@ export function deadlineDialog({ matter = null, clientId = null, date = null, on
       toast('Dodano termin'); close(); onSaved?.();
     } }, 'Zapisz termin')]);
 }
-
-// zadanie zespołu powiązane ze sprawą – wiersz w „Terminach”; kliknięcie otwiera zadanie
-const TASK_DONE = ['zaakceptowane', 'anulowane'];
-function matterTaskRow(z, onChange) {
-  const today = todayIso(), done = TASK_DONE.includes(z.status);
-  const late = !done && z.due_date && z.due_date < today;
-  const open = () => import('./zlecenia.js').then(x => x.openZlecenie(z.id, onChange));
-  return h('div', { class: 'dl-row' + (done ? ' done' : '') + (late ? ' late' : ''), role: 'button', tabindex: '0', style: { cursor: 'pointer' }, onclick: open, onkeydown: e => { if (e.key === 'Enter') open(); } },
-    h('span', { class: 'small muted', style: { width: '16px' } }, '#'),
-    h('div', { class: 'dl-date' }, h('b', {}, z.due_date ? fmtDate(z.due_date) : 'bez terminu')),
-    h('span', { class: 'dot', style: { background: '#2563EB' }, 'data-tip': 'Zadanie zespołu' }),
-    h('div', { class: 'dl-main' }, h('div', {}, z.priority === 'pilne' ? h('b', { style: { color: '#B42318' } }, '! ') : null, z.title), h('div', { class: 'small muted' }, `Zadanie #${z.no} · w „Zadaniach zespołu”`)),
-    h('div', { class: 'small' }, who(z.assignee_id)),
-    h('div', { class: 'dl-act' }, late ? h('span', { class: 'badge warn' }, 'po terminie') : null, h('span', { class: 'badge' + (done ? ' ok' : '') }, TASK_ST[z.status] || z.status)));
-}
-const TASK_ST = { nowe: 'nowe', w_toku: 'w toku', pytanie: 'pytanie', zgloszone: 'do sprawdzenia', zaakceptowane: '✓ wykonane', anulowane: 'anulowane' };
 
 function deadlineRow(dl, matters, onChange) {
   const today = todayIso();
@@ -221,6 +217,7 @@ function deadlineRow(dl, matters, onChange) {
     h('div', { class: 'dl-date' }, h('b', {}, fmtDate(dl.due_date)), dl.due_time ? h('span', { class: 'small muted' }, dl.due_time.slice(0, 5)) : null),
     h('span', { class: 'dot', style: { background: k.color }, 'data-tip': k.label }),
     h('div', { class: 'dl-main' }, h('div', {}, dl.title),
+      dl.notes && dl.kind === 'wewnetrzny' ? h('div', { class: 'small muted', style: { whiteSpace: 'pre-line' } }, dl.notes) : null,
             h('div', { class: 'small muted' }, m ? h('a', { href: `${BASE}/sprawa/${m.id}` }, `${m.number} · ${m.title}`) : null,
         dl.basis ? h('span', { 'data-tip': dl.basis }, (m ? ' · ' : '') + dl.basis) : null)),
     h('div', { class: 'small' }, who(dl.assignee_id)),
@@ -451,9 +448,8 @@ async function viewMatter(main, id, params) {
   }
 
   // ---- karta istniejącej sprawy ----
-  const [deadlines, tasks, journal, time, siblings] = await Promise.all([
+  const [deadlines, journal, time, siblings] = await Promise.all([
     fetchAll(() => sb.from('m2_deadlines').select('*').eq('matter_id', id).order('due_date')),
-    fetchAll(() => sb.from('zlecenia').select('id,no,title,status,due_date,assignee_id,priority').eq('matter_id', id).order('due_date', { nullsFirst: false })).catch(() => []),
     fetchAll(() => sb.from('m2_journal').select('*').eq('matter_id', id).order('entry_date', { ascending: false }).order('created_at', { ascending: false })),
     fetchAll(() => sb.from('m2_time').select('*').eq('matter_id', id).order('work_date', { ascending: false })),
     m.order_id ? fetchAll(() => sb.from('m2_matters').select('id,number,title,status').eq('order_id', m.order_id).order('opened_at')) : Promise.resolve([]),
@@ -463,14 +459,11 @@ async function viewMatter(main, id, params) {
 
   const dueLate = m.due_date && m.due_date < todayIso() && OPEN_STATUSES.includes(m.status);
   const dlCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Terminy'),
-    h('div', { style: { display: 'flex', gap: '8px' } },
-      h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('./zlecenia.js').then(z => z.newZlecenie(reload, { matter_id: m.id, matter_no: m.number, assignee_id: state.me.id })) }, '+ Zadanie'),
-      h('button', { class: 'btn btn-outline btn-sm', onclick: () => deadlineDialog({ matter: m, onSaved: reload }) }, '+ Termin'))),
+    h('button', { class: 'btn btn-outline btn-sm', onclick: () => deadlineDialog({ matter: m, onSaved: reload }) }, '+ Termin')),
   h('div', { class: 'm2-due' + (dueLate ? ' late' : '') }, h('span', { class: 'muted small' }, 'Termin realizacji sprawy'),
     m.due_date ? h('b', {}, (m.due_approx ? 'ok. ' : '') + fmtDate(m.due_date), m.due_approx ? h('span', { class: 'muted small', style: { fontWeight: 500 } }, ' · orientacyjnie') : null, dueLate ? h('span', { class: 'small', style: { fontWeight: 600 } }, ' · minął') : null)
       : h('span', { class: 'muted' }, 'nie ustalono – wpisz w „Dane sprawy”')),
-  ...tasks.map(z => matterTaskRow(z, reload)),
-  ...(deadlines.length ? deadlines.map(d => deadlineRow(d, new Map([[m.id, null]]), reload)) : tasks.length ? [] : [h('p', { class: 'hint' }, 'Brak terminów i zadań. „+ Zadanie” – np. wysłać coś klientowi (trafi do „Zadań zespołu”); „+ Termin” – kalkulator policzy termin od daty doręczenia.')]));
+  ...(deadlines.length ? deadlines.map(d => deadlineRow(d, new Map([[m.id, null]]), reload)) : [h('p', { class: 'hint' }, 'Brak terminów. „+ Termin” – urzędowy (kalkulator policzy go od daty doręczenia) albo inny, np. wysłać coś klientowi.')]));
 
   // czas pracy
   const totalMin = time.reduce((n, t) => n + t.minutes, 0);
