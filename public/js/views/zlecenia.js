@@ -64,7 +64,7 @@ Widzisz zadania, które masz do zrobienia, i te, które zleciłeś.
 Nie odpowiadaj na maile o zadaniach – odpowiadaj tutaj. Sprawy bieżących rozliczeń klienta (braki dokumentów, problemy z księgowaniem) prowadź w „Rozmowach”.`;
 
 async function loadAll() {
-  const { data, error } = await sb.from('zlecenia').select('*').order('created_at', { ascending: false }).limit(500);
+  const { data, error } = await sb.from('zlecenia').select('*, m2_matters(number)').order('created_at', { ascending: false }).limit(500);
   if (error) throw error;
   return data || [];
 }
@@ -74,7 +74,7 @@ const ST_COLOR = { nowe: '#9CA3AF', w_toku: '#2563EB', pytanie: '#6B4FC4', zglos
 function row(z, onOpen) {
   const st = stepsOf(z), done = st.filter(s => s.done).length, me = state.me.id;
   const d = z.due_date, lt = late(z);
-  const sub = [z.assignee_id !== me ? `dla: ${who(z.assignee_id).split(' ')[0]}` : z.created_by && z.created_by !== me ? `od: ${who(z.created_by).split(' ')[0]}` : '', helpersOf(z).length ? `razem z: ${helpersOf(z).map(id => who(id).split(' ')[0]).join(', ')}` : ''].filter(Boolean).join(' · ');
+  const sub = [z.assignee_id !== me ? `dla: ${who(z.assignee_id).split(' ')[0]}` : z.created_by && z.created_by !== me ? `od: ${who(z.created_by).split(' ')[0]}` : '', helpersOf(z).length ? `razem z: ${helpersOf(z).map(id => who(id).split(' ')[0]).join(', ')}` : '', z.m2_matters?.number ? `sprawa ${z.m2_matters.number}` : ''].filter(Boolean).join(' · ');
   const people = [z.assignee_id, ...helpersOf(z)].filter((x, i, arr) => x && arr.indexOf(x) === i).map(memberById).filter(Boolean);
   const el = h('div', { class: 'mj-card', role: 'button', tabindex: '0', onclick: () => onOpen(z), onkeydown: e => { if (e.key === 'Enter') onOpen(z); } },
     h('div', { class: 'mj-top' }, h('span', { class: 'mj-k' }, ZL_ST[z.status]?.[0] || z.status),
@@ -184,7 +184,7 @@ export async function newZlecenie(onDone, preset = {}) {
   const hpick = new Set(helpersOf(preset));
   const helperBox = h('div', { class: 'zl-people' }, ...team.filter(m => m.id !== preset.assignee_id).map(m => { const cb = h('input', { type: 'checkbox', checked: hpick.has(m.id) }); cb.addEventListener('change', () => cb.checked ? hpick.add(m.id) : hpick.delete(m.id)); return h('label', { class: 'zl-person-pick' }, cb, ava(m), m.id === state.me.id ? 'Ja' : m.full_name); }));
   const pending = [];
-  modal(editing ? `Edytuj zadanie #${preset.no}` : 'Nowe zadanie', h('div', { class: 'zl-form' },
+  modal(editing ? `Edytuj zadanie #${preset.no}` : preset.matter_no ? `Nowe zadanie – sprawa ${preset.matter_no}` : 'Nowe zadanie', h('div', { class: 'zl-form' },
     editing ? null : h('div', { class: 'field' }, h('span', {}, 'Dla kogo'), people),
     editing && canAddPeople(preset) ? h('div', { class: 'field' }, h('span', {}, 'Pracują razem nad zadaniem (dodatkowe osoby)'), helperBox) : null,
     h('label', { class: 'field' }, h('span', {}, 'Zadanie'), title),
@@ -200,6 +200,7 @@ export async function newZlecenie(onDone, preset = {}) {
     const old = stepsOf(preset);
     const st = steps.value.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 30).map(t => ({ t: t.slice(0, 300), done: !!old.find(o => o.t === t)?.done }));
     const rec = { title: title.value.trim(), body: body.value.trim() || null, due_date: due.value || null, priority: hot.checked ? 'pilne' : 'normalny', steps: st, client_id: client.value || null };
+    if (!editing && preset.matter_id) rec.matter_id = preset.matter_id;
     e.currentTarget.disabled = true;
     const btn = e.currentTarget;
     const { data: made, error } = editing ? await sb.from('zlecenia').update(rec).eq('id', preset.id).select('id')
@@ -235,7 +236,7 @@ function peopleDialog(z, onDone) {
 export async function openZlecenie(id, onChange) {
   let admin = isAdmin();
   const [{ data: z, error }, { data: wp }] = await Promise.all([
-    sb.from('zlecenia').select('*').eq('id', id).maybeSingle(),
+    sb.from('zlecenia').select('*, m2_matters(id,number,title)').eq('id', id).maybeSingle(),
     sb.from('zlecenia_wpisy').select('*').eq('zlecenie_id', id).order('created_at'),
   ]);
   const { data: files } = await sb.from('zlecenia_pliki').select('*').eq('zlecenie_id', id).order('created_at');
@@ -368,7 +369,8 @@ export async function openZlecenie(id, onChange) {
     z.body ? h('div', { class: 'zl-pin-body' }, z.body) : null,
     h('div', { class: 'zl-pin-meta' }, h('span', {}, 'Wykonuje: ', h('b', {}, who(z.assignee_id))), h('span', {}, 'Zlecił(a): ', h('b', {}, who(z.created_by))),
       helpersOf(z).length ? h('span', {}, 'Razem z: ', h('b', {}, helpersOf(z).map(who).join(', '))) : null,
-      cl?.name ? h('span', {}, 'Klient: ', h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name)) : null),
+      cl?.name ? h('span', {}, 'Klient: ', h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name)) : null,
+      z.m2_matters ? h('span', {}, 'Sprawa: ', h('a', { href: `#/doradztwo/sprawa/${z.m2_matters.id}`, onclick: () => closeFn() }, `${z.m2_matters.number} · ${z.m2_matters.title}`)) : null),
     stepsBox, tiles((files || []).filter(f => !f.wpis_id)));
   const toggle = h('button', { type: 'button', class: 'zl-pin-tg', 'aria-expanded': 'false' }, '⌄');
   const pin = h('div', { class: 'zl-pin' + (isLate || hot ? ' hot' : '') + (closed ? ' closed' : ''), role: 'button', tabindex: '0' },

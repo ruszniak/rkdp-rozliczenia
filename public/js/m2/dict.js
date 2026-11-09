@@ -86,7 +86,7 @@ export const DEADLINE_KIND = {
   procesowy: { label: 'Termin procesowy', color: '#A4462F' },
   organ: { label: 'Termin organu', color: '#7A5A37' },
   przedawnienie: { label: 'Przedawnienie', color: '#5C4228' },
-  wewnetrzny: { label: 'Zadanie / wewnętrzny', color: '#6A6157' },
+  wewnetrzny: { label: 'Wewnętrzny', color: '#6A6157' },
   spotkanie: { label: 'Spotkanie', color: '#3E6B47' },
 };
 
