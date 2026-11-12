@@ -78,7 +78,7 @@
   function close() { if (EMBED && window.parent !== window) window.parent.postMessage({ type: 'rkdp-umow-close' }, '*'); }
   function top(step) {
     return h('div', { class: 'um-top' },
-      h('img', { class: 'um-logo', src: '/logo-app.svg', alt: '', width: '44', height: '44' }),
+      h('img', { class: 'um-logo', src: '/logo-rdp.svg', alt: '', width: '44', height: '44' }),
       h('div', null, h('h1', null, TOKEN ? 'Twoje spotkanie' : 'Umów spotkanie z doradcą podatkowym'), h('p', null, 'Doradcy podatkowi · Wrocław i online · tel. 883 643 565')),
       !TOKEN ? h('div', { class: 'um-steps' }, h('span', { class: step === 1 ? 'on' : '' }, '1. Termin'), '—', h('span', { class: step === 2 ? 'on' : '' }, '2. Dane'), '—', h('span', { class: step === 3 ? 'on' : '' }, '3. Gotowe')) : null,
       EMBED ? h('button', { class: 'um-x', type: 'button', 'aria-label': 'Zamknij', onclick: close }, '✕') : null);

@@ -45,7 +45,7 @@ export async function renderLogin(app, initialError = '') {
   const errBox = h('p', { class: 'err', role: 'alert' }, initialError);
   const box = h('div', { class: 'login-box' });
   const head = (eyebrow, title, text) => [
-    h('img', { src: '/logo-app.svg', alt: 'RKDP' }),
+    h('img', { src: '/logo-rdp.svg', alt: 'RKDP' }),
     h('div', {}, h('p', { class: 'eyebrow' }, eyebrow), h('h1', { style: { marginTop: '8px' } }, title)),
     text ? h('p', { class: 'muted' }, ...[].concat(text)) : null];
   const linkBtn = (label, fn) => h('button', { class: 'btn btn-ghost btn-sm', type: 'button', style: { alignSelf: 'flex-start', width: 'auto' },

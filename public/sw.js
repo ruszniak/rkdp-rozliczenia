@@ -1,11 +1,11 @@
 // Service worker aplikacji RKDP: powiadomienia push, instalacja jako aplikacja (PWA) i ekran „brak internetu”.
 // Danych z bazy NIE zapisujemy w pamięci urządzenia – w trybie offline pokazujemy tylko komunikat.
 const OFFLINE = '/offline.html';
-const CACHE = 'rkdp-shell-v64';
+const CACHE = 'rkdp-shell-v65';
 const NAV = 'rkdp-nav'; // cel kliknięcia w powiadomienie – odbiera go otwarta aplikacja
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll([OFFLINE, '/icon-192-v7.png', '/logo-app.svg'])).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll([OFFLINE, '/icon-192-v7.png', '/logo-rdp.svg'])).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== NAV).map(k => caches.delete(k)))).then(() => self.clients.claim()));

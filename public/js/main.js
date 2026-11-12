@@ -9,7 +9,7 @@ import { getTheme, toggleTheme, onThemeChange, ICON_MOON, ICON_SUN } from './mot
 import { initPanelLinks, closePanel } from './panel.js';
 import { initUpdates } from './update.js';
 // logo w aplikacji: RKDP – granatowe (logotyp aplikacji), M2 TAX – zwykłe; w motywie ciemnym rozjaśniane w CSS
-const LIGHT_LOGO = src => src.replace('/logo-rkdp.png', '/logo-app.svg').replace('/m2tax-logo.png', '/logo-app.svg');
+const LIGHT_LOGO = src => src.replace('/logo-rkdp.png', '/logo-rdp.svg').replace('/m2tax-logo.png', '/logo-rdp.svg');
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
 const lazy = (load, name) => (...a) => load().then(m => m[name](...a));
 const renderRozliczenia = lazy(() => import('./views/rozliczenia.js'), 'renderRozliczenia');
