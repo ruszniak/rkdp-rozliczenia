@@ -1,5 +1,5 @@
 // Automatyczne aktualizacje: otwarta aplikacja (także zainstalowana na telefonie) sprawdza, czy jest nowa wersja,
-// i sama się przeładowuje – gdy wracasz do niej z tła albo gdy nic w niej nie robisz. Po przeładowaniu pokazuje „Zaktualizowano app.R”.
+// i sama się przeładowuje – gdy wracasz do niej z tła albo gdy nic w niej nie robisz. Po przeładowaniu pokazuje „Zaktualizowano rdp.app”.
 import { toast } from './ui.js';
 
 const current = document.querySelector('meta[name="app-build"]')?.content || null;   // brak w wersji ze źródeł (testy) – wtedy nic nie robimy
@@ -26,7 +26,7 @@ function showBanner() {
   if (banner) return;
   banner = document.createElement('div');
   banner.className = 'upd-banner';
-  banner.innerHTML = '<span>Jest nowa wersja app.R</span>';
+  banner.innerHTML = '<span>Jest nowa wersja rdp.app</span>';
   const b = document.createElement('button');
   b.type = 'button'; b.textContent = 'Odśwież';
   b.onclick = reloadNow;
@@ -62,7 +62,7 @@ async function checkApk() {
     if (skip) return;
     const el = document.createElement('div');
     el.className = 'upd-banner';
-    el.innerHTML = '<span>Jest nowa wersja aplikacji app.R na Androida</span>';
+    el.innerHTML = '<span>Jest nowa wersja aplikacji rdp.app na Androida</span>';
     const a = document.createElement('a'); a.href = '/pobierz/app-r.apk'; a.textContent = 'Pobierz'; a.className = 'upd-btn';
     const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.className = 'upd-x';
     x.onclick = () => { el.remove(); try { sessionStorage.setItem('rkdp_apk_skip', '1'); } catch { /* */ } };
@@ -72,7 +72,7 @@ async function checkApk() {
 
 export function initUpdates() {
   setTimeout(checkApk, 4000);
-  try { if (sessionStorage.getItem('rkdp_updated')) { sessionStorage.removeItem('rkdp_updated'); setTimeout(() => toast('Zaktualizowano app.R do najnowszej wersji'), 800); } } catch { /* */ }
+  try { if (sessionStorage.getItem('rkdp_updated')) { sessionStorage.removeItem('rkdp_updated'); setTimeout(() => toast('Zaktualizowano rdp.app do najnowszej wersji'), 800); } } catch { /* */ }
   if (!current) return;
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') { if (pending) reloadNow(); else check(); }

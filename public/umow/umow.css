@@ -98,7 +98,7 @@ body.bare .um-top{display:none}body.bare .um-grid{min-height:0}
 .dor img.av{object-fit:cover;background:#E5E7EB}
 img.um-logo{background:none;border-radius:12px;object-fit:contain}
 
-/* kolory aplikacji app.R: grafit + niebieski akcent */
+/* kolory aplikacji rdp.app: grafit + niebieski akcent */
 .typ.on{border-color:var(--blue);background:var(--gold-l)}
 .dor.on{border-color:var(--blue);background:var(--gold-l)}
 .typ.on .ic{background:var(--blue)}

@@ -272,7 +272,7 @@ async function mailClient(c: Ctx, kind: Kind) {
   const btn = (href: string, label: string, primary: boolean) => `<a href="${esc(href)}" style="display:inline-block;margin:0 8px 8px 0;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px;${primary ? 'background:#2563EB;color:#ffffff;' : 'background:#ffffff;color:#111827;border:1px solid #D1D5DB;'}">${label}</a>`;
   const html = `<!doctype html><html><body style="margin:0;background:#F6F6F7;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
 <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #E5E7EB;">
-<div style="background:#0E1015;background-image:linear-gradient(135deg,#1F2937,#0E1015);padding:18px 24px;"><table cellpadding="0" cellspacing="0" role="presentation"><tr><td style="vertical-align:middle;"><img src="${S.app_url}/icon-192-v6.png" width="36" height="36" alt="" style="display:block;border-radius:9px;"></td><td style="vertical-align:middle;padding-left:12px;color:#ffffff;font-size:17px;font-weight:bold;letter-spacing:.2px;">Spotkanie z Doradcą Podatkowym</td></tr></table></div>
+<div style="background:#0E1015;background-image:linear-gradient(135deg,#1F2937,#0E1015);padding:18px 24px;"><table cellpadding="0" cellspacing="0" role="presentation"><tr><td style="vertical-align:middle;"><img src="${S.app_url}/icon-192-v7.png" width="36" height="36" alt="" style="display:block;border-radius:9px;"></td><td style="vertical-align:middle;padding-left:12px;color:#ffffff;font-size:17px;font-weight:bold;letter-spacing:.2px;">Spotkanie z Doradcą Podatkowym</td></tr></table></div>
 <div style="padding:24px;">
 <div style="font-size:21px;font-weight:bold;margin:0 0 10px;">${head}</div>
 <p style="font-size:14px;line-height:1.6;margin:0 0 16px;">${first ? `Dzień dobry ${esc(first)}, ` : 'Dzień dobry, '}${intro}</p>
@@ -320,19 +320,19 @@ async function mailTeam(c: Ctx, ids: string[], actor: string | null, kind: 'nowe
     ['Gdzie', where], ['Kto', others], ['Temat', m.topic || ''], ['NIP', m.client_nip || ''], ['Kontakt', [m.client_email, m.client_phone].filter(Boolean).join(' · ')]].filter(r => r[1]) as [string, string][];
   const text = [head, '', ...rows.map(([k, v]) => `${k}: ${v}`), '', `W aplikacji: ${link}`, '', 'Spotkanie jest też w Twoim Kalendarzu Google (jeśli jest połączony).'].join('\n');
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px">`
-    + `<p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Spotkanie · app.R</p>`
+    + `<p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Spotkanie · rdp.app</p>`
     + `<h2 style="margin:0 0 12px;font-size:19px">${esc(head)}</h2>`
     + `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#F3F4F6;border-radius:12px;width:100%"><tr><td style="padding:12px 16px"><table cellpadding="0" cellspacing="0">`
     + rows.map(([k, v]) => `<tr><td style="padding:5px 14px 5px 0;color:#6B7280;font-size:13px;vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:5px 0;font-size:14px;font-weight:bold">${k === 'Gdzie' && /^https?:/.test(v) ? `<a href="${esc(v)}" style="color:#2563EB">Google Meet</a>` : esc(v)}</td></tr>`).join('')
     + `</table></td></tr></table>`
-    + `<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Otwórz spotkanie w app.R</a></p>`
-    + `<p style="color:#6B7280;font-size:12px">Wiadomość wysłana automatycznie z app.R. Spotkanie jest też w Twoim Kalendarzu Google (jeśli jest połączony).</p></div>`;
+    + `<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Otwórz spotkanie w rdp.app</a></p>`
+    + `<p style="color:#6B7280;font-size:12px">Wiadomość wysłana automatycznie z rdp.app. Spotkanie jest też w Twoim Kalendarzu Google (jeśli jest połączony).</p></div>`;
   let n = 0;
   for (const x of ms || []) {
     const pr = (pf || []).find((r: any) => r.member_id === x.id);
     const addr = pr?.notify_email && emailOk(String(pr.notify_email)) ? String(pr.notify_email) : String(x.email || '');
     if (!emailOk(addr)) continue;
-    try { await transport().sendMail({ from: { name: 'app.R – spotkania', address: S.from_email || SMTP_USER }, to: addr, subject, text, html }); n++; }
+    try { await transport().sendMail({ from: { name: 'rdp.app – spotkania', address: S.from_email || SMTP_USER }, to: addr, subject, text, html }); n++; }
     catch (err) { console.error('mail zespół', x.id, err); }
   }
   return n;

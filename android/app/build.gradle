@@ -1,4 +1,4 @@
-// Aplikacja app.R na Androida: Trusted Web Activity – pełny ekran z aplikacją https://app.ruszniak.io (silnik Chrome,
+// Aplikacja rdp.app na Androida: Trusted Web Activity – pełny ekran z aplikacją https://app.ruszniak.io (silnik Chrome,
 // powiadomienia i logowanie jak w przeglądarce). Budowana i podpisywana automatycznie na GitHubie (.github/workflows/android.yml).
 plugins { id 'com.android.application' }
 

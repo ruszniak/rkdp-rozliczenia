@@ -3,7 +3,7 @@ import { h } from '../ui.js';
 import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
-export const APP_VERSION = '2.2';
+export const APP_VERSION = '2.3';
 export const APP_DATE = '2026-11-08';
 const DOCS_DATE = '2 listopada 2026 r.';
 
@@ -13,7 +13,7 @@ const CONTACT = 'kancelaria@rkdp.pl';
 // ---------- treści ----------
 export const PRIVACY = [
   ['1. Czego dotyczy polityka', [
-    'Polityka opisuje, jakie informacje zapisuje i przetwarza aplikacja „app.R” (app.ruszniak.io) – w przeglądarce, w aplikacji zainstalowanej na komputerze lub telefonie oraz na serwerach.',
+    'Polityka opisuje, jakie informacje zapisuje i przetwarza aplikacja „rdp.app” (app.ruszniak.io) – w przeglądarce, w aplikacji zainstalowanej na komputerze lub telefonie oraz na serwerach.',
     `Właścicielem aplikacji jest ${OWNER} (dalej „RKDP”).`,
     'Aplikacja jest narzędziem wewnętrznym – korzystają z niej wyłącznie osoby, którym RKDP nadało dostęp. Nie służy do sprzedaży, reklamy ani profilowania.',
   ]],
@@ -53,7 +53,7 @@ export const RODO = [
     'Zgodnie z art. 13 rozporządzenia Parlamentu Europejskiego i Rady (UE) 2016/679 (RODO) informujemy:',
   ]],
   ['1. Administrator danych', [
-    `Administratorem Twoich danych osobowych przetwarzanych w aplikacji „app.R” jest ${OWNER}. Kontakt: ${CONTACT} lub pisemnie na adres siedziby.`,
+    `Administratorem Twoich danych osobowych przetwarzanych w aplikacji „rdp.app” jest ${OWNER}. Kontakt: ${CONTACT} lub pisemnie na adres siedziby.`,
     'Jeżeli współpracujesz z M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska, M2 TAX pozostaje administratorem danych związanych z Twoim zatrudnieniem lub współpracą z M2 TAX; w aplikacji Twoje dane przetwarza RKDP jako jej właściciel, w zakresie opisanym poniżej.',
   ]],
   ['2. Jakie dane przetwarzamy', [
@@ -95,6 +95,9 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.3', '12 listopada 2026', [
+    'Nowa nazwa i logo: rdp.app. W sprawach „+ Termin” ma teraz wariant „Inny termin” z własną treścią (np. wysłać coś klientowi). Wzajemny podgląd kalendarzy Michała i Marcina na Pulpicie.',
+  ]],
   ['2.2', '8 listopada 2026', [
     'Nowa nazwa: app.R. Spotkania zamiast Zoho: rezerwacja na stronach rkdp.pl i m2tax.pl oraz pod linkiem app.ruszniak.io/umow, „Umów spotkanie” w aplikacji (z klientem albo prywatne), grafik przyjęć na każdy tydzień, rodzaje spotkań, e-maile do klientów z potwierdzeniem i przypomnieniem, wszystko w Kalendarzu Google.',
   ]],
@@ -217,7 +220,7 @@ const row = (href, k, title, sub, extra) => h('a', { class: 'oa-row', href, targ
 function docPage(main, title, sections) {
   main.replaceChildren(
     h('a', { href: '#/o-aplikacji', class: 'btn btn-ghost btn-sm', style: { marginBottom: '6px' } }, '← O aplikacji'),
-    h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'app.R'), h('h1', { style: { marginTop: '6px' } }, title),
+    h('div', { class: 'page-head' }, h('div', {}, h('p', { class: 'eyebrow' }, 'rdp.app'), h('h1', { style: { marginTop: '6px' } }, title),
       h('p', { class: 'sub' }, `Obowiązuje od ${DOCS_DATE}`)),
       h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => window.print() }, 'Drukuj / PDF')),
     h('section', { class: 'card section oa-doc' }, ...sections.map(([hd, items]) => h('div', {},
@@ -232,8 +235,8 @@ export async function renderOAplikacji(main, sub) {
       h('p', { class: 'sub' }, 'Wersja, dokumenty i pomoc.'))),
     h('div', { class: 'oa-grid' },
       h('section', { class: 'card section oa-app' },
-        h('img', { src: '/icon-192-v6.png', alt: '', class: 'oa-logo', width: 72, height: 72 }),
-        h('h2', {}, 'app.R'),
+        h('img', { src: '/icon-192-v7.png', alt: '', class: 'oa-logo', width: 72, height: 72 }),
+        h('h2', {}, 'rdp.app'),
         h('p', { class: 'muted' }, `Wersja ${APP_VERSION} · ${new Date(APP_DATE + 'T12:00:00').toLocaleDateString('pl-PL')}`),
         h('p', { class: 'small muted', style: { marginTop: '10px' } }, 'Właściciel: RKDP spółka doradztwa podatkowego sp. z o.o.', h('br'), 'Dane objęte tajemnicą doradcy podatkowego.'),
         h('p', { class: 'small muted', style: { marginTop: '6px' } }, 'Wykonanie: ', h('a', { href: 'https://ruszniak.io', target: '_blank', rel: 'noopener' }, 'druslak'))),
@@ -246,7 +249,7 @@ export async function renderOAplikacji(main, sub) {
         h('p', { class: 'oa-lbl' }, 'Pomoc'),
         h('div', { class: 'card oa-list' },
           row('#/profil', 'user', 'Mój profil, Face ID, powiadomienia', state.me?.email || ''),
-          row(`mailto:${CONTACT}?subject=${encodeURIComponent('app.R – zgłoszenie problemu')}&body=${encodeURIComponent(`\n\n---\nWersja ${APP_VERSION} · ${navigator.userAgent}`)}`, 'mail', 'Zgłoś problem', 'e-mail z opisem i wersją aplikacji')),
+          row(`mailto:${CONTACT}?subject=${encodeURIComponent('rdp.app – zgłoszenie problemu')}&body=${encodeURIComponent(`\n\n---\nWersja ${APP_VERSION} · ${navigator.userAgent}`)}`, 'mail', 'Zgłoś problem', 'e-mail z opisem i wersją aplikacji')),
         h('p', { class: 'oa-lbl' }, 'Co nowego'),
         h('div', { class: 'card oa-news' }, ...NEWS.map(([v, d, items], i) => h('details', { class: 'oa-new', open: i === 0 ? true : null },
           h('summary', {}, h('span', { class: 'oa-v' }, v), h('b', {}, i === 0 ? 'Aktualna wersja' : `Wersja ${v}`), h('span', { class: 'small muted' }, d)),

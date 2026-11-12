@@ -38,7 +38,7 @@ const fmtRanges = r => (r || []).map(([a, b]) => `${a.replace(/^0/, '')}–${b.r
 const firstName = n => String(n || '').split(/\s+/)[0];
 const canNotes = () => ['admin', 'full'].includes(state.me?.role);
 const money = v => (v == null || v === '' ? '' : Number(v).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' zł');
-// płatności online (Przelewy24) – w app.R wyłączone; rezerwacja z płatnością działa tylko na osobnej stronie /umow2/
+// płatności online (Przelewy24) – w rdp.app wyłączone; rezerwacja z płatnością działa tylko na osobnej stronie /umow2/
 const PAYMENTS = false;
 const PAY = { p24: 'online – Przelewy24', gotowka: 'gotówka', przelew: 'przelew', karta: 'karta / BLIK' };
 
@@ -396,8 +396,8 @@ function notesBox(m) {
     const drawSum = (txt, url, at) => sumBox && put(sumBox,
       h('div', { class: 'sp-notes-h' }, h('b', {}, 'Podsumowanie z Google Meet'), txt ? h('span', { class: 'small muted' }, 'notatki Gemini' + (at ? ` · ${new Date(at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : '')) : null),
       txt ? h('div', { class: 'sp-sum-txt' }, txt) : h('p', { class: 'small muted', style: { margin: '0 0 6px' } }, new Date(m.end_at) > new Date()
-        ? 'Po spotkaniu app.R sama pobierze notatki Gemini (jeśli w Meet włączysz „Rób notatki z Gemini”).'
-        : 'Notatki Gemini pojawiają się zwykle kilka–kilkanaście minut po spotkaniu. app.R sprawdza je sama przez 3 dni.'),
+        ? 'Po spotkaniu rdp.app sama pobierze notatki Gemini (jeśli w Meet włączysz „Rób notatki z Gemini”).'
+        : 'Notatki Gemini pojawiają się zwykle kilka–kilkanaście minut po spotkaniu. rdp.app sprawdza je sama przez 3 dni.'),
       h('div', { class: 'sp-notes-foot' },
         url ? h('a', { class: 'btn btn-ghost btn-sm', href: url, target: '_blank', rel: 'noopener' }, 'Otwórz dokument') : null,
         new Date(m.end_at) <= new Date() ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: async (e) => {

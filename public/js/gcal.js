@@ -61,7 +61,7 @@ export function gcalCard() {
       h('b', {}, 'Połącz ponownie, aby umawiać spotkania. '), 'Aplikacja potrzebuje dodatkowej zgody: dodawania spotkań do Twojego kalendarza i sprawdzania, kiedy jesteś zajęty. ',
       h('button', { class: 'btn btn-primary btn-sm', style: { marginTop: '8px' }, onclick: async (e) => { e.target.disabled = true; try { const r = await call('connect', { email: state.me.email }); location.href = r.url; } catch (er) { e.target.disabled = false; fail(er); } } }, 'Połącz ponownie z Google'))
       : !st.can_summary ? h('div', { class: 'gc-err', style: { background: '#EEF4FF', color: '#1E3A8A' } },
-        h('b', {}, 'Podsumowania spotkań z Google Meet. '), 'Połącz ponownie, aby app.R sama pobierała notatki Gemini po spotkaniach online (dostęp tylko do plików utworzonych przez Google Meet). ',
+        h('b', {}, 'Podsumowania spotkań z Google Meet. '), 'Połącz ponownie, aby rdp.app sama pobierała notatki Gemini po spotkaniach online (dostęp tylko do plików utworzonych przez Google Meet). ',
         h('button', { class: 'btn btn-primary btn-sm', style: { marginTop: '8px' }, onclick: async (e) => { e.target.disabled = true; try { const r = await call('connect', { email: state.me.email }); location.href = r.url; } catch (er) { e.target.disabled = false; fail(er); } } }, 'Połącz ponownie z Google')) : null;
     const syncBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
       syncBtn.disabled = true;

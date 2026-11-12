@@ -231,7 +231,7 @@ async function onSpotkanie(b: any) {
     return n;
   }
   if (ev === 'oplacone') return act.length ? notify(act, 'spotkania', { title: `Klient zapłacił online${b.amount ? ` – ${Number(b.amount).toLocaleString('pl-PL')} zł` : ''}`, body: `${short(who, 60)} · ${when} · Przelewy24`, url, tag: `pay-${m.id}` }) : 0;
-  if (ev === 'podsumowanie') return act.length ? notify(act, 'spotkania', { title: 'Podsumowanie spotkania z Meet', body: `${short(who, 60)} · ${when} – notatki Gemini są w app.R`, url, tag: `sum-${m.id}` }) : 0;
+  if (ev === 'podsumowanie') return act.length ? notify(act, 'spotkania', { title: 'Podsumowanie spotkania z Meet', body: `${short(who, 60)} · ${when} – notatki Gemini są w rdp.app`, url, tag: `sum-${m.id}` }) : 0;
   if (ev === 'przypomnienie') return act.length ? notify(act, 'spotkania', { title: `O ${hour}: spotkanie`, body: `${short(who, 60)}` + (act.length > 1 ? ' · uczestniczycie razem' : ''), url, tag }) : 0;
   const all = ev.startsWith('odwolane') ? (mm || []).map((x: any) => x.member_id) : act;
   const to = all.filter((x: string) => x && x !== b.actor);
@@ -271,7 +271,7 @@ Deno.serve(async (req) => {
     const { data: me } = await db.from('team_members').select('id, full_name, active').eq('email', email).maybeSingle();
     if (!me?.active) return json({ error: 'Brak dostępu' }, 403);
     if (body.event === 'test') {
-      const sent = await notify([me.id], 'test', { title: 'Powiadomienia działają', body: `Cześć ${me.full_name.split(' ')[0]}! Tak będą wyglądały powiadomienia z app.R.`, url: '/#/profil', tag: 'test' }, true);
+      const sent = await notify([me.id], 'test', { title: 'Powiadomienia działają', body: `Cześć ${me.full_name.split(' ')[0]}! Tak będą wyglądały powiadomienia z rdp.app.`, url: '/#/profil', tag: 'test' }, true);
       return json({ sent });
     }
     return json({ error: 'Nieznane zdarzenie' }, 400);

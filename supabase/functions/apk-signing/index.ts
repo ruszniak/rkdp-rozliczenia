@@ -1,4 +1,4 @@
-// Klucz podpisu aplikacji Android (app.R) dla automatycznego budowania na GitHubie.
+// Klucz podpisu aplikacji Android (rdp.app) dla automatycznego budowania na GitHubie.
 // Bez stałych haseł w repozytorium: workflow przedstawia token OIDC wystawiony przez GitHub,
 // a funkcja wydaje klucz tylko dla repozytorium ruszniak/rkdp-rozliczenia, gałęzi main i workflow android.yml.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';

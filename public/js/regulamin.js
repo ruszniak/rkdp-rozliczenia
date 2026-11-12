@@ -2,14 +2,14 @@
 // Zmiana treści = nowa wersja (TERMS_VERSION) → każdy użytkownik akceptuje ponownie przy wejściu do aplikacji.
 export const TERMS_VERSION = '1.0';
 export const TERMS_DATE = '2026-10-23';
-export const TERMS_TITLE = 'Regulamin korzystania z aplikacji „app.R”';
+export const TERMS_TITLE = 'Regulamin korzystania z aplikacji „rdp.app”';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), wpisana do rejestru przedsiębiorców KRS pod numerem 0000812185, NIP 8992871126, REGON 384812329';
 const M2 = 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska z siedzibą we Wrocławiu (KRS 0001238577)';
 
 export const TERMS = [
   ['§ 1. Postanowienia ogólne', [
-    'Regulamin określa zasady korzystania z aplikacji internetowej „app.R”, dostępnej pod adresem app.ruszniak.io (dalej „Aplikacja”).',
+    'Regulamin określa zasady korzystania z aplikacji internetowej „rdp.app”, dostępnej pod adresem app.ruszniak.io (dalej „Aplikacja”).',
     `Właścicielem Aplikacji i podmiotem uprawnionym z autorskich praw majątkowych do Aplikacji jest ${OWNER} (dalej „Właściciel”).`,
     'Aplikacja jest narzędziem wewnętrznym wspierającym organizację pracy: ewidencję rozliczeń klientów, zgłoszenia i zadania, obsługę spraw doradczych, generowanie dokumentów, listę obecności, weryfikację klientów, podgląd plików JPK oraz narzędzia pomocnicze (wzory dokumentów, kalkulator formy opodatkowania).',
     `Z Aplikacji korzystają osoby, którym Właściciel nadał dostęp (dalej „Użytkownik”), w szczególności pracownicy i współpracownicy Właściciela, ${M2} (dalej „M2 TAX”) oraz jej pracownicy i współpracownicy – na podstawie udostępnienia Aplikacji przez Właściciela – a także osoby z dostępem ograniczonym, np. wyłącznie do podglądu plików JPK.`,
@@ -82,7 +82,7 @@ export async function termsHash() {
 export function termsBlocks() {
   const B = [
     { t: 'title', text: 'REGULAMIN KORZYSTANIA Z APLIKACJI' },
-    { t: 'subtitle', text: '„app.R” (app.ruszniak.io)' },
+    { t: 'subtitle', text: '„rdp.app” (app.ruszniak.io)' },
     { t: 'meta', text: `Wersja ${TERMS_VERSION} · obowiązuje od 23 października 2026 r.` },
   ];
   for (const [hd, items] of TERMS) {

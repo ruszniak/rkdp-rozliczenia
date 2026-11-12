@@ -72,7 +72,7 @@ async function ensureCalendar(memberId: string, token: string, current: string |
     const g = await gapi(token, 'GET', `/calendars/${encodeURIComponent(current)}`);
     if (g.ok) return current;
   }
-  const c = await gapi(token, 'POST', '/calendars', { summary: CAL_NAME, description: 'Terminy spraw, zadania i pytania z aplikacji app.R. Aktualizuje się samo – zmiany wprowadzaj w aplikacji.', timeZone: TZ });
+  const c = await gapi(token, 'POST', '/calendars', { summary: CAL_NAME, description: 'Terminy spraw, zadania i pytania z aplikacji rdp.app. Aktualizuje się samo – zmiany wprowadzaj w aplikacji.', timeZone: TZ });
   if (!c.ok) throw new Error('Nie udało się założyć kalendarza w Google: ' + (c.data?.error?.message || c.status));
   await admin.from('gcal_links').update({ calendar_id: c.data.id }).eq('member_id', memberId);
   await admin.from('gcal_items').delete().eq('member_id', memberId);

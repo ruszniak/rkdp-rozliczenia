@@ -34,7 +34,7 @@ export async function downloadBackup(onProgress = () => {}) {
     const cols = [...new Set(rows.flatMap(r => Object.keys(r)))];
     return { name: table, rows: [cols.map(c => ({ v: c, s: 'header' })), ...rows.map(r => cols.map(c => cellOf(r[c])))], widths: cols.map(() => 18) };
   });
-  const readme = `Kopia danych aplikacji app.R z ${stamp.replace('_', ' ')}.\n\n` +
+  const readme = `Kopia danych aplikacji rdp.app z ${stamp.replace('_', ' ')}.\n\n` +
     `dane.json  – pełne dane wszystkich tabel (do odtworzenia bazy)\n` +
     `dane.xlsx  – te same dane do przeglądania, jedna tabela na arkusz\n\n` +
     Object.entries(data).map(([t, r]) => `${t}: ${r.length} ${plural(r.length)}`).join('\n') +
@@ -78,7 +78,7 @@ export async function downloadFilesBackup(onProgress = () => {}) {
     files.push({ name, data: new Uint8Array(await data.arrayBuffer()) });
   }
   const stamp = new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Warsaw' }).replace(' ', '_').replace(/:/g, '-').slice(0, 16);
-  const readme = `Kopia plików app.R z ${stamp.replace('_', ' ')}.\nPlików: ${files.length}` + (errs.length ? `\n\nNie udało się pobrać (${errs.length}):\n${errs.join('\n')}` : '') +
+  const readme = `Kopia plików rdp.app z ${stamp.replace('_', ' ')}.\nPlików: ${files.length}` + (errs.length ? `\n\nNie udało się pobrać (${errs.length}):\n${errs.join('\n')}` : '') +
     `\n\nPliki zawierają dane klientów – przechowuj kopię na zaszyfrowanym dysku i nie wysyłaj e-mailem.\n`;
   const blob = new Blob([zip([{ name: 'CZYTAJ.txt', data: readme }, ...files])], { type: 'application/zip' });
   const a = document.createElement('a');

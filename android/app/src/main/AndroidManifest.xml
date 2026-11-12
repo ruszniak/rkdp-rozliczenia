@@ -30,7 +30,7 @@
             </intent-filter>
         </activity>
 
-        <!-- powiadomienia z aplikacji pokazują się jako powiadomienia app.R -->
+        <!-- powiadomienia z aplikacji pokazują się jako powiadomienia rdp.app -->
         <service
             android:name="com.google.androidbrowserhelper.trusted.DelegationService"
             android:enabled="true"

@@ -961,7 +961,7 @@ export async function renderRozliczenia(main, params) {
       const header = ['Klient', 'Forma', AREAS[area].personLabel, ...(area === 'kadry' ? ['Pracownicy'] : []), ...t.cols.map(c => c.label), 'Klient rozliczony', 'Uwagi', 'Pytania / problemy'];
       const rows = [
         [{ v: `${AREAS[area].label} – ${t.title} – ${periodLabel(period)}`, s: 'title' }],
-        [{ v: `app.R · wygenerowano ${new Date().toLocaleString('pl-PL')} · ${filterInfo()}`, s: 'sub' }],
+        [{ v: `rdp.app · wygenerowano ${new Date().toLocaleString('pl-PL')} · ${filterInfo()}`, s: 'sub' }],
         header.map(v => ({ v, s: 'header' })),
         ...t.rows.map(c => {
           const m = byClient.get(c.id);

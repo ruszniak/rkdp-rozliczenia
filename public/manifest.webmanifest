@@ -1,6 +1,6 @@
 {
-  "name": "app.R – RKDP · M2 TAX",
-  "short_name": "app.R",
+  "name": "rdp.app – RKDP · M2 TAX",
+  "short_name": "rdp.app",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,17 +10,17 @@
   "lang": "pl",
   "icons": [
     {
-      "src": "/icon-192-v6.png",
+      "src": "/icon-192-v7.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon-512-v6.png",
+      "src": "/icon-512-v7.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/icon-maskable-512-v6.png",
+      "src": "/icon-maskable-512-v7.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
