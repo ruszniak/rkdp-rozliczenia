@@ -1,7 +1,7 @@
 // Dokumenty M2 TAX na papierze firmowym: ZLECENIE (krótkie, 1 strona) i UMOWA (wg wzoru kancelarii).
 // Jedna treść (lista bloków) → podgląd, PDF (druk) i Word (.docx).
 import { printHtml } from '../ui.js';
-import { FIRM as M2_FIRM, MATTER_TYPE, firmData } from './dict.js';
+import { FIRM as M2_FIRM, RKDP_FIRM, MATTER_TYPE, firmData } from './dict.js';
 const FIRM = M2_FIRM;
 import { zip } from '../xlsx.js';
 
@@ -487,6 +487,9 @@ export function poaDefaultScope(p) {
   return `przed organami podatkowymi, organami Krajowej Administracji Skarbowej i sądami administracyjnymi${what ? ` w sprawie (${what})` : ''}`;
 }
 
+// Domyślny adres do doręczeń na pełnomocnictwach (biuro – jak w „Mój profil”)
+export const POA_DELIVERY = RKDP_FIRM.office;
+
 export function poaBlocks(o, client, signers, { standalone = false, brand = M2_BRAND } = {}) {
   const p = { ...CONTRACT_DEFAULTS, ...(o.params || {}) };
   const c = client || {};
@@ -509,13 +512,21 @@ export function poaBlocks(o, client, signers, { standalone = false, brand = M2_B
     'przeglądania akt sprawy, sporządzania z nich notatek, odpisów i kopii;',
     'udziału w czynnościach dowodowych, przesłuchaniach i rozprawach;',
     court ? 'wnoszenia skarg, skarg kasacyjnych, zażaleń, wniosków i innych pism procesowych;' : 'wnoszenia odwołań, zażaleń, zastrzeżeń, wniosków i innych środków przewidzianych w przepisach;',
-    'udzielania dalszych pełnomocnictw (substytucji) doradcom podatkowym.',
+    'udzielania dalszych pełnomocnictw (substytucji) doradcy podatkowemu, adwokatowi lub radcy prawnemu (art. 41 ust. 5 ustawy o doradztwie podatkowym).',
   ].forEach((x, i) => B.push({ t: 'pkt', n: `${i + 1})`, text: x }));
+  // jeden adres do doręczeń dla całego pełnomocnictwa; przy kilku pełnomocnikach – wskazany pełnomocnik do doręczeń
+  const addr = (p.poa_delivery || '').trim() || POA_DELIVERY;
+  const eaddr = (p.poa_edelivery ?? sg[0]?.ae_address ?? '').trim();
+  const to = sg.find(x => x.id && x.id === p.poa_delivery_to) || sg[0];
+  B.push({ t: 'intro', text: `Adres do doręczeń dla ${sg.length > 1 ? 'pełnomocników' : 'pełnomocnika'}: ${addr}${eaddr ? `; adres do doręczeń elektronicznych: ${eaddr}` : ''}.`
+    + (sg.length > 1 ? ` Pełnomocnikiem do doręczeń${court ? ' (art. 76 § 3 p.p.s.a.)' : ''} jest ${to.full_name}.` : '') });
   B.push({ t: 'intro', text: 'Pełnomocnictwo jest ważne do zakończenia sprawy albo do jego odwołania.' });
-  B.push({ t: 'sign2', left: { label: 'MOCODAWCA', firm: c.kind === 'osoba' ? null : (c.name || P), people: c.kind === 'osoba' ? [c.name || P] : (reps.length ? reps : [`${P} – ${P}`]) },
-    right: { label: 'PEŁNOMOCNICY (przyjęcie)', firm: null, people: sg.map(x => `${x.full_name} – doradca podatkowy`) } });
+  // podpis wyłącznie mocodawcy (bez przyjęcia przez pełnomocników)
+  if (c.kind === 'osoba') B.push({ t: 'signR', lines: [party, 'Mocodawca'] });
+  else (reps.length ? reps : [`${P} – ${P}`]).forEach(r => B.push({ t: 'signR', lines: [r, c.name || party] }));
   B.push({ t: 'gap' });
-  B.push({ t: 'small', text: 'Opłata skarbowa od pełnomocnictwa: 17 zł (art. 1 ust. 1 pkt 2 ustawy o opłacie skarbowej), chyba że zachodzi zwolnienie.' });
+  const n = sg.length;
+  B.push({ t: 'small', text: `Opłata skarbowa od pełnomocnictwa: ${n > 1 ? `${17 * n} zł (17 zł od każdego stosunku pełnomocnictwa × ${n} pełnomocników)` : '17 zł'} – art. 1 ust. 1 pkt 2 i część IV załącznika do ustawy o opłacie skarbowej, chyba że zachodzi zwolnienie.` });
   return B;
 }
 

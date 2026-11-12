@@ -4,7 +4,7 @@ import { sb, state, canEditClients } from '../store.js';
 import { fillDocx, docxToHtml, downloadBytes } from '../docx.js';
 import { upl1Defaults, upl1Items, pelDefaults, pelItems, printOverlay, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
 import { pps1Defaults, printPps1, parseAddress, BOX4_LABELS } from '../m2/pps1.js';
-import { poaBlocks, printableHtml, buildOrderDocx, RKDP_BRAND } from '../m2/order.js';
+import { poaBlocks, printableHtml, buildOrderDocx, RKDP_BRAND, POA_DELIVERY } from '../m2/order.js';
 import { lookupNip, validNip, cleanNip } from '../nip.js';
 import { fetchAll } from '../views/rozliczenia.js';
 import { loadTeamPoa } from '../views/profil.js';
@@ -113,7 +113,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
         if (kind === 'osoba') { const n = rkSplit(cl?.name); x.client_name = `${n.last}, ${n.first}`; x.reps = `${n.first} ${n.last}`.trim(); } else x.reps = repsText;
         return x;
       })(),
-      proc: { organ: 'Wojewódzki Sąd Administracyjny we Wrocławiu', scope: '', reps: repsText, date: new Date().toISOString().slice(0, 10) },
+      proc: { organ: 'Wojewódzki Sąd Administracyjny we Wrocławiu', scope: '', reps: repsText, date: new Date().toISOString().slice(0, 10), delivery_addr: POA_DELIVERY, delivery_e: advisor?.ae_address || '' },
     };
   };
   reset();
@@ -226,7 +226,8 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     } else if (t === 'procesowe') {
       parts.push(h('p', { class: 'small', style: { margin: '0 0 10px' } }, 'Pełnomocnik: ', h('b', {}, `${advisor.full_name} – doradca podatkowy, nr wpisu ${advisor.license_no || '—'}`)),
         grid([['organ', 'Sąd', 'text', null, true], ['scope', 'Zakres – „do reprezentowania Mocodawcy …” (puste = przed wskazanym sądem)', 'textarea'],
-          ['reps', isJdg(cl) ? 'Mocodawca' : 'Reprezentanci – „Jan Kowalski – prezes zarządu”', 'textarea'], ['date', 'Data', 'date']], v.proc));
+          ['reps', isJdg(cl) ? 'Mocodawca' : 'Reprezentanci – „Jan Kowalski – prezes zarządu”', 'textarea'], ['date', 'Data', 'date'],
+          ['delivery_addr', 'Adres do doręczeń', 'text'], ['delivery_e', 'Adres elektroniczny do doręczeń (ePUAP / e-Doręczenia)', 'text']], v.proc));
     }
     box.replaceChildren(...parts.filter(Boolean));
   }
@@ -256,7 +257,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       }
       if (t === 'procesowe') {
         const pr = v.proc;
-        const o = { order_date: pr.date, params: { authority: pr.organ, client_reps: pr.reps, poa_type: 'procesowe (art. 35 p.p.s.a.)', poa_scope: (pr.scope || '').trim() || null } };
+        const o = { order_date: pr.date, params: { authority: pr.organ, client_reps: pr.reps, poa_type: 'procesowe (art. 35 p.p.s.a.)', poa_scope: (pr.scope || '').trim() || null, poa_delivery: pr.delivery_addr, poa_edelivery: pr.delivery_e } };
         const n = rkSplit(cl.name);
         const party = isJdg(cl) ? { ...cl, kind: 'osoba', name: `${n.first} ${n.last}`.trim() } : { ...cl, kind: 'firma' };
         const blocks = poaBlocks(o, party, [advisor], { standalone: true, brand: RKDP_BRAND });

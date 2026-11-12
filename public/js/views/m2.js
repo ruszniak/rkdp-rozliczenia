@@ -11,7 +11,7 @@ import {
 import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, brandOf, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
-import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
+import { poaBlocks, printableHtml, buildOrderDocx, POA_DELIVERY } from '../m2/order.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
@@ -833,7 +833,8 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
   let cl = client;
   let d = {};
   const reset = () => {
-    const keep = { kind: d.kind || kind, who: d.who || first?.id || '', whoMany: d.whoMany || [first?.id].filter(Boolean), date: d.date };
+    const keep = { kind: d.kind || kind, who: d.who || first?.id || '', whoMany: d.whoMany || [first?.id].filter(Boolean), date: d.date,
+      delivery_addr: d.delivery_addr ?? POA_DELIVERY, delivery_e: d.delivery_e ?? (first?.ae_address || ''), delivery_to: d.delivery_to || '' };
     d = { ...pps1Defaults({ client: cl || {}, params, signer: first, scope: pps1Scope(params) }), ...keep };
     if (!d.date) d.date = todayIso();
   };
@@ -880,6 +881,11 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
         ['scope', pps ? 'Poz. 71 – wskazanie sprawy i zakresu' : 'Zakres – „do reprezentowania Mocodawcy …” (puste = z danych sprawy)', 'textarea'],
         ['reps', d.client_kind === 'osoba' ? 'Mocodawca (imię i nazwisko)' : 'Reprezentanci mocodawcy (max 3) – każda osoba w osobnej linii: „Jan Kowalski – prezes zarządu”', 'textarea'],
       ], d),
+      pps ? '' : fieldsGrid([
+        ['delivery_addr', 'Adres do doręczeń (jeden dla całego pełnomocnictwa)', 'text'],
+        ['delivery_e', 'Adres elektroniczny do doręczeń (ePUAP / e-Doręczenia)', 'text'],
+        ...(d.whoMany.length > 1 ? [['delivery_to', 'Pełnomocnik do doręczeń', 'select', Object.fromEntries(signers.filter(x => d.whoMany.includes(x.id)).map(x => [x.id, x.full_name]))]] : []),
+      ], d),
       warn || '',
       pps ? h('div', {},
         h('p', { class: 'eyebrow', style: { margin: '14px 0 8px' } }, 'Dane do formularza PPS-1'),
@@ -910,6 +916,7 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
     const scope = (d.scope || '').trim();
     const o = { order_date: d.date, params: { ...params, authority: d.organ, client_reps: d.reps,
       poa_type: d.kind === 'procesowe' ? 'procesowe (art. 35 p.p.s.a.)' : 'szczególne',
+      poa_delivery: d.delivery_addr, poa_edelivery: d.delivery_e, poa_delivery_to: d.delivery_to || chosen[0]?.id,
       poa_scope: scope && scope !== pps1Scope(params) ? scope.replace(/^(do\s+)?reprezentowania\s+Mocodawcy\s*/i, '') : null } };
     return poaBlocks(o, cl, chosen, { standalone: true, brand });
   };
