@@ -17,6 +17,7 @@ import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
 import { historyCard } from '../m2/history.js';
 import { renderM2Dokumenty } from './m2pisma.js';
+import { OFFICE_NAMES } from '../urzedy.js';
 import { amlCard, renderAml, amlDashCard } from '../aml/aml.js';
 import { modal as uiModal } from '../ui.js';
 import { renderOferty } from './oferty.js';
@@ -876,7 +877,7 @@ async function pelnomocnictwoDialog({ client = null, params = {}, defaultSignerI
       fieldsGrid([
         ['date', 'Data', 'date'],
         ['organ', d.kind === 'procesowe' ? 'Sąd (np. Wojewódzki Sąd Administracyjny we Wrocławiu)' : 'Organ, do którego składane jest pełnomocnictwo', 'list',
-          d.kind === 'procesowe' ? ['Wojewódzki Sąd Administracyjny we Wrocławiu', 'Naczelny Sąd Administracyjny'] : AUTHORITIES, true],
+          d.kind === 'procesowe' ? ['Wojewódzki Sąd Administracyjny we Wrocławiu', 'Naczelny Sąd Administracyjny'] : [...OFFICE_NAMES, ...AUTHORITIES], true],
         ['scope', pps ? 'Poz. 71 – wskazanie sprawy i zakresu' : 'Zakres – „do reprezentowania Mocodawcy …” (puste = z danych sprawy)', 'textarea'],
         ['reps', d.client_kind === 'osoba' ? 'Mocodawca (imię i nazwisko)' : 'Reprezentanci mocodawcy (max 3) – każda osoba w osobnej linii: „Jan Kowalski – prezes zarządu”', 'textarea'],
       ], d),

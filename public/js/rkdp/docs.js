@@ -4,6 +4,7 @@ import { sb, state, canEditClients } from '../store.js';
 import { fillDocx, docxToHtml, downloadBytes } from '../docx.js';
 import { upl1Defaults, upl1Items, pelDefaults, pelItems, printOverlay, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
 import { pps1Defaults, printPps1, parseAddress, BOX4_LABELS } from '../m2/pps1.js';
+import { US_NAMES, OFFICE_NAMES } from '../urzedy.js';
 import { poaBlocks, printableHtml, buildOrderDocx, RKDP_BRAND } from '../m2/order.js';
 import { lookupNip, validNip, cleanNip } from '../nip.js';
 import { fetchAll } from '../views/rozliczenia.js';
@@ -36,6 +37,13 @@ function grid(defs, obj, onChange) {
     if (type === 'select') { el = h('select', { class: 'select' }, ...Object.entries(opts).map(([k, v]) => h('option', { value: k }, v))); el.value = obj[key] ?? ''; }
     else if (type === 'textarea') el = h('textarea', { class: 'input', rows: 3 }, obj[key] ?? '');
     else if (type === 'check') { el = h('input', { type: 'checkbox', checked: !!obj[key] }); }
+    else if (type === 'list') {   // pole z podpowiedziami (np. urzędy skarbowe) – można też wpisać własną wartość
+      const id = 'dl-' + key + '-' + Math.random().toString(36).slice(2, 7);
+      el = h('input', { class: 'input', list: id, value: obj[key] ?? '', placeholder: 'zacznij pisać, np. Krzyki, Oława…' });
+      const lbl = h('label', { class: 'field' + (wide ? ' wide' : '') }, h('span', {}, label), el, h('datalist', { id }, ...opts.map(o => h('option', { value: o }))));
+      el.addEventListener('input', () => { obj[key] = el.value; onChange?.(key); });
+      return lbl;
+    }
     else el = h('input', { class: 'input', type: type || 'text', value: obj[key] ?? '' });
     el.addEventListener(type === 'select' || type === 'check' ? 'change' : 'input', () => { obj[key] = type === 'check' ? el.checked : el.value; onChange?.(key); });
     if (type === 'check') return h('label', { class: 'check' + (wide ? ' wide' : ''), style: { alignSelf: 'end' } }, el, label);
@@ -184,6 +192,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       const x = v[t];
       parts.push(grid([['who', 'Pełnomocnik', 'select', whoOpts(), true]], d, () => build()), whoHint());
       if (t === 'upl1') parts.push(grid([
+        ['office', 'Poz. 4 – urząd skarbowy (właściwy w sprawach ewidencji podatnika)', 'list', US_NAMES, true],
         ['client_kind', 'Poz. 6 – rodzaj podmiotu', 'select', { firma: 'Podmiot niebędący osobą fizyczną', osoba: 'Osoba fizyczna' }],
         ['client_nip', 'Poz. 1 – NIP', 'text'], ['client_name', 'Poz. 7 – nazwa pełna / „Nazwisko, imię”', 'text', null, true],
         ['c_voiv', '9. Województwo', 'text'], ['c_county', '10. Powiat', 'text'], ['c_commune', '11. Gmina', 'text'], ['c_street', '12. Ulica', 'text'],
@@ -213,7 +222,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
           })));
         parts.push(b4, grid([
           ['delivery', 'Poz. 35 – pełnomocnik do doręczeń', 'check'], ['further', 'E.2 – dalsze pełnomocnictwo', 'select', { tak: 'tak', nie: 'nie' }],
-          ['organ', 'Poz. 3 – organ', 'text', null, true], ['scope', 'Poz. 71 – sprawa i zakres', 'textarea'],
+          ['organ', 'Poz. 3 – organ podatkowy (np. naczelnik urzędu skarbowego)', 'list', OFFICE_NAMES, true], ['scope', 'Poz. 71 – sprawa i zakres', 'textarea'],
           ['client_kind', 'Poz. 5 – rodzaj podmiotu', 'select', { firma: 'Podmiot niebędący osobą fizyczną', osoba: 'Osoba fizyczna' }],
           ['client_nip', 'Poz. 1 – NIP', 'text'], ['client_name', 'Poz. 6 – nazwa / „Nazwisko, imię”', 'text', null, true],
           ['c_voiv', '14. Województwo', 'text'], ['c_county', '15. Powiat', 'text'], ['c_commune', '16. Gmina', 'text'], ['c_street', '17. Ulica', 'text'],

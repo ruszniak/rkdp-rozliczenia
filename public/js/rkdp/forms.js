@@ -64,7 +64,9 @@ export function upl1Items(d, p = {}) {
   const check = (page, x0, y0) => it.push({ page, x: x0 + 2.4, y: y0 - 0.2, text: 'X', size: 9.5, bold: true });
   // poz. 1 – NIP mocodawcy (skreślamy „numer PESEL”)
   if (d.client_nip) { it.push(...glyphComb(1, 110.0, 278.1, 51.4, NIP_COMB, d.client_nip)); it.push({ page: 1, x: 139.5, y: 42.6, line: 45.6 }); }
-  check(1, 62.4, 233.0); // poz. 4 – naczelnik US
+  // A – organ: poz. 5 dla Drugiego US Warszawa-Śródmieście, w pozostałych przypadkach poz. 4 (+ nazwa urzędu pod kwadratem)
+  if (/drugi\S* urz\S* skarbow\S* warszawa-śr/i.test(d.office || '')) check(1, 62.4, 253.2);
+  else { check(1, 62.4, 233.0); if (d.office) at(1, 78, 235.3, d.office, { size: 8.5, w: 480 }); }
   check(1, d.client_kind === 'osoba' ? 384.2 : 163.2, 344.6);
   at(1, 54.7, 359.3, d.client_name, { w: 500, size: d.client_name?.length > 70 ? 7.5 : 9 });
   at(1, 54.7, 417.3, d.c_country); at(1, 162.7, 417.3, d.c_voiv); at(1, 414.7, 417.3, d.c_county);

@@ -3,7 +3,8 @@ import { h, toast, fail, icon, infoTip, printHtml } from '../ui.js';
 import { sb, state, hasModule } from '../store.js';
 import { myFirms, bothFirms, defaultFirm, rkdpClientChoices, FIRM_LABEL } from '../firma.js';
 import { fetchAll } from './rozliczenia.js';
-import { PISMA, pismoBlocks, pismoBrand } from '../m2/pisma.js';
+import { PISMA, pismoBlocks, pismoBrand, ADDR } from '../m2/pisma.js';
+import { OFFICES, officeAddr } from '../urzedy.js';
 import { orderHtml, printableHtml, buildOrderDocx, ORDER_CSS } from '../m2/order.js';
 
 const HELP = `Wzory pism procesowych na papierze firmowym RKDP albo M2 TAX:
@@ -62,7 +63,7 @@ export async function renderM2Dokumenty(main, params) {
     const groups = [...new Set(Object.values(PISMA).map(p => p.group))];
     list.replaceChildren(...groups.map(g => h('div', { class: 'pz-group' }, h('p', { class: 'eyebrow' }, g),
       ...Object.entries(PISMA).filter(([, p]) => p.group === g).map(([k, p]) => h('button', { type: 'button', class: 'pz-item' + (k === type ? ' on' : ''), onclick: () => {
-        type = k; delete d.addr; delete d.via; delete d.actOrg; drawList(); drawForm(); draw();
+        type = k; delete d.addr; delete d.via; delete d.actOrg; delete d.us; drawList(); drawForm(); draw();
         history.replaceState(null, '', `#/doradztwo/dokumenty?wzor=${k}&firma=${firm}${d.matter ? `&sprawa=${d.matter}` : ''}`);
       } }, h('b', {}, p.label), h('span', { class: 'small muted' }, p.desc))))));
   };
@@ -95,6 +96,16 @@ export async function renderM2Dokumenty(main, params) {
     const poa = h('select', { class: 'select' }, h('option', { value: 'akta', selected: d.poaWhere === 'akta' }, 'w aktach sprawy'), h('option', { value: 'zal', selected: d.poaWhere === 'zal' }, 'w załączeniu (z opłatą skarbową)'));
     poa.addEventListener('change', () => { d.poaWhere = poa.value; draw(); });
     const act = T.actLabel ? ` ${T.actLabel}` : '';
+    // wybór urzędu z listy: adres trafia do „Adresat” (pismo do US) albo „Za pośrednictwem” (odwołanie, zażalenie, ponaglenie)
+    const usList = OFFICES.filter(o => o.name.startsWith('Naczelnik'));
+    const usSel = h('select', { class: 'select' }, h('option', { value: '' }, '— wybierz albo wpisz adres ręcznie —'), ...usList.map((o, i) => h('option', { value: String(i), selected: d.us === o.name }, o.name.replace(/^Naczelnik /, ''))));
+    usSel.addEventListener('change', () => {
+      const o = usList[+usSel.value]; if (!o) return;
+      d.us = o.name;
+      if (T.addr === ADDR.us) d.addr = officeAddr(o); else d.via = officeAddr(o);
+      if (T.fields.includes('actOrg') && (!d.actOrg || /^Naczelnika /.test(d.actOrg))) d.actOrg = o.gen;
+      drawForm(); draw();
+    });
     form.replaceChildren(
       h('h2', { style: { margin: '0 0 4px' } }, T.label), h('p', { class: 'small muted', style: { margin: '0 0 12px' } }, T.desc),
       h('p', { class: 'field-label' }, 'Pełnomocnik'), who,
@@ -105,6 +116,7 @@ export async function renderM2Dokumenty(main, params) {
         field('Adres', cIn('address', 'ulica, kod, miejscowość'), true),
         field('NIP', cIn('nip', 'puste = PESEL do uzupełnienia')),
         field('Pełnomocnictwo', poa),
+        T.addr === ADDR.us || T.via === ADDR.us || T.addr === ADDR.dias ? field('Urząd skarbowy (wpisze adres)', usSel, true) : null,
         field('Adresat', input('addr', { area: true }), true),
         T.via ? field('Za pośrednictwem (puste = bez)', input('via', { area: true }), true) : null,
         ...T.fields.map(f => f === 'ref' ? field(T.refLabel || LBL.ref, input('ref'))
