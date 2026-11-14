@@ -8,10 +8,11 @@ import {
   MATTER_TYPE, MATTER_STATUS, OPEN_STATUSES, AUTHORITIES, TAX_KINDS, FEE_TYPE, BILLING_TYPE, SUBSCRIPTIONS, AML_RISK,
   DEADLINE_KIND, JOURNAL_KIND, ORDER_STATUS, DEADLINE_RULES, computeDeadline, limitationDate, fmtDate, todayIso, addDaysIso, money, hours,
 } from '../m2/dict.js';
-import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, brandOf, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
+import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, orderDocumentXml, brandOf, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
+import { sendForSignature, signPanel, previewDoc } from '../podpisy.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
@@ -1214,6 +1215,21 @@ async function viewOrder(main, id, params) {
     if (!draft.id) return toast('Najpierw zapisz dokument', true);
     await downloadOrderDocx(docBlocks(draft, client(), chosenSigners()), fileName('docx'), brand);
   } }, icon('download'), 'Word (.docx)');
+  // wysyłka do podpisu: link /podpis/ (podgląd, uwagi, PDF z tekstem), podpisany plik wraca do „Do podpisu”
+  const signBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+    if (!draft.id) return toast('Najpierw zapisz dokument', true);
+    if (!(await save(true))) return;
+    const cl = client();
+    if (!cl) return toast('Wybierz klienta', true);
+    const blocks = docBlocks(draft, cl, chosenSigners());
+    const xml = orderDocumentXml(blocks);
+    const title = `${isUmowa() ? 'Umowa' : 'Zlecenie'} ${draft.number || ''} – ${cl.name}`.replace(/\s+/g, ' ').slice(0, 150);
+    const preview = previewDoc(orderHtml(blocks, location.origin + brand.logo, brand), { head: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap"><style>${ORDER_CSS}</style>` });
+    sendForSignature({ client: cl, target: { m2_client_id: cl.id, order_id: draft.id }, firm, kind: isUmowa() ? 'umowa_doradcza' : 'zlecenie', title,
+      buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, brand, title); }, preview,
+      onSent: () => { signBox.reload(); draft.status = draft.status === 'projekt' ? 'wyslane' : draft.status; } });
+  } }, icon('mail'), 'Wyślij do podpisu');
+  const signBox = draft.id ? signPanel({ order_id: draft.id }) : null;
   const delBtn = draft.id && isAdmin() ? h('button', { class: 'btn btn-danger btn-sm', onclick: async () => {
     const { data: ms } = await sb.from('m2_matters').select('id').eq('order_id', draft.id);
     const n = ms?.length || 0;
@@ -1237,11 +1253,11 @@ async function viewOrder(main, id, params) {
   const title = draft.id ? docLabel(draft) : (isUmowa() ? 'Nowa umowa' : 'Nowe zlecenie');
   const subTitle = (bothFirms() ? `${FIRM_LABEL[firm]} · ` : '') + (draft.id ? `Klient: ${client()?.name || '—'}` : 'Wybierz rodzaj dokumentu. Po zapisaniu automatycznie założy się sprawa – możesz ją potem edytować.');
   main.replaceChildren(...header('zlecenia', title, subTitle,
-    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : params.get('sprawa') ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn,
+    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : params.get('sprawa') ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn, signBtn,
       h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ firm, client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id, kind: isUmowa() && /procesow|p\.p\.s\.a/i.test(P.poa_type || matterTemplate(P.matter_type).poa) ? 'procesowe' : 'pps1' }) }, 'Pełnomocnictwo'),
       delBtn].filter(Boolean)),
   typeSwitch || '',
-  h('div', { class: 'order-layout' }, h('div', {}, h('section', { class: 'card section' }, formBox), mattersCard || ''), h('div', { class: 'paper-wrap' }, preview)));
+  h('div', { class: 'order-layout' }, h('div', {}, h('section', { class: 'card section' }, formBox), signBox ? h('div', { style: { marginTop: '16px' } }, signBox) : '', mattersCard || ''), h('div', { class: 'paper-wrap' }, preview)));
 }
 
 // ================= ROUTER =================

@@ -29,7 +29,7 @@
     // podgląd treści (izolowana ramka bez skryptów)
     if (d.html) {
       var view = document.getElementById('view'), frame = document.getElementById('frame'), full = document.getElementById('fullBtn');
-      frame.srcdoc = '<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
+      frame.srcdoc = /^<!doctype/i.test(d.html) ? d.html : '<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
         + 'html{font-size:11pt}body{margin:0;background:#E9EAEE;color:#1c1d21;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;line-height:1.4}'
         + '.paper{max-width:760px;margin:18px auto;background:#fff;padding:44px 60px 56px;box-shadow:0 2px 10px rgba(0,0,0,.08);border-radius:4px}'
         + '.lh{text-align:center;margin-bottom:18px}.lh img{width:190px;height:auto}p{margin:0}.tab{display:inline-block;width:36pt}'
@@ -70,6 +70,10 @@
           notesBox.insertAdjacentHTML('beforeend', '<p class="small" style="color:#15803D;font-weight:600">✓ Uwagi wysłane – odezwiemy się wkrótce.</p>');
         }).catch(function () { btn.disabled = false; btn.textContent = 'Wyślij uwagi'; nErr.textContent = 'Brak połączenia – spróbuj ponownie.'; nErr.hidden = false; });
     });
+    if (d.firm === 'm2') {   // M2 TAX: dane kontaktowe kancelarii
+      document.getElementById('contact').innerHTML = 'Zadzwoń: <a href="tel:+48883643565">883 643 565</a> · napisz: <a href="mailto:kancelaria@m2tax.pl">kancelaria@m2tax.pl</a>.';
+      document.getElementById('foot').textContent = 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska · ul. Zwycięska 3, 53-033 Wrocław';
+    }
     var steps = box.querySelectorAll('.steps li');
     var step = function (n) { steps.forEach(function (li, i) { li.className = i < n ? 'ok' : i === n ? 'on' : ''; }); };
     dl.addEventListener('click', function () { step(1); });

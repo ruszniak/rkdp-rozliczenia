@@ -737,11 +737,16 @@ function footerXml(brand = M2_BRAND) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}><w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="5" w:color="D6D2CA"/></w:pBdr><w:tabs><w:tab w:val="right" w:pos="${W}"/></w:tabs><w:spacing w:after="0"/></w:pPr>${r(brand.foot1.replace(/ · /g, '  |  '))}<w:r><w:tab/></w:r>${r('Strona ')}${fld('PAGE')}${r(' z ')}${fld('NUMPAGES')}</w:p>${para(r(brand.foot2), { after: 0 })}</w:ftr>`;
 }
 
+// treść dokumentu Word (bez nagłówka i stopki) – też źródło dla PDF z tekstem (umowapdf.js → orderPdf)
+export function orderDocumentXml(blocks) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document ${NS}><w:body>${docxBody(blocks)}<w:sectPr><w:headerReference w:type="default" r:id="rIdHdr"/><w:footerReference w:type="default" r:id="rIdFtr"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1650" w:right="1134" w:bottom="1250" w:left="1134" w:header="500" w:footer="420" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+}
+
 export async function buildOrderDocx(blocks, brand = M2_BRAND) {
   let logo = null;
   if (brand.logo) try { logo = new Uint8Array(await (await fetch(brand.logo)).arrayBuffer()); } catch { /* bez logo */ }
-  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document ${NS}><w:body>${docxBody(blocks)}<w:sectPr><w:headerReference w:type="default" r:id="rIdHdr"/><w:footerReference w:type="default" r:id="rIdFtr"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1650" w:right="1134" w:bottom="1250" w:left="1134" w:header="500" w:footer="420" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const doc = orderDocumentXml(blocks);
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri" w:eastAsia="Calibri"/><w:color w:val="1C1D21"/><w:sz w:val="21"/><w:szCs w:val="21"/><w:lang w:val="pl-PL"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
 <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`;

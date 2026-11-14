@@ -1,6 +1,7 @@
 // RKDP – dokumenty dla klientów: umowy (wg wzorów biura), UPL-1, PEL (ZUS), PPS-1, pełnomocnictwo procesowe.
 import { h, toast, fail, icon, modal, printHtml } from '../ui.js';
 import { sb, state, canEditClients } from '../store.js';
+import { sendForSignature, rkdpContractPreview } from '../podpisy.js';
 import { fillDocx, docxToHtml, downloadBytes } from '../docx.js';
 import { upl1Defaults, upl1Items, pelDefaults, pelItems, printOverlay, overlayHtml, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
 import { pps1Defaults, printPps1, parseAddress, BOX4_LABELS } from '../m2/pps1.js';
@@ -266,15 +267,25 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
   // umowa: e-mail z linkiem do strony podpisu (podgląd, uwagi, profil zaufany / kwalifikowany / odręcznie); podpisany plik wraca do archiwum klienta
   const signBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (!cl) return toast('Wybierz klienta', true);
+    if (d.type === 'pel') {   // ZUS PEL: formularz urzędowy – PDF z wzoru ZUS, podgląd stron formularza
+      const title = `Pełnomocnictwo ZUS PEL – ${cl.name}`.slice(0, 150);
+      const html = overlayHtml(PEL_PAGES, pelItems(v.pel, pelnomocnik()), title);
+      const preview = html.replace('</style>', '@media(max-width:820px){.pg{zoom:.75}}@media(max-width:640px){.pg{zoom:.55}}@media(max-width:460px){.pg{zoom:.42}}html,body{background:#E9EAEE}.pg{margin:14px auto;box-shadow:0 2px 10px rgba(0,0,0,.08)}</style>');
+      return sendForSignature({ client: cl, target: { client_id: cl.id }, firm: 'rkdp', kind: 'pel', title,
+        buildPdf: async () => { const { buildPdf } = await import('../pdfdoc.js'); return buildPdf(html, title); }, preview });
+    }
     const c = v.contract, T = TEMPLATES[c.tpl];
     try {
       const { documentXml } = await fillDocx(T.url, contractReplacements(c));
       const gaps = [...new Set((docxToHtml(documentXml).replace(/<[^>]+>/g, '').match(/\[[A-ZĄĆĘŁŃÓŚŹŻ][A-ZĄĆĘŁŃÓŚŹŻ ,.\/–-]{2,}\]/g) || []))];
       if (gaps.length && !confirm(`W umowie zostały niewypełnione pola:\n${gaps.slice(0, 8).join('\n')}\n\nWysłać mimo to?`)) return;
-      sendForSignature(cl, documentXml, `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150));
+      const { contractPdf } = await import('../umowapdf.js');
+      const title = `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150);
+      sendForSignature({ client: cl, target: { client_id: cl.id }, firm: 'rkdp', kind: 'umowa', title,
+        buildPdf: () => contractPdf(documentXml, title), preview: rkdpContractPreview(docxToHtml(documentXml)) });
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
-  const syncSend = () => { sendBtn.hidden = d.type !== 'upl1'; signBtn.hidden = d.type !== 'umowa'; };
+  const syncSend = () => { sendBtn.hidden = d.type !== 'upl1'; signBtn.hidden = !['umowa', 'pel'].includes(d.type); };
   const build0 = build; build = () => { build0(); syncSend(); }; syncSend();
   modal('Dokumenty klienta', box, (close) => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Zamknij'),
@@ -331,44 +342,5 @@ async function sendUpl1(cl, data, pelnomocnik, filename) {
         toast(`Wysłano UPL-1 do ${s.to.trim()}`); close();
       } catch (err) { fail(err, 'Nie udało się wysłać e-maila'); b.disabled = false; b.textContent = 'Wyślij e-mail'; }
     } }, icon('mail'), 'Wyślij e-mail'),
-  ]);
-}
-
-// ---------- dokument do podpisu przez klienta ----------
-// Klient dostaje tylko link (bez załącznika): na stronie czyta umowę, może zgłosić uwagi, pobiera PDF do podpisu i odsyła podpisany plik.
-export async function sendForSignature(cl, documentXml, title) {
-  const s = { title, to: String(cl.email || '').split(/[;,\s]+/).find(x => x.includes('@')) || '' };
-  s.subject = `${title} – prośba o podpis`;
-  s.body = `Dzień dobry,\n\nprzygotowaliśmy dla Państwa dokument „${title}”. Pod linkiem poniżej można go przeczytać, zgłosić ewentualne uwagi i podpisać:\n{link}\n\nPodpisać można:\n• bezpłatnie profilem zaufanym (podpis zaufany na gov.pl),\n• podpisem kwalifikowanym,\n• odręcznie – po wydrukowaniu i zeskanowaniu.\n\nNa stronie jest instrukcja krok po kroku i miejsce na odesłanie podpisanego pliku. Link jest ważny 7 dni.\n\nW razie pytań jesteśmy do dyspozycji.`;
-  const body = h('div');
-  body.append(
-    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · e-mail zawiera tylko link – umowę klient czyta, komentuje i pobiera do podpisu na stronie. Kopia PDF trafi do archiwum klienta. Link jest ważny 7 dni.'),
-    grid([['title', 'Nazwa dokumentu', 'text', null, true], ['to', 'Do (e-mail klienta)', 'email', null, true], ['subject', 'Temat', 'text', null, true],
-      ['body', 'Treść – {link} zamieni się na link do strony podpisu (pod spodem dopisze się Twoja stopka)', 'textarea']], s),
-    h('div', { class: 'row-btns', style: { marginTop: '8px' } },
-      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async e => {
-        const b = e.currentTarget; b.disabled = true;
-        try { const { downloadContractPdf } = await import('../umowapdf.js'); await downloadContractPdf(documentXml, `${s.title}.pdf`); }
-        catch (err) { fail(err, 'Nie udało się przygotować PDF'); } finally { b.disabled = false; }
-      } }, icon('download'), 'Podgląd PDF')),
-    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Uwagi klienta i podpisany plik zobaczysz w „Archiwum dokumentów” klienta (sekcja „Do podpisu”); dostaniesz też e-mail.'));
-  body.querySelector('textarea')?.setAttribute('rows', '13');
-  modal('Wyślij do podpisu', body, close => [
-    h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
-    h('button', { class: 'btn btn-primary btn-sm', onclick: async e => {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.to.trim())) return toast('Wpisz poprawny e-mail klienta', true);
-      if (!s.body.includes('{link}')) return toast('Zostaw w treści {link} – tam wstawi się link do podpisu', true);
-      const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję PDF…';
-      try {
-        const { contractPdf } = await import('../umowapdf.js');
-        const bytes = await contractPdf(documentXml, s.title);
-        let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-        b.textContent = 'Wysyłam…';
-        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'send', client_id: cl.id, title: s.title, to: s.to.trim(), subject: s.subject, body: s.body,
-          attachment: { base64: btoa(bin) }, doc_html: docxToHtml(documentXml) } });
-        if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
-        toast(`Wysłano link do podpisu: ${s.to.trim()}`); close();
-      } catch (err) { fail(err, 'Nie udało się wysłać'); b.disabled = false; b.textContent = 'Wyślij do podpisu'; }
-    } }, icon('mail'), 'Wyślij do podpisu'),
   ]);
 }

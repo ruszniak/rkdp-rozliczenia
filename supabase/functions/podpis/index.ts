@@ -1,11 +1,13 @@
 // Podpis dokumentu przez klienta (np. umowy): e-mail z samym linkiem do strony /podpis/?t=…, na której klient
 // czyta dokument, może zgłosić uwagi, pobiera PDF, podpisuje (profil zaufany, podpis kwalifikowany, odręcznie) i wgrywa podpisany plik.
-//  • send   – zalogowany członek zespołu: { client_id, title, to, subject, body, attachment: { base64 }, doc_html }
-//             zapis PDF w archiwum klienta, prośba o podpis, e-mail z kancelaria@rkdp.pl (SMTP) z linkiem (bez załącznika)
+//  • send   – zalogowany członek zespołu: { client_id | m2_client_id, order_id?, kind, firm, title, to, subject, body, attachment: { base64 }, doc_html }
+//             umowa księgowa i ZUS PEL (klient RKDP), zlecenie / umowa doradcza (klient M2 TAX lub RKDP);
+//             zapis PDF (archiwum klienta RKDP albo m2/<klient>/), prośba o podpis, e-mail (SMTP) z linkiem – bez załącznika
 //  • info   – publiczne { token }: dane do strony podpisu, treść do podglądu, uwagi + link do pobrania PDF (ważny 1 h)
 //  • note   – publiczne { token, text, author }: uwagi klienta do dokumentu → zapis + e-mail do zespołu
 //  • upload – publiczne, multipart { token, file }: podpisany plik → archiwum klienta + e-mail do osoby, która wysłała prośbę
 //  • cancel – zalogowany: { id } – anulowanie prośby (link przestaje działać)
+//  • file   – zalogowany: { id, which: 'original' | 'signed' } – link do pobrania pliku (też dla klientów M2 bez archiwum)
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
@@ -28,7 +30,9 @@ const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(e);
 const validToken = (t: unknown) => typeof t === 'string' && /^[0-9a-f]{48}$/.test(t);
 const safeName = (n: string) => (n || 'plik').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^\w.\-]+/g, '_').slice(-90);
 const escH = (t: string) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const FROM_NAME = 'RKDP | Kancelaria';
+const FROM_NAME: Record<string, string> = { rkdp: 'RKDP | Kancelaria', m2: 'M2 TAX Doradcy Podatkowi' };
+const KIND_CAT: Record<string, string> = { pel: 'pelnomocnictwo' };
+const clientName = (r: any) => r.clients?.name || r.m2_clients?.name || '';
 
 async function settings() {
   const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url']);
@@ -62,7 +66,7 @@ async function signatureOf(me: any, from: string) {
 const bodyHtml = (t: string) => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;">${escH(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#2563EB;">$1</a>').replace(/\n/g, '<br>')}</div>`;
 
 async function byToken(token: string) {
-  const { data } = await admin.from('sign_requests').select('*, clients(name, accountant_id)').eq('token', token).maybeSingle();
+  const { data } = await admin.from('sign_requests').select('*, clients(name, accountant_id), m2_clients(name)').eq('token', token).maybeSingle();
   if (!data) return { error: 'Link jest nieprawidłowy.' };
   if (data.status === 'anulowano') return { error: 'Ta prośba o podpis została anulowana. W razie pytań skontaktuj się z biurem.' };
   if (data.status !== 'podpisano' && new Date(data.expires_at) < new Date()) return { error: 'Link wygasł. Poproś biuro o nowy.' };
@@ -77,10 +81,16 @@ async function notifyTeam(r: any, subject: string, head: string, text: string, i
     const { data: ms } = ids.length ? await admin.from('team_members').select('email, full_name').in('id', ids) : { data: [] };
     const to = (ms || []).map((m: any) => m.email).filter((e: string) => emailOk(String(e || '')));
     if (!to.length || !SMTP_USER || !SMTP_PASS) return;
-    const link = `${S.app}/#/klient/${r.client_id}`;
+    const link = r.order_id ? `${S.app}/#/doradztwo/zlecenie/${r.order_id}` : r.client_id ? `${S.app}/#/klient/${r.client_id}` : `${S.app}/#/doradztwo/klient/${r.m2_client_id}`;
     await transport().sendMail({ from: { name: 'rdp.app – podpisy', address: S.from }, to, subject: subject.slice(0, 200), text,
-      html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px"><p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Podpis · rdp.app</p><h2 style="margin:0 0 12px;font-size:19px">${escH(head)}</h2>${inner}<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Otwórz kartę klienta</a></p><p style="color:#6B7280;font-size:12px">${escH(foot)}</p></div>` });
+      html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px"><p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Podpis · rdp.app</p><h2 style="margin:0 0 12px;font-size:19px">${escH(head)}</h2>${inner}<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">${r.order_id ? 'Otwórz dokument w aplikacji' : 'Otwórz kartę klienta'}</a></p><p style="color:#6B7280;font-size:12px">${escH(foot)}</p></div>` });
   } catch (e) { console.error('mail zespół', e); }
+}
+
+async function origFile(r: any): Promise<{ path: string; name: string } | null> {
+  if (r.file_id) { const { data: f } = await admin.from('client_files').select('path, name').eq('id', r.file_id).maybeSingle(); if (f) return f; }
+  if (r.file_path) return { path: r.file_path, name: `${r.title}.pdf` };
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -99,18 +109,24 @@ Deno.serve(async (req: Request) => {
       if (!(f instanceof File)) return json({ error: 'Nie wybrano pliku.' }, 400);
       if (f.size > MAX_FILE) return json({ error: 'Plik jest większy niż 25 MB.' }, 400);
       if (!OK_EXT.test(f.name)) return json({ error: 'Wgraj podpisany plik: PDF, plik podpisu (.xml, .xades, .p7s, .asice, .zip) albo zdjęcie / skan.' }, 400);
-      const path = `${r.client_id}/podpis-${crypto.randomUUID().slice(0, 8)}-${safeName(f.name)}`;
+      const ext = (f.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+      const name = `${r.title} – podpisana przez klienta${ext}`.slice(0, 200);
+      const path = `${r.client_id || 'm2/' + r.m2_client_id}/podpis-${crypto.randomUUID().slice(0, 8)}-${safeName(f.name)}`;
       const { error: e1 } = await admin.storage.from(BUCKET).upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
       if (e1) return json({ error: 'Nie udało się zapisać pliku – spróbuj ponownie.' }, 500);
-      const name = `${r.title} – podpisana przez klienta${(f.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase()}`.slice(0, 200);
-      const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: r.client_id, category: 'umowa', name, note: `Podpisany plik wgrany przez klienta (${f.name.slice(0, 120)})`, path, mime: f.type || null, size: f.size, uploaded_by: null }).select('id').single();
-      if (e2) { await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się zapisać pliku – spróbuj ponownie.' }, 500); }
-      await admin.from('sign_requests').update({ status: 'podpisano', signed_at: new Date().toISOString(), signed_file_id: cf.id }).eq('id', r.id);
-      const link = `${(await settings()).app}/#/klient/${r.client_id}`;
-      await notifyTeam(r, `Klient podpisał: ${r.title} – ${r.clients?.name || ''}`, 'Klient podpisał dokument',
-        `Klient ${r.clients?.name || ''} wgrał podpisany dokument „${r.title}” (${f.name}).\n\nPlik jest w archiwum dokumentów klienta: ${link}\n\nSprawdź podpis przed dalszymi krokami (np. w weryfikatorze na gov.pl).`,
-        `<p><b>${escH(r.clients?.name || '')}</b> wgrał(a) podpisany dokument „${escH(r.title)}” (${escH(f.name)}).</p>`,
-        'Plik jest w „Archiwum dokumentów” klienta. Sprawdź podpis przed dalszymi krokami (np. w weryfikatorze podpisu na gov.pl).');
+      let signedFileId = null;
+      if (r.client_id) {
+        const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: r.client_id, category: KIND_CAT[r.kind] || 'umowa', name, note: `Podpisany plik wgrany przez klienta (${f.name.slice(0, 120)})`, path, mime: f.type || null, size: f.size, uploaded_by: null }).select('id').single();
+        if (e2) { await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się zapisać pliku – spróbuj ponownie.' }, 500); }
+        signedFileId = cf.id;
+      }
+      await admin.from('sign_requests').update({ status: 'podpisano', signed_at: new Date().toISOString(), signed_file_id: signedFileId, signed_path: path, signed_name: name }).eq('id', r.id);
+      if (r.order_id) await admin.from('m2_orders').update({ status: 'podpisane' }).eq('id', r.order_id).neq('status', 'podpisane');
+      const where = r.client_id ? 'Plik jest w „Archiwum dokumentów” klienta.' : 'Plik pobierzesz z dokumentu w aplikacji (sekcja „Do podpisu”).';
+      await notifyTeam(r, `Klient podpisał: ${r.title} – ${clientName(r)}`, 'Klient podpisał dokument',
+        `Klient ${clientName(r)} wgrał podpisany dokument „${r.title}” (${f.name}).\n\n${where}\n\nSprawdź podpis przed dalszymi krokami (np. w weryfikatorze na gov.pl).`,
+        `<p><b>${escH(clientName(r))}</b> wgrał(a) podpisany dokument „${escH(r.title)}” (${escH(f.name)}).</p>`,
+        `${where} Sprawdź podpis przed dalszymi krokami (np. w weryfikatorze podpisu na gov.pl).`);
       return json({ ok: true });
     }
 
@@ -124,16 +140,14 @@ Deno.serve(async (req: Request) => {
       if (error) return json({ error }, 410);
       if (!r.opened_at) await admin.from('sign_requests').update({ opened_at: new Date().toISOString() }).eq('id', r.id);
       let url = '', fileName = '';
-      if (r.file_id) {
-        const { data: f } = await admin.from('client_files').select('path, name').eq('id', r.file_id).maybeSingle();
-        if (f) {
-          fileName = f.name;
-          const { data: su } = await admin.storage.from(BUCKET).createSignedUrl(f.path, 3600, { download: f.name.endsWith('.pdf') ? f.name : f.name + '.pdf' });
-          url = su?.signedUrl || '';
-        }
+      const orig = await origFile(r);
+      if (orig) {
+        fileName = orig.name;
+        const { data: su } = await admin.storage.from(BUCKET).createSignedUrl(orig.path, 3600, { download: orig.name.endsWith('.pdf') ? orig.name : orig.name + '.pdf' });
+        url = su?.signedUrl || '';
       }
       const { data: notes } = await admin.from('sign_notes').select('body, author, from_client, created_at').eq('request_id', r.id).order('created_at');
-      return json({ title: r.title, client: r.clients?.name || '', status: r.status, signed_at: r.signed_at, expires_at: r.expires_at, file: { name: fileName, url },
+      return json({ title: r.title, client: clientName(r), firm: r.firm, kind: r.kind, status: r.status, signed_at: r.signed_at, expires_at: r.expires_at, file: { name: fileName, url },
         html: r.doc_html || '', notes: notes || [] });
     }
 
@@ -149,11 +163,11 @@ Deno.serve(async (req: Request) => {
       if ((count || 0) >= 30) return json({ error: 'Osiągnięto limit uwag – skontaktuj się z biurem telefonicznie lub e-mailem.' }, 429);
       const { error: e1 } = await admin.from('sign_notes').insert({ request_id: r.id, body: text, author });
       if (e1) return json({ error: 'Nie udało się zapisać uwag – spróbuj ponownie.' }, 500);
-      const who = author ? `${author} (${r.clients?.name || 'klient'})` : (r.clients?.name || 'Klient');
-      await notifyTeam(r, `Uwagi do dokumentu: ${r.title} – ${r.clients?.name || ''}`, 'Klient zgłosił uwagi do dokumentu',
+      const who = author ? `${author} (${clientName(r) || 'klient'})` : (clientName(r) || 'Klient');
+      await notifyTeam(r, `Uwagi do dokumentu: ${r.title} – ${clientName(r)}`, 'Klient zgłosił uwagi do dokumentu',
         `${who} zgłosił(a) uwagi do dokumentu „${r.title}”:\n\n${text}\n\nOdpowiedz klientowi e-mailem lub telefonicznie. W razie zmian w umowie wyślij nową wersję do podpisu.`,
         `<p><b>${escH(who)}</b> zgłosił(a) uwagi do dokumentu „${escH(r.title)}”:</p><blockquote style="margin:12px 0;padding:10px 14px;background:#F3F4F6;border-left:3px solid #2563EB;border-radius:6px;white-space:pre-wrap">${escH(text)}</blockquote>`,
-        `Odpowiedz klientowi (${r.email || 'e-mail z prośby'}). Jeśli trzeba zmienić umowę, wyślij nową wersję do podpisu – poprzedni link możesz anulować w archiwum klienta.`);
+        `Odpowiedz klientowi (${r.email || 'e-mail z prośby'}). Jeśli trzeba zmienić umowę, wyślij nową wersję do podpisu – poprzedni link możesz anulować w sekcji „Do podpisu”.`);
       return json({ ok: true });
     }
 
@@ -171,9 +185,36 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true });
     }
 
+    if (action === 'file') {
+      const { data: r } = await sb.from('sign_requests').select('id, title, file_id, file_path, signed_file_id, signed_path, signed_name').eq('id', String(body.id || '')).maybeSingle();   // RLS
+      if (!r) return json({ error: 'Brak dostępu' }, 403);
+      let f: { path: string; name: string } | null = null;
+      if (body.which === 'signed') {
+        if (r.signed_file_id) { const { data } = await admin.from('client_files').select('path, name').eq('id', r.signed_file_id).maybeSingle(); f = data; }
+        if (!f && r.signed_path) f = { path: r.signed_path, name: r.signed_name || `${r.title} – podpisana` };
+      } else f = await origFile(r);
+      if (!f) return json({ error: 'Brak pliku' }, 404);
+      const { data: su } = await admin.storage.from(BUCKET).createSignedUrl(f.path, 600, { download: f.name });
+      return json({ url: su?.signedUrl || '' });
+    }
+
     if (action === 'send') {
-      const { data: c } = await sb.from('clients').select('id, name').eq('id', String(body.client_id || '')).maybeSingle();   // RLS: tylko klienci tej osoby
-      if (!c) return json({ error: 'Brak dostępu do klienta' }, 403);
+      // klient: RKDP (clients) albo M2 (m2_clients, ewentualnie powiązany z kartą RKDP); dostęp sprawdza RLS
+      let c: any = null, m2c: any = null;
+      if (body.client_id) { const { data } = await sb.from('clients').select('id, name').eq('id', String(body.client_id)).maybeSingle(); c = data; if (!c) return json({ error: 'Brak dostępu do klienta' }, 403); }
+      if (body.m2_client_id) {
+        const { data } = await sb.from('m2_clients').select('id, name, rkdp_client_id').eq('id', String(body.m2_client_id)).maybeSingle(); m2c = data;
+        if (!m2c) return json({ error: 'Brak dostępu do klienta' }, 403);
+        if (!c && m2c.rkdp_client_id) { const { data: rc } = await sb.from('clients').select('id, name').eq('id', m2c.rkdp_client_id).maybeSingle(); c = rc; }
+      }
+      if (!c && !m2c) return json({ error: 'Brak klienta' }, 400);
+      let order: any = null;
+      if (body.order_id) {
+        const { data } = await sb.from('m2_orders').select('id, client_id, status').eq('id', String(body.order_id)).maybeSingle(); order = data;
+        if (!order || (m2c && order.client_id !== m2c.id)) return json({ error: 'Brak dostępu do dokumentu' }, 403);
+      }
+      const firm = body.firm === 'm2' ? 'm2' : 'rkdp';
+      const kind = ['umowa', 'zlecenie', 'umowa_doradcza', 'pel', 'inne'].includes(body.kind) ? body.kind : 'umowa';
       const to = String(body.to || '').trim().toLowerCase();
       if (!emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail klienta' }, 400);
       const title = String(body.title || 'Umowa').trim().slice(0, 160) || 'Umowa';
@@ -185,29 +226,37 @@ Deno.serve(async (req: Request) => {
       const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
       const docHtml = typeof body.doc_html === 'string' && body.doc_html.length <= 1_500_000 ? body.doc_html : null;
       const fname = `${title}.pdf`.replace(/[\\/:*?"<>|\r\n]+/g, ' ');
-      const path = `${c.id}/do-podpisu-${crypto.randomUUID().slice(0, 8)}-${safeName(fname)}`;
+      const path = `${c ? c.id : 'm2/' + m2c.id}/do-podpisu-${crypto.randomUUID().slice(0, 8)}-${safeName(fname)}`;
       const { error: e1 } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: false });
       if (e1) return json({ error: 'Nie udało się zapisać dokumentu' }, 500);
-      const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: c.id, category: 'umowa', name: `${title} – wysłana do podpisu.pdf`.slice(0, 200), note: `Wysłana do podpisu na ${to}`.slice(0, 500), path, mime: 'application/pdf', size: bytes.length, uploaded_by: memberId }).select('id').single();
-      if (e2) { await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się zapisać dokumentu' }, 500); }
+      let fileId = null;
+      if (c) {
+        const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: c.id, category: KIND_CAT[kind] || 'umowa', name: `${title} – wysłana do podpisu.pdf`.slice(0, 200), note: `Wysłana do podpisu na ${to}`.slice(0, 500), path, mime: 'application/pdf', size: bytes.length, uploaded_by: memberId }).select('id').single();
+        if (e2) { await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się zapisać dokumentu' }, 500); }
+        fileId = cf.id;
+      }
       const token = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
-      const { data: rq, error: e3 } = await admin.from('sign_requests').insert({ client_id: c.id, token, title, email: to, file_id: cf.id, created_by: memberId, doc_html: docHtml }).select('id').single();
-      if (e3) return json({ error: 'Nie udało się utworzyć prośby o podpis' }, 500);
+      const { data: rq, error: e3 } = await admin.from('sign_requests').insert({ client_id: c?.id || null, m2_client_id: m2c?.id || null, order_id: order?.id || null, firm, kind,
+        token, title, email: to, file_id: fileId, file_path: fileId ? null : path, created_by: memberId, doc_html: docHtml }).select('id').single();
+      if (e3) { console.error(e3); return json({ error: 'Nie udało się utworzyć prośby o podpis' }, 500); }
       const S = await settings();
       const link = `${S.app}/podpis/?t=${token}`;
       const textBody = text0.replaceAll('{link}', link);
       const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
-      const sig = await signatureOf(me, S.from);
+      const sig = firm === 'm2'
+        ? { sigHtml: '', text: ['', 'Pozdrawiam serdecznie,', me?.full_name || '', 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska', 'ul. Zwycięska 3, 53-033 Wrocław', 'kancelaria@m2tax.pl · tel. 883 643 565 · www.m2tax.pl'].filter(Boolean).join('\n') }
+        : await signatureOf(me, S.from);
       const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">Przeczytaj i podpisz online</a></p>`;
       const html = bodyHtml(textBody) + btn + (sig.sigHtml ? '<br>' + sig.sigHtml : bodyHtml(sig.text));
       try {
-        await transport().sendMail({ from: { name: FROM_NAME, address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
+        await transport().sendMail({ from: { name: FROM_NAME[firm], address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
       } catch (e) {
         const m = String((e as Error).message || e);
         await admin.from('sign_requests').update({ status: 'anulowano' }).eq('id', rq.id);
         return json({ error: 'send_failed', detail: m.slice(0, 300) }, 200);
       }
-      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + `\n\n[dokument do podpisu online: ${fname}]`, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
+      if (order && order.status === 'projekt') await admin.from('m2_orders').update({ status: 'wyslane' }).eq('id', order.id);
+      if (c) await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + `\n\n[dokument do podpisu online: ${fname}]`, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
       return json({ ok: true, id: rq.id, link });
     }
     return json({ error: 'Nieznana operacja' }, 400);
