@@ -2,7 +2,7 @@
 import { h, toast, fail, icon, modal, printHtml } from '../ui.js';
 import { sb, state, canEditClients } from '../store.js';
 import { fillDocx, docxToHtml, downloadBytes } from '../docx.js';
-import { upl1Defaults, upl1Items, pelDefaults, pelItems, printOverlay, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
+import { upl1Defaults, upl1Items, pelDefaults, pelItems, printOverlay, overlayHtml, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
 import { pps1Defaults, printPps1, parseAddress, BOX4_LABELS } from '../m2/pps1.js';
 import { US_NAMES, OFFICE_NAMES } from '../urzedy.js';
 import { poaBlocks, printableHtml, buildOrderDocx, RKDP_BRAND } from '../m2/order.js';
@@ -165,7 +165,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     return h('p', { class: 'hint', style: { margin: '-4px 0 10px' } }, `Dane z „Mój profil”: ${[x.nip ? 'NIP' : x.pesel ? 'PESEL' : null, x.ae_address ? 'adres elektroniczny' : null, x.delivery === 'biuro' ? 'doręczenia na biuro' : 'własny adres', x.phone ? 'telefon' : null].filter(Boolean).join(', ')}.${!x.nip && !x.pesel && !me ? ' PESEL wpisze się tylko, gdy ta osoba wygeneruje dokument sama.' : ''}`);
   };
 
-  function build() {
+  let build = function () {
     const t = d.type;
     const parts = [clientRow, grid([['type', 'Dokument', 'select', DOC_TYPES, true]], d, () => build())];
     if (t === 'umowa') {
@@ -238,7 +238,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
           ['reps', isJdg(cl) ? 'Mocodawca' : 'Reprezentanci – „Jan Kowalski – prezes zarządu”', 'textarea'], ['date', 'Data', 'date']], v.proc));
     }
     box.replaceChildren(...parts.filter(Boolean));
-  }
+  };
   build();
 
   const fname = (prefix, ext) => `${prefix}_${(cl?.name || 'klient').replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 40)}.${ext}`;
@@ -275,9 +275,64 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     } catch (e) { fail(e, 'Nie udało się wygenerować dokumentu'); }
   }
 
+  // UPL-1: e-mail do klienta z wypełnionym formularzem (PDF w załączniku) i linkiem do instrukcji złożenia
+  const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => cl ? sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) : toast('Wybierz klienta', true) }, icon('mail'), 'Wyślij klientowi');
+  const syncSend = () => { sendBtn.hidden = d.type !== 'upl1'; };
+  const build0 = build; build = () => { build0(); syncSend(); }; syncSend();
   modal('Dokumenty klienta', box, (close) => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Zamknij'),
+    sendBtn,
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => generate('docx') }, icon('download'), 'Word'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: () => generate('pdf') }, icon('download'), 'PDF'),
+  ]);
+}
+
+// ---------- UPL-1 do klienta e-mailem ----------
+const UPL_WAYS = {
+  wszystkie: 'Wszystkie trzy sposoby – klient wybiera',
+  ezus: 'Online w e-Urzędzie Skarbowym (profil zaufany, bank, e-dowód)',
+  edoreczenia: 'Podpis zaufany na PDF + wysyłka przez e-Doręczenia',
+  papier: 'Na papierze – wydruk, podpis, oryginał do biura lub urzędu',
+};
+const UPL_TXT = {
+  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (podatki.gov.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym i wysyłając go do urzędu skarbowego przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu prosimy odesłać lub przekazać oryginał do naszego biura (złożymy go w urzędzie) albo złożyć go w urzędzie skarbowym.',
+  ezus: 'Najszybciej złożyć je samodzielnie online w e-Urzędzie Skarbowym (podatki.gov.pl) – logowanie profilem zaufanym, e-dowodem albo przez bank. Dane do wpisania (m.in. dane pełnomocnika) są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam potwierdzenia UPO.',
+  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do urzędu skarbowego przez e-Doręczenia, a dowód nadania przesłać nam.',
+  papier: 'Prosimy wydrukować formularz, podpisać go w części E i odesłać lub przekazać oryginał do naszego biura – złożymy go w urzędzie skarbowym. Można też złożyć go samodzielnie w urzędzie skarbowym.',
+};
+async function sendUpl1(cl, data, pelnomocnik, filename) {
+  const s = { way: 'wszystkie', to: String(cl.email || '').split(/[;,\s]+/).find(x => x.includes('@')) || '' };
+  const link = () => {
+    const q = new URLSearchParams();
+    if (s.way !== 'wszystkie') q.set('sposob', s.way);
+    if (data.office) q.set('us', data.office.replace(/^Naczelnik /, ''));
+    return `${location.origin}/upl-1/${q.toString() ? '?' + q : ''}`;
+  };
+  const text = () => `Dzień dobry,\n\nw załączniku przesyłamy wypełnione pełnomocnictwo UPL-1. Dzięki niemu będziemy mogli podpisywać i wysyłać w Państwa imieniu deklaracje podatkowe i pliki JPK do urzędu skarbowego. Prosimy o sprawdzenie danych.\n\n${UPL_TXT[s.way]}\n\nInstrukcja krok po kroku: ${link()}\n\nZłożenie UPL-1 jest bezpłatne – nie podlega opłacie skarbowej. W razie pytań jesteśmy do dyspozycji.`;
+  s.subject = `Pełnomocnictwo UPL-1 – ${cl.name}`; s.body = text();
+  const body = h('div');
+  const draw = () => body.replaceChildren(
+    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · w załączniku: ', h('b', {}, filename)),
+    grid([['way', 'Sposób złożenia (zmienia treść e-maila i instrukcji)', 'select', UPL_WAYS, true], ['to', 'Do (e-mail klienta)', 'email', null, true],
+      ['subject', 'Temat', 'text', null, true], ['body', 'Treść (pod spodem dopisze się Twoja stopka)', 'textarea']], s, k => { if (k === 'way') { s.body = text(); draw(); } }),
+    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Link do instrukcji: ', h('a', { href: link(), target: '_blank', rel: 'noopener' }, 'podgląd instrukcji'), ' · e-mail wyjdzie z kancelaria@rkdp.pl, a wiadomość zapisze się w historii klienta.'));
+  draw();
+  body.querySelector('textarea')?.setAttribute('rows', '12');
+  modal('Wyślij UPL-1 klientowi', body, close => [
+    h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: async e => {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.to.trim())) return toast('Wpisz poprawny e-mail klienta', true);
+      const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję PDF…';
+      try {
+        const { buildPdf } = await import('../pdfdoc.js');
+        const bytes = await buildPdf(overlayHtml(UPL1_PAGES, upl1Items(data, pelnomocnik), filename), filename);
+        let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        b.textContent = 'Wysyłam…';
+        const { data: r, error } = await sb.functions.invoke('mail', { body: { action: 'send_file', client_id: cl.id, to: s.to.trim(), subject: s.subject, body: s.body,
+          attachment: { name: filename.replace(/_/g, ' '), type: 'application/pdf', base64: btoa(bin) } } });
+        if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
+        toast(`Wysłano UPL-1 do ${s.to.trim()}`); close();
+      } catch (err) { fail(err, 'Nie udało się wysłać e-maila'); b.disabled = false; b.textContent = 'Wyślij e-mail'; }
+    } }, icon('mail'), 'Wyślij e-mail'),
   ]);
 }

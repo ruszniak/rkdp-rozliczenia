@@ -6,6 +6,7 @@
 //  • { action: 'send', kind, period, subject, body, client_ids[], mark_missing?, links?, mark_done? } – {klient}, {okres}, {link} w temacie i treści; kind 'kwoty' + mark_done: { client_id: [kody] } odhacza kratki
 //  • { action: 'broadcast', subject, body, client_ids[], groups?, test?, signature? } – jedna informacja do wielu klientów:
 //    Do: adres kancelarii, klienci w UDW (paczki po 90 adresów); test = tylko do osoby wysyłającej
+//  • { action: 'send_file', client_id, to, subject, body, attachment: { name, type: 'application/pdf', base64 } } – jeden e-mail z PDF (np. UPL-1)
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
@@ -87,11 +88,12 @@ const htmlToText = (h: string) => h.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(d
 const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const bodyHtml = (t: string) => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;">${escH(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#7A5A37;">$1</a>').replace(/\n/g, '<br>')}</div>`;
 
-async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string, html?: string, bcc: string[] = []) {
+async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string, html?: string, bcc: string[] = [], attachments: any[] = []) {
   if (smtpOn()) {
-    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, ...(bcc.length ? { bcc } : {}), subject, text, ...(html ? { html } : {}) }); return; }
+    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, ...(bcc.length ? { bcc } : {}), subject, text, ...(html ? { html } : {}), ...(attachments.length ? { attachments } : {}) }); return; }
     catch (e) { const m = String((e as Error).message || e); if (/Invalid login|Username and Password|535|534/i.test(m)) throw new Error('not_authorized: SMTP – nieprawidłowe hasło aplikacji (' + m.slice(0, 120) + ')'); throw e; }
   }
+  if (attachments.length) throw new Error('Załączniki wymagają wysyłki przez SMTP (sekrety SMTP_USER i SMTP_PASS).');
   const token = await gmailToken(cfg.sub);
   const part = (type: string, c: string) => [`Content-Type: ${type}; charset=UTF-8`, 'Content-Transfer-Encoding: base64', '', b64(c).replace(/(.{76})/g, '$1\r\n')].join('\r\n');
   const bnd = 'b' + crypto.randomUUID().replace(/-/g, '');
@@ -373,6 +375,32 @@ Deno.serve(async (req: Request) => {
       catch (e) { return json({ ready: false, from: cfg.from, reason: String((e as Error).message) }); }
     }
     if (body.action === 'broadcast') return await broadcast(sb, body, cfg, memberId);
+    // jeden e-mail do klienta z załącznikiem (np. wypełniony UPL-1 + link do instrukcji)
+    if (body.action === 'send_file') {
+      const to = String(body.to || '').trim().toLowerCase();
+      if (!emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail' }, 400);
+      const { data: c } = await sb.from('clients').select('id,name').eq('id', String(body.client_id || '')).maybeSingle();   // RLS: tylko klienci tej osoby
+      if (!c) return json({ error: 'Brak dostępu do klienta' }, 403);
+      const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').slice(0, 8000);
+      if (!subject || !text0.trim()) return json({ error: 'Pusty temat lub treść' }, 400);
+      const att = body.attachment || {};
+      const b64data = String(att.base64 || '').replace(/\s+/g, '');
+      if (!b64data || b64data.length > 10_000_000 || !/^[A-Za-z0-9+/=]+$/.test(b64data)) return json({ error: 'Brak albo zbyt duży załącznik' }, 400);
+      if (String(att.type || '') !== 'application/pdf') return json({ error: 'Dozwolony jest tylko załącznik PDF' }, 400);
+      const filename = (String(att.name || 'dokument.pdf').replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 120) || 'dokument.pdf').replace(/(\.pdf)?$/i, '.pdf');
+      const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
+      const { sigHtml, text: signature } = await signatureOf(me, cfg);
+      const text = text0 + '\n' + signature;
+      const html = `${bodyHtml(text0)}${sigHtml ? '<br><br>' + sigHtml : '<br>' + bodyHtml(signature)}`;
+      try { await sendMail(cfg, FROM_NAME, to, subject, text, html, [], [{ filename, content: b64data, encoding: 'base64', contentType: 'application/pdf' }]); }
+      catch (e) {
+        const m = String((e as Error).message || e);
+        await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, status: 'blad', error: m.slice(0, 300), sent_by: memberId });
+        return json({ error: /^not_(configured|authorized)/.test(m) ? 'not_configured' : 'send_failed', detail: m.slice(0, 300) }, 200);
+      }
+      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: text + `\n\n[załącznik: ${filename}]`, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
+      return json({ ok: true, sent: 1 });
+    }
     if (body.action === 'preview_kwoty') {
       const { data: me } = await admin.from('team_members').select('full_name, job_title, email').eq('id', memberId).single();
       const { sigHtml } = await signatureOf(me, cfg);

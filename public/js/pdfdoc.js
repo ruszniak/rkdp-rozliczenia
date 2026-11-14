@@ -125,7 +125,8 @@ const safeName = s => (s || 'dokument').replace(/[\\/:*?"<>|]+/g, '-').replace(/
 const blankPage = (P, SCALE) => { const c = document.createElement('canvas'); c.width = Math.round(P.W * SCALE); c.height = Math.round(P.H * SCALE); const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); return c; };
 
 // html – pełny dokument; filename – nazwa pliku bez „.pdf”; onStep(text) – opcjonalny postęp
-export async function downloadPdf(html, filename, onStep = () => {}) {
+// zwraca bajty PDF (np. do załącznika e-maila); downloadPdf – to samo + pobranie pliku
+export async function buildPdf(html, filename, onStep = () => {}) {
   onStep('Przygotowuję PDF…');
   const fonts = usedFonts(html);
   const [V, fontEmbedCSS] = await Promise.all([import('./lib/pdf-vendor.js'), embedCss(fonts), docFonts()]);
@@ -251,17 +252,21 @@ export async function downloadPdf(html, filename, onStep = () => {}) {
       ops.push(V.endText(), V.popGraphicsState());
       page.pushOperators(...ops);
     }
-    const bytes = await pdf.save();
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = `${safeName(filename)}.pdf`;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    return true;
+    return await pdf.save();
   } finally { f.remove(); }
 }
 // html-to-image czasem nie wczyta pojedynczego obrazka (np. z innej domeny) – wtedy pomijamy go zamiast przerywać
 async function toCanvasSafe(V, el, o) {
   try { return await V.toCanvas(el, o); }
   catch { return V.toCanvas(el, { ...o, imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', filter: n => !(n.tagName === 'IMG' && !/^(data:|blob:|\/|https?:\/\/(rozliczenia\.)?rkdp)/.test(n.getAttribute('src') || '') && !String(n.src).startsWith(location.origin)) }); }
+}
+
+export async function downloadPdf(html, filename, onStep = () => {}) {
+  const bytes = await buildPdf(html, filename, onStep);
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = `${safeName(filename)}.pdf`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return true;
 }
