@@ -3279,3 +3279,11 @@ html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scal
 .pt-bar{display:inline-block;width:180px;height:8px;border-radius:99px;background:var(--panel);overflow:hidden}
 .pt-bar i{display:block;height:100%;background:#B08D57;border-radius:99px}.pt-bar i.over{background:#A4462F}
 .pt-list{display:flex;flex-direction:column;gap:10px}
+/* terminy w wąskiej kolumnie (karta sprawy): tytuł nie może się zwężać do jednej litery – osoba i przyciski schodzą pod spód */
+.dl-card{container-type:inline-size}
+@container (max-width:560px){
+  .dl-card .dl-row{grid-template-columns:22px 84px minmax(0,1fr);row-gap:6px}
+  .dl-card .dl-row .dot{display:none}
+  .dl-card .dl-row>.small:not(.dl-main){grid-column:3}
+  .dl-card .dl-row .dl-act{grid-column:2/-1;justify-content:flex-start}
+}

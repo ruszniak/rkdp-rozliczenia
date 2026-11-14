@@ -460,7 +460,7 @@ async function viewMatter(main, id, params) {
   const reload = () => viewMatter(main, id, params);
 
   const dueLate = m.due_date && m.due_date < todayIso() && OPEN_STATUSES.includes(m.status);
-  const dlCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Terminy'),
+  const dlCard = h('section', { class: 'card section dl-card' }, h('div', { class: 'section-head' }, h('h2', {}, 'Terminy'),
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => deadlineDialog({ matter: m, onSaved: reload }) }, '+ Termin')),
   h('div', { class: 'm2-due' + (dueLate ? ' late' : '') }, h('span', { class: 'muted small' }, 'Termin realizacji sprawy'),
     m.due_date ? h('b', {}, (m.due_approx ? 'ok. ' : '') + fmtDate(m.due_date), m.due_approx ? h('span', { class: 'muted small', style: { fontWeight: 500 } }, ' · orientacyjnie') : null, dueLate ? h('span', { class: 'small', style: { fontWeight: 600 } }, ' · minął') : null)
