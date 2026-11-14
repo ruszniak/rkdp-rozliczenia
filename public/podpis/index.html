@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Podpisz dokument – RKDP</title>
+<link rel="icon" href="/favicon-v7.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/umow/doc.css">
+<link rel="stylesheet" href="/upl-1/upl.css">
+<link rel="stylesheet" href="/podpis/podpis.css">
+</head>
+<body>
+<header><div class="in"><span class="brand">Podpis dokumentu</span><span class="back">RKDP · biuro rachunkowe i doradztwo podatkowe</span></div></header>
+<main id="box" aria-live="polite">
+  <p class="meta">Wczytywanie…</p>
+</main>
+
+<template id="tpl">
+<h1 id="ttl">Podpisz dokument</h1>
+<p class="meta" id="who"></p>
+
+<ol class="steps" aria-label="Kroki">
+  <li class="on"><b>1</b><span>Pobierz</span></li>
+  <li><b>2</b><span>Podpisz</span></li>
+  <li><b>3</b><span>Odeślij</span></li>
+</ol>
+
+<section class="card-s">
+  <h2 class="h">1. Pobierz dokument</h2>
+  <p>Przeczytaj dokument i sprawdź dane. Ten sam plik masz też w załączniku naszego e-maila.</p>
+  <p><a class="btn-p" id="dl" href="#" download>Pobierz PDF</a> <span class="small" id="dlname"></span></p>
+</section>
+
+<section class="card-s">
+  <h2 class="h">2. Podpisz – wybierz sposób</h2>
+  <nav class="ways" aria-label="Sposób podpisu">
+    <a href="#pz" data-way="pz"><b>Profil zaufany</b><span>bezpłatnie, przez gov.pl</span></a>
+    <a href="#kw" data-way="kw"><b>Podpis kwalifikowany</b><span>jeśli masz certyfikat</span></a>
+    <a href="#rk" data-way="rk"><b>Odręcznie</b><span>wydruk i skan</span></a>
+  </nav>
+
+  <div class="way-box" id="pz">
+    <h3>Profil zaufany (podpis zaufany)</h3>
+    <ol>
+      <li>Zapisz pobrany PDF na komputerze lub telefonie.</li>
+      <li>Otwórz <a href="https://www.gov.pl/gov/podpisz-dokument-elektronicznie---wykorzystaj-podpis-zaufany" target="_blank" rel="noopener">gov.pl → „Podpisz dokument elektronicznie”</a> i kliknij <strong>„Start”</strong>.</li>
+      <li>Kliknij <strong>„Wybierz dokument z dysku”</strong> i wskaż pobrany PDF.</li>
+      <li>Wybierz <strong>„Podpisz”</strong> → <strong>podpis zaufany</strong>. Zaloguj się profilem zaufanym (bank, mObywatel, login i hasło) i potwierdź kodem.</li>
+      <li>Kliknij <strong>„Pobierz”</strong> – zapisze się podpisany plik (PDF albo XML). Ten plik wgraj w kroku 3.</li>
+    </ol>
+    <p class="small">Profil zaufany założysz bezpłatnie w kilka minut przez bankowość elektroniczną na <a href="https://pz.gov.pl" target="_blank" rel="noopener">pz.gov.pl</a>.</p>
+  </div>
+
+  <div class="way-box" id="kw" hidden>
+    <h3>Podpis kwalifikowany</h3>
+    <ol>
+      <li>Zapisz pobrany PDF.</li>
+      <li>Otwórz program do podpisu od swojego dostawcy (np. SimplySign / proCertum, Szafir, CenCert, Sigillum) i wybierz <strong>„Podpisz”</strong>.</li>
+      <li>Wskaż plik i wybierz format <strong>PAdES</strong> (podpis wewnątrz PDF) – jeśli program pyta. Format XAdES (plik .xml) też przyjmiemy.</li>
+      <li>Zapisz podpisany plik i wgraj go w kroku 3.</li>
+    </ol>
+  </div>
+
+  <div class="way-box" id="rk" hidden>
+    <h3>Podpis odręczny</h3>
+    <ol>
+      <li>Wydrukuj dokument i podpisz go w miejscu na podpis (na każdej wymaganej stronie).</li>
+      <li>Zeskanuj podpisane strony albo zrób wyraźne zdjęcia telefonem (najlepiej jako jeden PDF).</li>
+      <li>Wgraj skan w kroku 3. Oryginał przekaż nam przy najbliższej okazji albo wyślij pocztą.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="card-s" id="up">
+  <h2 class="h">3. Odeślij podpisany plik</h2>
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".pdf,.xml,.xades,.p7s,.p7m,.sig,.asice,.asics,.zip,.jpg,.jpeg,.png,.heic,application/pdf,image/*">
+    <b>Wybierz podpisany plik</b><span>albo przeciągnij go tutaj · PDF, XML, zdjęcie lub skan, do 25 MB</span>
+  </label>
+  <p class="err" id="err" hidden></p>
+  <button class="btn-p" type="button" id="send" disabled>Wyślij podpisany dokument</button>
+  <p class="small">Wolisz e-mailem? Odpowiedz na naszą wiadomość i dołącz podpisany plik.</p>
+</section>
+
+<section class="card-s done" id="done" hidden>
+  <h2 class="h">Dziękujemy – dokument dotarł do nas ✓</h2>
+  <p>Podpisany plik jest już w naszym biurze. Nic więcej nie musisz robić – w razie potrzeby skontaktujemy się z Tobą.</p>
+</section>
+
+<h2>Masz pytanie?</h2>
+<p>Zadzwoń: <a href="tel:+48883643565">883 643 565</a> · napisz: <a href="mailto:kancelaria@rkdp.pl">kancelaria@rkdp.pl</a>.</p>
+</template>
+
+<footer><div class="in">RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Beaty Artemskiej 11/44, 52-234 Wrocław</div></footer>
+<script src="/config.js"></script>
+<script src="/podpis/podpis.js"></script>
+</body>
+</html>

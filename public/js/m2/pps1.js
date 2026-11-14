@@ -18,9 +18,13 @@ export function parseAddress(s) {
   if (out.city && !out.street && !out.house) out.street = '';
   return out;
 }
+const FIRST_NAMES = new Set('adam adrian agata agnieszka aleksander aleksandra aliaksandr aliaksei alicja alina amelia anastasia anastasiia andrii andriy andrzej aneta angelika anna antoni antonina arkadiusz artem artur barbara bartosz bartłomiej beata bogdan bogusław bohdan bożena cezary czesław damian daniel danuta dariusz dawid denis denys dmitry dmytro dominik dominika dorota edyta elżbieta emil emilia eugen ewa ewelina filip franciszek gabriela grażyna grzegorz halina halyna hanna helena henryk hubert igor ilona inna irena iryna ivan iwona izabela jacek jadwiga jakub jan janina janusz jarosław jerzy joanna jolanta julia julian justyna józef kacper kamil kamila karol karolina katarzyna kateryna kazimierz kinga klaudia konrad krystian krystyna krzysztof laura lech leszek lidia liudmyla lucyna ludwik maciej magdalena maja maksym marcin marek maria marian marianna mariia mariusz marta martyna maryna mateusz maxim małgorzata michał mieczysław mikołaj milena mirosław mirosława monika mykola natalia natalie nataliia nikodem nikola norbert oksana oleg oleksandr oleksii olena olga oliwer oliwia patrycja patryk paula paulina pavlo paweł petro piotr przemysław radosław rafał renata robert roman ruslan ryszard sabina sebastian sergey sergii serhii siarhei stanisław stefan svitlana sylwia szymon tadeusz tamara taras tatsiana teresa tetiana tetyana tomasz uladzimir urszula vasyl viktoria viktoriia vitalii vladimir vladislav vladislavs vladyslav volha volodymyr wanda weronika wiesław wiktor wiktoria witold wojciech władysław włodzimierz yevhen yulia yuliia yuri yurii zbigniew zdzisław zenon zofia zuzanna zygmunt łukasz'.split(' '));
+export const isFirstName = w => FIRST_NAMES.has(String(w || '').toLocaleLowerCase('pl-PL'));
+// „Imię Nazwisko” (domyślnie) albo „Nazwisko Imię” – rozpoznane po imieniu na końcu
 export function splitName(full) {
   const parts = (full || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length < 2) return { last: parts[0] || '', first: '' };
+  if (isFirstName(parts[parts.length - 1]) && !isFirstName(parts[0])) return { first: parts[parts.length - 1], last: parts.slice(0, -1).join(' ') };
   return { first: parts[0], last: parts.slice(1).join(' ') };
 }
 export function parseReps(text) {

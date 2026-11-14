@@ -238,9 +238,16 @@ function windowOpen(w: any, at = new Date()): boolean {
 }
 
 // ---------- zlecenia: e-mail do pracownika (nowe, poprawka, odpowiedź, akceptacja) albo do zlecającego (pytanie, wykonanie) ----------
-const APP_URL = 'https://rozliczenia.rkdp.pl';
+const APP_URL = 'https://app.ruszniak.io';
 async function zlecenieMail(b: any, cfg: { sub: string; from: string }): Promise<any> {
   // dodanie osób do zadania – osobny e-mail do każdej dodanej osoby
+  // zamknięcie / anulowanie – e-mail do wszystkich osób przy zadaniu poza tą, która to zrobiła
+  if (['zamkniete', 'anulowane'].includes(String(b.ev || '')) && !b.toId) {
+    const { data: zz } = await admin.from('zlecenia').select('assignee_id, created_by, helpers').eq('id', String(b.id || '')).maybeSingle();
+    const ids = [...new Set([zz?.assignee_id, zz?.created_by, ...(zz?.helpers || [])].filter(x => x && x !== b.actor))].slice(0, 12);
+    let sent = 0; for (const id of ids) sent += (await zlecenieMail({ ...b, toId: id }, cfg)).sent || 0;
+    return { sent };
+  }
   if (String(b.ev || '') === 'dodany' && !b.toId) {
     const ids = Array.isArray(b.to) ? b.to.map(String).slice(0, 10) : [];
     let sent = 0; for (const id of ids) sent += (await zlecenieMail({ ...b, toId: id }, cfg)).sent || 0;
@@ -251,11 +258,11 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }): Promise
   const ev = String(b.ev || '');
   // zadanie dodane samemu sobie – bez maila o nowym zadaniu
   if (ev === 'nowe' && z.created_by && z.created_by === z.assignee_id) return { sent: 0, reason: 'self' };
-  const toId = ev === 'dodany' ? String(b.toId) : ['pytanie', 'zgloszone'].includes(ev) ? z.created_by : z.assignee_id;
-  const ids = [z.assignee_id, z.created_by, ev === 'dodany' ? toId : null].filter(Boolean);
+  const toId = b.toId ? String(b.toId) : ['pytanie', 'zgloszone'].includes(ev) ? z.created_by : z.assignee_id;
+  const ids = [z.assignee_id, z.created_by, toId, b.actor || null].filter(Boolean);
   const { data: ms } = await admin.from('team_members').select('id, full_name, email').in('id', ids);
   const m = new Map((ms || []).map((x: any) => [x.id, x]));
-  const to = m.get(toId), from = m.get(ev === 'dodany' ? z.created_by : toId === z.assignee_id ? z.created_by : z.assignee_id);
+  const to = m.get(toId), from = m.get(['zamkniete', 'anulowane'].includes(ev) && b.actor ? b.actor : ev === 'dodany' ? z.created_by : toId === z.assignee_id ? z.created_by : z.assignee_id);
   // odbiorca może wskazać własny adres do powiadomień (Mój profil)
   const { data: pr } = to ? await admin.from('member_profiles').select('zl_email, notify_email, notify_window').eq('member_id', to.id).maybeSingle() : { data: null };
   const toAddr = pr?.notify_email && emailOk(String(pr.notify_email)) ? String(pr.notify_email) : String(to?.email || '');
@@ -271,9 +278,9 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }): Promise
   const due = z.due_date ? z.due_date.split('-').reverse().join('.') : '';
   const HEAD: Record<string, string> = {
     nowe: `${from?.full_name || 'Michał'} zlecił(a) Ci zadanie`, dodany: 'Dodano Cię do zadania – pracujesz nad nim razem z innymi', poprawka: 'Zadanie wróciło do poprawy', odpowiedz: 'Odpowiedź na Twoje pytanie',
-    zaakceptowane: 'Zadanie zaakceptowane – dziękuję!', pytanie: `${from?.full_name || 'Pracownik'} ma pytanie do zadania`, zgloszone: `${from?.full_name || 'Pracownik'} zgłosił(a) wykonanie zadania`,
+    zaakceptowane: 'Zadanie zaakceptowane – dziękuję!', zamkniete: `${from?.full_name || 'Ktoś z zespołu'} zakończył(a) zadanie – wykonane`, anulowane: `${from?.full_name || 'Ktoś z zespołu'} anulował(a) zadanie`, pytanie: `${from?.full_name || 'Pracownik'} ma pytanie do zadania`, zgloszone: `${from?.full_name || 'Pracownik'} zgłosił(a) wykonanie zadania`,
   };
-  const subject = ev === 'dodany' ? `Dodano Cię do zadania #${z.no}: ${z.title}`.slice(0, 200) : `${ev === 'nowe' ? (z.priority === 'pilne' ? 'PILNE – zadanie' : 'Zadanie') : (HEAD[ev] || 'Zadanie')} #${z.no}: ${z.title}`.slice(0, 200);
+  const subject = ev === 'dodany' ? `Dodano Cię do zadania #${z.no}: ${z.title}`.slice(0, 200) : ev === 'zamkniete' ? `Zakończone ✓ – zadanie #${z.no}: ${z.title}`.slice(0, 200) : ev === 'anulowane' ? `Anulowane – zadanie #${z.no}: ${z.title}`.slice(0, 200) : `${ev === 'nowe' ? (z.priority === 'pilne' ? 'PILNE – zadanie' : 'Zadanie') : (HEAD[ev] || 'Zadanie')} #${z.no}: ${z.title}`.slice(0, 200);
   const steps = Array.isArray(z.steps) ? z.steps.map((s: any) => `${s.done ? '☑' : '☐'} ${s.t}`) : [];
   const link = `${APP_URL}/#/zlecenia/${z.id}`;
   const lines = [

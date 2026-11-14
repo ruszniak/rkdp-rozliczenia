@@ -1,12 +1,15 @@
 // Formularze urzędowe RKDP wypełniane na oryginalnych wzorach: UPL-1 (US) i PEL (ZUS).
 // Współrzędne w punktach PDF (A4, początek w lewym górnym rogu).
 import { printHtml } from '../ui.js';
-import { parseAddress, splitName, parseReps } from '../m2/pps1.js';
+import { parseAddress, splitName, parseReps, isFirstName as isFirst } from '../m2/pps1.js';
 
-// W bazie RKDP osoby (JDG) zapisane są jako „Nazwisko Imię”
+// Nazwa klienta-osoby (JDG) bywa zapisana jako „Nazwisko Imię” (zwykle) albo „Imię Nazwisko” (np. z białej listy VAT).
+// Rozpoznajemy, który człon jest imieniem; gdy nie wiadomo – przyjmujemy „Nazwisko Imię”.
 export function rkSplit(name) {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-  return parts.length < 2 ? { last: parts[0] || '', first: '' } : { last: parts[0], first: parts.slice(1).join(' ') };
+  if (parts.length < 2) return { last: parts[0] || '', first: '' };
+  if (isFirst(parts[0]) && !isFirst(parts[parts.length - 1])) return { first: parts[0], last: parts.slice(1).join(' ') };
+  return { last: parts[0], first: parts.slice(1).join(' ') };
 }
 
 // adres RKDP do doręczeń (pełnomocnik – doradca podatkowy)
