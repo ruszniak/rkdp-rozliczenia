@@ -3257,3 +3257,17 @@ html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scal
 .field.kl-miss .input,.field.kl-miss .select{border-color:var(--warn,#B42318);box-shadow:0 0 0 3px rgba(180,35,24,.12)}
 .section.kl-miss{outline:2px solid var(--warn,#B42318);outline-offset:2px}
 .pct.pct-go{cursor:pointer}.pct.pct-go:hover{color:var(--warn,#B42318);text-decoration:underline}
+
+/* archiwum: prośby o podpis wysłane klientowi */
+.sign-box{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 12px;background:var(--panel)}
+.sign-box h3{margin:2px 0 6px;font-size:14px}
+.sign-row{padding:8px 0;border-top:1px solid var(--line)}.sign-row:first-of-type{border-top:0}
+.sign-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sign-t{flex:1;min-width:200px}
+.sign-st{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:#EFF6FF;color:#1D4ED8;white-space:nowrap}
+.sign-st.ok{background:#DCFCE7;color:#166534}.sign-st.warn{background:#FEF3C7;color:#92400E}.sign-st.off{background:#F3F4F6;color:#6B7280}
+.sign-note{margin:6px 0 0;padding:8px 12px;border-left:3px solid #F59E0B;background:#FFFBEB;border-radius:6px;white-space:pre-wrap;font-size:14px;color:#1F2937}
+.sign-note small{display:block;color:#92400E;font-size:12px;font-weight:600;white-space:normal}
+:root[data-theme="dark"] .sign-note{background:rgba(245,158,11,.12);color:inherit}:root[data-theme="dark"] .sign-note small{color:#FCD34D}
+:root[data-theme="dark"] .sign-st{background:rgba(59,130,246,.18);color:#93C5FD}:root[data-theme="dark"] .sign-st.ok{background:rgba(34,197,94,.18);color:#86EFAC}
+:root[data-theme="dark"] .sign-st.warn{background:rgba(245,158,11,.18);color:#FCD34D}:root[data-theme="dark"] .sign-st.off{background:var(--soft);color:var(--muted)}

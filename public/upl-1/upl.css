@@ -9,3 +9,6 @@ h3{font-size:16px;margin:20px 0 6px;color:var(--ink)}
 .small{font-size:14px;color:var(--muted)}
 .hl{background:#EFF6FF;border:1px solid #BFDBFE}
 @media (max-width:720px){.ways{grid-template-columns:1fr}}
+header .brand img{border:1px solid rgba(255,255,255,.18)}
+header .appname{color:#fff;font-weight:800;font-size:16px;letter-spacing:.01em}
+@media (max-width:480px){header .brand>span{font-size:15px}}

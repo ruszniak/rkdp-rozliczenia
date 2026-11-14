@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#1D1A16">
-  <title>Wgraj dokumenty · RKDP</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Wgraj dokumenty · rdp.app</title>
+  <link rel="icon" href="/favicon-v7.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,7 +15,10 @@
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 Inter,system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100vh}
     header{background:radial-gradient(70% 220% at 95% -40%,rgba(207,174,134,.2),transparent 60%),url(/siec.svg) 85% 22%/1100px auto no-repeat,#1D1A16;padding:22px 20px 70px;color:#E6DED2}
-    header img{height:34px;display:block}
+    header img{height:34px;width:34px;display:block;border-radius:9px;border:1px solid rgba(255,255,255,.18)}
+    .hdr{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .hdr .brand{display:flex;align-items:center;gap:10px;font:700 15px Inter,system-ui,sans-serif;color:#fff}
+    .hdr .appname{font:800 16px Montserrat,Inter,system-ui,sans-serif;color:#fff;letter-spacing:.01em}
     .wrap{max-width:640px;margin:0 auto}
     .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px 24px;margin:-48px auto 24px;box-shadow:0 18px 40px rgba(29,26,22,.12)}
     h1{font:800 26px/1.15 Montserrat,system-ui,sans-serif;color:var(--ink);margin:4px 0 6px;letter-spacing:-.01em}
@@ -43,7 +46,7 @@
   </style>
 </head>
 <body>
-  <header><div class="wrap"><img src="/logo-rkdp.png" alt="RKDP spółka doradztwa podatkowego"></div></header>
+  <header><div class="wrap hdr"><span class="brand"><img src="/logo-rdp.svg" alt="rdp.app" width="34" height="34"><span>Wgraj dokumenty</span></span><span class="appname">rdp.app</span></div></header>
   <main class="wrap">
     <div class="card" id="box"><p class="muted">Wczytywanie…</p></div>
     <p class="foot">Pliki trafiają bezpośrednio do biura RKDP spółka doradztwa podatkowego sp. z o.o. i są widoczne tylko dla zespołu prowadzącego Twoje rozliczenia.<br>Dane objęte tajemnicą doradcy podatkowego.</p>

@@ -1,2 +1,3 @@
 Montserrat (Julieta Ulanovsky i in.) oraz Plus Jakarta Sans (Tokotype), Source Sans 3 (Adobe), Inter (Rasmus Andersson) – SIL Open Font License 1.1.
 Używane do wbudowania czcionek w pliki PDF generowane w przeglądarce (public/js/pdfdoc.js).
+Carlito (Łukasz Dziedzic / tyPoland, Google) – SIL Open Font License 1.1. Wbudowywana (podzbiór znaków łacińskich z polskimi) w umowy PDF (public/js/umowapdf.js).

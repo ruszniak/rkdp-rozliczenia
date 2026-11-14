@@ -85,20 +85,6 @@ function contractReplacements(v) {
     ['[NAZWA FIRMY]', v.firm || '[NAZWA FIRMY]'], ['[ADRES: ULICA, NR, KOD POCZTOWY, MIEJSCOWOŚĆ]', v.address || '[ADRES]'], ['[NIP]', v.nip || '[NIP]'],
     ['zwanym/ą', f ? 'zwaną' : 'zwanym'], ...common];
 }
-function contractPrintHtml(documentXml, title) {
-  const body = docxToHtml(documentXml);
-  return `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>${title}</title>
-<style>@page{size:A4;margin:14mm 24mm 18mm;
-@bottom-center{content:"RKDP spółka doradztwa podatkowego sp. z o.o.  |  ul. Beaty Artemskiej 11/44, 52-234 Wrocław  |  kancelaria@rkdp.pl";font:7pt Calibri,Arial,sans-serif;color:#666}
-@bottom-right{content:counter(page) "/" counter(pages);font:7pt Calibri,Arial,sans-serif;color:#999}}
-body{margin:0;font-family:Calibri,Carlito,Arial,sans-serif;font-size:11pt;line-height:1.35;color:#1c1d21;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-table.page{width:100%;border-collapse:collapse}table.page td{padding:0}
-.lh{text-align:center;padding-bottom:12pt}.lh img{width:165pt;height:auto}
-p{margin:0}.tab{display:inline-block;width:36pt}</style></head>
-<body><table class="page"><thead><tr><td><div class="lh"><img src="${location.origin}/logo-rkdp.png" alt="RKDP"></div></td></tr></thead>
-<tbody><tr><td>${body}</td></tr></tbody></table></body></html>`;
-}
-
 // ---------- okno dokumentów ----------
 export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
   const [advisor, clients] = await Promise.all([
@@ -250,8 +236,8 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
         const c = v.contract, T = TEMPLATES[c.tpl];
         const { bytes, documentXml } = await fillDocx(T.url, contractReplacements(c));
         if (format === 'docx') return downloadBytes(bytes, fname('Umowa_RKDP', 'docx'));
-        printHtml(contractPrintHtml(documentXml, fname('Umowa_RKDP', 'pdf')));
-        return;
+        const { downloadContractPdf } = await import('../umowapdf.js');
+        return downloadContractPdf(documentXml, fname('Umowa_RKDP', 'pdf'));
       }
       if (format === 'docx' && t !== 'procesowe') return toast('Formularz urzędowy pobierasz jako PDF', true);
       if (t === 'upl1') return printOverlay(UPL1_PAGES, upl1Items(v.upl1, pelnomocnik()), fname('UPL-1', 'pdf')) || toast('Zezwól na wyskakujące okna', true);
@@ -277,13 +263,15 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
 
   // UPL-1: e-mail do klienta z wypełnionym formularzem (PDF w załączniku) i linkiem do instrukcji złożenia
   const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => cl ? sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) : toast('Wybierz klienta', true) }, icon('mail'), 'Wyślij klientowi');
-  // umowa: e-mail z PDF + link do strony podpisu (profil zaufany / kwalifikowany / odręcznie), podpisany plik wraca do archiwum klienta
+  // umowa: e-mail z linkiem do strony podpisu (podgląd, uwagi, profil zaufany / kwalifikowany / odręcznie); podpisany plik wraca do archiwum klienta
   const signBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (!cl) return toast('Wybierz klienta', true);
     const c = v.contract, T = TEMPLATES[c.tpl];
     try {
       const { documentXml } = await fillDocx(T.url, contractReplacements(c));
-      sendForSignature(cl, contractPrintHtml(documentXml, fname('Umowa_RKDP', 'pdf')), `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150));
+      const gaps = [...new Set((docxToHtml(documentXml).replace(/<[^>]+>/g, '').match(/\[[A-ZĄĆĘŁŃÓŚŹŻ][A-ZĄĆĘŁŃÓŚŹŻ ,.\/–-]{2,}\]/g) || []))];
+      if (gaps.length && !confirm(`W umowie zostały niewypełnione pola:\n${gaps.slice(0, 8).join('\n')}\n\nWysłać mimo to?`)) return;
+      sendForSignature(cl, documentXml, `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150));
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
   const syncSend = () => { sendBtn.hidden = d.type !== 'upl1'; signBtn.hidden = d.type !== 'umowa'; };
@@ -347,16 +335,23 @@ async function sendUpl1(cl, data, pelnomocnik, filename) {
 }
 
 // ---------- dokument do podpisu przez klienta ----------
-export async function sendForSignature(cl, html, title) {
+// Klient dostaje tylko link (bez załącznika): na stronie czyta umowę, może zgłosić uwagi, pobiera PDF do podpisu i odsyła podpisany plik.
+export async function sendForSignature(cl, documentXml, title) {
   const s = { title, to: String(cl.email || '').split(/[;,\s]+/).find(x => x.includes('@')) || '' };
   s.subject = `${title} – prośba o podpis`;
-  s.body = `Dzień dobry,\n\nw załączniku przesyłamy dokument „${title}” do podpisu. Prosimy o zapoznanie się z treścią.\n\nPodpisać można:\n• bezpłatnie profilem zaufanym (podpis zaufany na gov.pl),\n• podpisem kwalifikowanym,\n• odręcznie – po wydrukowaniu i zeskanowaniu.\n\nNa stronie poniżej jest instrukcja krok po kroku i miejsce na odesłanie podpisanego pliku:\n{link}\n\nMożna też po prostu odpowiedzieć na tę wiadomość i dołączyć podpisany plik.\n\nW razie pytań jesteśmy do dyspozycji.`;
+  s.body = `Dzień dobry,\n\nprzygotowaliśmy dla Państwa dokument „${title}”. Pod linkiem poniżej można go przeczytać, zgłosić ewentualne uwagi i podpisać:\n{link}\n\nPodpisać można:\n• bezpłatnie profilem zaufanym (podpis zaufany na gov.pl),\n• podpisem kwalifikowanym,\n• odręcznie – po wydrukowaniu i zeskanowaniu.\n\nNa stronie jest instrukcja krok po kroku i miejsce na odesłanie podpisanego pliku.\n\nW razie pytań jesteśmy do dyspozycji.`;
   const body = h('div');
   body.append(
-    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · w załączniku PDF dokumentu; kopia trafi do archiwum klienta.'),
+    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · e-mail zawiera tylko link – umowę klient czyta, komentuje i pobiera do podpisu na stronie. Kopia PDF trafi do archiwum klienta.'),
     grid([['title', 'Nazwa dokumentu', 'text', null, true], ['to', 'Do (e-mail klienta)', 'email', null, true], ['subject', 'Temat', 'text', null, true],
       ['body', 'Treść – {link} zamieni się na link do strony podpisu (pod spodem dopisze się Twoja stopka)', 'textarea']], s),
-    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Gdy klient wgra podpisany plik, trafi on do „Archiwum dokumentów” klienta, a Ty dostaniesz e-mail.'));
+    h('div', { class: 'row-btns', style: { marginTop: '8px' } },
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async e => {
+        const b = e.currentTarget; b.disabled = true;
+        try { const { downloadContractPdf } = await import('../umowapdf.js'); await downloadContractPdf(documentXml, `${s.title}.pdf`); }
+        catch (err) { fail(err, 'Nie udało się przygotować PDF'); } finally { b.disabled = false; }
+      } }, icon('download'), 'Podgląd PDF')),
+    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Uwagi klienta i podpisany plik zobaczysz w „Archiwum dokumentów” klienta (sekcja „Do podpisu”); dostaniesz też e-mail.'));
   body.querySelector('textarea')?.setAttribute('rows', '13');
   modal('Wyślij do podpisu', body, close => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
@@ -365,13 +360,14 @@ export async function sendForSignature(cl, html, title) {
       if (!s.body.includes('{link}')) return toast('Zostaw w treści {link} – tam wstawi się link do podpisu', true);
       const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję PDF…';
       try {
-        const { buildPdf } = await import('../pdfdoc.js');
-        const bytes = await buildPdf(html, s.title);
+        const { contractPdf } = await import('../umowapdf.js');
+        const bytes = await contractPdf(documentXml, s.title);
         let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
         b.textContent = 'Wysyłam…';
-        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'send', client_id: cl.id, title: s.title, to: s.to.trim(), subject: s.subject, body: s.body, attachment: { base64: btoa(bin) } } });
+        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'send', client_id: cl.id, title: s.title, to: s.to.trim(), subject: s.subject, body: s.body,
+          attachment: { base64: btoa(bin) }, doc_html: docxToHtml(documentXml) } });
         if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
-        toast(`Wysłano do podpisu: ${s.to.trim()}`); close();
+        toast(`Wysłano link do podpisu: ${s.to.trim()}`); close();
       } catch (err) { fail(err, 'Nie udało się wysłać'); b.disabled = false; b.textContent = 'Wyślij do podpisu'; }
     } }, icon('mail'), 'Wyślij do podpisu'),
   ]);

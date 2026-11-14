@@ -1,8 +1,9 @@
-// Podpis dokumentu przez klienta (np. umowy): e-mail z PDF + link do strony /podpis/?t=…, na której klient
-// podpisuje dokument (profil zaufany, e-dowód, podpis kwalifikowany) i wgrywa podpisany plik.
-//  • send   – zalogowany członek zespołu: { client_id, title, to, subject, body, attachment: { name, base64 } }
-//             zapis oryginału w archiwum klienta, prośba o podpis, e-mail z kancelaria@rkdp.pl (SMTP) z PDF i linkiem
-//  • info   – publiczne { token }: dane do strony podpisu + link do pobrania dokumentu (ważny 1 h)
+// Podpis dokumentu przez klienta (np. umowy): e-mail z samym linkiem do strony /podpis/?t=…, na której klient
+// czyta dokument, może zgłosić uwagi, pobiera PDF, podpisuje (profil zaufany, podpis kwalifikowany, odręcznie) i wgrywa podpisany plik.
+//  • send   – zalogowany członek zespołu: { client_id, title, to, subject, body, attachment: { base64 }, doc_html }
+//             zapis PDF w archiwum klienta, prośba o podpis, e-mail z kancelaria@rkdp.pl (SMTP) z linkiem (bez załącznika)
+//  • info   – publiczne { token }: dane do strony podpisu, treść do podglądu, uwagi + link do pobrania PDF (ważny 1 h)
+//  • note   – publiczne { token, text, author }: uwagi klienta do dokumentu → zapis + e-mail do zespołu
 //  • upload – publiczne, multipart { token, file }: podpisany plik → archiwum klienta + e-mail do osoby, która wysłała prośbę
 //  • cancel – zalogowany: { id } – anulowanie prośby (link przestaje działać)
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -68,6 +69,20 @@ async function byToken(token: string) {
   return { r: data };
 }
 
+// e-mail do osoby, która wysłała prośbę, i księgowej klienta
+async function notifyTeam(r: any, subject: string, head: string, text: string, inner: string, foot: string) {
+  try {
+    const S = await settings();
+    const ids = [...new Set([r.created_by, r.clients?.accountant_id].filter(Boolean))];
+    const { data: ms } = ids.length ? await admin.from('team_members').select('email, full_name').in('id', ids) : { data: [] };
+    const to = (ms || []).map((m: any) => m.email).filter((e: string) => emailOk(String(e || '')));
+    if (!to.length || !SMTP_USER || !SMTP_PASS) return;
+    const link = `${S.app}/#/klient/${r.client_id}`;
+    await transport().sendMail({ from: { name: 'rdp.app – podpisy', address: S.from }, to, subject: subject.slice(0, 200), text,
+      html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px"><p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Podpis · rdp.app</p><h2 style="margin:0 0 12px;font-size:19px">${escH(head)}</h2>${inner}<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Otwórz kartę klienta</a></p><p style="color:#6B7280;font-size:12px">${escH(foot)}</p></div>` });
+  } catch (e) { console.error('mail zespół', e); }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Metoda niedozwolona' }, 405);
@@ -91,19 +106,11 @@ Deno.serve(async (req: Request) => {
       const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: r.client_id, category: 'umowa', name, note: `Podpisany plik wgrany przez klienta (${f.name.slice(0, 120)})`, path, mime: f.type || null, size: f.size, uploaded_by: null }).select('id').single();
       if (e2) { await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się zapisać pliku – spróbuj ponownie.' }, 500); }
       await admin.from('sign_requests').update({ status: 'podpisano', signed_at: new Date().toISOString(), signed_file_id: cf.id }).eq('id', r.id);
-      // e-mail do osoby, która wysłała prośbę, i księgowej klienta
-      try {
-        const S = await settings();
-        const ids = [...new Set([r.created_by, r.clients?.accountant_id].filter(Boolean))];
-        const { data: ms } = ids.length ? await admin.from('team_members').select('email, full_name').in('id', ids) : { data: [] };
-        const to = (ms || []).map((m: any) => m.email).filter((e: string) => emailOk(String(e || '')));
-        if (to.length && SMTP_USER && SMTP_PASS) {
-          const link = `${S.app}/#/klient/${r.client_id}`;
-          await transport().sendMail({ from: { name: 'rdp.app – podpisy', address: S.from }, to, subject: `Klient podpisał: ${r.title} – ${r.clients?.name || ''}`.slice(0, 200),
-            text: `Klient ${r.clients?.name || ''} wgrał podpisany dokument „${r.title}” (${f.name}).\n\nPlik jest w archiwum dokumentów klienta: ${link}\n\nSprawdź podpis przed dalszymi krokami (np. w weryfikatorze na gov.pl).`,
-            html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px"><p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Podpis · rdp.app</p><h2 style="margin:0 0 12px;font-size:19px">Klient podpisał dokument</h2><p><b>${escH(r.clients?.name || '')}</b> wgrał(a) podpisany dokument „${escH(r.title)}” (${escH(f.name)}).</p><p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">Otwórz kartę klienta</a></p><p style="color:#6B7280;font-size:12px">Plik jest w „Archiwum dokumentów” klienta. Sprawdź podpis przed dalszymi krokami (np. w weryfikatorze podpisu na gov.pl).</p></div>` });
-        }
-      } catch (e) { console.error('mail zespół', e); }
+      const link = `${(await settings()).app}/#/klient/${r.client_id}`;
+      await notifyTeam(r, `Klient podpisał: ${r.title} – ${r.clients?.name || ''}`, 'Klient podpisał dokument',
+        `Klient ${r.clients?.name || ''} wgrał podpisany dokument „${r.title}” (${f.name}).\n\nPlik jest w archiwum dokumentów klienta: ${link}\n\nSprawdź podpis przed dalszymi krokami (np. w weryfikatorze na gov.pl).`,
+        `<p><b>${escH(r.clients?.name || '')}</b> wgrał(a) podpisany dokument „${escH(r.title)}” (${escH(f.name)}).</p>`,
+        'Plik jest w „Archiwum dokumentów” klienta. Sprawdź podpis przed dalszymi krokami (np. w weryfikatorze podpisu na gov.pl).');
       return json({ ok: true });
     }
 
@@ -125,7 +132,29 @@ Deno.serve(async (req: Request) => {
           url = su?.signedUrl || '';
         }
       }
-      return json({ title: r.title, client: r.clients?.name || '', status: r.status, signed_at: r.signed_at, expires_at: r.expires_at, file: { name: fileName, url } });
+      const { data: notes } = await admin.from('sign_notes').select('body, author, from_client, created_at').eq('request_id', r.id).order('created_at');
+      return json({ title: r.title, client: r.clients?.name || '', status: r.status, signed_at: r.signed_at, expires_at: r.expires_at, file: { name: fileName, url },
+        html: r.doc_html || '', notes: notes || [] });
+    }
+
+    // ===== uwagi klienta do dokumentu =====
+    if (action === 'note') {
+      if (!validToken(body.token)) return json({ error: 'Link jest nieprawidłowy.' }, 400);
+      const { r, error } = await byToken(body.token);
+      if (error) return json({ error }, 410);
+      const text = String(body.text || '').replace(/\r/g, '').trim().slice(0, 4000);
+      const author = String(body.author || '').replace(/\s+/g, ' ').trim().slice(0, 120) || null;
+      if (text.length < 2) return json({ error: 'Wpisz treść uwag.' }, 400);
+      const { count } = await admin.from('sign_notes').select('id', { count: 'exact', head: true }).eq('request_id', r.id);
+      if ((count || 0) >= 30) return json({ error: 'Osiągnięto limit uwag – skontaktuj się z biurem telefonicznie lub e-mailem.' }, 429);
+      const { error: e1 } = await admin.from('sign_notes').insert({ request_id: r.id, body: text, author });
+      if (e1) return json({ error: 'Nie udało się zapisać uwag – spróbuj ponownie.' }, 500);
+      const who = author ? `${author} (${r.clients?.name || 'klient'})` : (r.clients?.name || 'Klient');
+      await notifyTeam(r, `Uwagi do dokumentu: ${r.title} – ${r.clients?.name || ''}`, 'Klient zgłosił uwagi do dokumentu',
+        `${who} zgłosił(a) uwagi do dokumentu „${r.title}”:\n\n${text}\n\nOdpowiedz klientowi e-mailem lub telefonicznie. W razie zmian w umowie wyślij nową wersję do podpisu.`,
+        `<p><b>${escH(who)}</b> zgłosił(a) uwagi do dokumentu „${escH(r.title)}”:</p><blockquote style="margin:12px 0;padding:10px 14px;background:#F3F4F6;border-left:3px solid #2563EB;border-radius:6px;white-space:pre-wrap">${escH(text)}</blockquote>`,
+        `Odpowiedz klientowi (${r.email || 'e-mail z prośby'}). Jeśli trzeba zmienić umowę, wyślij nową wersję do podpisu – poprzedni link możesz anulować w archiwum klienta.`);
+      return json({ ok: true });
     }
 
     // ===== zespół (zalogowany) =====
@@ -154,6 +183,7 @@ Deno.serve(async (req: Request) => {
       if (!b64 || b64.length > 14_000_000 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return json({ error: 'Brak albo zbyt duży plik PDF' }, 400);
       if (!SMTP_USER || !SMTP_PASS) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
       const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+      const docHtml = typeof body.doc_html === 'string' && body.doc_html.length <= 1_500_000 ? body.doc_html : null;
       const fname = `${title}.pdf`.replace(/[\\/:*?"<>|\r\n]+/g, ' ');
       const path = `${c.id}/do-podpisu-${crypto.randomUUID().slice(0, 8)}-${safeName(fname)}`;
       const { error: e1 } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: false });
@@ -161,24 +191,23 @@ Deno.serve(async (req: Request) => {
       const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: c.id, category: 'umowa', name: `${title} – wysłana do podpisu.pdf`.slice(0, 200), note: `Wysłana do podpisu na ${to}`.slice(0, 500), path, mime: 'application/pdf', size: bytes.length, uploaded_by: memberId }).select('id').single();
       if (e2) { await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się zapisać dokumentu' }, 500); }
       const token = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
-      const { data: rq, error: e3 } = await admin.from('sign_requests').insert({ client_id: c.id, token, title, email: to, file_id: cf.id, created_by: memberId }).select('id').single();
+      const { data: rq, error: e3 } = await admin.from('sign_requests').insert({ client_id: c.id, token, title, email: to, file_id: cf.id, created_by: memberId, doc_html: docHtml }).select('id').single();
       if (e3) return json({ error: 'Nie udało się utworzyć prośby o podpis' }, 500);
       const S = await settings();
       const link = `${S.app}/podpis/?t=${token}`;
       const textBody = text0.replaceAll('{link}', link);
       const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
       const sig = await signatureOf(me, S.from);
-      const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">Podpisz i odeślij online</a></p>`;
+      const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">Przeczytaj i podpisz online</a></p>`;
       const html = bodyHtml(textBody) + btn + (sig.sigHtml ? '<br>' + sig.sigHtml : bodyHtml(sig.text));
       try {
-        await transport().sendMail({ from: { name: FROM_NAME, address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html,
-          attachments: [{ filename: fname, content: b64, encoding: 'base64', contentType: 'application/pdf' }] });
+        await transport().sendMail({ from: { name: FROM_NAME, address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
       } catch (e) {
         const m = String((e as Error).message || e);
         await admin.from('sign_requests').update({ status: 'anulowano' }).eq('id', rq.id);
         return json({ error: 'send_failed', detail: m.slice(0, 300) }, 200);
       }
-      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + `\n\n[załącznik: ${fname}]`, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
+      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + `\n\n[dokument do podpisu online: ${fname}]`, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
       return json({ ok: true, id: rq.id, link });
     }
     return json({ error: 'Nieznana operacja' }, 400);

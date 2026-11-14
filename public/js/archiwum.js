@@ -18,6 +18,7 @@ export function archiveCard(c) {
   const list = h('div', { class: 'tk-files arch-files' });
   const chips = h('div', { class: 'arch-chips', role: 'group', 'aria-label': 'Kategoria' });
   const count = h('span', { class: 'muted', style: { fontWeight: 500 } });
+  const signBox = h('div', { class: 'sign-box', hidden: true });
   const catSel = h('select', { class: 'arch-cat', 'aria-label': 'Kategoria nowych plików', onchange: () => { cat = catSel.value; } },
     ...Object.entries(ARCH_CATS).map(([k, v]) => h('option', { value: k }, CAT_ONE[k] + (k === 'inne' ? ' / inne' : ''))));
   const camIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true });
@@ -30,7 +31,7 @@ export function archiveCard(c) {
       h('div', { class: 'row-btns' }, camIn,
         h('button', { class: 'btn btn-primary btn-sm cam-btn', type: 'button', onclick: () => camIn.click() }, icon('camera'), 'Zdjęcie / skan telefonem'))),
     dropZone(fs => upload(fs), 'albo wklej Ctrl+V / ⌘V · PDF, zdjęcia, Word, Excel do 25 MB'),
-    chips, list);
+    signBox, chips, list);
   box.addEventListener('paste', e => { const fs = pastedFiles(e); if (fs.length) { e.preventDefault(); upload(fs); } });
 
   function draw() {
@@ -53,7 +54,36 @@ export function archiveCard(c) {
     t.append(h('div', { class: 'arch-meta' }, sel, r.note ? h('div', { class: 'small muted arch-note' }, r.note) : null));
     return t;
   }
+  // prośby o podpis wysłane klientowi (link /podpis/): status, uwagi klienta, anulowanie
+  async function loadSign() {
+    const { data, error } = await sb.from('sign_requests').select('id, title, email, status, token, created_at, opened_at, signed_at, expires_at, sign_notes(body, author, created_at)')
+      .eq('client_id', c.id).order('created_at', { ascending: false }).limit(12);
+    if (error || !data?.length) { signBox.hidden = true; return; }
+    const d = v => v ? new Date(v).toLocaleDateString('pl-PL') : '';
+    signBox.hidden = false;
+    signBox.replaceChildren(h('h3', {}, 'Do podpisu'), ...data.map(r => {
+      const expired = r.status === 'wyslano' && new Date(r.expires_at) < new Date();
+      const notes = (r.sign_notes || []).sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const [label, cls] = r.status === 'podpisano' ? ['podpisano ' + d(r.signed_at), 'ok'] : r.status === 'anulowano' ? ['anulowano', 'off']
+        : expired ? ['link wygasł', 'off'] : notes.length ? ['uwagi klienta', 'warn'] : r.opened_at ? ['otwarto ' + d(r.opened_at), 'info'] : ['wysłano ' + d(r.created_at), 'info'];
+      const link = `${location.origin}/podpis/?t=${r.token}`;
+      return h('div', { class: 'sign-row' },
+        h('div', { class: 'sign-top' },
+          h('div', { class: 'sign-t' }, h('b', {}, r.title), h('span', { class: 'small muted' }, ` · ${r.email || ''} · ${d(r.created_at)}`)),
+          h('span', { class: 'sign-st ' + cls }, label),
+          r.status === 'wyslano' && !expired ? h('span', { class: 'row-btns' },
+            h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('Skopiowano link do podpisu'); } catch { prompt('Link do podpisu:', link); } } }, 'Kopiuj link'),
+            h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
+              if (!confirm(`Anulować prośbę o podpis „${r.title}”? Link u klienta przestanie działać.`)) return;
+              const { data: x, error: e } = await sb.functions.invoke('podpis', { body: { action: 'cancel', id: r.id } });
+              if (e || x?.error) return fail(e || new Error(x.error));
+              toast('Anulowano prośbę o podpis'); loadSign();
+            } }, 'Anuluj')) : null),
+        ...notes.map(n => h('div', { class: 'sign-note' }, h('small', {}, `Uwagi klienta${n.author ? ' – ' + n.author : ''} · ${new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}`), n.body)));
+    }));
+  }
   async function load() {
+    loadSign();
     const { data, error } = await sb.from('client_files').select('*').eq('client_id', c.id).order('created_at', { ascending: false });
     if (error) { list.replaceChildren(h('p', { class: 'hint' }, 'Archiwum będzie dostępne po aktualizacji bazy danych.')); return; }
     rows = data || []; draw();

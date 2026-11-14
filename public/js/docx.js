@@ -77,20 +77,23 @@ export function docxToHtml(documentXml) {
       const rpr = (r.match(/<w:rPr>([\s\S]*?)<\/w:rPr>/) || [, ''])[1];
       const bold = /<w:b\/>|<w:b w:val="(true|1)"\/>/.test(rpr);
       const ital = /<w:i\/>|<w:i w:val="(true|1)"\/>/.test(rpr);
+      const und = /<w:u w:val="(?!none)[a-z]+"/.test(rpr);
       const sz = Number((rpr.match(/<w:sz w:val="(\d+)"/) || [])[1] || 0) / 2;
       let txt = '';
       for (const m of r.matchAll(/<w:t(?: [^>]*)?>([\s\S]*?)<\/w:t>|<w:tab\/>|<w:br\/>/g)) {
         if (m[0] === '<w:tab/>') txt += '<span class="tab"></span>';
         else if (m[0] === '<w:br/>') txt += '<br>';
-        else txt += htmlEsc(unXml(m[1]));
+        else txt += htmlEsc(unXml(m[1])).replace(/\t/g, '<span class="tab"></span>');
       }
       if (!txt) return '';
       let inner = txt;
       if (ital) inner = `<i>${inner}</i>`;
+      if (und) inner = `<u>${inner}</u>`;
       if (bold) inner = `<b>${inner}</b>`;
       return sz ? `<span style="font-size:${sz}pt">${inner}</span>` : inner;
     }).join('');
-    const st = [`text-align:${jc === 'both' ? 'justify' : jc === 'center' ? 'center' : jc === 'right' ? 'right' : 'left'}`,
+    const tabR = /<w:tab w:val="right"/.test(ppr) && runs.includes('class="tab"');
+    const st = [tabR ? 'display:flex;justify-content:space-between' : '', `text-align:${jc === 'both' ? 'justify' : jc === 'center' ? 'center' : jc === 'right' ? 'right' : 'left'}`,
       ind ? `margin-left:${ind}pt` : '', hang ? `text-indent:-${hang}pt` : '', `margin-bottom:${after}pt`, before ? `margin-top:${before}pt` : ''].filter(Boolean).join(';');
     return `<p style="${st}">${runs || '&nbsp;'}</p>`;
   }).join('\n');

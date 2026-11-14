@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Podpisz dokument – RKDP</title>
+<title>Podpisz dokument – rdp.app</title>
 <link rel="icon" href="/favicon-v7.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/umow/doc.css">
 <link rel="stylesheet" href="/upl-1/upl.css">
 <link rel="stylesheet" href="/podpis/podpis.css">
 </head>
 <body>
-<header><div class="in"><span class="brand">Podpis dokumentu</span><span class="back">RKDP · biuro rachunkowe i doradztwo podatkowe</span></div></header>
+<header><div class="in"><span class="brand"><img src="/logo-rdp.svg" alt="rdp.app" width="32" height="32"><span>Podpis dokumentu</span></span><span class="appname">rdp.app</span></div></header>
 <main id="box" aria-live="polite">
   <p class="meta">Wczytywanie…</p>
 </main>
@@ -21,15 +21,31 @@
 <p class="meta" id="who"></p>
 
 <ol class="steps" aria-label="Kroki">
-  <li class="on"><b>1</b><span>Pobierz</span></li>
+  <li class="on"><b>1</b><span>Przeczytaj</span></li>
   <li><b>2</b><span>Podpisz</span></li>
   <li><b>3</b><span>Odeślij</span></li>
 </ol>
 
 <section class="card-s">
-  <h2 class="h">1. Pobierz dokument</h2>
-  <p>Przeczytaj dokument i sprawdź dane. Ten sam plik masz też w załączniku naszego e-maila.</p>
-  <p><a class="btn-p" id="dl" href="#" download>Pobierz PDF</a> <span class="small" id="dlname"></span></p>
+  <h2 class="h">1. Przeczytaj dokument</h2>
+  <p>Sprawdź treść i swoje dane. Jeśli coś się nie zgadza albo masz pytania – zgłoś uwagi, zanim podpiszesz.</p>
+  <div class="doc-view" id="view" hidden><iframe id="frame" title="Treść dokumentu" sandbox></iframe></div>
+  <div class="doc-acts">
+    <a class="btn-p" id="dl" href="#" download>Pobierz PDF do podpisu</a>
+    <button class="btn-s" type="button" id="noteBtn">Zgłoś uwagi</button>
+    <button class="btn-s" type="button" id="fullBtn" hidden>Pełny ekran</button>
+  </div>
+  <p class="small" id="dlname"></p>
+  <div class="notes" id="notes" hidden></div>
+  <form class="note-form" id="noteForm" hidden>
+    <label for="noteTxt"><b>Twoje uwagi do dokumentu</b></label>
+    <textarea id="noteTxt" rows="5" maxlength="4000" placeholder="Np. „W § 2 proszę dopisać…”, „Błędny adres – poprawny to…”"></textarea>
+    <label for="noteWho" class="small">Imię i nazwisko (opcjonalnie)</label>
+    <input id="noteWho" maxlength="120" autocomplete="name">
+    <p class="err" id="noteErr" hidden></p>
+    <div class="doc-acts"><button class="btn-p" type="submit" id="noteSend">Wyślij uwagi</button><button class="btn-s" type="button" id="noteCancel">Anuluj</button></div>
+    <p class="small">Uwagi trafią od razu do osoby z biura, która przygotowała dokument. Odpowiemy e-mailem lub telefonicznie, a w razie zmian prześlemy poprawioną wersję.</p>
+  </form>
 </section>
 
 <section class="card-s">
@@ -43,7 +59,7 @@
   <div class="way-box" id="pz">
     <h3>Profil zaufany (podpis zaufany)</h3>
     <ol>
-      <li>Zapisz pobrany PDF na komputerze lub telefonie.</li>
+      <li>Pobierz PDF (przycisk w kroku 1) i zapisz go na komputerze lub telefonie.</li>
       <li>Otwórz <a href="https://www.gov.pl/gov/podpisz-dokument-elektronicznie---wykorzystaj-podpis-zaufany" target="_blank" rel="noopener">gov.pl → „Podpisz dokument elektronicznie”</a> i kliknij <strong>„Start”</strong>.</li>
       <li>Kliknij <strong>„Wybierz dokument z dysku”</strong> i wskaż pobrany PDF.</li>
       <li>Wybierz <strong>„Podpisz”</strong> → <strong>podpis zaufany</strong>. Zaloguj się profilem zaufanym (bank, mObywatel, login i hasło) i potwierdź kodem.</li>
@@ -55,7 +71,7 @@
   <div class="way-box" id="kw" hidden>
     <h3>Podpis kwalifikowany</h3>
     <ol>
-      <li>Zapisz pobrany PDF.</li>
+      <li>Pobierz PDF (przycisk w kroku 1).</li>
       <li>Otwórz program do podpisu od swojego dostawcy (np. SimplySign / proCertum, Szafir, CenCert, Sigillum) i wybierz <strong>„Podpisz”</strong>.</li>
       <li>Wskaż plik i wybierz format <strong>PAdES</strong> (podpis wewnątrz PDF) – jeśli program pyta. Format XAdES (plik .xml) też przyjmiemy.</li>
       <li>Zapisz podpisany plik i wgraj go w kroku 3.</li>
@@ -65,7 +81,7 @@
   <div class="way-box" id="rk" hidden>
     <h3>Podpis odręczny</h3>
     <ol>
-      <li>Wydrukuj dokument i podpisz go w miejscu na podpis (na każdej wymaganej stronie).</li>
+      <li>Pobierz PDF (krok 1), wydrukuj go i podpisz go w miejscu na podpis (na każdej wymaganej stronie).</li>
       <li>Zeskanuj podpisane strony albo zrób wyraźne zdjęcia telefonem (najlepiej jako jeden PDF).</li>
       <li>Wgraj skan w kroku 3. Oryginał przekaż nam przy najbliższej okazji albo wyślij pocztą.</li>
     </ol>
