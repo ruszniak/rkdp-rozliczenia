@@ -3,8 +3,8 @@ import { h } from '../ui.js';
 import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
-export const APP_VERSION = '2.3';
-export const APP_DATE = '2026-11-08';
+export const APP_VERSION = '2.4';
+export const APP_DATE = '2026-11-14';
 const DOCS_DATE = '2 listopada 2026 r.';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), KRS 0000812185, NIP 8992871126, REGON 384812329';
@@ -95,6 +95,13 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.4', '14 listopada 2026', [
+    'Umowy i pełnomocnictwa prosto z aplikacji: „Wyślij do podpisu” (umowa księgowa, ZUS PEL, umowy i zlecenia doradcze) – klient dostaje link (ważny 7 dni) z podglądem dokumentu, może zgłosić uwagi i podpisać profilem zaufanym, kwalifikowanym albo odręcznie; podpisany plik trafia sam do Archiwum klienta. Opcja „Tylko link – kopiuj” bez e-maila.',
+    'UPL-1: „Wyślij klientowi” – e-mail z wypełnionym PDF i stroną z instrukcją złożenia; urząd skarbowy z listy (UPL-1, PPS-1).',
+    'Umowa w PDF jako prawdziwy dokument z tekstem (logo, stopka, bez uciętych wierszy); data zawarcia umów i zleceń = dzień złożenia pierwszego podpisu.',
+    'Poprawki: kolejność imienia i nazwiska w UPL-1/PPS-1/PEL, nazwy klientów-osób „Nazwisko Imię”, „Braki w profilu” pokazują brakujące pola, powiadomienie otwiera zadanie wprost, powiadomienie o zamknięciu/anulowaniu zadania. Okno „Co nowego” po zalogowaniu.',
+    'M2 TAX: Program Partner – konta biur rachunkowych (zadania do doradców przez aplikację, wzory, JPK), oznaczenie Partner na liście klientów, umowa z biurem wg pakietów.',
+  ]],
   ['2.3', '12 listopada 2026', [
     'Nowa nazwa i logo: rdp.app. W sprawach „+ Termin” ma teraz wariant „Inny termin” z własną treścią (np. wysłać coś klientowi). Wzajemny podgląd kalendarzy Michała i Marcina na Pulpicie.',
   ]],

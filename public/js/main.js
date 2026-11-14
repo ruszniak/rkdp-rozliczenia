@@ -512,6 +512,8 @@ async function start() {
     route({ silent: true, keepScroll: true });
   });
   route().then(prefetchViews);
+  // „Co nowego” dla tej osoby – okno po zalogowaniu (po załadowaniu widoku)
+  if (!isPartner()) setTimeout(() => import('./ogloszenia.js').then(m => m.showAnnouncements()).catch(() => {}), 1200);
 }
 
 sb.auth.onAuthStateChange((event) => {

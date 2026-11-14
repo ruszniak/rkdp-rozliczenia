@@ -242,6 +242,12 @@ async function onSpotkanie(b: any) {
   return notify(to, 'spotkania', { title, body: `${short(who, 60)} · ${when}${extra}`, url, tag });
 }
 
+async function onOgloszenie(b: any) {
+  const { data: o } = await db.from('ogloszenia').select('id, title, audience').eq('id', String(b.id || '')).maybeSingle();
+  if (!o?.audience?.length) return 0;
+  return notify(o.audience, 'zgloszenia', { title: 'Co nowego w rdp.app', body: short(String(o.title || ''), 140), url: '/#/pulpit', tag: `og-${o.id}` });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Metoda niedozwolona' }, 405);
@@ -262,6 +268,7 @@ Deno.serve(async (req) => {
       if (body.event === 'zlecenie') return json({ sent: await onZlecenie(body) });
       if (body.event === 'spotkanie') return json({ sent: await onSpotkanie(body) });
       if (body.event === 'flush') return json({ sent: await flush() });
+      if (body.event === 'ogloszenie') return json({ sent: await onOgloszenie(body) });
       return json({ error: 'Nieznane zdarzenie' }, 400);
     }
     // zalogowany użytkownik: tylko powiadomienie testowe na własne urządzenia
