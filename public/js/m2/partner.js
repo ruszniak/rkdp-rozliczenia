@@ -189,7 +189,14 @@ export async function partnerContractDialog({ client, pkgKey = 'partner', pkg = 
       sendForSignature({ client, target: { m2_client_id: client.id }, firm: 'm2', kind: 'umowa_doradcza', title: t,
         buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, M2_BRAND, t); },
         preview: previewDoc(orderHtml(B, location.origin + M2_BRAND.logo, M2_BRAND), { head: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap"><style>${ORDER_CSS}</style>` }),
-        onSent: () => { close(); toast('Umowa wysłana – status zobaczysz na karcie biura w sekcji „Do podpisu”'); } });
+        onSent: async () => {
+          close(); toast('Umowa wysłana – status zobaczysz na karcie biura w sekcji „Do podpisu”');
+          // biuro, któremu wysłano umowę partnerską, oznaczamy jako partnera (z wybranym pakietem)
+          if (client.client_type !== 'partner' || client.partner_package !== d.pkg) {
+            const { error: e } = await sb.from('m2_clients').update({ client_type: 'partner', partner_package: d.pkg }).eq('id', client.id);
+            if (!e) Object.assign(client, { client_type: 'partner', partner_package: d.pkg });
+          }
+        } });
     } }, icon('mail'), 'Wyślij do podpisu'),
   ]);
 }

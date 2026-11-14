@@ -3271,3 +3271,6 @@ html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scal
 :root[data-theme="dark"] .sign-note{background:rgba(245,158,11,.12);color:inherit}:root[data-theme="dark"] .sign-note small{color:#FCD34D}
 :root[data-theme="dark"] .sign-st{background:rgba(59,130,246,.18);color:#93C5FD}:root[data-theme="dark"] .sign-st.ok{background:rgba(34,197,94,.18);color:#86EFAC}
 :root[data-theme="dark"] .sign-st.warn{background:rgba(245,158,11,.18);color:#FCD34D}:root[data-theme="dark"] .sign-st.off{background:var(--soft);color:var(--muted)}
+/* M2 TAX – klient-partner (biuro rachunkowe w Programie Partner) */
+.badge.partner{background:#F3E8D6;color:#7A5A37;margin-left:8px;vertical-align:1px}
+:root[data-theme="dark"] .badge.partner{background:rgba(176,141,87,.22);color:#E0C098}

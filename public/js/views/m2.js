@@ -589,6 +589,7 @@ async function viewMatter(main, id, params) {
 }
 
 // ================= KLIENCI =================
+const PARTNER_PKG = { baza: 'Biuro Baza', partner: 'Biuro Partner', plus: 'Biuro Plus' };
 async function viewClients(main) {
   const [clients, matters] = await Promise.all([
     fetchAll(() => sb.from('m2_clients').select('*').eq('firm', 'm2').order('name')),
@@ -598,6 +599,7 @@ async function viewClients(main) {
   // ten sam wygląd co lista klientów RKDP: nagłówek z licznikiem i przełącznikiem firmy, wyszukiwarka, etykiety, tabela
   const search = h('input', { class: 'input grow', type: 'search', placeholder: 'Szukaj po nazwie, NIP, e-mailu, telefonie…', 'aria-label': 'Szukaj' });
   const f = { st: 'aktywny', who: '' };
+  const isPartner = c => c.client_type === 'partner';
   const isMine = c => matters.some(m => m.client_id === c.id && OPEN_STATUSES.includes(m.status) && [m.lead_id, m.second_id, m.assistant_id].includes(state.me.id));
   const counter = h('span', { class: 'kl-count' });
   const chips = h('div', { class: 'zl-chips kl-chips' });
@@ -609,13 +611,13 @@ async function viewClients(main) {
     const base = clients.filter(c => !f.st || c.status === f.st);
     const noAml = base.filter(c => !c.aml_verified_at);
     const chip = (k, l, n) => h('button', { type: 'button', class: 'zl-chip' + (f.who === k ? ' on' : ''), onclick: () => { f.who = k; render(); } }, l, h('span', {}, String(n)));
-    chips.replaceChildren(chip('', 'Wszyscy', base.length), chip('moi', 'Moi', base.filter(isMine).length), noAml.length || f.who === 'aml' ? chip('aml', 'Brak AML', noAml.length) : null, h('label', { class: 'kl-sel' }, statusSel));
+    chips.replaceChildren(chip('', 'Wszyscy', base.length), chip('moi', 'Moi', base.filter(isMine).length), chip('klienci', 'Klienci', base.filter(c => !isPartner(c)).length), chip('partner', 'Partnerzy', base.filter(isPartner).length), noAml.length || f.who === 'aml' ? chip('aml', 'Brak AML', noAml.length) : null, h('label', { class: 'kl-sel' }, statusSel));
     [...chips.childNodes].forEach(n => { if (n.nodeType === 3) n.remove(); });
-    const rows = base.filter(c => (f.who !== 'moi' || isMine(c)) && (f.who !== 'aml' || !c.aml_verified_at) && (!q || [c.name, c.nip, c.email, c.phone, c.contact_person].some(v => (v || '').toLowerCase().includes(q))));
+    const rows = base.filter(c => (f.who !== 'moi' || isMine(c)) && (f.who !== 'partner' || isPartner(c)) && (f.who !== 'klienci' || !isPartner(c)) && (f.who !== 'aml' || !c.aml_verified_at) && (!q || [c.name, c.nip, c.email, c.phone, c.contact_person].some(v => (v || '').toLowerCase().includes(q))));
     counter.textContent = String(rows.length);
     tbody.replaceChildren(...(rows.length ? rows.map(c => h('tr', { class: 'click', onclick: () => { location.hash = `${BASE}/klient/${c.id}`; } },
-      h('td', {}, h('b', {}, c.name), h('div', { class: 'small muted' }, c.nip ? `NIP ${c.nip}` : '')),
-      h('td', { class: 'small' }, c.kind === 'osoba' ? 'osoba fizyczna' : 'firma'),
+      h('td', {}, h('b', {}, c.name), isPartner(c) ? h('span', { class: 'badge partner', 'data-tip': 'Program Partner – biuro rachunkowe' + (PARTNER_PKG[c.partner_package] ? ` · pakiet ${PARTNER_PKG[c.partner_package]}` : '') }, 'Partner') : null, h('div', { class: 'small muted' }, c.nip ? `NIP ${c.nip}` : '')),
+      h('td', { class: 'small' }, isPartner(c) ? 'biuro rachunkowe' : c.kind === 'osoba' ? 'osoba fizyczna' : 'firma'),
       h('td', { class: 'small' }, BILLING_TYPE[c.billing_type] || '—', c.hourly_rate ? h('div', { class: 'muted' }, money(c.hourly_rate) + ' / h') : null, c.monthly_fee ? h('div', { class: 'muted' }, money(c.monthly_fee) + ' / mies.') : null),
       h('td', { class: 'small' }, c.contact_person || '', c.phone ? h('div', {}, c.phone) : null, c.email ? h('div', { class: 'muted' }, c.email) : null),
       h('td', {}, c.aml_verified_at ? h('span', { class: 'badge ok', 'data-tip': `Ryzyko: ${AML_RISK[c.aml_risk] || '—'}` }, 'AML ' + fmtDate(c.aml_verified_at)) : h('span', { class: 'badge warn' }, 'brak AML')),
@@ -651,7 +653,10 @@ async function viewClient(main, id) {
   const draft = { ...c };
   const sections = [
     ['Dane', [['name', 'Nazwa / imię i nazwisko', 'text', null, true], ['kind', 'Rodzaj', 'select', { firma: 'Firma', osoba: 'Osoba fizyczna' }],
-      ['status', 'Status', 'select', { aktywny: 'Aktywny', archiwum: 'Archiwum' }], ['nip', 'NIP', 'text'], ['regon', 'REGON', 'text'], ['krs', 'KRS', 'text'],
+      ['status', 'Status', 'select', { aktywny: 'Aktywny', archiwum: 'Archiwum' }],
+      ['client_type', 'Typ klienta', 'select', { klient: 'Klient (standardowy)', partner: 'Partner – biuro rachunkowe (Program Partner)' }],
+      ['partner_package', 'Pakiet partnera', 'select', { '': '—', baza: 'Biuro Baza', partner: 'Biuro Partner', plus: 'Biuro Plus' }],
+      ['nip', 'NIP', 'text'], ['regon', 'REGON', 'text'], ['krs', 'KRS', 'text'],
       ['address', 'Adres', 'text', null, true], ['mail_address', 'Adres do korespondencji (jeśli inny)', 'text', null, true],
       ['industry', 'Branża', 'list', ['budowlana', 'medyczna', 'beauty', 'produkcyjna', 'nieruchomości', 'handel', 'usługi', 'osoba prywatna']],
       ['source', 'Skąd klient', 'list', ['polecenie', 'strona m2tax.pl', 'podatkiwroclaw.pl', 'rezerwacja online', 'Zoho Bookings', 'RKDP', 'KIDP']]]],
@@ -666,7 +671,8 @@ async function viewClient(main, id) {
   async function save() {
     if (!draft.name) return toast('Podaj nazwę klienta', true);
     const row = {}; sections.forEach(([, defs]) => defs.forEach(([k]) => { row[k] = draft[k] ?? null; }));
-    row.kind = row.kind || 'firma'; row.status = row.status || 'aktywny';
+    row.kind = row.kind || 'firma'; row.status = row.status || 'aktywny'; row.client_type = row.client_type || 'klient';
+    row.partner_package = row.client_type === 'partner' ? (row.partner_package || null) : null;
     saveBtn.disabled = true;
     const q = isNew ? sb.from('m2_clients').insert(row).select('id').single() : sb.from('m2_clients').update(row).eq('id', id).select('id').single();
     const { data, error } = await q; saveBtn.disabled = false;
@@ -715,7 +721,7 @@ async function viewClient(main, id) {
       c.kind !== 'osoba' ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'Program Partner – stała obsługa doradcza biura rachunkowego', onclick: async () => { const { partnerContractDialog } = await import('../m2/partner.js'); partnerContractDialog({ client: c }); } }, '+ Umowa z biurem rachunkowym') : null)),
   signPanel({ m2_client_id: c.id }),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
-  main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
+  main.replaceChildren(...header('klienci', c.name, [c.client_type === 'partner' ? `Partner – biuro rachunkowe${PARTNER_PKG[c.partner_package] ? ` (pakiet ${PARTNER_PKG[c.partner_package]})` : ''}` : null, c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
     h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
