@@ -55,6 +55,18 @@ export async function sendForSignature(opts) {
     h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Uwagi klienta, status i podpisany plik zobaczysz w sekcji „Do podpisu”; dostaniesz też e-mail.'));
   modal('Wyślij do podpisu', body, close => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+    // sam link – do wysłania klientowi samodzielnie (SMS, WhatsApp, własny e-mail); bez wiadomości z aplikacji
+    h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Utwórz link do strony podpisu i skopiuj go – bez wysyłania e-maila z aplikacji', onclick: async e => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję…';
+      try {
+        const bytes = await pdf();
+        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'send', no_email: true, ...target, firm, kind, title: s.title.trim(), to: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.to.trim()) ? s.to.trim() : '',
+          attachment: { base64: b64(bytes) }, doc_html: preview || null } });
+        if (error || r?.error || !r?.link) throw new Error(r?.detail || r?.error || error?.message || 'Brak linku');
+        close(); onSent?.(r);
+        showLink(r.link, s.title);
+      } catch (err) { fail(err, 'Nie udało się utworzyć linku'); b.disabled = false; b.textContent = 'Tylko link – kopiuj'; }
+    } }, '🔗 Tylko link – kopiuj'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: async e => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.to.trim())) return toast('Wpisz poprawny e-mail klienta', true);
       if (!s.body.includes('{link}')) return toast('Zostaw w treści {link} – tam wstawi się link do podpisu', true);
@@ -69,6 +81,18 @@ export async function sendForSignature(opts) {
       } catch (err) { fail(err, 'Nie udało się wysłać'); b.disabled = false; b.textContent = 'Wyślij do podpisu'; }
     } }, icon('mail'), 'Wyślij do podpisu'),
   ]);
+}
+
+// gotowy link do podpisu: kopiowanie (także ręczne, gdy przeglądarka nie pozwala)
+function showLink(link, title) {
+  const inp = h('input', { class: 'input', readonly: true, value: link, onfocus: e => e.target.select() });
+  const copy = async () => { try { await navigator.clipboard.writeText(link); toast('Skopiowano link do podpisu'); } catch { inp.select(); document.execCommand?.('copy'); toast('Zaznaczono link – skopiuj Ctrl+C / ⌘C'); } };
+  copy();
+  modal('Link do podpisu', h('div', {},
+    h('p', { class: 'small', style: { margin: '0 0 10px' } }, `„${title}” – wyślij ten link klientowi (SMS, komunikator, własny e-mail). Na stronie przeczyta dokument, zgłosi uwagi, pobierze PDF i odeśle podpisany plik. Link jest ważny 7 dni.`),
+    inp,
+    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Status, uwagi klienta i podpisany plik zobaczysz w sekcji „Do podpisu”. Link możesz skopiować tam ponownie.')),
+    close => [h('button', { class: 'btn btn-outline btn-sm', onclick: copy }, 'Kopiuj ponownie'), h('button', { class: 'btn btn-primary btn-sm', onclick: close }, 'Gotowe')]);
 }
 
 // Panel „Do podpisu”: filter = { client_id } | { order_id } | { m2_client_id }
@@ -95,7 +119,7 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
       const active = r.status === 'wyslano' && !expired;
       return h('div', { class: 'sign-row' },
         h('div', { class: 'sign-top' },
-          h('div', { class: 'sign-t' }, h('b', {}, r.title), h('span', { class: 'small muted' }, ` · ${r.email || ''} · ${d(r.created_at)}`)),
+          h('div', { class: 'sign-t' }, h('b', {}, r.title), h('span', { class: 'small muted' }, ` · ${r.email || 'link skopiowany'} · ${d(r.created_at)}`)),
           h('span', { class: 'sign-st ' + cls }, label),
           h('span', { class: 'row-btns' },
             h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => open(r, 'original') }, 'PDF'),

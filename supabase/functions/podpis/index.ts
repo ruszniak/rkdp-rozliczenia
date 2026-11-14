@@ -215,14 +215,17 @@ Deno.serve(async (req: Request) => {
       }
       const firm = body.firm === 'm2' ? 'm2' : 'rkdp';
       const kind = ['umowa', 'zlecenie', 'umowa_doradcza', 'pel', 'inne'].includes(body.kind) ? body.kind : 'umowa';
+      // no_email: tylko link do skopiowania (np. wysłany klientowi innym kanałem) – bez e-maila
+      const noMail = body.no_email === true;
       const to = String(body.to || '').trim().toLowerCase();
-      if (!emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail klienta' }, 400);
+      if (!noMail && !emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail klienta' }, 400);
+      if (noMail && to && !emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail klienta' }, 400);
       const title = String(body.title || 'Umowa').trim().slice(0, 160) || 'Umowa';
       const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').slice(0, 8000);
-      if (!subject || !text0.trim()) return json({ error: 'Pusty temat lub treść' }, 400);
+      if (!noMail && (!subject || !text0.trim())) return json({ error: 'Pusty temat lub treść' }, 400);
       const b64 = String(body.attachment?.base64 || '').replace(/\s+/g, '');
       if (!b64 || b64.length > 14_000_000 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return json({ error: 'Brak albo zbyt duży plik PDF' }, 400);
-      if (!SMTP_USER || !SMTP_PASS) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
+      if (!noMail && (!SMTP_USER || !SMTP_PASS)) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
       const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
       const docHtml = typeof body.doc_html === 'string' && body.doc_html.length <= 1_500_000 ? body.doc_html : null;
       const fname = `${title}.pdf`.replace(/[\\/:*?"<>|\r\n]+/g, ' ');
@@ -231,16 +234,20 @@ Deno.serve(async (req: Request) => {
       if (e1) return json({ error: 'Nie udało się zapisać dokumentu' }, 500);
       let fileId = null;
       if (c) {
-        const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: c.id, category: KIND_CAT[kind] || 'umowa', name: `${title} – wysłana do podpisu.pdf`.slice(0, 200), note: `Wysłana do podpisu na ${to}`.slice(0, 500), path, mime: 'application/pdf', size: bytes.length, uploaded_by: memberId }).select('id').single();
+        const { data: cf, error: e2 } = await admin.from('client_files').insert({ client_id: c.id, category: KIND_CAT[kind] || 'umowa', name: `${title} – wysłana do podpisu.pdf`.slice(0, 200), note: (noMail ? 'Link do podpisu skopiowany w aplikacji' : `Wysłana do podpisu na ${to}`).slice(0, 500), path, mime: 'application/pdf', size: bytes.length, uploaded_by: memberId }).select('id').single();
         if (e2) { await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się zapisać dokumentu' }, 500); }
         fileId = cf.id;
       }
       const token = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
       const { data: rq, error: e3 } = await admin.from('sign_requests').insert({ client_id: c?.id || null, m2_client_id: m2c?.id || null, order_id: order?.id || null, firm, kind,
-        token, title, email: to, file_id: fileId, file_path: fileId ? null : path, created_by: memberId, doc_html: docHtml }).select('id').single();
+        token, title, email: to || null, file_id: fileId, file_path: fileId ? null : path, created_by: memberId, doc_html: docHtml }).select('id').single();
       if (e3) { console.error(e3); return json({ error: 'Nie udało się utworzyć prośby o podpis' }, 500); }
       const S = await settings();
       const link = `${S.app}/podpis/?t=${token}`;
+      if (noMail) {
+        if (order && order.status === 'projekt') await admin.from('m2_orders').update({ status: 'wyslane' }).eq('id', order.id);
+        return json({ ok: true, id: rq.id, link });
+      }
       const textBody = text0.replaceAll('{link}', link);
       const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
       const sig = firm === 'm2'
