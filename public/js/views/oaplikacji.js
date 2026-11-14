@@ -99,7 +99,7 @@ const NEWS = [
     'Umowy i pełnomocnictwa prosto z aplikacji: „Wyślij do podpisu” (umowa księgowa, ZUS PEL, umowy i zlecenia doradcze) – klient dostaje link (ważny 7 dni) z podglądem dokumentu, może zgłosić uwagi i podpisać profilem zaufanym, kwalifikowanym albo odręcznie; podpisany plik trafia sam do Archiwum klienta. Opcja „Tylko link – kopiuj” bez e-maila.',
     'UPL-1: „Wyślij klientowi” – e-mail z wypełnionym PDF i stroną z instrukcją złożenia; urząd skarbowy z listy (UPL-1, PPS-1).',
     'Umowa w PDF jako prawdziwy dokument z tekstem (logo, stopka, bez uciętych wierszy); data zawarcia umów i zleceń = dzień złożenia pierwszego podpisu.',
-    'Poprawki: kolejność imienia i nazwiska w UPL-1/PPS-1/PEL, nazwy klientów-osób „Nazwisko Imię”, „Braki w profilu” pokazują brakujące pola, powiadomienie otwiera zadanie wprost, powiadomienie o zamknięciu/anulowaniu zadania. Okno „Co nowego” po zalogowaniu.',
+    'Poprawki: kolejność imienia i nazwiska w UPL-1/PPS-1/PEL, nazwy klientów-osób „Nazwisko Imię”, „Braki w profilu” pokazują brakujące pola, powiadomienie otwiera zadanie wprost, powiadomienie o zamknięciu/anulowaniu zadania. Okno „Co nowego” po zalogowaniu. Na iPhonie przewijane wiadomości w zadaniu nie wchodzą już nad nagłówek okna.',
     'Pomoc i instrukcje ze zrzutami ekranu (Więcej → Pomoc i instrukcje): dla księgowości RKDP, dla doradców M2 TAX i dla biur partnerskich.',
     'M2 TAX: Program Partner – konta biur rachunkowych (zadania do doradców przez aplikację, wzory, JPK), oznaczenie Partner na liście klientów, umowa z biurem wg pakietów.',
   ]],

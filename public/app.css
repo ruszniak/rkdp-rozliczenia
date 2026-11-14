@@ -2621,6 +2621,10 @@ html:not([data-theme="dark"]) .grid thead th .sub{text-transform:none;letter-spa
 .zl-cmodal{background:#F1F2F4;padding-bottom:0!important;display:flex;flex-direction:column}
 .zl-cmodal>.row:last-child{display:none!important}
 .zl-cmodal>.section-head{position:sticky;top:-1px;z-index:6;background:#F1F2F4;margin:0 -2px 6px;padding-top:2px}
+/* górny margines okna nie może odsłaniać przewijanych wiadomości nad nagłówkiem (iPhone) – nagłówek zaczyna się od samej krawędzi */
+.zl-cmodal{padding-top:0!important}
+.zl-cmodal>.section-head{top:0;padding-top:22px}
+@media (max-width:820px){.zl-cmodal>.section-head{padding-top:18px}}
 :root[data-theme="dark"] .zl-cmodal,:root[data-theme="dark"] .zl-cmodal>.section-head{background:#131314}
 .zl-chat{display:flex;flex-direction:column;flex:1;min-height:0}
 .zl-chat-who{display:flex;align-items:center;gap:8px;margin:-4px 0 10px}
