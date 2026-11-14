@@ -339,10 +339,10 @@ async function sendUpl1(cl, data, pelnomocnik, filename) {
 export async function sendForSignature(cl, documentXml, title) {
   const s = { title, to: String(cl.email || '').split(/[;,\s]+/).find(x => x.includes('@')) || '' };
   s.subject = `${title} – prośba o podpis`;
-  s.body = `Dzień dobry,\n\nprzygotowaliśmy dla Państwa dokument „${title}”. Pod linkiem poniżej można go przeczytać, zgłosić ewentualne uwagi i podpisać:\n{link}\n\nPodpisać można:\n• bezpłatnie profilem zaufanym (podpis zaufany na gov.pl),\n• podpisem kwalifikowanym,\n• odręcznie – po wydrukowaniu i zeskanowaniu.\n\nNa stronie jest instrukcja krok po kroku i miejsce na odesłanie podpisanego pliku.\n\nW razie pytań jesteśmy do dyspozycji.`;
+  s.body = `Dzień dobry,\n\nprzygotowaliśmy dla Państwa dokument „${title}”. Pod linkiem poniżej można go przeczytać, zgłosić ewentualne uwagi i podpisać:\n{link}\n\nPodpisać można:\n• bezpłatnie profilem zaufanym (podpis zaufany na gov.pl),\n• podpisem kwalifikowanym,\n• odręcznie – po wydrukowaniu i zeskanowaniu.\n\nNa stronie jest instrukcja krok po kroku i miejsce na odesłanie podpisanego pliku. Link jest ważny 7 dni.\n\nW razie pytań jesteśmy do dyspozycji.`;
   const body = h('div');
   body.append(
-    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · e-mail zawiera tylko link – umowę klient czyta, komentuje i pobiera do podpisu na stronie. Kopia PDF trafi do archiwum klienta.'),
+    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · e-mail zawiera tylko link – umowę klient czyta, komentuje i pobiera do podpisu na stronie. Kopia PDF trafi do archiwum klienta. Link jest ważny 7 dni.'),
     grid([['title', 'Nazwa dokumentu', 'text', null, true], ['to', 'Do (e-mail klienta)', 'email', null, true], ['subject', 'Temat', 'text', null, true],
       ['body', 'Treść – {link} zamieni się na link do strony podpisu (pod spodem dopisze się Twoja stopka)', 'textarea']], s),
     h('div', { class: 'row-btns', style: { marginTop: '8px' } },
