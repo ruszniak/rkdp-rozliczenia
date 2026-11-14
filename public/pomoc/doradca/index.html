@@ -15,7 +15,7 @@
 <main id="top">
 <p class="eyebrow" style="margin:0 0 6px;color:var(--muted);font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase">M2 TAX · zespół</p>
 <h1>rdp.app – instrukcja dla doradcy</h1>
-<p class="meta">Pulpit, sprawy, zlecenia i umowy, a przede wszystkim zadania i rozmowy z biurami rachunkowymi (Program Partner) · listopad 2026 r.</p>
+<p class="meta">Pulpit, prowadzenie spraw, grafik przyjęć i spotkania, zlecenia i umowy, a przede wszystkim zadania i rozmowy z biurami rachunkowymi (Program Partner) · listopad 2026 r.</p>
 <p class="small">Zrzuty ekranu pokazują wersję demonstracyjną z fikcyjnymi danymi (doradcy „Anna Kowalska” i „Piotr Mazur”, biuro „Biuro Rachunkowe Przykład”).</p>
 
 <ol class="toc">
@@ -25,7 +25,8 @@
   <li><a href="#czas">Licznik czasu pracy</a></li>
   <li><a href="#biuro">Karta biura partnerskiego</a></li>
   <li><a href="#klienci">Klienci i AML</a></li>
-  <li><a href="#sprawy">Sprawy i terminy</a></li>
+  <li><a href="#sprawy">Prowadzenie sprawy – co uzupełniać</a></li>
+  <li><a href="#spotkania">Grafik przyjęć i spotkania</a></li>
   <li><a href="#podpis">Zlecenia, umowy i podpis klienta</a></li>
   <li><a href="#telefon">Na telefonie</a></li>
   <li><a href="#sciaga">Ściąga</a></li>
@@ -89,12 +90,128 @@
 <figure><img src="/pomoc/img/doradca-klienci.jpg" alt="Lista klientów M2 TAX z filtrem Partnerzy" loading="lazy"><figcaption>Filtry: Wszyscy, Moi, Klienci, Partnerzy, Brak AML. Kolumna AML pokazuje datę weryfikacji.</figcaption></figure>
 <p>Nowego klienta dodasz przyciskiem <b>+ Dodaj klienta</b> (dane z NIP pobierają się same). Weryfikację AML robisz na karcie klienta (sekcja AML) albo w „Weryfikacja AML” – data i ocena ryzyka same pojawiają się na liście.</p>
 
-<h2 id="sprawy"><span class="n">7</span>Sprawy i terminy</h2>
+<h2 id="sprawy"><span class="n">7</span>Prowadzenie sprawy – co uzupełniać</h2>
+<p>Każda sprawa (konsultacja, interpretacja, kontrola, postępowanie, skarga do WSA…) ma swoją kartę. Znajdziesz ją w menu <b>Sprawy</b>, na karcie klienta albo przez <kbd>Ctrl</kbd>+<kbd>K</kbd>. Nową sprawę zakładasz przyciskiem <b>+ Nowa sprawa</b> (w Sprawach albo na karcie klienta). Wybierasz klienta, wpisujesz tytuł i zapisujesz, a zlecenie lub umowę do podpisu przygotowujesz potem z karty sprawy.</p>
 <figure><img src="/pomoc/img/doradca-sprawy.jpg" alt="Lista spraw" loading="lazy"><figcaption>Sprawy: numer, klient, organ i sygnatura, status, zespół i najbliższy termin. Filtry: otwarte, rodzaj, doradca.</figcaption></figure>
-<figure><img src="/pomoc/img/doradca-sprawa.jpg" alt="Karta sprawy z terminami" loading="lazy"><figcaption>Karta sprawy: dane, zespół (prowadzący i drugi doradca), terminy (urzędowe i „Inny termin” – np. wysłać coś klientowi), dziennik, czas pracy, pismo, raport PDF, pełnomocnictwo.</figcaption></figure>
-<p><b>+ Termin</b> → „Termin urzędowy” (liczony od doręczenia) albo „Inny termin” z opisem, co trzeba zrobić. Terminy trafiają do kalendarza Google i do „Terminy i pytania” na Pulpicie.</p>
 
-<h2 id="podpis"><span class="n">8</span>Zlecenia, umowy i podpis klienta</h2>
+<h3>Pasek na górze karty</h3>
+<figure><img src="/pomoc/img/doradca-sp2-naglowek.jpg" alt="Nagłówek karty sprawy z przyciskami" loading="lazy"><figcaption>Status, „✓ Zakończ sprawę”, „⏱ Licz czas”, „Pismo”, „Raport PDF”, „Pełnomocnictwo”.</figcaption></figure>
+<table class="st">
+  <tr><th>Przycisk</th><th>Do czego służy</th></tr>
+  <tr><td><span class="btn-i">⏱ Licz czas</span></td><td>Stoper czasu pracy przypisany do tej sprawy. Po „■ Stop” wpis sam trafia do sekcji „Czas pracy”.</td></tr>
+  <tr><td><span class="btn-i">Pismo</span></td><td>Wzory pism procesowych z danymi tej sprawy (klient, organ, sygnatura) – na papierze M2 TAX.</td></tr>
+  <tr><td><span class="btn-i">Raport PDF</span></td><td>Raport dla klienta lub do rozliczenia: pełne podsumowanie, samo zestawienie godzin albo sam dziennik; można zawęzić okres.</td></tr>
+  <tr><td><span class="btn-i">Pełnomocnictwo</span></td><td>PPS-1 albo pełnomocnictwo szczególne / procesowe (WSA, NSA) z danymi sprawy.</td></tr>
+  <tr><td><span class="btn-i pri">✓ Zakończ sprawę</span></td><td>Status „Zakończona”, data zakończenia = dziś, otwarte terminy zostają odhaczone. „Wznów sprawę” cofa to jednym kliknięciem.</td></tr>
+</table>
+
+<h3>Dane sprawy – pola</h3>
+<div class="pair">
+<figure><img src="/pomoc/img/doradca-sp2-dane.jpg" alt="Formularz Dane sprawy" loading="lazy"><figcaption>„Dane sprawy” – po zmianach kliknij „Zapisz zmiany”.</figcaption></figure>
+<div style="flex:1 1 320px">
+<table class="st">
+  <tr><th>Pole</th><th>Co wpisać</th></tr>
+  <tr><td><b>Tytuł sprawy</b> ✱</td><td>Krótko i konkretnie: „Kontrola VAT za 2024 r.”, „Interpretacja – leasing auta”.</td></tr>
+  <tr><td><b>Rodzaj</b>, <b>Status</b></td><td>Status zmieniaj na bieżąco: Nowa → W toku → Czeka na organ / Czeka na klienta → Zakończona.</td></tr>
+  <tr><td><b>Etap (opis)</b></td><td>Gdzie jesteśmy, np. „protokół – zastrzeżenia”, „odwołanie złożone”.</td></tr>
+  <tr><td><b>Organ</b>, <b>Sygnatura</b></td><td>Organ z listy i znak sprawy z pisma – trafiają do pism i pełnomocnictw.</td></tr>
+  <tr><td><b>Podatek</b>, <b>Okres</b>, <b>Kwota sporu</b></td><td>Czego dotyczy spór (np. VAT, 2024, 84 500 zł).</td></tr>
+  <tr><td><b>Doradca prowadzący</b>, <b>Drugi doradca</b>, <b>Asystent(ka)</b></td><td>Prowadzący odpowiada za sprawę; drugi doradca widzi ją i dostaje terminy, gdy nikt inny ich nie ma.</td></tr>
+  <tr><td><b>Pełnomocnictwo</b> + data</td><td>Jakie pełnomocnictwo złożono (PPS-1, szczególne, procesowe) i kiedy.</td></tr>
+  <tr><td><b>Data rozpoczęcia / zakończenia</b></td><td>Zakończenia nie wpisujesz ręcznie – ustawia się przy „Zakończ sprawę”.</td></tr>
+  <tr><td><b>Termin realizacji (planowany)</b></td><td>Kiedy chcemy skończyć; „orientacyjny (ok.)”, jeśli to tylko szacunek. Po terminie sprawa świeci się na czerwono.</td></tr>
+  <tr><td><b>Wynagrodzenie</b>, <b>Kwota / stawka</b>, <b>Szacowany czas</b></td><td>Ryczałt albo stawka godzinowa (netto). Przy stawce godzinowej „Czas pracy” liczy od razu wartość.</td></tr>
+  <tr><td><b>Opis sprawy, stan faktyczny</b></td><td>Najważniejsze fakty i ustalenia – tak, żeby drugi doradca mógł przejąć sprawę.</td></tr>
+  <tr><td><b>Rozstrzygnięcie / wynik</b></td><td>Uzupełnij na koniec: decyzja, wyrok, interpretacja, wynik kontroli.</td></tr>
+</table>
+</div>
+</div>
+
+<h3>Terminy</h3>
+<p><span class="btn-i">+ Termin</span> ma dwie zakładki:</p>
+<div class="pair">
+<figure><img src="/pomoc/img/doradca-sp2-termin-urz.jpg" alt="Nowy termin urzędowy z kalkulatorem" loading="lazy"><figcaption><b>Termin urzędowy</b> – wybierz czynność i datę doręczenia, kalkulator policzy termin (z sobotami i świętami). Możesz też „Wczytaj pismo z urzędu (PDF)” – rodzaj pisma i data odczytają się same.</figcaption></figure>
+<figure><img src="/pomoc/img/doradca-sp2-termin-inny.jpg" alt="Inny termin" loading="lazy"><figcaption><b>Inny termin</b> – zwykłe przypomnienie: co trzeba zrobić, kiedy i kto odpowiada (np. „wysłać klientowi projekt odwołania”).</figcaption></figure>
+</div>
+<ul>
+  <li>Terminy trafiają do Kalendarza Google (kalendarz „rdp.app – terminy”), do „Terminy i pytania” na Pulpicie i do porannego powiadomienia „Plan na dziś”.</li>
+  <li>Po wykonaniu kliknij <span class="btn-i">✓ Zrealizowano</span>. Termin „po terminie” jest czerwony, „wkrótce” – 3 dni przed.</li>
+</ul>
+
+<h3>Dziennik sprawy</h3>
+<div class="pair">
+<figure><img src="/pomoc/img/doradca-sp2-dziennik.jpg" alt="Dziennik sprawy" loading="lazy"><figcaption>Rodzaj wpisu, data, tytuł i treść. Wpisy układają się od najnowszego.</figcaption></figure>
+<div style="flex:1 1 300px">
+<p>Wszystko, co dzieje się w sprawie, zapisuj w dzienniku: <b>pismo otrzymane</b>, <b>pismo wysłane</b>, <b>czynność</b> (np. udział w czynnościach kontrolnych), <b>telefon / e-mail</b> i <b>notatka</b>. W tytule podaj, co to jest i z jakiego dnia („Wezwanie z US z 10.10”), a w treści – ustalenia.</p>
+<p class="tip"><b>Pismo otrzymane</b> → po „Dodaj wpis” aplikacja zapyta, czy dodać termin liczony od doręczenia. Zawsze dodawaj – wtedy nic nie umknie.</p>
+</div>
+</div>
+
+<h3>Czas pracy i raport</h3>
+<div class="pair">
+<figure><img src="/pomoc/img/doradca-sp2-czas.jpg" alt="Czas pracy w sprawie" loading="lazy"><figcaption>Data, liczba godzin (np. 1,5), co zrobiono, „do rozliczenia”. Na górze suma, wartość netto i szacunek.</figcaption></figure>
+<figure><img src="/pomoc/img/doradca-sp2-raport.jpg" alt="Okno Raport PDF" loading="lazy"><figcaption>Raport PDF: pełny, zestawienie godzin albo dziennik – za wybrany okres.</figcaption></figure>
+</div>
+<p>Czas wpisuj <b>codziennie</b> – licznikiem „⏱ Licz czas” albo ręcznie w „Czas pracy”. Odznacz „do rozliczenia”, jeśli to praca, której nie fakturujemy (np. wewnętrzne ustalenia).</p>
+
+<h3>Zlecenie / umowa do sprawy</h3>
+<p>Sekcja <b>„Zlecenie / umowa”</b> pokazuje dokument, do którego należy sprawa. Jeśli go nie ma – <span class="btn-i">+ Zlecenie do podpisu</span> albo <span class="btn-i">+ Umowa</span> (szczegóły w <a href="#podpis">punkcie 9</a>).</p>
+
+<h3>Minimum w każdej sprawie</h3>
+<table class="st">
+  <tr><th>Kiedy</th><th>Co uzupełnić</th></tr>
+  <tr><td>Na start</td><td>Tytuł, rodzaj, klient, prowadzący (i drugi doradca), organ i sygnatura, wynagrodzenie, opis stanu faktycznego, zlecenie do podpisu.</td></tr>
+  <tr><td>Po każdym piśmie</td><td>Wpis w dzienniku + termin na odpowiedź; zmiana statusu i etapu.</td></tr>
+  <tr><td>Każdego dnia pracy</td><td>Czas pracy z krótkim opisem.</td></tr>
+  <tr><td>Na koniec</td><td>Rozstrzygnięcie / wynik, „✓ Zakończ sprawę”, ewentualnie Raport PDF dla klienta.</td></tr>
+</table>
+
+<h2 id="spotkania"><span class="n">8</span>Grafik przyjęć i spotkania</h2>
+<p>Klienci umawiają się sami na stronach rkdp.pl i m2tax.pl oraz pod linkiem <b>app.ruszniak.io/umow</b> – widzą tylko wolne godziny z Twojego <b>grafiku przyjęć</b> minus to, co już masz w Kalendarzu Google. Spotkania umawiasz też sam w aplikacji. Wszystko jest w <b>Więcej → Spotkania i grafik przyjęć</b>.</p>
+
+<h3>Krok 1. Połącz Kalendarz Google (raz)</h3>
+<p><b>Mój profil</b> (inicjały w prawym górnym rogu) → <b>Kalendarz Google</b> → „Połącz z Google” i zaloguj się kontem, w którym prowadzisz kalendarz. Potem w <b>Spotkania → Grafik i ustawienia → Kalendarze Google</b> wybierz:</p>
+<figure><img src="/pomoc/img/doradca-sp-kalendarze.jpg" alt="Ustawienia kalendarzy Google" loading="lazy"><figcaption>„Dodawaj spotkania do” – kalendarz, w którym pojawią się rezerwacje. „Blokuj godziny zajęte w kalendarzach” – zaznacz kalendarze, w których masz inne zajęcia (także prywatny, jeśli jest udostępniony).</figcaption></figure>
+<p class="tip"><b>Prywatne wpisy są bezpieczne:</b> klient i zespół widzą w tym czasie tylko „Zajęty” – bez tytułu i szczegółów.</p>
+
+<h3>Krok 2. Ustaw grafik domyślny</h3>
+<p><b>Spotkania → Grafik i ustawienia → Grafik przyjęć</b> → pod swoim imieniem kliknij <b>„Grafik domyślny”</b>. Dla każdego dnia tygodnia wpisz godziny, w których przyjmujesz klientów (np. 9:00–12:00 i 13:00–16:00). Puste = w ten dzień nie przyjmujesz. Grafik domyślny obowiązuje co tydzień.</p>
+<figure class="mid"><img src="/pomoc/img/doradca-sp-domyslny.jpg" alt="Grafik domyślny" loading="lazy"><figcaption>„+ kolejne godziny (np. po przerwie)” dodaje drugi przedział, ✕ usuwa przedział.</figcaption></figure>
+
+<h3>Krok 3. Zmiany w konkretnym tygodniu</h3>
+<figure><img src="/pomoc/img/doradca-sp-grafik.jpg" alt="Grafik przyjęć na tydzień" loading="lazy"><figcaption>Tydzień w siatce: niebieskie – grafik domyślny, żółte – zmiana w tym dniu (z notatką), szare – nie przyjmuje. Strzałki ‹ › zmieniają tydzień.</figcaption></figure>
+<p>Kliknij dzień, żeby zmienić tylko ten jeden dzień – urlop, rozprawa, wizyta, dłuższy dzień:</p>
+<div class="pair">
+<figure><img src="/pomoc/img/doradca-sp-dzien-wolne.jpg" alt="Zmiana dnia – nie przyjmuję" loading="lazy"><figcaption>„Nie przyjmuję tego dnia” + powód (widzi tylko zespół).</figcaption></figure>
+<figure><img src="/pomoc/img/doradca-sp-dzien-inne.jpg" alt="Zmiana dnia – inne godziny" loading="lazy"><figcaption>„Inne godziny” – np. tylko popołudnie. „Jak zwykle” wraca do grafiku domyślnego.</figcaption></figure>
+</div>
+<ul>
+  <li><b>Skopiuj zmiany na kolejny tydzień</b> – gdy następny tydzień ma wyglądać tak samo (np. stały dzień w sądzie).</li>
+  <li><b>Przywróć domyślny</b> – kasuje zmiany w oglądanym tygodniu.</li>
+  <li>Święta są wolne automatycznie. Klient może zarezerwować najwcześniej kilka godzin od teraz i najdalej kilka tygodni do przodu (zasady ustawia Michał).</li>
+</ul>
+
+<h3>Krok 4. Umów spotkanie z klientem</h3>
+<p><span class="btn-i pri">+ Umów spotkanie</span> jest w <b>Spotkaniach</b>, na <b>Pulpicie</b> (karta „Spotkania z klientami”) i na <b>karcie klienta</b> (sekcja „Spotkania” – klient jest już wpisany).</p>
+<figure><img src="/pomoc/img/doradca-sp-umow.jpg" alt="Okno Umów spotkanie" loading="lazy"><figcaption>Po lewej dane spotkania, po prawej Twój dzień – jasne tło to godziny przyjęć, niebieskie – spotkania, szare – „Zajęty” z Google.</figcaption></figure>
+<ol>
+  <li><b>Klient</b> – zacznij wpisywać nazwę i wybierz z podpowiedzi (e-mail i telefon uzupełnią się same) albo wpisz dane nowej osoby.</li>
+  <li><b>Rodzaj</b> – Konsultacja (Google Meet), W kancelarii, Rozmowa telefoniczna albo „Inne…” (własny czas i forma).</li>
+  <li><b>Kto z nas</b> – domyślnie Ty. Zaznacz kilka osób, jeśli idziecie razem – aplikacja pokaże godziny wolne u wszystkich.</li>
+  <li><b>Dzień</b> i jedna z <b>wolnych godzin</b> (albo „inna godzina”, jeśli umawiasz poza grafikiem).</li>
+  <li><b>Temat</b> – widoczny w kalendarzu. Zostaw zaznaczone „Wyślij klientowi potwierdzenie i przypomnienie”.</li>
+  <li><span class="btn-i pri">Umów spotkanie</span> – spotkanie trafia do Twojego Kalendarza Google (przy Meet – z linkiem), klient dostaje e-mail z potwierdzeniem i przypomnienie dzień przed.</li>
+</ol>
+
+<h3>Prywatne / wewnętrzne – zablokuj czas</h3>
+<figure class="mid"><img src="/pomoc/img/doradca-sp-blokada.jpg" alt="Blokada godzin" loading="lazy"><figcaption>Zakładka „Prywatne / wewnętrzne”: spotkanie wewnętrzne, „Blokada godzin” albo „Cały dzień / kilka dni”. W tym czasie nikt się do Ciebie nie umówi.</figcaption></figure>
+
+<h3>Lista spotkań i szczegóły</h3>
+<figure><img src="/pomoc/img/doradca-sp-lista.jpg" alt="Lista spotkań" loading="lazy"><figcaption>Nadchodzące / Minione / Odwołane, Moje / Wszyscy. Etykieta „ze strony m2tax.pl” albo „z linku” – klient umówił się sam; „Meet” – link do rozmowy.</figcaption></figure>
+<figure><img src="/pomoc/img/doradca-sp-szczegoly.jpg" alt="Szczegóły spotkania" loading="lazy"><figcaption>Kliknij spotkanie: dane klienta, link Meet, osoby. Tu zmienisz termin, osoby albo odwołasz spotkanie (klient dostanie e-mail). Po spotkaniu wpisz notatkę wewnętrzną, koszt wizyty i czy jest opłacona / zafakturowana.</figcaption></figure>
+<p class="tip"><b>Notatki z Google Meet:</b> jeśli w Meet włączysz „Rób notatki z Gemini”, po spotkaniu rdp.app sama pobierze podsumowanie do szczegółów spotkania.</p>
+
+<h2 id="podpis"><span class="n">9</span>Zlecenia, umowy i podpis klienta</h2>
 <p>Zlecenie lub umowę (abonament) tworzysz z karty klienta albo sprawy. Po zapisaniu: <b>PDF</b>, <b>Word</b> i <span class="btn-i">✉ Wyślij do podpisu</span>.</p>
 <figure><img src="/pomoc/img/doradca-zlecenie.jpg" alt="Zlecenie z podglądem dokumentu" loading="lazy"><figcaption>Formularz po lewej, podgląd dokumentu na papierze M2 TAX po prawej. Data zawarcia: z dniem złożenia pierwszego podpisu.</figcaption></figure>
 <figure class="mid"><img src="/pomoc/img/doradca-podpis.jpg" alt="Okno wysyłki do podpisu" loading="lazy"><figcaption>„Wyślij do podpisu” – e-mail z linkiem; „🔗 Tylko link – kopiuj” – sam link do wysłania SMS-em lub komunikatorem.</figcaption></figure>
@@ -103,11 +220,11 @@
   <li>Status, uwagi klienta i podpisany plik widać w sekcji <b>„Do podpisu”</b> pod zleceniem (i na karcie klienta). O uwagach i podpisie dostajesz e-mail; po podpisaniu zlecenie ma status „Podpisane”.</li>
 </ul>
 
-<h2 id="telefon"><span class="n">9</span>Na telefonie</h2>
+<h2 id="telefon"><span class="n">10</span>Na telefonie</h2>
 <p>rdp.app działa jak aplikacja na telefonie (instrukcja: <a href="/zainstaluj/">app.ruszniak.io/zainstaluj</a>). W „Mój profil” włączysz powiadomienia push – wtedy o nowych zadaniach od biur dowiesz się od razu.</p>
 <figure class="narrow"><img src="/pomoc/img/doradca-telefon.jpg" alt="Zadanie od biura na telefonie" loading="lazy"><figcaption>Zadanie od biura na telefonie – te same przyciski i licznik czasu.</figcaption></figure>
 
-<h2 id="sciaga"><span class="n">10</span>Ściąga</h2>
+<h2 id="sciaga"><span class="n">11</span>Ściąga</h2>
 <table class="st">
   <tr><th>Chcę…</th><th>Gdzie</th></tr>
   <tr><td>odpowiedzieć biuru</td><td>Zadanie → „✓ Wyślij odpowiedź do biura”</td></tr>
@@ -115,6 +232,10 @@
   <tr><td>napisać krótką wiadomość / dodać plik</td><td>Zadanie → pole „Wiadomość…”, + / aparat</td></tr>
   <tr><td>policzyć czas</td><td>„⏱ Licz czas” w zadaniu, na karcie klienta lub w sprawie</td></tr>
   <tr><td>zobaczyć wszystkie pytania biura</td><td>Klienci → biuro → „Zadania od biura”</td></tr>
+  <tr><td>zmienić godziny przyjęć w jednym dniu</td><td>Spotkania → Grafik i ustawienia → kliknij dzień</td></tr>
+  <tr><td>umówić klienta</td><td>„+ Umów spotkanie” (Spotkania, Pulpit, karta klienta)</td></tr>
+  <tr><td>zablokować czas (urlop, sąd)</td><td>Umów spotkanie → „Prywatne / wewnętrzne” → Blokada / Cały dzień</td></tr>
+  <tr><td>dodać termin z pisma</td><td>Sprawa → „+ Termin” → Termin urzędowy (albo dziennik → Pismo otrzymane)</td></tr>
   <tr><td>wysłać umowę do podpisu</td><td>Zlecenie / umowa → „Wyślij do podpisu” albo „Tylko link – kopiuj”</td></tr>
   <tr><td>szybko znaleźć klienta lub sprawę</td><td><kbd>Ctrl</kbd>+<kbd>K</kbd> (na Macu <kbd>⌘</kbd>+<kbd>K</kbd>)</td></tr>
 </table>
