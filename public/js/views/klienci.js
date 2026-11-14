@@ -23,8 +23,8 @@ export function requiredFields(c) {
 }
 export function completeness(c, partnersCount = 0) {
   const req = requiredFields(c);
-  const done = req.filter(k => k === 'partners' ? partnersCount > 0 : c[k] !== null && c[k] !== undefined && c[k] !== '').length;
-  return { pct: Math.round(done / req.length * 100), missing: req.length - done };
+  const keys = req.filter(k => !(k === 'partners' ? partnersCount > 0 : c[k] !== null && c[k] !== undefined && c[k] !== ''));
+  return { pct: Math.round((req.length - keys.length) / req.length * 100), missing: keys.length, keys };
 }
 
 export function taxSummary(c) {
@@ -151,7 +151,8 @@ export async function renderKlienci(main) {
           c.email ? h('div', {}, h('a', { href: 'mailto:' + c.email, onclick: e => e.stopPropagation() }, c.email)) : ''),
         h('td', { class: 'small' }, acc ? h('div', {}, 'Księgowość: ', h('b', {}, acc)) : null, hr ? h('div', {}, 'Kadry: ', h('b', {}, hr)) : null,
           !acc && !hr ? h('span', { class: 'muted' }, '—') : null),
-        h('td', {}, h('span', { class: 'pct', title: comp.missing ? `Brakuje ${comp.missing} pól` : 'Profil kompletny' },
+        h('td', {}, h('span', { class: 'pct' + (comp.missing ? ' pct-go' : ''), title: comp.missing ? `Brakuje ${comp.missing} pól – kliknij, aby zobaczyć których` : 'Profil kompletny',
+          onclick: comp.missing ? e => { e.stopPropagation(); try { sessionStorage.setItem('kl-braki', c.id); } catch {} location.hash = `#/klient/${c.id}`; } : null },
           h('span', { class: 'bar' }, h('i', { style: { width: comp.pct + '%' } })), comp.pct + '%')));
     }));
   };

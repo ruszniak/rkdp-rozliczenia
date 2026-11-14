@@ -19,7 +19,11 @@ export function registerSW() {
 }
 // kliknięcie powiadomienia: przejdź do miejsca z powiadomienia, a nie tam, gdzie skończyłeś
 function goTo(url) {
-  try { const u = new URL(url, location.origin); const hash = u.hash || '#/'; if (location.hash !== hash) location.hash = hash; } catch {}
+  try {
+    const u = new URL(url, location.origin); const hash = u.hash || '#/';
+    if (location.hash !== hash) location.hash = hash;
+    else window.dispatchEvent(new HashChangeEvent('hashchange'));   // ten sam adres (np. drugie kliknięcie) – i tak otwórz
+  } catch {}
 }
 async function takePendingNav() {
   if (!('caches' in window)) return;
@@ -33,7 +37,7 @@ async function takePendingNav() {
   } catch {}
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
-  if (e.data?.type === 'open' && e.data.url) { goTo(e.data.url); caches?.open('rkdp-nav').then(c => c.delete('/__nav')).catch(() => {}); }
+  if (e.data?.type === 'open' && e.data.url) { if (!e.data.moved) goTo(e.data.url); caches?.open('rkdp-nav').then(c => c.delete('/__nav')).catch(() => {}); }
 });
 takePendingNav();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') takePendingNav(); });

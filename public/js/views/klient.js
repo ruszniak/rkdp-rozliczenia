@@ -134,7 +134,9 @@ export async function renderKlient(main, id) {
 
   // ---------- sekcje formularza ----------
   const sectionsBox = h('div');
+  let afterEdit = null;   // braki w profilu: odświeżenie listy i podświetlenia po zmianie pola
   function renderSections() {
+    setTimeout(() => afterEdit?.(), 0);
     sectionsBox.replaceChildren(...SECTIONS.map(sec => {
       const visible = sec.fields.filter(f => f[4](draft));
       const hint = sec.hint?.(draft);
@@ -145,12 +147,12 @@ export async function renderKlient(main, id) {
         visible.length ? h('div', { class: 'form-grid' }, visible.map(([key, label, type, options, , wide]) => {
           const el = inputFor(type, options, draft[key], !editable);
           el.addEventListener(type === 'select' || type === 'bool' ? 'change' : 'input', () => {
-            draft[key] = readInput(type, el); markDirty();
+            draft[key] = readInput(type, el); markDirty(); afterEdit?.();
             if (['legal_form', 'pit_form', 'cit_type', 'zus_type', 'has_employees', 'vat_status', 'contract_signed', 'service_scope'].includes(key)) {
               renderSections(); renderPartners();
             }
           });
-          return h('label', { class: 'field' + (wide ? ' wide' : '') }, h('span', {}, label), el);
+          return h('label', { class: 'field' + (wide ? ' wide' : ''), 'data-key': key }, h('span', {}, label), el);
         })) : null);
     }).filter(Boolean),
     h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Notatki stałe')),
@@ -299,11 +301,32 @@ export async function renderKlient(main, id) {
 
   const titleEl = h('h1', { style: { marginTop: '6px' } }, c.name);
   const compEl = h('p', { class: 'sub' });
+  // braki w profilu: kliknięcie pokazuje, których pól brakuje (lista + podświetlenie pól i przewinięcie do pierwszego)
+  const LABELS = Object.fromEntries(SECTIONS.flatMap(s => s.fields.map(f => [f[0], f[1]])));
+  LABELS.partners = 'Wspólnicy';
+  let showMiss = false;
+  const markMissing = (scroll) => {
+    const cp = completeness(draft, partnerList.filter(p => p.full_name?.trim()).length);
+    document.querySelectorAll('.kl-miss').forEach(x => x.classList.remove('kl-miss'));
+    if (!showMiss || !cp.keys.length) return;
+    const els = cp.keys.map(k => k === 'partners' ? partnersBox.firstElementChild : sectionsBox.querySelector(`[data-key="${k}"]`)).filter(Boolean);
+    els.forEach(x => x.classList.add('kl-miss'));
+    if (scroll && els[0]) els[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   const renderComp = () => {
     const cp = completeness(draft, partnerList.filter(p => p.full_name?.trim()).length);
-    compEl.textContent = cp.pct === 100 ? 'Profil kompletny.' : `Profil uzupełniony w ${cp.pct}% (brakuje ${cp.missing} pól).`;
+    if (cp.pct === 100) { showMiss = false; compEl.replaceChildren('Profil kompletny.'); markMissing(); return; }
+    const names = cp.keys.map(k => LABELS[k] || k);
+    compEl.replaceChildren(`Profil uzupełniony w ${cp.pct}% `,
+      h('button', { type: 'button', class: 'kl-miss-btn', 'aria-expanded': String(showMiss), onclick: () => { showMiss = !showMiss; renderComp(); markMissing(showMiss); } },
+        `brakuje ${cp.missing} ${cp.missing === 1 ? 'pola' : 'pól'}${showMiss ? ' – ukryj' : ' – pokaż które'}`),
+      showMiss ? h('span', { class: 'kl-miss-list' }, ': ', names.join(', ')) : '');
+    markMissing();
   };
   renderComp();
+  afterEdit = () => { if (showMiss) renderComp(); };
+  // przejście z listy klientów (kliknięcie w procent) – od razu pokaż braki
+  try { if (sessionStorage.getItem('kl-braki') === id) { sessionStorage.removeItem('kl-braki'); showMiss = true; renderComp(); setTimeout(() => markMissing(true), 400); } } catch { /* */ }
 
   const deleteBtn = isAdmin() ? h('button', { class: 'btn btn-danger btn-sm', onclick: async () => {
     if (!confirm(`Usunąć klienta „${c.name}” razem z całą historią rozliczeń? Tego nie da się cofnąć.\n\nJeśli współpraca się skończyła, lepiej zmień status na „Współpraca zakończona”.`)) return;
