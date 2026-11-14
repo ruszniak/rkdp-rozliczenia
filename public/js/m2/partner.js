@@ -38,7 +38,7 @@ export function partnerContractBlocks(d, client = {}, signers = []) {
 
   B.push({ t: 'title', text: 'UMOWA O STAŁĄ OBSŁUGĘ DORADCZĄ BIURA RACHUNKOWEGO' });
   B.push({ t: 'meta', text: `Program Partner M2 TAX – pakiet „${pk.name}”` });
-  intro(`zawarta w dniu ${dateLong(d.date)} we Wrocławiu (dalej: Umowa) pomiędzy:`);
+  intro('zawarta we Wrocławiu z dniem złożenia pierwszego podpisu pod Umową (dalej: Umowa) pomiędzy:');
   intro(`${FIRM.name} ${FIRM.seat}, wpisaną do rejestru przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez ${FIRM.court}, pod nr KRS ${FIRM.krs}, NIP ${FIRM.nip}, REGON ${FIRM.regon}, reprezentowaną przez:`);
   sg.forEach(x => B.push({ t: 'bullet', text: signerAcc(x) + ',' }));
   intro('zwaną dalej Kancelarią,');
@@ -156,7 +156,7 @@ export async function partnerContractDialog({ client, pkgKey = 'partner', pkg = 
         field('channels', 'Jak biuro zadaje pytania'), field('response', 'Czas odpowiedzi'),
         field('implement', 'Wsparcie wdrożeń', 'text', true),
         field('discount', 'Rabat na sprawy klientów biura (%)'), field('over_rate', 'Stawka ponad pulę (zł netto / h)'),
-        field('date', 'Data zawarcia', 'date'), field('start', 'Wchodzi w życie', 'date'), field('pay_day', 'Płatność z góry – do którego dnia miesiąca', 'number'),
+        field('start', 'Wchodzi w życie', 'date'), field('pay_day', 'Płatność z góry – do którego dnia miesiąca', 'number'),
         field('party', 'Biuro – oznaczenie w umowie (nazwa, siedziba, KRS / NIP)', 'textarea', true),
         field('reps', 'Reprezentanci biura – każda osoba w osobnej linii: „Anna Nowak – właścicielka”', 'textarea', true)),
       h('div', { style: { display: 'flex', gap: '18px', flexWrap: 'wrap', margin: '6px 0 10px' } }, check('rollover', 'Niewykorzystane godziny przechodzą na kolejny miesiąc'), check('two', 'Stały kontakt z dwoma doradcami')),

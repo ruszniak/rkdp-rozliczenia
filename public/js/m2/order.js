@@ -84,7 +84,7 @@ export function orderBlocks(o, client, signer) {
   const c = client || {};
   const B = [];
   B.push({ t: 'title', text: 'ZLECENIE' });
-  B.push({ t: 'meta', text: `nr ${o.number || '(nadany po zapisaniu)'} z dnia ${dateLong(o.order_date)}` });
+  B.push({ t: 'meta', text: `nr ${o.number || '(nadany po zapisaniu)'} · zawarte z dniem złożenia pierwszego podpisu` });
   B.push({ t: 'parties', left: { label: 'Zleceniodawca', lines: [c.name || P, c.address, c.nip ? `NIP ${c.nip}` : null].filter(Boolean) },
     right: { label: 'Zleceniobiorca', lines: [FIRM.name, FIRM.address, `NIP ${FIRM.nip} · KRS ${FIRM.krs}`] } });
   let s = 0;
@@ -261,7 +261,7 @@ export function contractBlocks(o, client, signers) {
   const intro = text => B.push({ t: 'intro', text });
 
   B.push({ t: 'title', text: 'UMOWA O ŚWIADCZENIE USŁUG DORADZTWA PODATKOWEGO' });
-  intro(`zawarta w dniu ${dateLong(o.order_date)} ${p.place === 'Wrocław' ? 'we Wrocławiu' : `w miejscowości ${p.place || P}`} (dalej: Umowa) pomiędzy:`);
+  intro(`zawarta ${p.place === 'Wrocław' ? 'we Wrocławiu' : `w miejscowości ${p.place || P}`} z dniem złożenia pierwszego podpisu pod Umową (dalej: Umowa) pomiędzy:`);
   intro(`${FIRM.name} ${FIRM.seat}, wpisaną do rejestru przedsiębiorców Krajowego Rejestru Sądowego prowadzonego przez ${FIRM.court}, pod nr KRS ${FIRM.krs}, NIP ${FIRM.nip}, REGON ${FIRM.regon}${FIRM.extra}, reprezentowaną przez:`);
   // RKDP (sp. z o.o.) reprezentuje zarząd; M2 TAX (sp. p.) – partnerzy podpisujący umowę
   const reps0 = o.firm === 'rkdp' ? rkdpBoard(sg) : sg;

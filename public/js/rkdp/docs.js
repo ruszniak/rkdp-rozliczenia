@@ -74,7 +74,7 @@ function contractDefaults(c) {
 }
 function contractReplacements(v) {
   const T = TEMPLATES[v.tpl];
-  const common = [['[MIESIĄC ROK]', v.month || '[MIESIĄC ROK]'], ['[ADRES E-MAIL]', v.email || '[ADRES E-MAIL]'],
+  const common = [['Zawarta zgodnie z datą podpisów elektronicznych, we Wrocławiu, w formie elektronicznej, pomiędzy:', 'Zawarta we Wrocławiu z dniem złożenia pierwszego podpisu pod Umową, pomiędzy:'], ['[MIESIĄC ROK]', v.month || '[MIESIĄC ROK]'], ['[ADRES E-MAIL]', v.email || '[ADRES E-MAIL]'],
     ['[KWOTA]', amount(v.fee)], ['[LICZBA]', v.docs_limit || '[LICZBA]'], ['[KWOTA]', amount(v.fee_extra)], ['[KWOTA]', amount(v.fee_year)], ['[KWOTA]', amount(v.fee_hr)]];
   if (v.tpl === 'ksiegi') return [[T.sub, T.sub.slice(1, -1)],
     ['[NAZWA SPÓŁKI]', v.company || '[NAZWA SPÓŁKI]'], ['[MIEJSCOWOŚĆ]', v.seat_loc || '[MIEJSCOWOŚĆ]'], ['[ULICA, NR]', v.street || '[ULICA, NR]'],
