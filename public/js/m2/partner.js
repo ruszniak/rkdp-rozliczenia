@@ -20,7 +20,7 @@ export function partnerDefaults(client = {}, pkgKey = 'partner', pkgObj = null) 
     date: isoToday(), start: firstOfNextMonth(), pkg: pk.key,
     price: pk.price, hours: pk.f.hours, channels: pk.f.channels, response: pk.f.response, rollover: !!pk.f.rollover,
     implement: pk.f.implement, two: !!pk.f.two, discount: String(pk.f.discount || '').replace('%', ''),
-    over_rate: '400', pay_days: '7', reps: client.contact_person || '', party: defaultClientParty(client) || '', signers: [],
+    over_rate: '400', pay_day: '7', reps: client.contact_person || '', party: defaultClientParty(client) || '', signers: [],
   };
 }
 const applyPkg = (d, key) => { const pk = partnerPackages().find(p => p.key === key); if (!pk) return; Object.assign(d, { pkg: key, price: pk.price, hours: pk.f.hours, channels: pk.f.channels, response: pk.f.response, rollover: !!pk.f.rollover, implement: pk.f.implement, two: !!pk.f.two, discount: String(pk.f.discount || '').replace('%', '') }); };
@@ -68,8 +68,10 @@ export function partnerContractBlocks(d, client = {}, signers = []) {
   ust('Czas pracy liczy się w odcinkach 15-minutowych. Kancelaria prowadzi ewidencję czasu pracy i udostępnia ją Biuru na żądanie, a po wyczerpaniu puli informuje o tym Biuro przed podjęciem dalszych czynności.');
   ust(`Czynności wykraczające poza pulę godzin Kancelaria wykonuje za zgodą Biura wyrażoną w formie dokumentowej, za wynagrodzeniem w wysokości ${zl(d.over_rate)} netto za godzinę, powiększonym o VAT.`);
   ust('Biuro może zmienić pakiet ze skutkiem od pierwszego dnia kolejnego miesiąca kalendarzowego, zawiadamiając Kancelarię w formie dokumentowej (e-mail) najpóźniej na 7 dni przed końcem miesiąca. Zmiana pakietu nie wymaga aneksu do Umowy; wynagrodzenie i zakres pakietu określa wówczas aktualny cennik Programu Partner M2 TAX.');
-  ust(`Wynagrodzenie ryczałtowe płatne jest miesięcznie z góry, a wynagrodzenie za czynności ponad pulę – po zakończeniu miesiąca, na podstawie faktur wystawianych przez Kancelarię, w terminie ${d.pay_days || 7} dni od dnia wystawienia faktury, na rachunek bankowy wskazany na fakturze. Biuro wyraża zgodę na otrzymywanie faktur w formie elektronicznej, w tym za pośrednictwem KSeF.`);
-  ust('Wynagrodzenie ryczałtowe przysługuje Kancelarii niezależnie od liczby pytań zadanych w danym miesiącu. Za niepełny miesiąc obowiązywania Umowy wynagrodzenie ustala się proporcjonalnie do liczby dni.');
+  ust(`Wynagrodzenie ryczałtowe płatne jest z góry za każdy rozpoczęty miesiąc kalendarzowy, na podstawie faktury wystawianej przez Kancelarię pomiędzy 1. a 2. dniem tego miesiąca, w terminie do ${d.pay_day || 7}. dnia tego miesiąca, na rachunek bankowy wskazany na fakturze.`);
+  ust('Wynagrodzenie ryczałtowe przysługuje Kancelarii w pełnej wysokości za każdy rozpoczęty miesiąc kalendarzowy obowiązywania Umowy, także wtedy, gdy współpraca rozpoczyna się albo kończy w trakcie miesiąca, oraz niezależnie od liczby pytań zadanych w danym miesiącu.');
+  ust(`Wynagrodzenie za czynności ponad pulę godzin płatne jest po zakończeniu miesiąca, na podstawie faktury wystawionej przez Kancelarię, w terminie ${d.pay_day || 7} dni od dnia jej wystawienia.`);
+  ust('Biuro wyraża zgodę na otrzymywanie faktur w formie elektronicznej, w tym za pośrednictwem KSeF.');
 
   sec('Sprawy klientów Biura');
   ust('Reprezentacja klientów Biura przed organami podatkowymi, organami Krajowej Administracji Skarbowej, ZUS oraz sądami administracyjnymi (w tym czynności sprawdzające, kontrole, postępowania podatkowe, wnioski o interpretacje indywidualne i skargi) nie jest objęta pakietem. Wymaga ona odrębnej umowy zawartej bezpośrednio przez Kancelarię z klientem Biura oraz udzielenia pełnomocnictwa.');
@@ -79,7 +81,7 @@ export function partnerContractBlocks(d, client = {}, signers = []) {
   sec('Zasady współpracy i odpowiedzialność');
   ust('Kancelaria wykonuje Usługi z należytą starannością, przy uwzględnieniu zawodowego charakteru prowadzonej działalności (art. 355 § 2 Kodeksu cywilnego), zgodnie z przepisami prawa, ustawą o doradztwie podatkowym i Zasadami Etyki Doradców Podatkowych.');
   ust('Biuro przekazuje Kancelarii kompletne i prawdziwe informacje oraz dokumenty niezbędne do wykonania Usług. Kancelaria nie odpowiada za skutki porad udzielonych na podstawie informacji niepełnych, nieprawdziwych lub przekazanych z opóźnieniem.');
-  ust('Prowadzenie ksiąg i ewidencji, sporządzanie i składanie deklaracji oraz kontakt z klientami Biura pozostają obowiązkiem i odpowiedzialnością Biura. Kancelaria odpowiada za treść udzielonych porad i opinii.');
+  ust('Prowadzenie ksiąg i ewidencji, sporządzanie i składanie deklaracji oraz kontakt z klientami Biura pozostają obowiązkiem i odpowiedzialnością Biura.');
   ust('Doradcy podatkowi świadczący Usługi posiadają obowiązkowe ubezpieczenie odpowiedzialności cywilnej.');
   ust('Odpowiedzialność Kancelarii wobec Biura, z wyjątkiem szkody wyrządzonej umyślnie, ograniczona jest do wysokości wynagrodzenia netto zapłaconego przez Biuro za ostatnie 12 miesięcy obowiązywania Umowy. Kancelaria nie odpowiada za utracone korzyści Biura.');
   ust('Porady udzielane są według stanu prawnego z dnia ich udzielenia. Kancelaria nie ma obowiązku aktualizowania udzielonych porad w razie późniejszej zmiany przepisów lub praktyki organów, chyba że Biuro zada nowe pytanie.');
@@ -119,7 +121,7 @@ export function partnerContractBlocks(d, client = {}, signers = []) {
   B.push({ t: 'att', text: `Załącznik nr 1 – Pakiet „${pk.name}”` });
   const val = (k, type) => { const v = { hours: d.hours, channels: d.channels, response: d.response, direct: true, notes: true, rollover: d.rollover, implement: d.implement, two: d.two, discount: pct(d.discount) }[k]; return type === 'bool' ? (v ? 'tak' : 'nie') : (String(v ?? '').trim() || '—'); };
   B.push({ t: 'kv', head: ['Element pakietu', 'Warunki'], rows: [['Wynagrodzenie ryczałtowe', `${zl(d.price)} netto / miesiąc + VAT`], ...PARTNER_FEATURES.map(([k, label, type]) => [label, val(k, type)]),
-    ['Godzina ponad pulę pakietu', `${zl(d.over_rate)} netto, rozliczana co do 15 minut`], ['Termin płatności', `${d.pay_days || 7} dni od wystawienia faktury`]] });
+    ['Godzina ponad pulę pakietu', `${zl(d.over_rate)} netto, rozliczana co do 15 minut`], ['Płatność', `z góry za każdy rozpoczęty miesiąc – faktura 1.–2. dnia miesiąca, płatna do ${d.pay_day || 7}. dnia miesiąca`]] });
   return B;
 }
 
@@ -153,7 +155,7 @@ export async function partnerContractDialog({ client, pkgKey = 'partner', pkg = 
         field('channels', 'Jak biuro zadaje pytania'), field('response', 'Czas odpowiedzi'),
         field('implement', 'Wsparcie wdrożeń', 'text', true),
         field('discount', 'Rabat na sprawy klientów biura (%)'), field('over_rate', 'Stawka ponad pulę (zł netto / h)'),
-        field('date', 'Data zawarcia', 'date'), field('start', 'Wchodzi w życie', 'date'), field('pay_days', 'Termin płatności (dni)', 'number'),
+        field('date', 'Data zawarcia', 'date'), field('start', 'Wchodzi w życie', 'date'), field('pay_day', 'Płatność z góry – do którego dnia miesiąca', 'number'),
         field('party', 'Biuro – oznaczenie w umowie (nazwa, siedziba, KRS / NIP)', 'textarea', true),
         field('reps', 'Reprezentanci biura – każda osoba w osobnej linii: „Anna Nowak – właścicielka”', 'textarea', true)),
       h('div', { style: { display: 'flex', gap: '18px', flexWrap: 'wrap', margin: '6px 0 10px' } }, check('rollover', 'Niewykorzystane godziny przechodzą na kolejny miesiąc'), check('two', 'Stały kontakt z dwoma doradcami')),

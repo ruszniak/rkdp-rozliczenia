@@ -132,7 +132,7 @@ export function offerDefaults(brand, client = {}, kind = '') {
 export function partnerTerms() {
   return [
     'Ceny podane są w kwotach netto – doliczamy do nich podatek VAT 23%.',
-    'Abonament płatny miesięcznie z góry, w terminie 7 dni od wystawienia faktury.',
+    'Abonament płatny z góry za każdy rozpoczęty miesiąc – faktura wystawiana 1.–2. dnia miesiąca, płatna do 7. dnia miesiąca; przy rozpoczęciu współpracy w trakcie miesiąca opłata należy się za cały miesiąc.',
     'Umowa na czas nieokreślony z miesięcznym okresem wypowiedzenia; pakiet można zmienić od kolejnego miesiąca.',
     'Czas pracy doradców liczymy w 15-minutowych odcinkach; godziny ponad pulę pakietu rozliczamy według stawki z cennika.',
     'Dostęp do bazy wiedzy, wzorów dokumentów i aplikacji (weryfikacja JPK CIT, sprawozdania do KRS) otrzymują imienne konta pracowników biura.',
