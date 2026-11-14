@@ -711,7 +711,9 @@ async function viewClient(main, id) {
   ...(matters.length ? matters.map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` }, h('div', {}, h('b', {}, m.number), ' ', m.title), statusPill(m.status))) : [h('p', { class: 'hint' }, 'Brak spraw.')]));
   const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Umowy i zlecenia'),
     h('div', { style: { display: 'flex', gap: '6px' } },
-      h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa (abonament)'))),
+      h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa (abonament)'),
+      c.kind !== 'osoba' ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'Program Partner – stała obsługa doradcza biura rachunkowego', onclick: async () => { const { partnerContractDialog } = await import('../m2/partner.js'); partnerContractDialog({ client: c }); } }, '+ Umowa z biurem rachunkowym') : null)),
+  signPanel({ m2_client_id: c.id }),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
     h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));

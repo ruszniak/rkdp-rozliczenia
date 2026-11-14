@@ -71,8 +71,8 @@ export function accName(full) {
   return (full || '').split(/\s+/).map(w => /ska$/i.test(w) ? w.slice(0, -1) + 'ą' : /cka$/i.test(w) ? w.slice(0, -1) + 'ą'
     : /a$/i.test(w) ? w.slice(0, -1) + 'ę' : /ek$/i.test(w) ? w.slice(0, -2) + 'ka' : /[bcćdfghjklłmnńprsśtwzźż]$/i.test(w) ? w + 'a' : w).join(' ');
 }
-const signerAcc = s => `${s.name_acc || accName(s.full_name)} – ${s.role_acc || 'partnera zarządzającego'}, doradcę podatkowego (nr wpisu ${s.license_no || P})`;
-const signerCap = s => `${s.full_name} – ${(s.role_label || 'partner zarządzający').toLowerCase()}`;
+export const signerAcc = s => `${s.name_acc || accName(s.full_name)} – ${s.role_acc || 'partnera zarządzającego'}, doradcę podatkowego (nr wpisu ${s.license_no || P})`;
+export const signerCap = s => `${s.full_name} – ${(s.role_label || 'partner zarządzający').toLowerCase()}`;
 // zarząd RKDP (reprezentacja w umowach RKDP)
 const RKDP_BOARD = [{ full_name: 'Michał Ruszniak', license_no: '15009', role_acc: 'Prezesa Zarządu', role_label: 'Prezes Zarządu' }];
 const rkdpBoard = sg => RKDP_BOARD.map(b => ({ ...(sg.find(x => x.full_name === b.full_name) || {}), ...b }));

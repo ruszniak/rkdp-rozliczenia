@@ -242,6 +242,15 @@ async function renderEditor(main, id, brand) {
         h('button', { class: 'btn btn-primary', style: { width: '100%' }, onclick: () => pdf().catch(e => fail(e)) }, icon('download'), 'Podgląd / PDF'),
         h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => shareOffer().catch(e => fail(e)), 'data-tip': 'Link do oferty dla klienta – podgląd bez logowania, zawsze aktualna wersja, z licznikiem otwarć' }, '🔗 Link do oferty'),
         linkInfo,
+        brand === 'm2' && o.services?.partner?.on ? h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: async () => {
+          if (!clientId) return toast('Wybierz biuro z listy klientów M2 TAX (u góry) – umowa trafi na jego kartę', true);
+          if (dirty || !row) { if (!(await save())) return; }
+          const { data: cl, error } = await sb.from('m2_clients').select('*').eq('id', clientId).maybeSingle();
+          if (error || !cl) return fail(error || new Error('Nie znaleziono klienta'));
+          const P = o.services.partner, pk = (P.packages || []).find(x => x.key === P.chosen);
+          const { partnerContractDialog } = await import('../m2/partner.js');
+          partnerContractDialog({ client: cl, pkg: pk || null, pkgKey: P.chosen });
+        }, 'data-tip': 'Umowa o stałą obsługę doradczą biura z pakietem wybranym w ofercie – PDF, Word albo wysyłka do podpisu' }, icon('mail'), 'Umowa z biurem') : null,
         h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => save().then(ok => ok && toast('Zapisano ofertę')) }, 'Zapisz'),
         h('p', { class: 'hint', style: { marginTop: '10px' } }, 'W oknie drukowania wybierz „Zapisz jako PDF”. Okładka i tło drukują się w kolorze.')))),
     h('div', { class: 'savebar' }, info,
