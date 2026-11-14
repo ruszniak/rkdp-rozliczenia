@@ -1,6 +1,6 @@
 import { h, initials, toast, initTooltips, initMobileTables, ava, modal } from './ui.js';
 import { loadMemberPrefs, saveMemberPrefs } from './data.js';
-import { sb, state, hasModule, isJpkOnly, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
+import { sb, state, hasModule, isJpkOnly, isPartner, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
 import { renderLogin } from './views/login.js';
 import { TERMS_VERSION } from './regulamin.js';
 import { registerSW, isStandalone, isIOS } from './push.js';
@@ -80,6 +80,9 @@ const MODULES = {
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'rdp.app · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
+// konto partnera (biuro rachunkowe w Programie Partner M2 TAX): zadania dla doradców, wzory dla klientów, podgląd JPK
+MODULES.partner = { label: 'M2 TAX', full: 'rdp.app · Partner M2 TAX', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/zadania', need: 'partner',
+  tabs: [['#/zadania', 'Zadania', 'm2:zadania'], ['#/wzory', 'Wzory', 'm2:dokumenty'], ['#/jpk', 'JPK', 'm2:jpk'], ['#/sprawozdanie', 'Sprawozdanie KRS', 'p:sf']] };
 const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', aml: 'klienci', dokumenty: 'dokumenty', zlecenie: 'zlecenia', oferty: 'zlecenia' };
 const remembered = () => { try { return localStorage.getItem('rkdp_module'); } catch { return null; } };
 const remember = m => { try { localStorage.setItem('rkdp_module', m); } catch { /* */ } };
@@ -116,7 +119,7 @@ const TAB_ICONS = {
   oaplikacji: I.info, 'm2:czas': I.zegar, spotkania: I.terminy,
 };
 TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
-const TAB_SHORT = { moje: 'Sprawy', 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
+const TAB_SHORT = { 'm2:zadania': 'Zadania', 'p:sf': 'KRS', moje: 'Sprawy', 'm2:jpk': 'JPK', rozliczenia: 'Rozliczenia', sprawozdania: 'Dokumenty', zespol: 'Ustawienia', 'm2:': 'Pulpit', 'm2:kalendarz': 'Kalendarz', 'm2:zgloszenia': 'Zgłoszenia', 'm2:dokumenty': 'Dokumenty', 'm2:spotkania': 'Spotkania' };
 
 let themeOff = null;
 // szeroki widok (duże monitory) – zapamiętany w tej przeglądarce
@@ -199,9 +202,9 @@ let timerMod = null;
 function timerPillEl() { const box = h('span', { class: 'tm-slot' }); (timerMod ||= import('./czas.js')).then(m => box.replaceChildren(m.timerPill())).catch(() => {}); return box; }
 function layout(active) {
   const me = state.me;
-  const jpkOnly = isJpkOnly();
-  const mine = jpkOnly ? ['jpk'] : Object.keys(MODULES).filter(k => k !== 'jpk' && hasModule(MODULES[k].need));
-  let mod = jpkOnly ? 'jpk' : hasModule('rozliczenia') ? 'rkdp' : active.startsWith('m2:') ? 'm2' : active === 'zespol' ? (remembered() || mine[0]) : 'rkdp';
+  const jpkOnly = isJpkOnly(), partner = isPartner();
+  const mine = partner ? ['partner'] : jpkOnly ? ['jpk'] : Object.keys(MODULES).filter(k => !['jpk', 'partner'].includes(k) && hasModule(MODULES[k].need));
+  let mod = partner ? 'partner' : jpkOnly ? 'jpk' : hasModule('rozliczenia') ? 'rkdp' : active.startsWith('m2:') ? 'm2' : active === 'zespol' ? (remembered() || mine[0]) : 'rkdp';
   // jedna aplikacja: widoki doradztwa podświetlają zakładki RKDP
   if (mod === 'rkdp' && active.startsWith('m2:')) active = active === 'm2:klienci' ? 'klienci' : ['m2:zlecenia', 'm2:dokumenty', 'm2:', 'm2:czas'].includes(active) ? active : 'm2:sprawy';
   if (!mine.includes(mod)) mod = mine[0] || 'rkdp';
@@ -259,7 +262,7 @@ function layout(active) {
   document.body.classList.toggle('has-tabbar', true);
   const main = h('main', { class: 'wrap' });
   const foot = h('footer', { class: 'wrap foot' },
-    mod === 'm2' ? 'M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p.' : 'RKDP spółka doradztwa podatkowego sp. z o.o.',
+    mod === 'm2' || mod === 'partner' ? 'M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p.' : 'RKDP spółka doradztwa podatkowego sp. z o.o.',
     ' · rdp.app · ', h('a', { href: '#/o-aplikacji' }, 'O aplikacji i RODO'), ' · wykonanie: ',
     h('a', { href: 'https://ruszniak.io', target: '_blank', rel: 'noopener' }, 'druslak'),
     h('div', { class: 'owner' }, `© ${new Date().getFullYear()} Właściciel oprogramowania: RKDP spółka doradztwa podatkowego sp. z o.o. Wszelkie prawa zastrzeżone. · `, h('a', { href: '#/regulamin' }, 'Regulamin')));
@@ -281,7 +284,8 @@ async function loadContext() {
     sb.from('task_types').select('*').order('sort'),
   ]);
   if (error || e2) throw error || e2;
-  state.members = members;
+  state.allMembers = members;
+  state.members = members.filter(m => (m.modules || ['rozliczenia']).some(x => x === 'rozliczenia' || x === 'doradztwo'));
   state.taskTypes = tasks;
   state.me = members.find(m => m.email === email && m.active) || null;
 }
@@ -350,6 +354,23 @@ async function route(opts = {}) {
   closePanel();
   const { parts, params } = parseHash();
   if (parts[0] === 'wynik') { location.reload(); return; }
+  if (isPartner()) {
+    const v = parts[0] || 'zadania';
+    try {
+      if (v === 'regulamin') c = await renderRegulamin(layout('regulamin'));
+      else if (v === 'o-aplikacji') { const m = await import('./views/oaplikacji.js'); c = await m.renderOAplikacji(layout('oaplikacji'), parts[1]); }
+      else if (v === 'jpk') c = await renderJpk(layout('m2:jpk'), { mod: 'partner' });
+      else if (v === 'wzory') c = await renderWzory(layout('m2:dokumenty'), { mod: 'partner', params });
+      else if (v === 'sprawozdanie') c = await renderEsf(layout('p:sf'), params, { partner: true });
+      else {
+        // zadania; stare linki z powiadomień (#/zlecenia/<id>, #/moje?zl=…, #/pulpit?zl=…) też tutaj
+        const id = ['zadania', 'zlecenia'].includes(v) ? parts[1] || params.get('zl') : params.get('zl');
+        if (v !== 'zadania' || (!parts[1] && id)) history.replaceState(null, '', '#/zadania' + (id ? '/' + id : ''));
+        c = await renderZlecenia(layout('m2:zadania'), id || null);
+      }
+    } catch (err) { console.error(err); toast('Nie udało się wczytać: ' + (err.message || err), true); }
+    return done();
+  }
   if (isJpkOnly()) {
     if (parts[0] === 'regulamin') { try { c = await renderRegulamin(layout('regulamin')); } catch (err) { console.error(err); } return done(); }
     if (parts[0] !== 'jpk') history.replaceState(null, '', '#/jpk');

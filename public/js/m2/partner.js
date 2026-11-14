@@ -29,7 +29,7 @@ export function partnerContractBlocks(d, client = {}, signers = []) {
   const pk = partnerPackages().find(p => p.key === d.pkg) || { name: P };
   const sg = signers.length ? signers : [{ full_name: P, license_no: P }];
   const reps = String(d.reps || '').split('\n').map(x => x.trim()).filter(Boolean);
-  const emailOnly = /tylko e-mail/i.test(d.channels || '');
+  const extra = String(d.channels || '').split(',').map(x => x.trim()).filter(x => x && !/aplikacj|rdp\.app|e-mail|pisemnie/i.test(x));
   const B = [];
   let s = 0, n = 0;
   const sec = t => { B.push({ t: 'h', text: `§ ${++s}. ${t}` }); n = 0; };
@@ -58,14 +58,14 @@ export function partnerContractBlocks(d, client = {}, signers = []) {
     'udostępnianie narzędzi i materiałów Kancelarii na zasadach określonych w § 5.',
   ]);
   ust('Usługi świadczą wyłącznie doradcy podatkowi wpisani na listę doradców podatkowych, będący partnerami lub współpracownikami Kancelarii. Kancelaria nie prowadzi ksiąg rachunkowych ani ewidencji podatkowych i nie świadczy usług księgowych.');
-  ust(`Biuro zadaje pytania ${emailOnly ? 'w formie elektronicznej (e-mail) na adres ' + FIRM.email : `w następujących formach: ${d.channels || P}`}. Pytania mogą zadawać pracownicy Biura wskazani przez Biuro w formie dokumentowej.`);
+  ust(`Biuro zadaje pytania i przekazuje sprawy za pośrednictwem aplikacji rdp.app udostępnionej przez Kancelarię (moduł „Zadania”), z imiennych kont pracowników Biura wskazanych przez Biuro w formie dokumentowej${extra.length ? `, a ponadto: ${extra.join(', ')}` : ''}. Kancelaria udziela odpowiedzi w aplikacji, a o odpowiedzi Biuro jest powiadamiane wiadomością e-mail. Wiadomości e-mail kierowane poza aplikacją nie są traktowane jako zlecenie Usługi.`);
   ust(`Kancelaria udziela odpowiedzi w terminie: ${d.response || P}, licząc od otrzymania kompletnych informacji. Sprawy złożone lub wymagające analizy dokumentów Kancelaria może rozpatrywać w dłuższym terminie uzgodnionym z Biurem.`);
   ust('Usługi są świadczone na rzecz Biura. Udzielając porady, Kancelaria opiera się na stanie faktycznym i dokumentach przedstawionych przez Biuro.');
 
   sec('Pakiet i wynagrodzenie');
   ust(`Biuro wybiera pakiet „${pk.name}” opisany w Załączniku nr 1. Z tytułu Usług w ramach pakietu Kancelarii przysługuje miesięczne wynagrodzenie ryczałtowe w wysokości ${zl(d.price)} netto, powiększone o podatek VAT według obowiązującej stawki.`);
   ust(`W ramach wynagrodzenia ryczałtowego Biuro może wykorzystać pulę czasu pracy doradców podatkowych w wymiarze: ${d.hours || P} w miesiącu, dla wszystkich pracowników Biura łącznie. ${d.rollover ? 'Niewykorzystane godziny przechodzą na kolejny miesiąc kalendarzowy i wygasają, jeżeli nie zostaną wykorzystane w tym miesiącu.' : 'Niewykorzystane godziny nie przechodzą na kolejne miesiące.'}`);
-  ust('Czas pracy liczy się w odcinkach 15-minutowych. Kancelaria prowadzi ewidencję czasu pracy i udostępnia ją Biuru na żądanie, a po wyczerpaniu puli informuje o tym Biuro przed podjęciem dalszych czynności.');
+  ust('Czas pracy liczy się w odcinkach 15-minutowych. Kancelaria prowadzi ewidencję czasu pracy przy zadaniach Biura w aplikacji rdp.app; Biuro widzi w aplikacji wykorzystanie puli w bieżącym miesiącu, a szczegółowe zestawienie otrzymuje na żądanie. Po wyczerpaniu puli Kancelaria informuje o tym Biuro przed podjęciem dalszych czynności.');
   ust(`Czynności wykraczające poza pulę godzin Kancelaria wykonuje za zgodą Biura wyrażoną w formie dokumentowej, za wynagrodzeniem w wysokości ${zl(d.over_rate)} netto za godzinę, powiększonym o VAT.`);
   ust('Biuro może zmienić pakiet ze skutkiem od pierwszego dnia kolejnego miesiąca kalendarzowego, zawiadamiając Kancelarię w formie dokumentowej (e-mail) najpóźniej na 7 dni przed końcem miesiąca. Zmiana pakietu nie wymaga aneksu do Umowy; wynagrodzenie i zakres pakietu określa wówczas aktualny cennik Programu Partner M2 TAX.');
   ust(`Wynagrodzenie ryczałtowe płatne jest z góry za każdy rozpoczęty miesiąc kalendarzowy, na podstawie faktury wystawianej przez Kancelarię pomiędzy 1. a 2. dniem tego miesiąca, w terminie do ${d.pay_day || 7}. dnia tego miesiąca, na rachunek bankowy wskazany na fakturze.`);
@@ -88,12 +88,13 @@ export function partnerContractBlocks(d, client = {}, signers = []) {
 
   sec('Narzędzia i materiały Kancelarii');
   ust('W okresie obowiązywania Umowy Kancelaria udostępnia pracownikom Biura, w ramach wynagrodzenia ryczałtowego:', [
+    'aplikację rdp.app – moduł „Zadania” do przekazywania pytań i spraw doradcom oraz odbierania odpowiedzi, wraz z podglądem wykorzystania pakietu,',
     'bazę wiedzy M2 TAX – omówienia przepisów, odpowiedzi na najczęstsze pytania i komunikaty o zmianach,',
     'wzory dokumentów – pisma do urzędów, odpowiedzi na wezwania, pełnomocnictwa, uchwały i komunikaty,',
     'aplikację do weryfikacji plików JPK (JPK CIT, JPK_PKPIR, JPK_EWP),',
     'aplikację do przygotowania sprawozdania finansowego do KRS na podstawie JPK CIT.',
   ]);
-  ust('Dostęp udzielany jest przez imienne konta pracowników Biura i nie może być udostępniany osobom trzecim. Biuro może wykorzystywać wzory dokumentów w sprawach swoich klientów.');
+  ust('Dostęp udzielany jest przez imienne konta pracowników Biura, zakładane przez Kancelarię na wniosek Biura, i nie może być udostępniany osobom trzecim. Biuro niezwłocznie informuje Kancelarię o konieczności zablokowania konta osoby, która przestała współpracować z Biurem. Biuro może wykorzystywać wzory dokumentów w sprawach swoich klientów.');
   ust('Wyniki działania aplikacji mają charakter pomocniczy i nie zastępują weryfikacji dokonywanej przez Biuro. Odpowiedzialność za treść plików JPK, sprawozdań i deklaracji wysyłanych do organów ponosi podmiot je wysyłający.');
   ust('Prawa autorskie do materiałów i aplikacji przysługują Kancelarii lub jej partnerom. Po rozwiązaniu Umowy dostęp wygasa.');
 
@@ -193,7 +194,7 @@ export async function partnerContractDialog({ client, pkgKey = 'partner', pkg = 
           close(); toast('Umowa wysłana – status zobaczysz na karcie biura w sekcji „Do podpisu”');
           // biuro, któremu wysłano umowę partnerską, oznaczamy jako partnera (z wybranym pakietem)
           if (client.client_type !== 'partner' || client.partner_package !== d.pkg) {
-            const { error: e } = await sb.from('m2_clients').update({ client_type: 'partner', partner_package: d.pkg }).eq('id', client.id);
+            const { error: e } = await sb.from('m2_clients').update({ client_type: 'partner', partner_package: d.pkg, ...(client.package_hours ? {} : { package_hours: parseFloat(String(d.hours).replace(',', '.')) || null }) }).eq('id', client.id);
             if (!e) Object.assign(client, { client_type: 'partner', partner_package: d.pkg });
           }
         } });

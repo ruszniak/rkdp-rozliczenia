@@ -656,6 +656,7 @@ async function viewClient(main, id) {
       ['status', 'Status', 'select', { aktywny: 'Aktywny', archiwum: 'Archiwum' }],
       ['client_type', 'Typ klienta', 'select', { klient: 'Klient (standardowy)', partner: 'Partner – biuro rachunkowe (Program Partner)' }],
       ['partner_package', 'Pakiet partnera', 'select', { '': '—', baza: 'Biuro Baza', partner: 'Biuro Partner', plus: 'Biuro Plus' }],
+      ['partner_advisor_id', 'Doradca biura (dostaje zadania od partnera)', 'select', { '': '— domyślnie: administrator —', ...Object.fromEntries(state.members.filter(m => m.active && (m.modules || []).includes('doradztwo')).map(m => [m.id, m.full_name])) }],
       ['nip', 'NIP', 'text'], ['regon', 'REGON', 'text'], ['krs', 'KRS', 'text'],
       ['address', 'Adres', 'text', null, true], ['mail_address', 'Adres do korespondencji (jeśli inny)', 'text', null, true],
       ['industry', 'Branża', 'list', ['budowlana', 'medyczna', 'beauty', 'produkcyjna', 'nieruchomości', 'handel', 'usługi', 'osoba prywatna']],
@@ -673,6 +674,9 @@ async function viewClient(main, id) {
     const row = {}; sections.forEach(([, defs]) => defs.forEach(([k]) => { row[k] = draft[k] ?? null; }));
     row.kind = row.kind || 'firma'; row.status = row.status || 'aktywny'; row.client_type = row.client_type || 'klient';
     row.partner_package = row.client_type === 'partner' ? (row.partner_package || null) : null;
+    row.partner_advisor_id = row.client_type === 'partner' ? (row.partner_advisor_id || null) : null;
+    // pula godzin pakietu partnera → „Czas pracy” pokazuje wykorzystanie (gdy pula nie była ustawiona ręcznie)
+    if (row.client_type === 'partner' && row.partner_package && !c.package_hours) row.package_hours = { baza: 1, partner: 2, plus: 4 }[row.partner_package];
     saveBtn.disabled = true;
     const q = isNew ? sb.from('m2_clients').insert(row).select('id').single() : sb.from('m2_clients').update(row).eq('id', id).select('id').single();
     const { data, error } = await q; saveBtn.disabled = false;
@@ -722,7 +726,32 @@ async function viewClient(main, id) {
   signPanel({ m2_client_id: c.id }),
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.client_type === 'partner' ? `Partner – biuro rachunkowe${PARTNER_PKG[c.partner_package] ? ` (pakiet ${PARTNER_PKG[c.partner_package]})` : ''}` : null, c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
-    h('div', { class: 'two' }, form, h('div', {}, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
+    h('div', { class: 'two' }, form, h('div', {}, c.client_type === 'partner' ? partnerTasksCard(c) : null, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
+}
+
+// ================= PROGRAM PARTNER: zadania od biura rachunkowego na karcie biura =================
+function partnerTasksCard(c) {
+  const box = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Zadania od biura')), h('p', { class: 'hint' }, 'Wczytywanie…'));
+  (async () => {
+    const [{ data: zs, error }, { data: users }] = await Promise.all([
+      sb.from('zlecenia').select('id,no,title,status,created_by,assignee_id,created_at,due_date').eq('m2_client_id', c.id).order('created_at', { ascending: false }).limit(30),
+      sb.from('team_members').select('id,full_name,email,active').eq('partner_client_id', c.id),
+    ]);
+    if (error) { box.lastChild.textContent = 'Zadania niedostępne.'; return; }
+    const { ZL_ST, openZlecenie } = await import('./zlecenia.js');
+    const OPEN = ['nowe', 'w_toku', 'pytanie', 'zgloszone'];
+    const open = (zs || []).filter(z => OPEN.includes(z.status)), done = (zs || []).filter(z => !OPEN.includes(z.status)).slice(0, 8);
+    const item = z => h('a', { class: 'mini-matter', href: '#', onclick: e => { e.preventDefault(); openZlecenie(z.id, () => viewClient(document.querySelector('main'), c.id)); } },
+      h('div', {}, h('b', {}, '#' + z.no), ' ', z.title, h('div', { class: 'small muted' }, `${memberById(z.created_by)?.full_name || 'biuro'} · ${fmtDate(z.created_at.slice(0, 10))}`)),
+      h('span', { class: 'zl-pill ' + (ZL_ST[z.status]?.[1] || '') }, ZL_ST[z.status]?.[0] || z.status));
+    box.replaceChildren(h('div', { class: 'section-head' }, h('h2', {}, `Zadania od biura (${open.length} otwartych)`)),
+      h('p', { class: 'small muted', style: { margin: '-4px 0 10px' } }, (users || []).filter(u => u.active).length
+        ? `Konta biura: ${(users || []).filter(u => u.active).map(u => u.full_name).join(', ')} · czas liczony licznikiem w zadaniu trafia do „Czasu pracy” tego biura.`
+        : 'Biuro nie ma jeszcze kont w aplikacji – dodaj je w „Zespół i ustawienia” (typ: Partner – biuro).'),
+      ...(open.length ? open.map(item) : [h('p', { class: 'hint' }, 'Brak otwartych zadań.')]),
+      done.length ? h('details', { style: { marginTop: '8px' } }, h('summary', { class: 'small' }, `Zamknięte (${done.length})`), ...done.map(item)) : null);
+  })();
+  return box;
 }
 
 // ================= SPOTKANIA Z KLIENTAMI – karta na pulpicie (własny system rezerwacji, jak na pulpicie RKDP) =================

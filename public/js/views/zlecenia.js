@@ -2,7 +2,7 @@
 // Zadanie może dodać każdy użytkownik RKDP; widzi je osoba wykonująca, zlecający i administrator. Zlecający (lub administrator) akceptuje wykonanie. Przebieg: nowe → w trakcie → (pytanie) → zgłoszone → zaakceptowane / do poprawy.
 // Każde zlecenie i każda zmiana stanu: powiadomienie na telefon i e-mail (robi to baza – wyzwalacze → funkcje push i mail).
 import { h, toast, fail, modal, icon, ava, infoTip } from '../ui.js';
-import { sb, state, memberById, hasModule } from '../store.js';
+import { sb, state, memberById, hasModule, isPartner } from '../store.js';
 import { fileTile, dropZone, pastedFiles, safeName, named, fmtSize } from './zgloszenia.js';
 // bez „null” w treści: puste elementy (null/false) są pomijane
 const put = (el, ...k) => el.replaceChildren(...k.flat().filter(x => x != null && x !== false));
@@ -39,6 +39,13 @@ export const ZL_ST = {
   nowe: ['Nowe', 'zl-new'], w_toku: ['W trakcie', 'zl-prog'], pytanie: ['Pytanie', 'zl-q'], zgloszone: ['Do sprawdzenia', 'zl-rep'],
   zaakceptowane: ['Zaakceptowane', 'zl-ok'], anulowane: ['Anulowane', 'zl-off'],
 };
+// zadanie od biura rachunkowego (Program Partner M2 TAX) – opisy statusów z punktu widzenia biura
+const ZL_ST_P = {
+  nowe: ['Wysłane do doradcy', 'zl-new'], w_toku: ['Doradca pracuje', 'zl-prog'], pytanie: ['Doradca dopytuje', 'zl-q'], zgloszone: ['Odpowiedź gotowa', 'zl-rep'],
+  zaakceptowane: ['Zamknięte', 'zl-ok'], anulowane: ['Anulowane', 'zl-off'],
+};
+const stOf = z => (isPartner() ? ZL_ST_P : ZL_ST)[z.status] || [z.status, ''];
+const fromOffice = z => !!z?.m2_client_id;
 const OPEN = ['nowe', 'w_toku', 'pytanie', 'zgloszone'];
 const isAdmin = () => state.me?.role === 'admin';
 // zlecający danego zadania (albo administrator) – akceptuje, odpowiada, edytuje, anuluje
@@ -52,7 +59,7 @@ const today = () => new Date().toLocaleDateString('sv-SE');
 const fmtD = d => d ? d.split('-').reverse().join('.') : '';
 const late = z => ['nowe', 'w_toku', 'pytanie'].includes(z.status) && z.due_date && z.due_date < today();
 const who = id => memberById(id)?.full_name || '—';
-const pill = z => h('span', { class: 'zl-pill ' + (ZL_ST[z.status]?.[1] || '') }, ZL_ST[z.status]?.[0] || z.status);
+const pill = z => h('span', { class: 'zl-pill ' + stOf(z)[1] }, stOf(z)[0]);
 const dueEl = z => z.due_date ? h('span', { class: 'zl-due' + (late(z) ? ' late' : z.due_date === today() ? ' today' : '') }, late(z) ? `po terminie · ${fmtD(z.due_date)}` : `termin ${fmtD(z.due_date)}`) : null;
 const stepsOf = z => Array.isArray(z.steps) ? z.steps : [];
 const HELP = `Zadania to dodatkowe zadania w zespole RKDP.
@@ -64,7 +71,7 @@ Widzisz zadania, które masz do zrobienia, i te, które zleciłeś.
 Nie odpowiadaj na maile o zadaniach – odpowiadaj tutaj. Sprawy bieżących rozliczeń klienta (braki dokumentów, problemy z księgowaniem) prowadź w „Rozmowach”.`;
 
 async function loadAll() {
-  const { data, error } = await sb.from('zlecenia').select('*, m2_matters(number)').order('created_at', { ascending: false }).limit(500);
+  const { data, error } = await sb.from('zlecenia').select('*, m2_matters(number), m2_clients(name)').order('created_at', { ascending: false }).limit(500);
   if (error) throw error;
   return data || [];
 }
@@ -74,10 +81,10 @@ const ST_COLOR = { nowe: '#9CA3AF', w_toku: '#2563EB', pytanie: '#6B4FC4', zglos
 function row(z, onOpen) {
   const st = stepsOf(z), done = st.filter(s => s.done).length, me = state.me.id;
   const d = z.due_date, lt = late(z);
-  const sub = [z.assignee_id !== me ? `dla: ${who(z.assignee_id).split(' ')[0]}` : z.created_by && z.created_by !== me ? `od: ${who(z.created_by).split(' ')[0]}` : '', helpersOf(z).length ? `razem z: ${helpersOf(z).map(id => who(id).split(' ')[0]).join(', ')}` : '', z.m2_matters?.number ? `sprawa ${z.m2_matters.number}` : ''].filter(Boolean).join(' · ');
+  const sub = isPartner() ? [`od: ${who(z.created_by).split(' ')[0]}`, `doradca: ${who(z.assignee_id)}`].join(' · ') : [fromOffice(z) ? `biuro: ${z.m2_clients?.name || '—'}` : '', z.assignee_id !== me ? `dla: ${who(z.assignee_id).split(' ')[0]}` : z.created_by && z.created_by !== me ? `od: ${who(z.created_by).split(' ')[0]}` : '', helpersOf(z).length ? `razem z: ${helpersOf(z).map(id => who(id).split(' ')[0]).join(', ')}` : '', z.m2_matters?.number ? `sprawa ${z.m2_matters.number}` : ''].filter(Boolean).join(' · ');
   const people = [z.assignee_id, ...helpersOf(z)].filter((x, i, arr) => x && arr.indexOf(x) === i).map(memberById).filter(Boolean);
   const el = h('div', { class: 'mj-card', role: 'button', tabindex: '0', onclick: () => onOpen(z), onkeydown: e => { if (e.key === 'Enter') onOpen(z); } },
-    h('div', { class: 'mj-top' }, h('span', { class: 'mj-k' }, ZL_ST[z.status]?.[0] || z.status),
+    h('div', { class: 'mj-top' }, h('span', { class: 'mj-k' }, stOf(z)[0]),
       h('span', { class: 'mj-r' }, h('span', { class: 'mj-no' }, '#' + z.no),
         d ? h('span', { class: 'mj-date' + (lt ? ' late' : d === today() ? ' today' : '') }, lt ? `po terminie · ${fmtD(d).slice(0, 5)}` : d === today() ? 'dziś' : fmtD(d).slice(0, 5)) : null)),
     h('div', { class: 'mj-title' }, z.priority === 'pilne' ? h('span', { class: 'mj-hot', title: 'pilne' }, '!') : null, h('span', {}, z.title)),
@@ -91,6 +98,7 @@ function row(z, onOpen) {
 
 // ---------- widok #/zlecenia ----------
 export async function renderZlecenia(main, id, { embed = false } = {}) {
+  if (isPartner()) return renderPartner(main, id);
   const admin = isAdmin();
   let all = [], filter = admin ? 'aktywne' : 'aktywne';
   const listBox = h('div', {}, h('div', { class: 'spinner' }, 'Wczytywanie…'));
@@ -236,7 +244,7 @@ function peopleDialog(z, onDone) {
 export async function openZlecenie(id, onChange) {
   let admin = isAdmin();
   const [{ data: z, error }, { data: wp }] = await Promise.all([
-    sb.from('zlecenia').select('*, m2_matters(id,number,title)').eq('id', id).maybeSingle(),
+    sb.from('zlecenia').select('*, m2_matters(id,number,title), m2_clients(id,name,package_hours)').eq('id', id).maybeSingle(),
     sb.from('zlecenia_wpisy').select('*').eq('zlecenie_id', id).order('created_at'),
   ]);
   const { data: files } = await sb.from('zlecenia_pliki').select('*').eq('zlecenie_id', id).order('created_at');
@@ -245,6 +253,7 @@ export async function openZlecenie(id, onChange) {
   if (error || !z) return toast('Nie znaleziono zadania (albo nie masz do niego dostępu)', true);
   const mine = z.assignee_id === state.me.id;
   admin = canManage(z); // zlecający tego zadania ma te same przyciski co administrator
+  const P = isPartner(), office = fromOffice(z);
   const helper = isHelper(z);
   const boss = firstName(z.created_by);
   const { data: cl } = z.client_id ? await sb.from('clients').select('name').eq('id', z.client_id).maybeSingle() : { data: null };
@@ -258,6 +267,7 @@ export async function openZlecenie(id, onChange) {
       const { data: lw } = await sb.from('zlecenia_wpisy').select('id').eq('zlecenie_id', id).eq('author_id', state.me.id).order('created_at', { ascending: false }).limit(1);
       await uploadZl(id, att, lw?.[0]?.id || null);
     }
+    if (office) { toast({ start: 'Powodzenia! Włącz licznik czasu', zglos: 'Wysłano odpowiedź – biuro dostanie e-mail', pytanie: 'Wysłano pytanie do biura', popraw: 'Wysłano dodatkowe pytanie do doradcy', akceptuj: 'Zadanie zamknięte – dziękujemy!', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zadanie', wznow: 'Otwarto ponownie', zakoncz: 'Zadanie zamknięte' }[akcja] || 'Zapisano'); refresh(); return; }
     toast({ start: 'Powodzenia!', pytanie: `Wysłano pytanie – ${boss} dostanie powiadomienie`, zglos: `Zgłoszono wykonanie – ${boss} dostanie powiadomienie`, akceptuj: 'Zaakceptowano', zakoncz: 'Zadanie zamknięte jako wykonane', popraw: 'Odesłano do poprawy', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zadanie', wznow: 'Wznowiono' }[akcja] || 'Zapisano');
     refresh();
   };
@@ -273,14 +283,15 @@ export async function openZlecenie(id, onChange) {
   })) : null;
 
   // ---- przebieg jako czat: dymki, zdarzenia jako szare wstawki, separator dni ----
-  const KIND = { pytanie: 'Pytanie', zgloszenie: 'Zgłoszenie wykonania', poprawka: 'Do poprawy', akceptacja: 'Akceptacja', komentarz: '' };
+  const KIND = office ? { pytanie: 'Doradca dopytuje', zgloszenie: 'Odpowiedź doradcy', poprawka: 'Dodatkowe pytanie', akceptacja: 'Zamknięte', komentarz: '' }
+    : { pytanie: 'Pytanie', zgloszenie: 'Zgłoszenie wykonania', poprawka: 'Do poprawy', akceptacja: 'Akceptacja', komentarz: '' };
   const fn = idm => (who(idm) || '').split(' ')[0] || '—';
   const dayOf = t => new Date(t).toLocaleDateString('sv-SE');
   const dayLbl = t => { const d = dayOf(t), td = today(), y = new Date(Date.now() - 864e5).toLocaleDateString('sv-SE');
     return d === td ? 'Dziś' : d === y ? 'Wczoraj' : new Date(t).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: d.slice(0, 4) !== td.slice(0, 4) ? 'numeric' : undefined }); };
   const hm = t => new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
   const sys = (txt, cls = '') => h('div', { class: 'zl-sys ' + cls }, h('span', {}, txt));
-  const feed = [{ t: z.created_at, sys: `📌 ${fn(z.created_by)} ${z.created_by === z.assignee_id ? 'dodał(a) zadanie' : `zlecił(a) zadanie: ${fn(z.assignee_id)}`}` }, ...(wp || []).map(w => ({ t: w.created_at, w }))];
+  const feed = [{ t: z.created_at, sys: office ? `📌 ${fn(z.created_by)}${z.m2_clients?.name ? ` (${z.m2_clients.name})` : ''} przekazał(a) zadanie doradcy: ${who(z.assignee_id)}` : `📌 ${fn(z.created_by)} ${z.created_by === z.assignee_id ? 'dodał(a) zadanie' : `zlecił(a) zadanie: ${fn(z.assignee_id)}`}` }, ...(wp || []).map(w => ({ t: w.created_at, w }))];
   let lastDay = '', lastAuthor = null;
   const msgs = [];
   for (const it of feed) {
@@ -321,7 +332,8 @@ export async function openZlecenie(id, onChange) {
     refresh();
   };
   comment.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendC(); } });
-  const canWrite = (mine || admin || helper) && z.status !== 'anulowane';
+  // przy zadaniu biura piszą też współpracownicy z biura i doradcy M2 TAX
+  const canWrite = (mine || admin || helper || (office && (P || hasModule('doradztwo')))) && z.status !== 'anulowane';
   const composer = canWrite ? h('div', { class: 'zl-composer' }, cList,
     h('div', { class: 'zl-crow' },
       h('button', { type: 'button', class: 'zl-cbtn', title: 'Dołącz plik', 'aria-label': 'Dołącz plik', onclick: () => fileIn.click() }, '+'),
@@ -341,35 +353,53 @@ export async function openZlecenie(id, onChange) {
   const acts = []; let hint = '';
   const A = (label, f, tone = '') => acts.push(h('button', { type: 'button', class: 'zl-qa' + (tone ? ' ' + tone : ''), onclick: f }, label));
   const closed = !OPEN.includes(z.status);
+  if (P) {
+    // biuro rachunkowe: zlecający pyta, czyta odpowiedź, zamyka albo dopytuje
+    hint = closed ? (z.status === 'anulowane' ? 'Zadanie anulowane.' : '✓ Zadanie zamknięte. Możesz otworzyć je ponownie, jeśli coś się zmieni.')
+      : { nowe: 'Zadanie czeka u doradcy – dostaniesz e-mail, gdy przygotuje odpowiedź.', w_toku: 'Doradca pracuje nad odpowiedzią – dostaniesz e-mail.', pytanie: 'Doradca prosi o doprecyzowanie – odpowiedz poniżej.', zgloszone: 'Odpowiedź doradcy jest powyżej. Zamknij zadanie albo dopytaj.' }[z.status];
+    if (admin && !closed) {
+      if (z.status === 'zgloszone') { A('✓ Dziękuję – zamykam', () => act('akceptuj'), 'ok'); A('Dopytaj doradcę', () => ask('Dodatkowe pytanie', 'Czego jeszcze potrzebujesz?', 'popraw', true, 'Wyślij do doradcy'), 'warn'); }
+      if (z.status === 'pytanie') A('Odpowiedz doradcy', () => ask('Odpowiedź dla doradcy', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź'), 'pri');
+      A('Anuluj zadanie', () => { if (confirm('Anulować to zadanie? Doradca przestanie nad nim pracować.')) act('anuluj'); }, 'danger');
+    }
+    if (admin && closed) A('Otwórz ponownie', () => act('wznow'));
+  } else {
   if (closed) {
     hint = z.status === 'anulowane' ? 'Zadanie anulowane.' : `✓ Zadanie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''} 👍`;
     if (admin) A('Wznów zadanie', () => act('wznow'));
   } else if (mine) {
-    hint = { nowe: 'Kliknij „Zaczynam”, gdy się za to weźmiesz.', w_toku: 'Gdy skończysz – „Zrobione – zgłaszam”.', pytanie: 'Czekasz na odpowiedź – dostaniesz powiadomienie.', zgloszone: 'Zgłoszone – czeka na akceptację.' }[z.status];
+    hint = office ? { nowe: 'Pytanie od biura rachunkowego – kliknij „Zaczynam” i włącz licznik czasu.', w_toku: 'Gdy odpowiedź będzie gotowa – „Wyślij odpowiedź do biura”.', pytanie: 'Czekasz na odpowiedź biura – dostaniesz powiadomienie.', zgloszone: 'Odpowiedź wysłana – czeka na zamknięcie przez biuro.' }[z.status]
+      : { nowe: 'Kliknij „Zaczynam”, gdy się za to weźmiesz.', w_toku: 'Gdy skończysz – „Zrobione – zgłaszam”.', pytanie: 'Czekasz na odpowiedź – dostaniesz powiadomienie.', zgloszone: 'Zgłoszone – czeka na akceptację.' }[z.status];
     if (['nowe', 'pytanie'].includes(z.status)) A('▶ Zaczynam', () => act('start'), 'pri');
-    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) A('✓ Zrobione – zgłaszam', () => ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie'), 'ok');
-    if (['nowe', 'w_toku'].includes(z.status)) A('? Mam pytanie', () => ask('Pytanie do zadania', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie'));
+    if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) A(office ? '✓ Wyślij odpowiedź do biura' : '✓ Zrobione – zgłaszam', () => office
+      ? ask('Odpowiedź dla biura', 'Odpowiedź z podstawą prawną – biuro dostanie ją w aplikacji i e-mailem', 'zglos', true, 'Wyślij odpowiedź')
+      : ask('Zgłoś wykonanie', 'Komentarz (opcjonalnie) – co zostało zrobione', 'zglos', false, 'Zgłaszam wykonanie'), 'ok');
+    if (['nowe', 'w_toku'].includes(z.status)) A(office ? '? Dopytaj biuro' : '? Mam pytanie', () => ask(office ? 'Pytanie do biura' : 'Pytanie do zadania', 'Twoje pytanie', 'pytanie', true, 'Wyślij pytanie'));
   }
-  if (!closed && admin && !mine) hint = { nowe: `Czeka, aż ${first} zacznie.`, w_toku: `${first} pracuje nad zadaniem.`, pytanie: `${first} ma pytanie – odpowiedz.`, zgloszone: `${first} zgłasza wykonanie – sprawdź.` }[z.status];
-  if (!closed && admin) {
+  if (!closed && office && !mine) hint = { nowe: `Zadanie biura czeka u: ${first}.`, w_toku: `${first} przygotowuje odpowiedź.`, pytanie: 'Czekamy na doprecyzowanie od biura.', zgloszone: 'Odpowiedź wysłana – czeka na zamknięcie przez biuro.' }[z.status];
+  if (['nowe', 'w_toku', 'pytanie'].includes(z.status) && office && isAdmin()) A('Zamknij zadanie biura', () => { if (confirm('Zamknąć zadanie biura? Biuro dostanie informację e-mailem.')) act('zakoncz'); });
+  if (!closed && admin && !mine && !office) hint = { nowe: `Czeka, aż ${first} zacznie.`, w_toku: `${first} pracuje nad zadaniem.`, pytanie: `${first} ma pytanie – odpowiedz.`, zgloszone: `${first} zgłasza wykonanie – sprawdź.` }[z.status];
+  if (!closed && admin && !office) {
     if (z.status === 'zgloszone') { A('✓ Akceptuję – zakończ', () => act('akceptuj'), 'ok'); A('Do poprawy', () => ask('Odeślij do poprawy', 'Co trzeba poprawić?', 'popraw', true, 'Odeślij'), 'warn'); }
     if (z.status === 'pytanie') A('Odpowiedz', () => ask('Odpowiedź', 'Twoja odpowiedź', 'odpowiedz', true, 'Wyślij odpowiedź'), 'pri');
     if (['nowe', 'w_toku', 'pytanie'].includes(z.status)) A('✓ Zakończ – wykonane', () => { if (confirm('Zamknąć zadanie jako wykonane?')) act('zakoncz'); }, z.status === 'pytanie' ? '' : 'ok');
   }
-  if (canAddPeople(z) && OPEN.includes(z.status)) A('+ Osoba', () => peopleDialog(z, () => { closeFn(); onChange?.(); openZlecenie(id, onChange); }));
+  if (canAddPeople(z) && OPEN.includes(z.status) && !office) A('+ Osoba', () => peopleDialog(z, () => { closeFn(); onChange?.(); openZlecenie(id, onChange); }));
   if (admin) A('📎 Plik do zadania', () => topIn.click());
-  if (!closed && admin) { A('Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }); A('Anuluj zadanie', () => { if (confirm('Anulować to zadanie?')) act('anuluj'); }, 'danger'); }
+  if (!closed && admin && !office) { A('Edytuj', () => { closeFn(); newZlecenie(() => { onChange?.(); openZlecenie(id, onChange); }, z); }); A('Anuluj zadanie', () => { if (confirm('Anulować to zadanie?')) act('anuluj'); }, 'danger'); }
+  }
   if (hint) timeline.append(sys(hint, 'hint'));
 
   // ---- przypięta karta zadania: termin, opis, kroki, osoby (rozwijana) ----
   const isLate = late(z), hot = z.priority === 'pilne';
   const done = st.filter(s => s.done).length;
-  const pinTags = [hot ? 'Pilne' : null, ZL_ST[z.status]?.[0], z.due_date ? (isLate ? `po terminie · ${fmtD(z.due_date)}` : `termin ${fmtD(z.due_date)}`) : null].filter(Boolean).join(' · ');
+  const pinTags = [hot ? 'Pilne' : null, stOf(z)[0], z.due_date ? (isLate ? `po terminie · ${fmtD(z.due_date)}` : `termin ${fmtD(z.due_date)}`) : null].filter(Boolean).join(' · ');
   const more = h('div', { class: 'zl-pin-more', hidden: true },
     z.body ? h('div', { class: 'zl-pin-body' }, z.body) : null,
     h('div', { class: 'zl-pin-meta' }, h('span', {}, 'Wykonuje: ', h('b', {}, who(z.assignee_id))), h('span', {}, 'Zlecił(a): ', h('b', {}, who(z.created_by))),
       helpersOf(z).length ? h('span', {}, 'Razem z: ', h('b', {}, helpersOf(z).map(who).join(', '))) : null,
       cl?.name ? h('span', {}, 'Klient: ', h('a', { href: `#/klient/${z.client_id}`, onclick: () => closeFn() }, cl.name)) : null,
+      office && !P && z.m2_clients ? h('span', {}, 'Biuro: ', h('a', { href: `#/doradztwo/klient/${z.m2_clients.id}`, onclick: () => closeFn() }, z.m2_clients.name)) : null,
       z.m2_matters ? h('span', {}, 'Sprawa: ', h('a', { href: `#/doradztwo/sprawa/${z.m2_matters.id}`, onclick: () => closeFn() }, `${z.m2_matters.number} · ${z.m2_matters.title}`)) : null),
     stepsBox, tiles((files || []).filter(f => !f.wpis_id)));
   const toggle = h('button', { type: 'button', class: 'zl-pin-tg', 'aria-expanded': 'false' }, '⌄');
@@ -386,12 +416,95 @@ export async function openZlecenie(id, onChange) {
   // osoby w nagłówku
   const people = [z.assignee_id, z.created_by, ...helpersOf(z)].filter((x, i, a) => x && a.indexOf(x) === i);
 
+  // zadanie biura: licznik czasu pracy liczony na kartę biura (pula godzin pakietu)
+  let timer = null;
+  if (office && !P && z.m2_clients && hasModule('doradztwo')) { try { const { timerButton } = await import('../czas.js'); timer = timerButton({ module: 'm2', clientId: z.m2_clients.id, name: z.m2_clients.name }); } catch { /* */ } }
   closeFn = modal(`Zadanie #${z.no}`, h('div', { class: 'zl-chat' },
     h('div', { class: 'zl-chat-who' }, h('span', { class: 'zl-avs' }, ...people.slice(0, 4).map(p => h('span', { class: 'zl-av', title: who(p) }, ava(memberById(p) || { full_name: '?' })))),
-      h('span', { class: 'small muted' }, people.map(fn).join(', '))),
+      h('span', { class: 'small muted' }, people.map(fn).join(', ')), timer ? h('span', { style: { marginLeft: 'auto' } }, timer) : null),
     pin, timeline, topIn,
     h('div', { class: 'zl-dock' }, acts.length ? h('div', { class: 'zl-qas' }, ...acts) : null, composer)),
   () => [], { wide: true });
   const mEl = timeline.closest('.modal');
   if (mEl) { mEl.classList.add('zl-cmodal'); requestAnimationFrame(() => { mEl.scrollTop = mEl.scrollHeight; }); }
+}
+
+// ---------- biuro rachunkowe (Program Partner M2 TAX): zadania dla doradców ----------
+const PKG = { baza: 'Biuro Baza', partner: 'Biuro Partner', plus: 'Biuro Plus' };
+const PKG_MIN = { baza: 60, partner: 120, plus: 240 };
+const hmin = m => { const h0 = Math.floor(m / 60), mm = Math.round(m % 60); return h0 ? `${h0} h${mm ? ` ${mm} min` : ''}` : `${mm} min`; };
+const P_HELP = `Zadania dla doradców M2 TAX:
+• „+ Nowe zadanie” – opisz pytanie lub sprawę klienta biura, dołącz pliki (zdjęcia, PDF, JPK). Zadanie trafia od razu do doradcy podatkowego opiekującego się Państwa biurem.
+• Gdy odpowiedź będzie gotowa, dostaniesz e-mail – odpowiedź z podstawą prawną znajdziesz w zadaniu.
+• Jeśli czegoś brakuje – „Dopytaj doradcę”. Gdy sprawa jest wyjaśniona – „Dziękuję – zamykam”.
+• Widzisz zadania całego biura, więc koledzy mogą sprawdzić odpowiedzi i dopisać informacje.
+• Nie odpowiadaj na e-maile z powiadomieniami – pisz w zadaniu w aplikacji.
+Dane klientów biura podawaj tylko w niezbędnym zakresie.`;
+
+async function renderPartner(main, id) {
+  let all = [], filter = 'aktywne';
+  const listBox = h('div', {}, h('div', { class: 'spinner' }, 'Wczytywanie…'));
+  const chips = h('div', { class: 'zl-chips' });
+  const info = h('p', { class: 'sub' }, 'Pytania i sprawy przekazane doradcom podatkowym M2 TAX.');
+  const usage = h('div', { class: 'pt-usage', hidden: true });
+  const reload = async () => {
+    try { all = await loadAll(); } catch { put(listBox, h('p', { class: 'hint' }, 'Zadania są chwilowo niedostępne.')); return; }
+    draw();
+  };
+  sb.rpc('partner_info').then(({ data: d }) => {
+    if (!d) { info.textContent = 'Konto nie jest jeszcze przypisane do biura – skontaktuj się z M2 TAX (kancelaria@m2tax.pl).'; return; }
+    info.textContent = `${d.name}${PKG[d.package] ? ` · pakiet ${PKG[d.package]}` : ''} · pytania i sprawy przekazane doradcom podatkowym M2 TAX.`;
+    const used = Number(d.minutes_month) || 0, lim = PKG_MIN[d.package];
+    usage.hidden = false;
+    put(usage, h('span', {}, 'Czas pracy doradców w tym miesiącu: ', h('b', {}, hmin(used)), lim ? ` z ${hmin(lim)} w pakiecie` : ''),
+      lim ? h('span', { class: 'pt-bar' }, h('i', { style: { width: Math.min(100, Math.round(used / lim * 100)) + '%' }, class: used > lim ? 'over' : '' })) : null);
+  });
+  const open = z => openZlecenie(z.id, reload);
+  function draw() {
+    const F = [
+      ['aktywne', 'W toku', z => OPEN.includes(z.status) && z.status !== 'zgloszone'],
+      ['odp', 'Odpowiedzi', z => z.status === 'zgloszone'],
+      ['moje', 'Moje', z => z.created_by === state.me.id && OPEN.includes(z.status)],
+      ['koniec', 'Zamknięte', z => !OPEN.includes(z.status)],
+    ];
+    put(chips, ...F.map(([k, l, f]) => { const n = all.filter(f).length; return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : '') + (k === 'odp' && n ? ' hot' : ''), onclick: () => { filter = k; draw(); } }, l, h('span', {}, String(n))); }));
+    const rows = all.filter(F.find(x => x[0] === filter)[2]).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    put(listBox, rows.length ? h('div', { class: 'zl-list pt-list' }, ...rows.map(z => row(z, open)))
+      : h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'odp' ? 'Brak nowych odpowiedzi.' : filter === 'koniec' ? 'Brak zamkniętych zadań.' : 'Brak zadań w toku. Kliknij „+ Nowe zadanie”, aby zadać pytanie doradcy.'));
+  }
+  put(main,
+    h('div', { class: 'page-head' },
+      h('div', {},
+        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Zadania dla doradców', infoTip(P_HELP, 'Zadania – jak to działa')),
+        info),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newPartnerZadanie(reload) }, icon('plus'), 'Nowe zadanie')),
+    usage, chips, listBox);
+  await reload();
+  if (id) openZlecenie(id, reload);
+}
+
+async function newPartnerZadanie(onDone) {
+  const title = h('input', { class: 'input', maxlength: 200, placeholder: 'Krótko: czego dotyczy pytanie? (np. „Korekta VAT – faktura zaliczkowa”)' });
+  const body = h('textarea', { class: 'input', rows: 7, maxlength: 5000, placeholder: 'Opisz stan faktyczny i pytanie. Podaj formę opodatkowania klienta, okres i kwoty, jeśli są istotne.' });
+  const due = h('input', { class: 'input', type: 'date' });
+  const hot = h('input', { type: 'checkbox' });
+  const pending = [];
+  modal('Nowe zadanie dla doradcy', h('div', { class: 'zl-form' },
+    h('label', { class: 'field' }, h('span', {}, 'Temat'), title),
+    h('label', { class: 'field' }, h('span', {}, 'Pytanie / opis sprawy'), body),
+    h('div', { class: 'form-grid' }, h('label', { class: 'field' }, h('span', {}, 'Potrzebna odpowiedź do (opcjonalnie)'), due), h('label', { class: 'check', style: { alignSelf: 'end' } }, hot, 'Pilne')),
+    h('div', { class: 'field' }, h('span', {}, 'Załączniki (opcjonalnie) – dokumenty, zrzuty ekranu, pliki JPK'), pendingBox(pending)),
+    h('p', { class: 'small muted' }, 'Zadanie trafi do doradcy podatkowego M2 TAX opiekującego się Państwa biurem. O odpowiedzi poinformujemy e-mailem. Dane klientów podawaj tylko w niezbędnym zakresie.')),
+  close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async e => {
+    if (!title.value.trim()) { title.focus(); return toast('Wpisz temat', true); }
+    if (!body.value.trim() && !pending.length) { body.focus(); return toast('Opisz pytanie albo dołącz plik', true); }
+    const btn = e.currentTarget; btn.disabled = true;
+    // doradcę, biuro i drugiego doradcę ustawia baza (konto partnera)
+    const { data: made, error } = await sb.from('zlecenia').insert({ title: title.value.trim(), body: body.value.trim() || null, due_date: due.value || null,
+      priority: hot.checked ? 'pilne' : 'normalny', steps: [], assignee_id: state.me.id }).select('id').single();
+    if (error) { btn.disabled = false; return fail(error); }
+    if (pending.length) { btn.textContent = 'Wysyłanie plików…'; await uploadZl(made.id, pending); }
+    close(); toast('Wysłano zadanie do doradcy – dostaniesz e-mail, gdy odpowie');
+    onDone?.();
+  } }, 'Wyślij do doradcy')], { wide: true });
 }

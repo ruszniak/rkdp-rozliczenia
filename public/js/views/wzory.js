@@ -66,9 +66,9 @@ export async function renderWzory(main, { mod = 'rkdp', params } = {}) {
 
   drawList(); drawForm(); draw();
   main.replaceChildren(
-    h('a', { href: mod === 'm2' ? '#/doradztwo/dokumenty' : '#/dokumenty', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Dokumenty'),
+    mod === 'partner' ? '' : h('a', { href: mod === 'm2' ? '#/doradztwo/dokumenty' : '#/dokumenty', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Dokumenty'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
-      h('div', {}, h('p', { class: 'eyebrow' }, `Wzory dla klientów · ${mod === 'm2' ? 'M2 TAX' : 'RKDP'}`),
+      h('div', {}, h('p', { class: 'eyebrow' }, `Wzory dla klientów · ${mod === 'rkdp' ? 'RKDP' : 'M2 TAX'}`),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Wzory umów i uchwał', infoTip(HELP, 'Wzory – instrukcja')),
         h('p', { class: 'sub' }, 'Umowy cywilnoprawne, uchwały wspólników i dokumenty do CIT estońskiego – do pobrania w Wordzie.')),
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },

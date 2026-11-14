@@ -19,32 +19,37 @@ const FORM_CODES = [[/z ograniczoną odpowiedzialnością/i, '17'], [/prosta sp�
 const title = s => String(s || '').toLowerCase().replace(/(^|[\s\-–(/])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 const today = () => new Date().toLocaleDateString('sv-SE');
 
-export async function renderEsf(main, params) {
-  const { data: clients, error } = await sb.from('clients').select('id,name,nip,krs,legal_form,status').order('name');
+export async function renderEsf(main, params, { partner = false } = {}) {
+  // partner (biuro rachunkowe): bez bazy klientów i bez zapisu w aplikacji – sprawozdanie z JPK i KRS, plik XML / PDF do pobrania
+  const { data: clients, error } = partner ? { data: [], error: null } : await sb.from('clients').select('id,name,nip,krs,legal_form,status').order('name');
   if (error) throw error;
   const companies = (clients || []).filter(c => c.krs || ['spzoo', 'spolka_akcyjna', 'psa', 'prosta_spolka_akcyjna', 'fundacja_stowarzyszenie'].includes(c.legal_form));
-  let clientId = params.get('klient') || '', year = Number(params.get('rok')) || new Date().getFullYear() - 1;
+  let clientId = partner ? 'biuro' : params.get('klient') || '', year = Number(params.get('rok')) || new Date().getFullYear() - 1;
   let d = null, rowId = null, dirty = false, status = 'projekt';
 
   const body = h('div', { class: 'esf' });
-  const saveBtn = h('button', { class: 'btn btn-primary btn-sm', onclick: () => save() }, 'Zapisz');
+  const saveBtn = h('button', { class: 'btn btn-primary btn-sm', hidden: partner, onclick: () => save() }, 'Zapisz');
   const clientSel = h('select', { class: 'select', 'aria-label': 'Spółka', onchange: () => { clientId = clientSel.value; load(); } },
     h('option', { value: '' }, '— wybierz spółkę —'), ...companies.map(c => h('option', { value: c.id, selected: c.id === clientId }, c.name)));
   const ys = []; for (let y = new Date().getFullYear(); y >= new Date().getFullYear() - 6; y--) ys.push(y);
   const yearSel = h('select', { class: 'select', 'aria-label': 'Rok obrotowy', onchange: () => { year = Number(yearSel.value); load(); } }, ...ys.map(y => h('option', { value: y, selected: y === year }, `rok ${y}`)));
 
   main.replaceChildren(
-    h('a', { href: '#/dokumenty', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Generowanie dokumentów'),
+    partner ? '' : h('a', { href: '#/dokumenty', class: 'small', style: { fontWeight: 600, textDecoration: 'none' } }, '← Generowanie dokumentów'),
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
       h('div', {}, h('p', { class: 'eyebrow' }, 'e-Sprawozdanie · wzór SFJMIZ(2)'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Sprawozdanie finansowe – jednostka mikro', infoTip(HELP, 'Sprawozdanie finansowe – instrukcja')),
         h('p', { class: 'sub' }, 'Z JPK_KR_PD i ubiegłorocznego sprawozdania z KRS. Plik XML do podpisania i złożenia w eKRS.')),
-      h('div', { class: 'esf-pick' }, clientSel, yearSel)),
+      h('div', { class: 'esf-pick' }, partner ? null : clientSel, yearSel)),
     body);
 
   const markDirty = () => { dirty = true; saveBtn.textContent = 'Zapisz *'; };
 
   async function load() {
+    if (partner) {
+      history.replaceState(null, '', `#/sprawozdanie?rok=${year}`);
+      rowId = null; status = 'projekt'; d = emptyData(year); dirty = false; draw(); return;
+    }
     history.replaceState(null, '', `#/sprawozdanie-finansowe?${new URLSearchParams({ ...(clientId ? { klient: clientId } : {}), rok: year })}`);
     if (!clientId) { body.replaceChildren(h('div', { class: 'card section' }, h('p', { class: 'hint' }, companies.length ? 'Wybierz spółkę i rok obrotowy.' : 'Brak spółek w bazie klientów (forma prawna sp. z o.o. / S.A. albo wpisany numer KRS).'))); return; }
     body.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
@@ -75,6 +80,7 @@ export async function renderEsf(main, params) {
 
   async function save(newStatus) {
     if (!d) return;
+    if (partner) { status = newStatus || status; dirty = !newStatus && dirty; return; }
     recompute(d);
     const row = { client_id: clientId, year, wzor: 'mikro', data: d, status: newStatus || status };
     const q = rowId ? sb.from('fin_statements').update(row).eq('id', rowId).select('id').single() : sb.from('fin_statements').insert(row).select('id').single();
@@ -281,7 +287,7 @@ export async function renderEsf(main, params) {
       checksBox,
       h('div', { class: 'row-btns' }, saveBtn, xmlBtn,
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => printHtml(previewHtml(d, year), `Sprawozdanie ${d.firma.nazwa} ${year}`) }, 'Podgląd / PDF'),
-        status !== 'zlozone' ? h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { if (confirm('Oznaczyć sprawozdanie jako złożone w KRS?')) save('zlozone').then(draw); } }, 'Oznacz jako złożone') : null),
+        status !== 'zlozone' && !partner ? h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { if (confirm('Oznaczyć sprawozdanie jako złożone w KRS?')) save('zlozone').then(draw); } }, 'Oznacz jako złożone') : null),
       h('p', { class: 'hint', style: { marginTop: '10px' } }, 'Plik XML podpisują wszyscy członkowie zarządu i osoba prowadząca księgi (podpis kwalifikowany, zaufany albo osobisty, np. w podpis.gov.pl lub eKRS). Złożenie: eKRS → „Złóż dokumenty finansowe” – razem z uchwałą zatwierdzającą i o podziale zysku / pokryciu straty.'));
 
     body.replaceChildren(src, firm, bil, rz, ogolne, info, cit, actions);

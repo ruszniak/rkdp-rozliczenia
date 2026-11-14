@@ -1,22 +1,30 @@
 import { h, toast, fail, infoTip, modal } from '../ui.js';
-import { sb, state } from '../store.js';
+import { sb, state, isStaffMember } from '../store.js';
 import { ROLE, RULE } from '../dict.js';
 import { fetchAll } from './rozliczenia.js';
 import { downloadBackup, downloadFilesBackup } from '../backup.js';
 
 export async function renderZespol(main) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie…'));
-  const [clients, assigns] = await Promise.all([
+  const [clients, assigns, offices0] = await Promise.all([
     fetchAll(() => sb.from('clients').select('id,name,status,accountant_id,hr_id').order('name')),
     fetchAll(() => sb.from('client_assignments').select('client_id,member_id')),
+    sb.from('m2_clients').select('id,name,client_type,kind,status').eq('firm', 'm2').neq('kind', 'osoba').order('name').then(r => r.data || [], () => []),
   ]);
+  // biura rachunkowe (Program Partner M2 TAX) – partnerzy na górze listy
+  const offices = [...offices0.filter(o => o.client_type === 'partner'), ...offices0.filter(o => o.client_type !== 'partner' && o.status === 'aktywny')];
+  const officeName = id => offices0.find(o => o.id === id)?.name || 'biuro';
+  const officeSel = (value, onpick) => { const sel = h('select', { class: 'select' }, h('option', { value: '' }, '— wybierz biuro —'),
+    ...offices.map(o => h('option', { value: o.id, selected: o.id === value }, `${o.name}${o.client_type === 'partner' ? ' · partner' : ''}`)));
+    sel.addEventListener('change', () => onpick(sel.value || null)); return sel; };
+  const partnerMods = office => office ? ['jpk', 'partner'] : ['jpk'];
   let devices = [];
   const loadDevices = async () => { const { data, error } = await sb.from('auth_devices').select('id,member_id,label,created_at,last_used_at,expires_at'); devices = error ? null : data; };
   await loadDevices();
   const fmtD = iso => iso ? new Date(iso).toLocaleDateString('pl-PL') : '';
   const reloadMembers = async () => {
     const { data, error } = await sb.from('team_members').select('*').order('full_name');
-    if (error) throw error; state.members = data;
+    if (error) throw error; state.allMembers = data; state.members = data.filter(isStaffMember);
   };
 
   // ---------- zespół: lista osób + karta osoby (zamiast szerokiej tabeli) ----------
@@ -24,20 +32,20 @@ export async function renderZespol(main) {
   const assignPanel = h('div');
   let tf = { q: '', st: 'aktywni' };
   let openId = null, closeCard = null;
-  const firmLabel = m => { const md = m.modules || ['rozliczenia']; return md.includes('jpk') ? ['Tylko JPK'] : [md.includes('rozliczenia') && 'RKDP', md.includes('doradztwo') && 'M2 TAX'].filter(Boolean); };
+  const firmLabel = m => { const md = m.modules || ['rozliczenia']; return md.includes('partner') ? ['Partner: ' + officeName(m.partner_client_id)] : md.includes('jpk') ? ['Tylko JPK'] : [md.includes('rozliczenia') && 'RKDP', md.includes('doradztwo') && 'M2 TAX'].filter(Boolean); };
   const avatar = m => h('span', { class: 'tm-av' }, m.avatar ? h('img', { src: m.avatar, alt: '' }) : (m.full_name || '?').split(/\s+/).map(x => x[0]).join('').slice(0, 2).toUpperCase());
   const sw = (checked, disabled, onchange, label, tip) => h('label', { class: 'tm-sw', 'data-tip': tip || null }, h('input', { type: 'checkbox', checked, disabled, onchange: e => onchange(e.target.checked) }), h('span', { class: 'tm-sw-ui', 'aria-hidden': 'true' }), h('span', {}, label));
   const seg = (opts, value, disabled, onpick) => h('div', { class: 'tm-seg' + (disabled ? ' dis' : '') }, ...opts.map(([k, l, tip]) => h('button', { type: 'button', class: k === value ? 'on' : '', disabled, 'data-tip': tip || null, onclick: () => onpick(k) }, l)));
   function renderTeam() {
     const q = tf.q.toLowerCase();
-    const list = state.members.filter(m => (tf.st === 'wszyscy' || (tf.st === 'aktywni' ? m.active : !m.active)) && (!q || `${m.full_name} ${m.email} ${m.short_name}`.toLowerCase().includes(q)));
+    const list = state.allMembers.filter(m => (tf.st === 'wszyscy' || (tf.st === 'aktywni' ? m.active : !m.active)) && (!q || `${m.full_name} ${m.email} ${m.short_name}`.toLowerCase().includes(q)));
     teamList.replaceChildren(...(list.length ? list.map(m => {
       const nAcc = clients.filter(c => c.accountant_id === m.id).length, nHr = clients.filter(c => c.hr_id === m.id).length;
       const extra = assigns.filter(a => a.member_id === m.id).length;
       return h('button', { type: 'button', class: 'tm-row' + (m.active ? '' : ' off'), onclick: () => openCard(m.id) },
         avatar(m),
         h('span', { class: 'tm-who' }, h('b', {}, m.full_name, m.id === state.me.id ? h('small', { class: 'tm-me' }, 'Ty') : null), h('small', {}, m.email)),
-        h('span', { class: 'tm-tags' }, ...firmLabel(m).map(f => h('span', { class: 'tm-tag' + (f === 'M2 TAX' ? ' m2' : f === 'Tylko JPK' ? ' jpk' : '') }, f))),
+        h('span', { class: 'tm-tags' }, ...firmLabel(m).map(f => h('span', { class: 'tm-tag' + (f === 'M2 TAX' ? ' m2' : f === 'Tylko JPK' || f.startsWith('Partner') ? ' jpk' : '') }, f))),
         h('span', { class: 'tm-role' }, ROLE[m.role] || m.role),
         h('span', { class: 'tm-meta' }, nAcc || nHr ? `prowadzi ${nAcc + nHr}` : '', extra ? ` · +${extra} wgląd` : ''),
         h('span', { class: 'tm-state' + (m.active ? '' : ' off') }, m.active ? 'aktywny' : 'zablokowany'),
@@ -48,22 +56,24 @@ export async function renderZespol(main) {
   const cardBody = h('div', { class: 'tm-card' });
   function openCard(id) {
     openId = id; drawCard();
-    closeCard = modal(state.members.find(x => x.id === id)?.full_name || 'Osoba', cardBody, close => [h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); } }, 'Gotowe')]);
+    closeCard = modal(state.allMembers.find(x => x.id === id)?.full_name || 'Osoba', cardBody, close => [h('button', { class: 'btn btn-primary btn-sm', onclick: () => { close(); } }, 'Gotowe')]);
   }
   function drawCard() {
-    const m = state.members.find(x => x.id === openId);
+    const m = state.allMembers.find(x => x.id === openId);
     if (!m) return;
     const self = m.id === state.me.id;
     const mods = m.modules || ['rozliczenia'];
-    const firm = mods.includes('jpk') ? 'jpk' : mods.includes('rozliczenia') && mods.includes('doradztwo') ? 'oba' : mods.includes('doradztwo') ? 'doradztwo' : 'rozliczenia';
-    const setFirm = k => update(m, k === 'jpk' ? { modules: ['jpk'], role: 'limited' } : { modules: k === 'oba' ? ['rozliczenia', 'doradztwo'] : [k] });
+    const firm = mods.includes('jpk') || mods.includes('partner') ? 'jpk' : mods.includes('rozliczenia') && mods.includes('doradztwo') ? 'oba' : mods.includes('doradztwo') ? 'doradztwo' : 'rozliczenia';
+    const setFirm = k => update(m, k === 'jpk' ? { modules: partnerMods(m.partner_client_id), role: 'limited' } : { modules: k === 'oba' ? ['rozliczenia', 'doradztwo'] : [k] });
     const nAcc = clients.filter(c => c.accountant_id === m.id).length, nHr = clients.filter(c => c.hr_id === m.id).length;
     const extra = assigns.filter(a => a.member_id === m.id).length;
     const mine = (devices || []).filter(d => d.member_id === m.id && new Date(d.expires_at) > new Date());
     cardBody.replaceChildren(
       h('div', { class: 'tm-head' }, avatar(m), h('div', {}, h('b', {}, m.full_name), h('div', { class: 'small muted' }, `${m.email} · skrót: ${m.short_name || '—'}${m.job_title ? ' · ' + m.job_title : ''}`))),
       h('section', { class: 'tm-sec' }, h('h3', {}, 'Dostęp'),
-        h('div', { class: 'tm-field' }, h('span', {}, 'Firma'), seg([['rozliczenia', 'RKDP', 'Cała aplikacja: rozliczenia, klienci RKDP, sprawy doradcze RKDP'], ['doradztwo', 'M2 TAX', 'Tylko doradztwo: klienci M2 TAX, sprawy, zlecenia, umowy, pisma'], ['oba', 'Obie'], ['jpk', 'Tylko JPK', 'Widzi wyłącznie podgląd plików JPK']], firm, self, setFirm)),
+        h('div', { class: 'tm-field' }, h('span', {}, 'Firma'), seg([['rozliczenia', 'RKDP', 'Cała aplikacja: rozliczenia, klienci RKDP, sprawy doradcze RKDP'], ['doradztwo', 'M2 TAX', 'Tylko doradztwo: klienci M2 TAX, sprawy, zlecenia, umowy, pisma'], ['oba', 'Obie'], ['jpk', 'Partner – biuro', 'Biuro rachunkowe w Programie Partner M2 TAX: zadania dla doradców (tylko swojego biura), wzory dla klientów, podgląd JPK']], firm, self, setFirm)),
+        firm === 'jpk' ? h('div', { class: 'tm-field' }, h('span', {}, 'Biuro'), officeSel(m.partner_client_id, v => update(m, { partner_client_id: v, modules: partnerMods(v) }))) : null,
+        firm === 'jpk' && !m.partner_client_id ? h('p', { class: 'small muted', style: { margin: '4px 0 0' } }, 'Bez wybranego biura konto widzi tylko podgląd JPK. Po wybraniu biura – także zadania dla doradców i wzory.') : null,
         h('div', { class: 'tm-field' }, h('span', {}, 'Zakres'), seg(Object.entries(ROLE).map(([k, v]) => [k, v]), m.role, self || firm === 'jpk', k => update(m, { role: k }))),
         self ? h('p', { class: 'small muted', style: { margin: '4px 0 0' } }, 'Swojego dostępu nie możesz zmienić.') : null),
       h('section', { class: 'tm-sec' }, h('h3', {}, 'Konto'),
@@ -93,19 +103,20 @@ export async function renderZespol(main) {
     const email = h('input', { class: 'input', type: 'email', placeholder: 'adres@rkdp.pl' });
     const name = h('input', { class: 'input', placeholder: 'Imię i nazwisko' });
     const short = h('input', { class: 'input', placeholder: 'np. Kuba' });
-    let firm = 'rozliczenia', role = 'limited';
-    const fBox = h('div'), rBox = h('div');
-    const draw = () => { fBox.replaceChildren(seg([['rozliczenia', 'RKDP'], ['doradztwo', 'M2 TAX'], ['oba', 'Obie'], ['jpk', 'Tylko JPK']], firm, false, k => { firm = k; if (k === 'jpk') role = 'limited'; draw(); }));
+    let firm = 'rozliczenia', role = 'limited', office = null;
+    const fBox = h('div'), rBox = h('div'), oBox = h('div', { class: 'field wide' });
+    const draw = () => { fBox.replaceChildren(seg([['rozliczenia', 'RKDP'], ['doradztwo', 'M2 TAX'], ['oba', 'Obie'], ['jpk', 'Partner – biuro']], firm, false, k => { firm = k; if (k === 'jpk') role = 'limited'; draw(); }));
+      oBox.hidden = firm !== 'jpk'; oBox.replaceChildren(h('span', {}, 'Biuro rachunkowe (Program Partner)'), officeSel(office, v => { office = v; }));
       rBox.replaceChildren(seg(Object.entries(ROLE).map(([k, v]) => [k, v]), role, firm === 'jpk', k => { role = k; draw(); })); };
     draw();
     modal('Dodaj osobę', h('div', { class: 'form-grid' },
       h('label', { class: 'field wide' }, h('span', {}, 'E-mail (login)'), email), h('label', { class: 'field' }, h('span', {}, 'Imię i nazwisko'), name), h('label', { class: 'field' }, h('span', {}, 'Skrót'), short),
-      h('div', { class: 'field wide' }, h('span', {}, 'Firma'), fBox), h('div', { class: 'field wide' }, h('span', {}, 'Zakres'), rBox),
+      h('div', { class: 'field wide' }, h('span', {}, 'Firma'), fBox), oBox, h('div', { class: 'field wide' }, h('span', {}, 'Zakres'), rBox),
       h('p', { class: 'hint wide', style: { margin: 0 } }, 'Ta osoba zaloguje się przez „Pierwsze logowanie”: kod z e-maila, potem własne hasło.')),
     close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async () => {
       if (!email.value.trim() || !name.value.trim() || !short.value.trim()) return toast('Uzupełnij e-mail, imię i nazwisko oraz skrót', true);
-      const modules = firm === 'oba' ? ['rozliczenia', 'doradztwo'] : [firm];
-      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: firm === 'jpk' ? 'limited' : role, modules });
+      const modules = firm === 'oba' ? ['rozliczenia', 'doradztwo'] : firm === 'jpk' ? partnerMods(office) : [firm];
+      const { error } = await sb.from('team_members').insert({ email: email.value.trim().toLowerCase(), full_name: name.value.trim(), short_name: short.value.trim(), role: firm === 'jpk' ? 'limited' : role, modules, partner_client_id: firm === 'jpk' ? office : null });
       if (error) return fail(error);
       close(); toast('Dodano osobę'); await reloadMembers(); renderTeam();
     } }, 'Dodaj')]);
@@ -237,7 +248,7 @@ export async function renderZespol(main) {
     h('div', { class: 'section-head' }, h('h2', {}, 'Regulamin – akceptacje')),
     h('p', { class: 'small muted', style: { margin: '0 0 10px' } }, 'Każdy użytkownik akceptuje regulamin przy pierwszym logowaniu, co najmniej raz na 30 dni i po zmianie treści. Historii nie można zmienić ani usunąć.'),
     termsBox));
-  import('./regulamin.js').then(m => m.termsAdminSection(state.members)).then(el => termsBox.replaceChildren(el)).catch(() => termsBox.replaceChildren(h('p', { class: 'hint' }, 'Historia akceptacji jest niedostępna.')));
+  import('./regulamin.js').then(m => m.termsAdminSection(state.allMembers)).then(el => termsBox.replaceChildren(el)).catch(() => termsBox.replaceChildren(h('p', { class: 'hint' }, 'Historia akceptacji jest niedostępna.')));
   main.append(h('section', { class: 'card section', style: { marginTop: '16px' } },
     h('div', { class: 'section-head' }, h('h2', {}, 'Kopia zapasowa'), h('div', { class: 'row-btns' }, filesBtn, backupBtn)),
     h('p', { class: 'hint' }, 'Kopia danych: plik ZIP ze wszystkimi danymi aplikacji (klienci, rozliczenia, rozmowy, zadania, Doradztwo M2 TAX, historia zmian) – w formacie JSON i Excel. ',
@@ -259,7 +270,7 @@ export async function renderZespol(main) {
         h('thead', {}, h('tr', {}, ...['Plik', 'Skąd', 'Klient', 'Usunął(a)', 'Kiedy', 'Zniknie za', ''].map(x => h('th', {}, x)))),
         h('tbody', {}, ...data.map(r => h('tr', {},
           h('td', {}, h('b', {}, r.name || r.path.split('/').pop())), h('td', { class: 'small' }, SRC[r.source] || r.source), h('td', { class: 'small' }, cl.get(r.client_id) || '—'),
-          h('td', { class: 'small' }, state.members.find(m => m.id === r.deleted_by)?.short_name || '—'),
+          h('td', { class: 'small' }, state.allMembers.find(m => m.id === r.deleted_by)?.short_name || '—'),
           h('td', { class: 'small' }, new Date(r.deleted_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })),
           h('td', { class: 'small' }, `${days(r)} dni`),
           h('td', {}, h('div', { class: 'row-btns' },
