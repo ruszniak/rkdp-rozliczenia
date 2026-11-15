@@ -48,7 +48,8 @@ const loadTypes = (fresh) => (typesP && !fresh ? typesP : (typesP = sb.from('mee
 async function advisorIds() {
   const [types, { data: bm }] = await Promise.all([loadTypes(), sb.from('booking_members').select('member_id')]);
   const ids = new Set([...types.flatMap(t => t.advisors || []), ...(bm || []).map(x => x.member_id)]);
-  return state.members.filter(m => m.active !== false && ids.has(m.id)).map(m => m.id);
+  // kolejność jak w rodzajach spotkań (najpierw Michał, potem Marcin), potem pozostałe osoby z grafikiem
+  return [...ids].filter(id => state.members.some(m => m.id === id && m.active !== false));
 }
 const avaChip = m => h('span', { class: 'sp-av', title: m?.full_name || '' }, ava(m));
 

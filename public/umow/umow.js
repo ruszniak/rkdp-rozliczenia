@@ -338,6 +338,9 @@
   if (TOKEN) { manage(); return; }
   api('config').then(function (r) {
     cfg = r;
+    // doradcy w kolejności z rodzajów spotkań (najpierw Michał Ruszniak, potem Marcin Otręba)
+    var ord = []; (cfg.types || []).forEach(function (t) { (t.advisors || []).forEach(function (id) { if (ord.indexOf(id) < 0) ord.push(id); }); });
+    cfg.advisors = (cfg.advisors || []).slice().sort(function (a, b) { var x = ord.indexOf(a.id), y = ord.indexOf(b.id); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });
     if (!cfg.types || !cfg.types.length) return fail('Rezerwacja online jest chwilowo niedostępna.');
     var wantT = norm(q.get('typ')), wantA = norm(q.get('doradca'));
     if (wantT) st.type = cfg.types.filter(function (t) { return t.id === q.get('typ') || norm(t.name).indexOf(wantT) >= 0; })[0] || null;
