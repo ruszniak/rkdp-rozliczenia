@@ -29,6 +29,7 @@
   // kolory: w okienku na stronie rkdp.pl / m2tax.pl – kolory tej strony, pod linkiem – kolory aplikacji
   var THEME = (q.get('motyw') || (EMBED && CHANNEL !== 'link' ? CHANNEL : '')).toLowerCase();
   if (THEME === 'rkdp' || THEME === 'm2tax') document.body.classList.add('th-' + THEME);
+  else document.body.classList.add('th-link');   // pod linkiem: wygląd jak pozostałe strony dla klientów (styl dokumentu kancelarii)
 
   function h(tag, attrs) {
     var el = document.createElement(tag);

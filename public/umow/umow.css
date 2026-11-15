@@ -1,3 +1,4 @@
+@font-face{font-family:"Lora";src:url(/fonts/pdf/Lora-SemiBold.woff) format("woff");font-weight:500 700;font-display:swap}
 :root{--gold:#1F2937;--gold-d:#1F2937;--gold-l:#F1F5FF;--blue:#2563EB;--ink:#111827;--muted:#6B7280;--line:#E5E7EB;--bg:#F6F6F7;--ok:#3E6B47}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Montserrat,Inter,system-ui,-apple-system,Segoe UI,sans-serif;-webkit-font-smoothing:antialiased}
@@ -235,3 +236,87 @@ body.th-m2tax .free.price{color:var(--ink);background:#F0E9DE}
 .um-flags{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:6px!important}
 .um-flags img{width:220px;max-width:70%;height:auto;opacity:.75}
 .um-flags:empty{display:none}
+
+/* ===== rkdp.pl (okienko na stronie): kolory i kształty strony rkdp.pl ===== */
+body.th-rkdp .cal button.sel,body.th-rkdp .cal button.ok.sel{background:#7A5A37;color:#F8F5F0}
+body.th-rkdp .cal button.td:not(.sel){box-shadow:inset 0 0 0 1.5px #7A5A37}
+body.th-rkdp .typ{border-color:#E3D9CA}
+body.th-rkdp .typ.on{border-color:#7A5A37;background:#F0E9DE;box-shadow:none}
+body.th-rkdp .dor{border-color:#E3D9CA}
+body.th-rkdp .dor.on{border-color:#7A5A37;background:#F0E9DE}
+body.th-rkdp .dor .av{background:#5C4228!important}
+body.th-rkdp .dor:first-child .av{background:#B5A792!important}
+body.th-rkdp .note{background:#F0E9DE;color:#5E564C}
+body.th-rkdp .slot{border-color:#E3D9CA}
+body.th-rkdp .slot:hover,body.th-rkdp .typ:hover,body.th-rkdp .dor:hover{border-color:#7A5A37}
+body.th-rkdp .um-top h1,body.th-rkdp .done h2{font-family:'Plus Jakarta Sans',Montserrat,sans-serif}
+body.th-rkdp .kv{background:#F0E9DE}
+body.th-rkdp .sum{background:#1D1A16}
+body.th-rkdp .sum .dd{background:#7A5A37}
+/* m2tax.pl: zdjęć brak – kolorowe kółka doradców w kolorach strony */
+body.th-m2tax .dor .av{background:#16171a!important}
+body.th-m2tax .dor:first-child .av{background:#A6A8AE!important}
+
+/* ===== pod linkiem (app.ruszniak.io/umow/): wygląd dokumentu kancelarii – jak strony podpisu i instrukcji ===== */
+body.th-link{--blue:#1C1F26;--gold:#1C1F26;--gold-d:#16181D;--gold-l:#F7F6F3;--ink:#16181D;--muted:#676B73;--line:#E3DFD8;--bg:#fff;
+  background:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;font-size:15.5px}
+body.th-link .um{padding-top:32px}
+body.th-link.embed .um{padding-top:0}
+body.th-link .um-card{border-radius:4px;box-shadow:none;border:1px solid #E3DFD8}
+body.th-link.embed .um-card{border:0;border-radius:0}
+body.th-link .um-top{padding:18px 24px;border-bottom-color:#E3DFD8}
+body.th-link .um-logo{width:32px;height:32px;border-radius:7px}
+body.th-link .um-top h1{font:600 23px/1.25 Lora,Georgia,serif;letter-spacing:0}
+body.th-link .um-top p{font-size:14px}
+body.th-link .um-steps{color:#9A9DA4;font-weight:600}
+body.th-link .um-steps .on{color:#16181D}
+body.th-link .um-x{border-radius:6px;background:#F7F6F3}
+body.th-link .um-side{background:#FAFAF8;border-right-color:#E3DFD8}
+body.th-link .lbl{letter-spacing:0;text-transform:none;font-size:14px;font-weight:700;color:#16181D}
+body.th-link .typ{border-width:1px;border-color:#CFC9BF;border-radius:6px}
+body.th-link .typ:hover{border-color:#16181D}
+body.th-link .typ.on{border-color:#16181D;background:#fff;box-shadow:inset 0 0 0 1px #16181D}
+body.th-link .typ .ic{border-radius:6px;background:#F7F3EC;color:#7A5A37}
+body.th-link .typ.on .ic{background:#16181D;color:#fff}
+body.th-link .free{border-radius:4px;background:#EEF3EC;color:#2F5E3A}
+body.th-link .dor{border-width:1px;border-color:#CFC9BF;border-radius:6px}
+body.th-link .dor:hover{border-color:#16181D}
+body.th-link .dor.on{border-color:#16181D;background:#F7F6F3}
+body.th-link .dor .av{background:#3A3D44!important;border-radius:4px}
+body.th-link .dor:first-child .av{background:#A6A8AE!important}
+body.th-link .note{background:#F7F3EC;border-radius:0;border-left:2px solid #7A5A37;color:#2B2E35}
+body.th-link .nb{border-radius:6px;border-color:#CFC9BF}
+body.th-link .cal span{color:#8A8C92}
+body.th-link .cal button{border-radius:6px}
+body.th-link .cal button.ok{background:#F7F6F3;color:#16181D}
+body.th-link .cal button.ok:hover{background:#ECEAE5}
+body.th-link .cal button.sel,body.th-link .cal button.ok.sel{background:#16181D;color:#fff}
+body.th-link .cal button.td:not(.sel){box-shadow:inset 0 0 0 1px #7A5A37}
+body.th-link .slot{border-width:1px;border-color:#CFC9BF;border-radius:6px}
+body.th-link .slot:hover{border-color:#16181D}
+body.th-link .slot.sel{background:#16181D;border-color:#16181D}
+body.th-link .btn{border-radius:6px;background:#1C1F26;font-weight:600}
+body.th-link .btn:not(:disabled):hover{background:#000}
+body.th-link .btn:disabled{opacity:.35}
+body.th-link .btn.out{border-radius:6px;border-width:1px;border-color:#CFC9BF}
+body.th-link .fl label{font-size:14px;color:#2B2E35}
+body.th-link .fl input,body.th-link .fl textarea{border-width:1px;border-color:#CFC9BF;border-radius:6px}
+body.th-link .fl input:focus,body.th-link .fl textarea:focus{border-color:#7A5A37;outline:2px solid rgba(122,90,55,.25)}
+body.th-link .consent input{accent-color:#16181D}
+body.th-link .sum{background:#F7F6F3;color:#2B2E35;border:1px solid #E3DFD8;border-radius:4px}
+body.th-link .sum .dd{background:#16181D;color:#fff;border-radius:4px}
+body.th-link .sum .dd b{font-family:Lora,Georgia,serif;font-weight:600}
+body.th-link .sum .d div[style]{color:#676B73!important}
+body.th-link .sum p{color:#676B73}
+body.th-link .sum a{color:#7A5A37}
+body.th-link .err{border-radius:0;border-left:2px solid #A3261B;background:#FBF1EF;color:#A3261B}
+body.th-link .done h2{font:600 26px/1.25 Lora,Georgia,serif}
+body.th-link .done .ok{background:#EEF3EC;color:#2F5E3A}
+body.th-link .kv{background:#F7F6F3;border-radius:0;border-left:2px solid #7A5A37}
+body.th-link .kv a{color:#7A5A37}
+body.th-link .cost{background:#F7F6F3;border-radius:0}
+body.th-link .pay{border-radius:4px;border-width:1px}
+@media (max-width:860px){body.th-link .um{padding:0 0 30px}body.th-link .um-card{border:0;border-bottom:1px solid #E3DFD8;border-radius:0}}
+html:has(body.th-link){background:#fff}
+body.th-link .consent a,body.th-rkdp .consent a{color:#7A5A37}
+@media (max-width:860px){body.th-link .um-top h1{font-size:19px}body.th-link .um-top p{font-size:13px}}
