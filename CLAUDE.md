@@ -13,6 +13,9 @@ Gdy zmieniasz coś, co widzi użytkownik (nowa funkcja, inny przycisk, inna nazw
 
 Zrzuty ekranu: wersja demo (`public/demo`) + nakładka do zrzutów (folder `_shot`, poza repozytorium – nie commitować `public/_shot`).
 
+## Wygląd stron dla klientów
+Strony z linków (podpis, UPL-1, wgrywanie, instrukcje, regulamin) mają wspólny styl w `public/umow/doc.css`: biała strona, nagłówki Lora (`/fonts/pdf/Lora-SemiBold.woff`), tekst czcionką systemową, cienkie linie, akcent brązowy #7A5A37, przyciski grafitowe. Bez emoji, gradientów, „pigułek”, ozdobnych teł i napisów WERSALIKAMI z rozstrzeleniem. Czcionki tylko z własnego serwera (bez Google Fonts). Oferta (`public/js/offers/offer.js`) – ten sam charakter.
+
 ## Inne zasady
 - Komunikacja z właścicielem po polsku; nazwa aplikacji: rdp.app.
 - Przed push: `git pull --rebase` (repo zmienia też inna sesja). Przy zmianie frontendu podbij `CACHE` w `public/sw.js`.

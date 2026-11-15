@@ -189,14 +189,11 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
   const rowHtml = r => `<tr><td><div class="pl">${esc(r.label)}${num(r.qty) > 1 ? ` <span class="qty">× ${esc(r.qty)}</span>` : ''}</div>${r.desc ? `<div class="pd">${esc(r.desc)}</div>` : ''}</td><td class="pr">${priceCell(r)}</td><td class="pu">${unitCell(r)}</td></tr>`;
   const groups = [...services.map(k => [k === 'partner' ? 'Poza pakietem' : SERVICE_TITLE[k], o.services[k].rows || []]), ...(o.extras?.length ? [['Dodatkowo', o.extras]] : [])].filter(([, rows]) => rows.some(r => r.label));
   const P = o.services?.partner?.on ? o.services.partner : null;
-  const n2 = i => String(i + 1).padStart(2, '0');
+  const n2 = i => `${i + 1}.`;
 
   const cover = `
 <section class="cover">
-  <svg class="orn" viewBox="0 0 600 600" aria-hidden="true"><g fill="none" stroke="#C9A877" stroke-width="1.2" opacity=".55">
-    <circle cx="470" cy="130" r="210"/><circle cx="470" cy="130" r="160"/><circle cx="470" cy="130" r="110" opacity=".6"/>
-    <path d="M60 520 L560 20" opacity=".35"/></g></svg>
-  <div class="cv-top"><img class="cv-logo" src="${origin}${B.logo}" alt="${esc(B.short)}"><div class="cv-meta">OFERTA${number ? ` <b>${esc(number)}</b>` : ''}<br>${esc(dateLong(o.offer_date))}</div></div>
+  <div class="cv-top"><img class="cv-logo" src="${origin}${B.logo}" alt="${esc(B.short)}"><div class="cv-meta">Oferta${number ? ` nr <b>${esc(number)}</b>` : ''}<br>${esc(dateLong(o.offer_date))}</div></div>
   <div class="cv-mid">
     <div class="eyebrow">Oferta współpracy</div>
     <h1>${esc(title)}</h1>
@@ -204,7 +201,7 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
     <div class="cv-for">przygotowana dla</div>
     <div class="cv-client">${esc(o.client?.name || '……………………')}</div>
     <div class="cv-cl2">${esc([o.client?.nip ? `NIP ${o.client.nip}` : '', o.client?.address].filter(Boolean).join(' · '))}</div>
-    ${services.length ? `<div class="cv-chips">${services.map(k => `<span>${esc(SERVICE_TITLE[k])}</span>`).join('')}</div>` : ''}
+    ${services.length ? `<div class="cv-chips">Zakres: ${services.map(k => esc(SERVICE_TITLE[k])).join(' · ')}</div>` : ''}
     ${est !== null ? `<div class="cv-est"><span>Szacunkowy koszt miesięczny</span><b>${esc(money(est))} netto</b></div>` : ''}
   </div>
   <div class="cv-band">
@@ -227,7 +224,7 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
   <div class="sec-h"><span class="sec-n">${n2(0)}</span><h2>O nas</h2></div>
   <p class="lead">${esc(B.about)}</p>
   <div class="facts">${B.facts.map(([a, b]) => `<div class="fact"><b>${esc(a)}</b><span>${esc(b)}</span></div>`).join('')}</div>
-  ${o.show_team !== false ? `<div class="team">${people.map(p => `<div class="person"><div class="av">${esc(p.initials)}</div><div><b>${esc(p.name)}</b><em>${esc(p.role[brandKey])}</em><p>${esc(p.bio)}</p></div></div>`).join('')}</div>` : ''}
+  ${o.show_team !== false ? `<div class="team">${people.map(p => `<div class="person"><div><b>${esc(p.name)}</b><em>${esc(p.role[brandKey])}</em><p>${esc(p.bio)}</p></div></div>`).join('')}</div>` : ''}
 </section>`;
 
   let sec = 1;
@@ -267,7 +264,7 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
   const terms = `
 <section class="blk keep">
   <div class="sec-h"><span class="sec-n">${n2(sec++)}</span><h2>Warunki współpracy</h2></div>
-  <ul class="dots">${lines(o.terms).map(x => `<li>${esc(x)}</li>`).join('')}<li>Oferta jest ważna do ${esc(dateLong(o.valid_until))}.</li></ul>
+  <ul class="dots">${lines(o.terms).map(x => `<li>${esc(x)}</li>`).join('')}<li>Oferta jest ważna do ${esc(dateLong(o.valid_until)).replace(/\.$/, '')}.</li></ul>
 </section>`;
 
   const why = o.show_why !== false ? `
@@ -294,7 +291,7 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
 </section>`;
 
   return `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>${esc(`Oferta ${number || ''} ${o.client?.name || ''}`.trim())}</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
+<style>@font-face{font-family:'Lora';font-weight:600;src:url(${origin}/fonts/pdf/Lora-SemiBold.woff) format('woff')}@font-face{font-family:'Source Sans 3';font-weight:400;src:url(${origin}/fonts/pdf/SourceSans3-Regular.woff2) format('woff2')}@font-face{font-family:'Source Sans 3';font-weight:600;src:url(${origin}/fonts/pdf/SourceSans3-Semibold.woff2) format('woff2')}@font-face{font-family:'Source Sans 3';font-weight:700;src:url(${origin}/fonts/pdf/SourceSans3-Bold.woff2) format('woff2')}</style>
 <style>${OFFER_CSS.replace('__FOOT__', esc(B.foot).replace(/"/g, "'"))}</style></head>
 <body><div class="doc ${brandKey}">${cover}
 <table class="flow"><thead><tr><td><div class="run"><img src="${origin}${B.logo}" alt=""><span>Oferta${number ? ` ${esc(number)}` : ''} · ${esc(o.client?.name || '')}</span></div></td></tr></thead>
@@ -424,4 +421,61 @@ table.pk-cmp i.ok{display:inline-flex;width:4.6mm;height:4.6mm;border-radius:50%
 table.pk-cmp .no{color:#B5AB9E}
 .pk-note{font-size:8pt;color:#6A6157;margin-top:3mm}
 @media screen{body{background:#E9E3D8}.doc{width:210mm;max-width:100%;margin:0 auto;background:#fff}table.flow>thead>tr>td,table.flow>tbody>tr>td{padding:0 17mm}table.flow>thead>tr>td{padding-top:12mm}table.flow>tbody>tr>td{padding-bottom:16mm}}
+/* ===== wygląd klasyczny (XI 2026): dokument kancelarii – szeryfowe nagłówki, cienkie linie, bez ozdobników ===== */
+@page{@bottom-left{font-family:'Source Sans 3',Arial,sans-serif}@bottom-right{font-family:'Source Sans 3',Arial,sans-serif}}
+body{font-family:'Source Sans 3',Arial,sans-serif;font-size:10pt;color:#2B2E35}
+h1,h2,h3,.cv-client,.fact b,.pk-price b,.est b,.cv-est b{font-family:Lora,Georgia,serif;letter-spacing:0;font-weight:600}
+.eyebrow,.cv-for,.cv-col span,.est span,.cv-est span,.contact span,.run span,table.prices th,table.pk-cmp th,.pk-badge{letter-spacing:.02em;text-transform:none}
+.eyebrow{font-size:9pt;font-weight:600;color:#7A5A37}
+.cover{background:#fff}
+.cv-meta{letter-spacing:0;font-size:9pt;color:#676B73;line-height:1.6}
+.cv-meta b{letter-spacing:0}
+.cv-mid{padding-top:48mm}
+.cv-mid h1{font-size:30pt;line-height:1.12;font-weight:600}
+.cv-rule{width:18mm;height:0;border-top:.8pt solid #1C1F26;background:none;border-radius:0;margin:9mm 0 8mm}
+.cv-for{font-size:9pt;color:#676B73}
+.cv-client{font-size:18pt}
+.cv-chips{display:block;margin-top:10mm;font-size:9.5pt;color:#2B2E35}
+.cv-chips span{border:0;background:none;padding:0;border-radius:0}
+.cv-est span{font-size:9pt;color:#676B73}
+.cv-band{background:#fff;color:#2B2E35;border-top:.6pt solid #CFC9BF;margin:0 20mm;padding:8mm 0 18mm}
+.cv-col span{font-size:8.5pt;color:#7A5A37;font-weight:600}
+.cv-col b{color:#16181D}
+.cv-col em{color:#676B73}
+.run{border-bottom-color:#E3DFD8}
+.run span{font-size:8pt;color:#8A8C92}
+.sec-h{gap:3mm;border-top:.6pt solid #E3DFD8;padding-top:5mm}
+.sec-n{font-family:Lora,Georgia,serif;font-weight:600;font-size:15pt;color:#7A5A37}
+.sec-h h2{font-size:15pt}
+.letter h2{font-size:14pt}
+.facts{gap:6mm}
+.fact{background:none;border-top:.6pt solid #1C1F26;border-radius:0;padding:3mm 0 0}
+.fact b{font-size:11.5pt}
+.person{grid-template-columns:1fr}
+.person .av{display:none}
+.person em{color:#7A5A37}
+ul.checks li,ul.dots li{position:relative;padding-left:5mm;display:block}
+ul.checks i{display:none}
+ul.checks li::before,ul.dots li::before{content:"–";position:absolute;left:0;top:0;width:auto;height:auto;background:none;border-radius:0;color:#7A5A37}
+table.prices th{font-size:8.5pt;color:#16181D;font-weight:700;border-bottom-width:.6pt}
+table.prices tr.grp td{background:none;border-bottom:.6pt solid #CFC9BF;padding-top:4mm;font-size:10pt}
+.est>div{background:#F7F6F3;color:#2B2E35;border-radius:0;border-left:.9mm solid #7A5A37}
+.est span{font-size:8.5pt;color:#7A5A37;font-weight:600}
+.est b{color:#16181D;font-size:14pt}
+.why-i span{border:0;width:auto;height:auto;font-family:Lora,Georgia,serif;font-size:11pt;color:#7A5A37}
+.why-i span::after{content:"."}
+.step{background:none;border-top:.6pt solid #1C1F26;border-radius:0;padding:3mm 0 0}
+.step span{background:none;color:#7A5A37;width:auto;height:auto;font-family:Lora,Georgia,serif;font-size:13pt;margin-bottom:1.5mm;display:block}
+.contact{background:none;border-top:.6pt solid #CFC9BF;border-radius:0;padding:4mm 0 0}
+.contact span{font-size:8pt;color:#7A5A37;font-weight:600}
+.pk{border-radius:0}
+.pk.on{box-shadow:none;border-color:#7A5A37;background:#fff}
+.pk-badge{border-radius:0;background:#7A5A37;color:#fff;font-size:7.5pt}
+table.pk-cmp th{font-size:8.5pt;color:#16181D}
+table.pk-cmp i.ok{background:none}
+table.pk-cmp tr.all td,table.pk-cmp .on{background:#F7F6F3}
+@media screen{body{background:#ECEAE5}}
+.svc h3 span{font-family:'Source Sans 3',Arial,sans-serif;font-size:9pt}
+table.prices tr.grp td{font-family:Lora,Georgia,serif;font-weight:600}
+
 `;

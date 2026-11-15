@@ -59,7 +59,7 @@
       var fd = new FormData(); fd.append('token', token); fd.append('file', it.f, it.f.name);
       fetch(api, { method: 'POST', body: fd }).then(function (r) { return r.json(); }).then(function (d) {
         if (d.error) mark(it.li, 'bad', d.error);
-        else if (d.saved && d.saved.length) { sent++; mark(it.li, 'ok', '✓ przesłano'); }
+        else if (d.saved && d.saved.length) { sent++; mark(it.li, 'ok', 'przesłano'); }
         else mark(it.li, 'bad', (d.rejected && d.rejected[0]) || 'nie przyjęto');
       }).catch(function () { mark(it.li, 'bad', 'błąd połączenia – spróbuj ponownie'); }).then(next);
     };

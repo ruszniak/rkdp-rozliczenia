@@ -20,8 +20,8 @@
 
   function render(d) {
     box.replaceChildren(document.getElementById('tpl').content.cloneNode(true));
-    document.title = 'Podpisz: ' + d.title + ' – rdp.app';
-    document.getElementById('ttl').textContent = 'Podpisz: ' + d.title;
+    document.title = d.title + ' – dokument do podpisu';
+    document.getElementById('ttl').textContent = d.title;
     document.getElementById('who').textContent = (d.client ? d.client + ' · ' : '') + 'link ważny do ' + new Date(d.expires_at).toLocaleDateString('pl-PL');
     var dl = document.getElementById('dl');
     if (d.file && d.file.url) dl.href = d.file.url;
@@ -39,7 +39,7 @@
       var closeBtn = null;
       var setFull = function (on) {
         view.classList.toggle('full', on); document.body.style.overflow = on ? 'hidden' : '';
-        if (on && !closeBtn) { closeBtn = document.createElement('button'); closeBtn.className = 'btn-p doc-close'; closeBtn.type = 'button'; closeBtn.textContent = 'Zamknij podgląd ✕'; closeBtn.onclick = function () { setFull(false); }; document.body.appendChild(closeBtn); }
+        if (on && !closeBtn) { closeBtn = document.createElement('button'); closeBtn.className = 'btn-p doc-close'; closeBtn.type = 'button'; closeBtn.textContent = 'Zamknij podgląd'; closeBtn.onclick = function () { setFull(false); }; document.body.appendChild(closeBtn); }
         if (!on && closeBtn) { closeBtn.remove(); closeBtn = null; }
       };
       full.addEventListener('click', function () { setFull(true); });
@@ -67,12 +67,12 @@
           if (r.error) { nErr.textContent = r.error; nErr.hidden = false; return; }
           notes = notes.concat([{ body: txt, author: who, created_at: new Date().toISOString() }]); drawNotes(notes);
           document.getElementById('noteTxt').value = ''; form.hidden = true;
-          notesBox.insertAdjacentHTML('beforeend', '<p class="small" style="color:#15803D;font-weight:600">✓ Uwagi wysłane – odezwiemy się wkrótce.</p>');
+          notesBox.insertAdjacentHTML('beforeend', '<p class="sent">Uwagi zostały wysłane. Odezwiemy się wkrótce.</p>');
         }).catch(function () { btn.disabled = false; btn.textContent = 'Wyślij uwagi'; nErr.textContent = 'Brak połączenia – spróbuj ponownie.'; nErr.hidden = false; });
     });
     if (d.firm === 'm2') {   // M2 TAX: dane kontaktowe kancelarii
       document.getElementById('contact').innerHTML = 'Zadzwoń: <a href="tel:+48883643565">883 643 565</a> · napisz: <a href="mailto:kancelaria@m2tax.pl">kancelaria@m2tax.pl</a>.';
-      document.getElementById('foot').textContent = 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska · ul. Zwycięska 3, 53-033 Wrocław';
+      document.getElementById('foot').innerHTML = 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska · ul. Zwycięska 3, 53-033 Wrocław<br>NIP 8993058189 · KRS 0001238577 · tel. 883 643 565 · kancelaria@m2tax.pl';
     }
     var steps = box.querySelectorAll('.steps li');
     var step = function (n) { steps.forEach(function (li, i) { li.className = i < n ? 'ok' : i === n ? 'on' : ''; }); };
@@ -93,7 +93,7 @@
     var setFile = function (f) {
       file = f || null; err.hidden = true;
       drop.classList.toggle('has', !!file);
-      drop.querySelector('b').textContent = file ? '✓ ' + file.name : 'Wybierz podpisany plik';
+      drop.querySelector('b').textContent = file ? 'Wybrany plik: ' + file.name : 'Wybierz podpisany plik';
       send.disabled = !file; if (file) step(2);
     };
     input.addEventListener('change', function () { setFile(input.files[0]); });

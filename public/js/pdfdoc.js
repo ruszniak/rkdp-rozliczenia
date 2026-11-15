@@ -11,8 +11,9 @@ const FONTS = [
   ['Plus Jakarta Sans', 600, 'PlusJakartaSans-SemiBold'], ['Plus Jakarta Sans', 700, 'PlusJakartaSans-Bold'], ['Plus Jakarta Sans', 800, 'PlusJakartaSans-ExtraBold'],
   ['Source Sans 3', 400, 'SourceSans3-Regular'], ['Source Sans 3', 600, 'SourceSans3-Semibold'], ['Source Sans 3', 700, 'SourceSans3-Bold'],
   ['Inter', 400, 'Inter-Regular'], ['Inter', 600, 'Inter-SemiBold'],
+  ['Lora', 600, 'Lora-SemiBold.woff'],
 ];
-const fontUrl = file => `${location.origin}/fonts/pdf/${file}.woff2`;
+const fontUrl = file => `${location.origin}/fonts/pdf/${file}${/\.woff2?$/.test(file) ? '' : '.woff2'}`;
 
 // ---------- czcionki ----------
 const dataCache = new Map();
@@ -28,7 +29,7 @@ const docFonts = () => docFontsP ||= Promise.all(FONTS.filter(f => f[0] === 'Mon
 // tylko rodziny użyte w dokumencie (mniej danych w każdym obrazie)
 const usedFonts = html => FONTS.filter(([fam]) => html.includes(fam) || html.includes(fam.replace(/ /g, '+')));
 async function embedCss(list) {
-  return (await Promise.all(list.map(async ([fam, w, file]) => `@font-face{font-family:'${fam}';font-weight:${w};font-style:normal;src:url(${await fontData(file)}) format('woff2');}`))).join('\n');
+  return (await Promise.all(list.map(async ([fam, w, file]) => `@font-face{font-family:'${fam}';font-weight:${w};font-style:normal;src:url(${await fontData(file)}) format('${file.endsWith('.woff') ? 'woff' : 'woff2'}');}`))).join('\n');
 }
 
 // ---------- ustawienia strony z „@page” ----------
