@@ -1,5 +1,5 @@
 // Oferty na usługi – lista i edytor (RKDP: zakładka Klienci → Oferty, M2 TAX: Zlecenia → Oferty).
-import { h, toast, fail, icon, infoTip, printHtml } from '../ui.js';
+import { h, toast, fail, icon, infoTip, printHtml, modal } from '../ui.js';
 import { sb, state, isAdmin } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { lookupNip, validNip } from '../nip.js';
@@ -19,6 +19,7 @@ const HELP = `Oferta na usługi w PDF – z okładką, zakresem usług, cennikie
 • Cennik: pozycje z umów; wpisz ceny. Pozycje bez ceny pokażą się jako „do uzgodnienia”. Zaznacz „Σ” przy pozycjach miesięcznych, a oferta policzy szacunkowy koszt miesięczny (dla kadr wpisz liczbę osób).
 • Warunki współpracy – każdy punkt w osobnej linii.
 • „Podgląd / PDF” otwiera gotowy dokument – w oknie drukowania wybierz „Zapisz jako PDF”.
+• „Wyślij e-mailem” – klient dostaje e-mail z Twoją stopką i linkiem do oferty (bez logowania, z pobraniem PDF); status zmienia się na „wysłana”, widać, czy klient ją otworzył.
 • Oferty zapisują się z numerem OF/rok/numer; status (wysłana, zaakceptowana…) pomaga śledzić, co się dzieje z ofertą.`;
 
 export async function renderOferty(main, id, brand = 'rkdp') {
@@ -212,6 +213,37 @@ async function renderEditor(main, id, brand) {
     } });
   }
   loadLinkInfo();
+  // e-mail do klienta z linkiem do oferty (wysyłka z aplikacji, stopka nadawcy dopisuje się sama)
+  async function mailOffer() {
+    if (dirty || !row) { if (!(await save())) return; }
+    const f = {
+      to: o.client.email || '',
+      subject: `Oferta współpracy – ${B.short}${row.number ? ' (nr ' + row.number + ')' : ''}`,
+      body: `Dzień dobry,\n\nw nawiązaniu do naszej rozmowy przesyłam ofertę współpracy przygotowaną dla ${(o.client.name || 'Państwa').replace(/\.$/, '')}. Ofertę można obejrzeć i pobrać jako PDF pod linkiem:\n{link}\n\nW razie pytań jestem do dyspozycji – chętnie omówię szczegóły telefonicznie lub na spotkaniu.`,
+    };
+    const fld = (k, label, type) => {
+      const el = type === 'textarea' ? h('textarea', { class: 'input', rows: 10 }) : h('input', { class: 'input', type });
+      el.value = f[k]; el.addEventListener('input', () => { f[k] = el.value; });
+      return h('label', { class: 'field wide' }, h('span', {}, label), el);
+    };
+    modal('Wyślij ofertę e-mailem', h('div', {},
+      h('p', { class: 'small muted', style: { marginTop: 0 } }, 'Klient dostanie e-mail z przyciskiem „Zobacz ofertę” – link otwiera ofertę bez logowania, z możliwością pobrania PDF. Link pokazuje zawsze ostatnio zapisaną wersję; w aplikacji widać, czy i kiedy klient ją otworzył.'),
+      h('div', { class: 'form-grid' }, fld('to', 'Do (e-mail klienta)', 'email'), fld('subject', 'Temat', 'text'),
+        fld('body', 'Treść – {link} zamieni się na link do oferty (pod spodem dopisze się Twoja stopka)', 'textarea'))), close => [
+      h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'),
+      h('button', { class: 'btn btn-primary', onclick: async e => {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.to.trim())) return toast('Wpisz poprawny adres e-mail klienta', true);
+        if (!f.subject.trim() || !f.body.trim()) return toast('Uzupełnij temat i treść', true);
+        e.target.disabled = true; e.target.textContent = 'Wysyłanie…';
+        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'offer_mail', offer_id: row.id, to: f.to.trim(), subject: f.subject.trim(), body: f.body } });
+        e.target.disabled = false; e.target.textContent = 'Wyślij';
+        if (error || r?.error) return toast(r?.error === 'send_failed' ? 'Nie udało się wysłać e-maila: ' + (r.detail || '') : r?.error === 'not_configured' ? 'Wysyłka e-mail nie jest skonfigurowana' : (r?.error || 'Nie udało się wysłać'), true);
+        close(); toast(`Wysłano ofertę na ${f.to.trim()}`);
+        if (status === 'projekt') { status = 'wyslana'; statusSel.value = status; }
+        loadLinkInfo();
+      } }, icon('mail'), 'Wyślij'),
+    ], { wide: true });
+  }
   async function pdf() {
     if (dirty || !row) { if (!(await save())) return; }
     const html = offerHtml(o, brand, { number: row.number });
@@ -240,6 +272,7 @@ async function renderEditor(main, id, brand) {
         h('img', { src: B.logo, alt: B.short, class: 'of-logo' }),
         estBox,
         h('button', { class: 'btn btn-primary', style: { width: '100%' }, onclick: () => pdf().catch(e => fail(e)) }, icon('download'), 'Podgląd / PDF'),
+        h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => mailOffer().catch(e => fail(e)), 'data-tip': 'E-mail do klienta z linkiem do oferty – wysyłka prosto z aplikacji, ze stopką' }, icon('mail'), 'Wyślij e-mailem'),
         h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => shareOffer().catch(e => fail(e)), 'data-tip': 'Link do oferty dla klienta – podgląd bez logowania, zawsze aktualna wersja, z licznikiem otwarć' }, '🔗 Link do oferty'),
         linkInfo,
         brand === 'm2' && o.services?.partner?.on ? h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: async () => {
@@ -254,6 +287,7 @@ async function renderEditor(main, id, brand) {
         h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => save().then(ok => ok && toast('Zapisano ofertę')) }, 'Zapisz'),
         h('p', { class: 'hint', style: { marginTop: '10px' } }, 'W oknie drukowania wybierz „Zapisz jako PDF”. Okładka i tło drukują się w kolorze.')))),
     h('div', { class: 'savebar' }, info,
+      h('button', { class: 'btn btn-outline', onclick: () => mailOffer().catch(e => fail(e)) }, icon('mail'), 'Wyślij'),
       h('button', { class: 'btn btn-outline', onclick: () => shareOffer().catch(e => fail(e)) }, '🔗 Link'),
       h('button', { class: 'btn btn-outline', onclick: () => save().then(ok => ok && toast('Zapisano ofertę')) }, 'Zapisz'),
       h('button', { class: 'btn btn-primary', onclick: () => pdf().catch(e => fail(e)) }, icon('download'), 'PDF')));

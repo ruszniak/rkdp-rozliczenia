@@ -8,6 +8,7 @@
 //  • upload – publiczne, multipart { token, file }: podpisany plik → archiwum klienta + e-mail do osoby, która wysłała prośbę
 //  • cancel – zalogowany: { id } – anulowanie prośby (link przestaje działać)
 //  • file   – zalogowany: { id, which: 'original' | 'signed' } – link do pobrania pliku (też dla klientów M2 bez archiwum)
+//  • offer_mail – zalogowany: { offer_id, to, subject, body } – e-mail do klienta z linkiem do oferty (podgląd bez logowania, #/wynik/<token>)
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
@@ -196,6 +197,39 @@ Deno.serve(async (req: Request) => {
       if (!f) return json({ error: 'Brak pliku' }, 404);
       const { data: su } = await admin.storage.from(BUCKET).createSignedUrl(f.path, 600, { download: f.name });
       return json({ url: su?.signedUrl || '' });
+    }
+
+    if (action === 'offer_mail') {
+      const { data: of } = await sb.from('offers').select('id, number, brand, client_id, m2_client_id, status, client_name').eq('id', String(body.offer_id || '')).maybeSingle();   // RLS
+      if (!of) return json({ error: 'Brak dostępu do oferty' }, 403);
+      const to = String(body.to || '').trim().toLowerCase();
+      if (!emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail klienta' }, 400);
+      const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').slice(0, 8000);
+      if (!subject || !text0.trim()) return json({ error: 'Pusty temat lub treść' }, 400);
+      if (!SMTP_USER || !SMTP_PASS) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
+      const firm = of.brand === 'm2' ? 'm2' : 'rkdp';
+      const { data: sd, error: e1 } = await sb.from('shared_docs').insert({ kind: 'oferta', brand: firm, title: `Oferta ${of.number || ''}`.trim(), ref_id: of.id, label: `E-mail do ${to}`.slice(0, 200) }).select('id, token').single();
+      if (e1 || !sd) { console.error(e1); return json({ error: 'Nie udało się utworzyć linku do oferty' }, 500); }
+      const S = await settings();
+      const link = `${S.app}/#/wynik/${sd.token}`;
+      const textBody = text0.includes('{link}') ? text0.replaceAll('{link}', link) : text0 + '\n\n' + link;
+      const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
+      const sig = firm === 'm2'
+        ? { sigHtml: '', text: ['', 'Pozdrawiam serdecznie,', me?.full_name || '', 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska', 'ul. Zwycięska 3, 53-033 Wrocław', 'kancelaria@m2tax.pl · tel. 883 643 565 · www.m2tax.pl'].filter(Boolean).join('\n') }
+        : await signatureOf(me, S.from);
+      const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#1C1F26;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:6px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">Zobacz ofertę</a></p>`;
+      const html = bodyHtml(textBody) + btn + (sig.sigHtml ? '<br>' + sig.sigHtml : bodyHtml(sig.text));
+      try {
+        await transport().sendMail({ from: { name: FROM_NAME[firm], address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
+      } catch (e) {
+        await admin.from('shared_docs').update({ revoked_at: new Date().toISOString() }).eq('id', sd.id);
+        return json({ error: 'send_failed', detail: String((e as Error).message || e).slice(0, 300) }, 200);
+      }
+      if (of.status === 'projekt') await admin.from('offers').update({ status: 'wyslana' }).eq('id', of.id);
+      let rk = of.client_id;
+      if (!rk && of.m2_client_id) { const { data: m } = await admin.from('m2_clients').select('rkdp_client_id').eq('id', of.m2_client_id).maybeSingle(); rk = m?.rkdp_client_id || null; }
+      if (rk) await admin.from('client_messages').insert({ client_id: rk, kind: 'informacja', period: null, email: to, subject, body: textBody + `\n\n[link do oferty ${of.number || ''}]`, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
+      return json({ ok: true, link });
     }
 
     if (action === 'send') {

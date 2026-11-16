@@ -15,7 +15,7 @@ export const OFFER_BRANDS = {
     address: 'ul. Beaty Artemskiej 11/44, 52-234 Wrocław', email: 'kancelaria@rkdp.pl', phone: '883 643 565', web: 'www.rkdp.pl',
     foot: 'RKDP spółka doradztwa podatkowego sp. z o.o. · KRS 0000812185 · NIP 8992871126 · wpis do rejestru osób prawnych uprawnionych do doradztwa podatkowego nr 855',
     about: 'RKDP to spółka doradztwa podatkowego z biurem rachunkowym we Wrocławiu. Łączymy prowadzenie księgowości i kadr z wiedzą doradcy podatkowego – Państwa rozliczenia przygotowujemy z myślą o bezpieczeństwie podatkowym, a w razie kontroli czy pytań z urzędu reprezentujemy Państwa przed organami.',
-    facts: [['Doradca podatkowy', 'usługi prowadzone pod nadzorem doradcy podatkowego (nr wpisu 15009)'], ['Nr 855', 'wpis do rejestru osób prawnych uprawnionych do doradztwa podatkowego'], ['Wszystko w jednym miejscu', 'księgowość, kadry i doradztwo podatkowe – bez pośredników']],
+    facts: [['Doradca podatkowy', 'usługi prowadzone pod nadzorem doradcy podatkowego'], ['Nr 855', 'wpis do rejestru osób prawnych uprawnionych do doradztwa podatkowego'], ['Wszystko w jednym miejscu', 'księgowość, kadry i doradztwo podatkowe – bez pośredników']],
     why: ['Księgowość prowadzona pod nadzorem doradcy podatkowego – nie tylko księgujemy, ale też doradzamy.', 'Obsługa elektroniczna: SaldeoSMART, KSeF, e-Deklaracje, ZUS PUE – bez wożenia segregatorów.', 'Stały opiekun Państwa firmy i szybki kontakt z doradcą podatkowym.', 'Reprezentacja w czynnościach sprawdzających i kontrolach – w ramach jednego biura.', 'Obowiązkowe ubezpieczenie odpowiedzialności cywilnej doradcy podatkowego.'],
     people: ['ruszniak'],
   },
