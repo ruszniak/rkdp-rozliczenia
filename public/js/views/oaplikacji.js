@@ -3,8 +3,8 @@ import { h } from '../ui.js';
 import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
-export const APP_VERSION = '2.4';
-export const APP_DATE = '2026-11-14';
+export const APP_VERSION = '2.4.1';
+export const APP_DATE = '2026-11-16';
 const DOCS_DATE = '2 listopada 2026 r.';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), KRS 0000812185, NIP 8992871126, REGON 384812329';
@@ -95,6 +95,9 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.4.1', '16 listopada 2026', [
+    'Nowe wzory umów o usługi księgowe RKDP (księgi rachunkowe, KPiR, ryczałt): umowa zawarta z dniem złożenia ostatniego podpisu; powierzenie przetwarzania danych osobowych (RODO) wprost w umowie – bez odrębnej umowy powierzenia; terminy przekazania wyników: ZUS do 12., zaliczki/ryczałt do 18., VAT do 23.; 14 dni na uwagi klienta; 1 wyciąg bankowy = 1 dokument; abonament z góry, nadwyżka i kadry z dołu; licencję Saldeo opłaca RKDP; reklamacja e-mailem z odpowiedzią w 14 dni; PPK i PFRON w kadrach; JPK_V7, JPK_CIT / JPK_PKPIR / JPK_EWP.',
+  ]],
   ['2.4', '14 listopada 2026', [
     'Umowy i pełnomocnictwa prosto z aplikacji: „Wyślij do podpisu” (umowa księgowa, ZUS PEL, umowy i zlecenia doradcze) – klient dostaje link (ważny 7 dni) z podglądem dokumentu, może zgłosić uwagi i podpisać profilem zaufanym, kwalifikowanym albo odręcznie; podpisany plik trafia sam do Archiwum klienta. Opcja „Tylko link – kopiuj” bez e-maila.',
     'UPL-1: „Wyślij klientowi” – e-mail z wypełnionym PDF i stroną z instrukcją złożenia; urząd skarbowy z listy (UPL-1, PPS-1).',
