@@ -3363,3 +3363,23 @@ html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scal
   html.sidebar-on.side-mini .sn-group{border-top-color:rgba(255,255,255,.08)}
   html.sidebar-on .site-header{border-bottom:0}
 }
+
+/* menu po lewej: przełącznik „Zwijaj automatycznie”, tryb auto (ikony; rozwija się nad treścią po najechaniu) */
+@media (min-width:1100px){
+  .sn-opt{width:100%;border:0;background:none;font:inherit;cursor:pointer;text-align:left}
+  .sn-sw{position:relative;width:20px;height:12px;border-radius:99px;background:rgba(255,255,255,.18);transition:background .15s}
+  .sn-sw::after{content:"";position:absolute;top:2px;left:2px;width:8px;height:8px;border-radius:50%;background:#C9CDD4;transition:transform .15s}
+  .sn-opt[aria-checked="true"] .sn-sw{background:#D9B98E}
+  .sn-opt[aria-checked="true"] .sn-sw::after{transform:translateX(8px);background:#1A1F29}
+  html.sidebar-on .side-nav{transition:width .16s ease, box-shadow .16s ease}
+  html.sidebar-on.side-auto .side-nav:hover,html.sidebar-on.side-auto .side-nav:has(:focus-visible){width:248px;padding-inline:12px;box-shadow:12px 0 40px rgba(0,0,0,.28);transition-delay:.12s}
+  html.sidebar-on.side-auto .side-nav:hover .sn-l,html.sidebar-on.side-auto .side-nav:has(:focus-visible) .sn-l{display:inline}
+  html.sidebar-on.side-auto .side-nav:hover .sn-gh,html.sidebar-on.side-auto .side-nav:has(:focus-visible) .sn-gh{display:block}
+  html.sidebar-on.side-auto .side-nav:hover .sn-logo,html.sidebar-on.side-auto .side-nav:has(:focus-visible) .sn-logo{display:block}
+  html.sidebar-on.side-auto .side-nav:hover .sn-top,html.sidebar-on.side-auto .side-nav:has(:focus-visible) .sn-top{justify-content:space-between;padding-inline:6px}
+  html.sidebar-on.side-auto .side-nav:hover :is(.sn-item,.sn-search),html.sidebar-on.side-auto .side-nav:has(:focus-visible) :is(.sn-item,.sn-search){justify-content:flex-start;padding-inline:10px}
+  html.sidebar-on.side-auto .side-nav:hover .sn-group,html.sidebar-on.side-auto .side-nav:has(:focus-visible) .sn-group{border-top:0;padding-top:0}
+  html.sidebar-on.side-auto .sn-mini{display:none}
+  html.sidebar-on.side-auto .side-nav:hover .sn-search .sn-l:first-of-type{flex:1}
+  .sn-item .sn-l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}

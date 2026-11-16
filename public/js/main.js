@@ -157,18 +157,27 @@ function navDialog(mod, all) {
 }
 
 let navCfgOpen = null;
-// menu po lewej na komputerze (wybór zapisany na tym urządzeniu)
+// menu po lewej na komputerze – domyślnie włączone; tryby: 'open' (rozwinięte), 'mini' (same ikony), 'auto' (ikony, rozwija się po najechaniu)
+// wybór zapisany na tym urządzeniu; „Menu u góry” przywraca dawny pasek
+const SIDE_MODES = ['open', 'mini', 'auto'];
+function sideMode() { try { const m = localStorage.getItem('rdp-side-mode'); return SIDE_MODES.includes(m) ? m : 'open'; } catch { return 'open'; } }
+function applySide() {
+  const el = document.documentElement, m = sideMode();
+  let top = false; try { top = localStorage.getItem('rdp-nav-top') === '1'; } catch {}
+  el.classList.toggle('sidebar-on', !top);
+  el.classList.toggle('side-mini', m !== 'open');
+  el.classList.toggle('side-auto', m === 'auto');
+}
+function setSideMode(m) { try { localStorage.setItem('rdp-side-mode', m); } catch {} applySide(); }
 function setSideNav(on) {
-  document.documentElement.classList.toggle('sidebar-on', on);
-  try { localStorage.setItem('rdp-side-nav', on ? '1' : '0'); } catch {}
-  route();
+  try { localStorage.setItem('rdp-nav-top', on ? '0' : '1'); } catch {}
+  applySide(); route();
 }
 try {
   const q = new URLSearchParams(location.search).get('menu');
-  if (q === 'lewe') localStorage.setItem('rdp-side-nav', '1'); else if (q === 'gora') localStorage.setItem('rdp-side-nav', '0');
-  if (localStorage.getItem('rdp-side-nav') === '1') document.documentElement.classList.add('sidebar-on');
-  if (localStorage.getItem('rdp-side-mini') === '1') document.documentElement.classList.add('side-mini');
+  if (q === 'lewe') localStorage.setItem('rdp-nav-top', '0'); else if (q === 'gora') localStorage.setItem('rdp-nav-top', '1');
 } catch {}
+applySide();
 function moreMenu(items, active) {
   lastMore = items.filter(x => x[2] !== 'navcfg' && x[2] !== 'sidenav');
   const ico = h('span', { class: 'tab-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS.more;
@@ -177,8 +186,7 @@ function moreMenu(items, active) {
     const i = h('span', { class: 'mm-ico', 'aria-hidden': 'true' }); i.innerHTML = TAB_ICONS[key] || TAB_ICONS.default;
     if (key === 'logout') return h('a', { href: '#/', role: 'menuitem', class: 'mm-logout', onclick: (e) => { e.preventDefault(); menu.hidden = true; logout(); } }, i, label);
     if (key === 'navcfg') return h('a', { href: '#', role: 'menuitem', class: 'mm-cfg', onclick: (e) => { e.preventDefault(); menu.hidden = true; navCfgOpen?.(); } }, i, label);
-    if (key === 'sidenav') { const onNow = document.documentElement.classList.contains('sidebar-on');
-      return h('a', { href: '#', role: 'menuitem', class: 'mm-cfg desk-only', onclick: (e) => { e.preventDefault(); menu.hidden = true; setSideNav(!onNow); } }, i, onNow ? 'Menu u góry (pasek)' : label); }
+    if (key === 'sidenav') return h('a', { href: '#', role: 'menuitem', class: 'mm-cfg desk-only', onclick: (e) => { e.preventDefault(); menu.hidden = true; setSideNav(true); } }, i, label);
     return h('a', { href, role: 'menuitem', class: key === active ? 'on' : null, onclick: () => { menu.hidden = true; } }, i, label);
   };
   const menu = h('div', { class: 'more-menu', role: 'menu', hidden: true }, ...items.map(item));
@@ -274,16 +282,24 @@ function layout(active) {
     });
     const rest = all.filter(x => !used.has(x[2]) && !BOTTOM.includes(x[2]));
     if (rest.length) groups.push(h('div', { class: 'sn-group' }, h('p', { class: 'sn-gh' }, 'Inne'), ...rest.map(item)));
-    const mini = h('button', { type: 'button', class: 'sn-mini', 'aria-label': 'Zwiń menu', title: 'Zwiń / rozwiń menu', onclick: () => {
-      const on = document.documentElement.classList.toggle('side-mini'); try { localStorage.setItem('rdp-side-mini', on ? '1' : '0'); } catch {} } });
+    const mini = h('button', { type: 'button', class: 'sn-mini', 'aria-label': 'Zwiń / rozwiń menu', title: 'Zwiń do ikon / rozwiń menu', onclick: () => setSideMode(sideMode() === 'open' ? 'mini' : 'open') });
+    // ustawienia menu: zwijanie automatyczne i powrót do paska u góry
+    const autoSw = h('button', { type: 'button', class: 'sn-item sn-opt', role: 'switch', 'aria-checked': String(sideMode() === 'auto'), title: 'Menu zwinięte do ikon – rozwija się po najechaniu myszką',
+      onclick: () => { const on = sideMode() !== 'auto'; setSideMode(on ? 'auto' : 'open'); autoSw.setAttribute('aria-checked', String(on)); autoSw.blur(); } },
+      h('span', { class: 'sn-ico sn-sw', 'aria-hidden': 'true' }), h('span', { class: 'sn-l' }, 'Zwijaj automatycznie'));
+    const topBtn = h('button', { type: 'button', class: 'sn-item sn-opt', title: 'Wróć do menu w pasku u góry', onclick: () => setSideNav(false) },
+      (() => { const i = h('span', { class: 'sn-ico', 'aria-hidden': 'true' }); i.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>'; return i; })(),
+      h('span', { class: 'sn-l' }, 'Menu u góry'));
     mini.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
     return h('aside', { class: 'side-nav', 'aria-label': 'Menu' },
       h('div', { class: 'sn-top' }, h('a', { href: M.home, class: 'sn-logo' }, h('img', { src: LIGHT_LOGO(M.logo), alt: M.alt })), mini),
       h('button', { type: 'button', class: 'sn-search', onclick: () => openCmdk() }, (() => { const i = h('span', { class: 'sn-ico' }); i.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'; return i; })(), h('span', { class: 'sn-l' }, 'Szukaj…'), h('kbd', { class: 'sn-l' }, 'Ctrl K')),
       h('nav', { class: 'sn-groups' }, ...groups.filter(Boolean)),
-      h('div', { class: 'sn-bottom' }, ...BOTTOM.map(k => all.find(x => x[2] === k)).filter(Boolean).map(item),
+      h('div', { class: 'sn-bottom' }, ...BOTTOM.map(k => all.find(x => x[2] === k)).filter(Boolean).map(item), autoSw, topBtn,
         h('a', { href: '#/profil', class: 'sn-item sn-me' + (active === 'profil' ? ' on' : ''), title: me.email }, h('span', { class: 'avatar sn-av' }, ava(me)), h('span', { class: 'sn-l' }, me.full_name))));
   })();
+  // partnerzy i konta tylko-JPK nie mają menu po lewej
+  if (sideNav) applySide(); else document.documentElement.classList.remove('sidebar-on', 'side-mini', 'side-auto');
   const header = h('header', { class: 'site-header' },
     h('div', { class: 'wrap nav' },
       h('div', { class: 'nav-brand' },
@@ -292,7 +308,7 @@ function layout(active) {
       h('nav', { class: 'nav-links' },
         ...M.tabs.map(link),
         ...pinned.map(x => { const a = link([x[0], x[1].split(/ – | \(| i |, /)[0], x[2]]); a.classList.add('nav-pin'); a.title = x[1]; return a; }),
-        moreAll.length ? moreMenu([...moreAll.filter(x => !pinned.includes(x)), ...(jpkOnly ? [] : [['#', 'Dostosuj pasek…', 'navcfg'], ['#', 'Menu po lewej (komputer)', 'sidenav']])], active) : null),
+        moreAll.length ? moreMenu([...moreAll.filter(x => !pinned.includes(x)), ...(jpkOnly ? [] : [['#', 'Dostosuj pasek…', 'navcfg'], ['#', 'Menu po lewej stronie', 'sidenav']])], active) : null),
       h('div', { class: 'nav-user' },
         jpkOnly ? null : timerPillEl(),
         (() => { const b = h('button', { type: 'button', class: 'hdr-search', onclick: () => openCmdk(), 'aria-label': 'Szukaj (Ctrl K)', 'data-tip': 'Szukaj klienta, sprawy, zgłoszenia, narzędzia' });
