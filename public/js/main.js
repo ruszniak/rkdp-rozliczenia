@@ -391,7 +391,7 @@ async function route(opts = {}) {
     else if (view === 'profil') c = await renderProfil(layout(m2only ? 'm2:profil' : 'profil'));
     // zadania zespołu – także dla osób tylko z M2 TAX (np. Marcin): mogą dostawać i zlecać zadania
     else if (view === 'doradztwo' && parts[1] === 'zadania') c = await renderZlecenia(layout('m2:zadania'), parts[2] || null);
-    else if (!hasModule('rozliczenia') && (view === 'zlecenia' || view === 'moje')) { const id = parts[1] || params.get('zl'); history.replaceState(null, '', '#/doradztwo/zadania' + (id ? '/' + id : '')); c = await renderZlecenia(layout('m2:zadania'), id || null); }
+    else if (!hasModule('rozliczenia') && (view === 'zlecenia' || view === 'zadania' || view === 'moje')) { const id = parts[1] || params.get('zl'); history.replaceState(null, '', '#/doradztwo/zadania' + (id ? '/' + id : '')); c = await renderZlecenia(layout('m2:zadania'), id || null); }
     else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) c = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
     else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) c = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
     else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) c = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });
@@ -412,7 +412,7 @@ async function route(opts = {}) {
     // „Moje sprawy” są teraz zakładką „Sprawy” na Pulpicie – stare linki (powiadomienia, maile) prowadzą tam
     else if (view === 'moje') { const q = new URLSearchParams(params || ''); history.replaceState(null, '', '#/pulpit' + (q.toString() ? '?' + q : '')); c = await renderPulpit(layout('pulpit'), q); }
     // „Zadania dla zespołu” połączone z „Moimi sprawami” – stare linki (także z powiadomień) prowadzą tutaj
-    else if (view === 'zlecenia') { const q = new URLSearchParams(state.me.role === 'admin' && !parts[1] ? 'f=zespol' : ''); if (parts[1]) q.set('zl', parts[1]); history.replaceState(null, '', '#/pulpit' + (q.toString() ? '?' + q : '')); c = await renderPulpit(layout('pulpit'), q); }
+    else if (view === 'zlecenia' || view === 'zadania') { const q = new URLSearchParams(state.me.role === 'admin' && !parts[1] ? 'f=zespol' : ''); if (parts[1]) q.set('zl', parts[1]); history.replaceState(null, '', '#/pulpit' + (q.toString() ? '?' + q : '')); c = await renderPulpit(layout('pulpit'), q); }
     else if (view === 'czas' && state.me.role === 'admin' && hasModule('doradztwo')) c = await renderCzas(layout('m2:czas'), params);
     else if (view === 'dzis') c = await renderPulpit(layout('pulpit'), new URLSearchParams('widok=dzis'));
     else if (view === 'terminy') c = await renderTerminy(layout('terminy'), params);

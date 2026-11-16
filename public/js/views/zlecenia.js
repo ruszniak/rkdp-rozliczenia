@@ -128,7 +128,8 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
         ...zs.map(z => row(z, open))))));
   }
 
-  if (embed) { put(main, chips, listBox); await reload(); return; }
+  // na Pulpicie (embed) też otwieramy zadanie z linku / powiadomienia (#/pulpit?zl=<id>)
+  if (embed) { put(main, chips, listBox); await reload(); if (id) openZlecenie(id, reload); return; }
   put(main, 
     h('div', { class: 'page-head' },
       h('div', {},

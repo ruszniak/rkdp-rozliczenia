@@ -100,6 +100,7 @@ const NEWS = [
     'UPL-1: „Wyślij klientowi” – e-mail z wypełnionym PDF i stroną z instrukcją złożenia; urząd skarbowy z listy (UPL-1, PPS-1).',
     'Umowa w PDF jako prawdziwy dokument z tekstem (logo, stopka, bez uciętych wierszy); data zawarcia umów i zleceń = dzień złożenia pierwszego podpisu.',
     'Poprawki: kolejność imienia i nazwiska w UPL-1/PPS-1/PEL, nazwy klientów-osób „Nazwisko Imię”, „Braki w profilu” pokazują brakujące pola, powiadomienie otwiera zadanie wprost, powiadomienie o zamknięciu/anulowaniu zadania. Okno „Co nowego” po zalogowaniu. Na iPhonie przewijane wiadomości w zadaniu nie wchodzą już nad nagłówek okna.',
+    'Naprawione: kliknięcie powiadomienia o zadaniu otwiera od razu to zadanie (także gdy aplikacja była zamknięta albo otwarta na Pulpicie).',
     'Umawianie spotkań: pod linkiem app.ruszniak.io/umow wygląd jak pozostałe strony dla klientów; w okienku na rkdp.pl i m2tax.pl – kolory i kształty danej strony (poprawione m.in. zaznaczenie dnia na rkdp.pl). Doradcy w kolejności: Michał Ruszniak, Marcin Otręba – na stronach, w grafiku i przy umawianiu w aplikacji.',
     'Nowy, klasyczny wygląd stron dla klientów (podpis dokumentu, UPL-1, wgrywanie dokumentów, instrukcje) i oferty: szeryfowe nagłówki, cienkie linie, pełne dane firmy w stopce, czcionki z naszego serwera.',
     'Pomoc i instrukcje ze zrzutami ekranu (Więcej → Pomoc i instrukcje): dla księgowości RKDP, dla doradców M2 TAX i dla biur partnerskich.',
