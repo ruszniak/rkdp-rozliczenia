@@ -409,6 +409,7 @@ export async function renderRozliczenia(main, params) {
       if (prefs.person === 'none' && c[field]) return false;
       if (prefs.person && !['me', 'none'].includes(prefs.person) && c[field] !== prefs.person) return false;
       if (prefs.show === 'nierozliczeni' && isSettled(c, area)) return false;
+      if (prefs.show === 'rewizor' && !(c.bookkeeping === 'pelna' || (!c.bookkeeping && ['spzoo', 'spolka_akcyjna', 'fundacja_rodzinna'].includes(c.legal_form)))) return false;
       if (prefs.show === 'braki' && !hasMissing(c, area)) return false;
       if (prefs.show === 'uwagi' && !hasNote(c)) return false;
       if (prefs.show === 'do_wyslania' && !pendingSend(c, area)) return false;
@@ -625,7 +626,8 @@ export async function renderRozliczenia(main, params) {
       ['do_wyslania', prefs.area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania'],
       ['braki', 'Z brakiem dokumentów'], ['uwagi', 'Z uwagami / pytaniami']];
     if (prefs.area === 'kadry') opts.push(['z_prac', 'Firmy z pracownikami'], ['jdg_bez', 'JDG bez pracowników']);
-    else if (['z_prac', 'jdg_bez'].includes(prefs.show)) prefs.show = '';
+    else opts.push(['rewizor', 'Tylko Rewizor (pełna księgowość)']);
+    if (prefs.area === 'kadry' ? prefs.show === 'rewizor' : ['z_prac', 'jdg_bez'].includes(prefs.show)) prefs.show = '';
     showSel.replaceChildren(...opts.map(([v, l]) => h('option', { value: v }, l)));
     showSel.value = prefs.show;
   }
@@ -663,6 +665,7 @@ export async function renderRozliczenia(main, params) {
       if (prefs.person && !['me', 'none'].includes(prefs.person) && c[field] !== prefs.person) return false;
       const ms = [...(yearData.get(c.id) || new Map()).values()];
       if (prefs.show === 'nierozliczeni' && !ms.some(yearOpen)) return false;
+      if (prefs.show === 'rewizor' && !(c.bookkeeping === 'pelna' || (!c.bookkeeping && ['spzoo', 'spolka_akcyjna', 'fundacja_rodzinna'].includes(c.legal_form)))) return false;
       if (prefs.show === 'braki' && !ms.some(e => ['missing_docs', 'reminded'].includes(e.status))) return false;
       if (prefs.show === 'uwagi' && !hasNote(c)) return false;
       return true;
