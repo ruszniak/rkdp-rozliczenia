@@ -12,7 +12,7 @@ import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, orderDo
 import { fetchAll } from './rozliczenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
-import { sendForSignature, signPanel, previewDoc } from '../podpisy.js';
+import { sendForSignature, signPanel, previewDoc, xmlPreview } from '../podpisy.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
@@ -1264,6 +1264,7 @@ async function viewOrder(main, id, params) {
     const preview = previewDoc(orderHtml(blocks, location.origin + brand.logo, brand), { head: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap"><style>${ORDER_CSS}</style>` });
     sendForSignature({ client: cl, target: { m2_client_id: cl.id, order_id: draft.id }, firm, kind: isUmowa() ? 'umowa_doradcza' : 'zlecenie', title,
       buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, brand, title); }, preview,
+      editable: { xml, pdf: async x => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(x, brand, title); }, preview: x => xmlPreview(x, brand) },
       onSent: () => { signBox.reload(); draft.status = draft.status === 'projekt' ? 'wyslane' : draft.status; } });
   } }, icon('mail'), 'Wyślij do podpisu');
   const signBox = draft.id ? signPanel({ order_id: draft.id }) : null;

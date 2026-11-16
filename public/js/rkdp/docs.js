@@ -282,7 +282,8 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       const { contractPdf } = await import('../umowapdf.js');
       const title = `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150);
       sendForSignature({ client: cl, target: { client_id: cl.id }, firm: 'rkdp', kind: 'umowa', title,
-        buildPdf: () => contractPdf(documentXml, title), preview: rkdpContractPreview(docxToHtml(documentXml)) });
+        buildPdf: () => contractPdf(documentXml, title), preview: rkdpContractPreview(docxToHtml(documentXml)),
+        editable: { xml: documentXml, pdf: x => contractPdf(x, title), preview: x => rkdpContractPreview(docxToHtml(x)) } });
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
   const syncSend = () => { sendBtn.hidden = d.type !== 'upl1'; signBtn.hidden = !['umowa', 'pel'].includes(d.type); };

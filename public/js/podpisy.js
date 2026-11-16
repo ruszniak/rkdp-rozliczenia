@@ -3,6 +3,7 @@
 // umowy z biurem rachunkowym (Program Partner M2 TAX).
 import { h, icon, toast, fail, modal } from './ui.js';
 import { sb } from './store.js';
+import { docxToHtml } from './docx.js';
 
 const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const b64 = bytes => { let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(bin); };
@@ -17,14 +18,20 @@ ${paper ? `.paper{max-width:760px;margin:18px auto;background:#fff;padding:44px 
 .lh-c{text-align:center;margin-bottom:18px}.lh-c img{width:190px;height:auto}p{margin:0}.tab{display:inline-block;width:36pt}
 </style></head><body>${paper ? `<div class="paper">${inner}</div>` : inner}</body></html>`;
 }
+// podgląd treści poprawionej ręcznie (document.xml) – z logo firmy z dokumentu
+export const xmlPreview = (xml, brand) => previewDoc(`${brand?.logo ? `<div class="lh-c"><img src="${location.origin}${brand.logo}" alt=""></div>` : ''}${docxToHtml(xml)}`);
 export const rkdpContractPreview = bodyHtml => previewDoc(`<div class="lh-c"><img src="${location.origin}/logo-rkdp.png" alt="RKDP"></div>${bodyHtml}`);
 
 const KIND_WORD = { umowa: 'umowę', umowa_doradcza: 'umowę', zlecenie: 'zlecenie', pel: 'pełnomocnictwo', partner: 'umowę', inne: 'dokument' };
 
 // opts: { client: { name, email }, target: { client_id } | { m2_client_id, order_id? }, firm: 'rkdp'|'m2', kind,
-//         title, buildPdf: async () => Uint8Array, preview: string (pełny HTML), fileName, onSent }
+//         title, buildPdf: async () => Uint8Array, preview: string (pełny HTML), fileName, onSent,
+//         editable?: { xml: document.xml, pdf: xml => Promise<Uint8Array>, preview: xml => string } – „Edytuj treść” przed wysyłką }
 export async function sendForSignature(opts) {
-  const { client, target, firm = 'rkdp', kind = 'umowa', buildPdf, preview, onSent } = opts;
+  const { client, target, firm = 'rkdp', kind = 'umowa', onSent, editable } = opts;
+  let editedXml = null;   // treść poprawiona ręcznie (tylko dla tej wysyłki)
+  const buildPdf = () => editedXml ? editable.pdf(editedXml) : opts.buildPdf();
+  const curPreview = () => editedXml ? editable.preview(editedXml) : opts.preview;
   const s = { title: opts.title, to: firstEmail(client.email) };
   const word = KIND_WORD[kind] || 'dokument';
   s.subject = `${opts.title} – prośba o podpis`;
@@ -37,6 +44,9 @@ export async function sendForSignature(opts) {
     return h('label', { class: 'field wide' }, h('span', {}, label), el);
   }));
   let pdfP = null;
+  const editedBox = h('span', { hidden: true });
+  const markEdited = () => { editedBox.hidden = !editedXml; editedBox.replaceChildren(h('span', { class: 'sign-edited' }, 'Treść zmieniona ręcznie',
+    h('button', { class: 'btn btn-ghost btn-sm de-b', type: 'button', onclick: () => { if (!confirm('Przywrócić treść z wzoru (bez Twoich zmian)?')) return; editedXml = null; pdfP = null; markEdited(); } }, 'Przywróć oryginał'))); };
   const pdf = () => pdfP ||= buildPdf().catch(e => { pdfP = null; throw e; });
   const body = h('div', {},
     h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, client.name || '—'),
@@ -51,7 +61,15 @@ export async function sendForSignature(opts) {
           const a = h('a', { href: url, download: `${(s.title || 'dokument').replace(/[\\/:*?"<>|]+/g, ' ')}.pdf` }); document.body.append(a); a.click(); a.remove();
           setTimeout(() => URL.revokeObjectURL(url), 60000);
         } catch (err) { fail(err, 'Nie udało się przygotować PDF'); } finally { b.disabled = false; }
-      } }, icon('download'), 'Podgląd PDF')),
+      } }, icon('download'), 'Podgląd PDF'),
+      editable ? h('button', { class: 'btn btn-ghost btn-sm', 'data-tip': 'Popraw treść dokumentu tylko dla tej wysyłki (wzór się nie zmienia)', onclick: async () => {
+        const { editDocumentXml } = await import('./docedit.js');
+        const x = await editDocumentXml(editedXml || editable.xml, { title: 'Edytuj treść – ' + (s.title || 'dokument') });
+        if (x == null) return;
+        editedXml = x; pdfP = null; markEdited();
+        toast('Zmieniono treść – sprawdź „Podgląd PDF” przed wysłaniem');
+      } }, icon('file'), 'Edytuj treść') : null,
+      editedBox),
     h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Uwagi klienta, status i podpisany plik zobaczysz w sekcji „Do podpisu”; dostaniesz też e-mail.'));
   modal('Wyślij do podpisu', body, close => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
@@ -61,7 +79,7 @@ export async function sendForSignature(opts) {
       try {
         const bytes = await pdf();
         const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'send', no_email: true, ...target, firm, kind, title: s.title.trim(), to: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.to.trim()) ? s.to.trim() : '',
-          attachment: { base64: b64(bytes) }, doc_html: preview || null } });
+          attachment: { base64: b64(bytes) }, doc_html: curPreview() || null } });
         if (error || r?.error || !r?.link) throw new Error(r?.detail || r?.error || error?.message || 'Brak linku');
         close(); onSent?.(r);
         showLink(r.link, s.title);
@@ -75,7 +93,7 @@ export async function sendForSignature(opts) {
         const bytes = await pdf();
         b.textContent = 'Wysyłam…';
         const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'send', ...target, firm, kind, title: s.title.trim(), to: s.to.trim(),
-          subject: s.subject, body: s.body, attachment: { base64: b64(bytes) }, doc_html: preview || null } });
+          subject: s.subject, body: s.body, attachment: { base64: b64(bytes) }, doc_html: curPreview() || null } });
         if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
         toast(`Wysłano link do podpisu: ${s.to.trim()}`); close(); onSent?.(r);
       } catch (err) { fail(err, 'Nie udało się wysłać'); b.disabled = false; b.textContent = 'Wyślij do podpisu'; }

@@ -6,7 +6,7 @@ import { sb } from '../store.js';
 import { M2_BRAND, dateLong, signerAcc, signerCap, defaultClientParty, orderDocumentXml, orderHtml, ORDER_CSS, buildOrderDocx } from './order.js';
 import { FIRM } from './dict.js';
 import { partnerPackages, PARTNER_FEATURES } from '../offers/offer.js';
-import { sendForSignature, signPanel, previewDoc } from '../podpisy.js';
+import { sendForSignature, signPanel, previewDoc, xmlPreview } from '../podpisy.js';
 
 const P = '[……]';
 const isoToday = () => new Date().toLocaleDateString('sv-SE');
@@ -190,6 +190,7 @@ export async function partnerContractDialog({ client, pkgKey = 'partner', pkg = 
       sendForSignature({ client, target: { m2_client_id: client.id }, firm: 'm2', kind: 'umowa_doradcza', title: t,
         buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, M2_BRAND, t); },
         preview: previewDoc(orderHtml(B, location.origin + M2_BRAND.logo, M2_BRAND), { head: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap"><style>${ORDER_CSS}</style>` }),
+        editable: { xml, pdf: async x => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(x, M2_BRAND, t); }, preview: x => xmlPreview(x, M2_BRAND) },
         onSent: async () => {
           close(); toast('Umowa wysłana – status zobaczysz na karcie biura w sekcji „Do podpisu”');
           // biuro, któremu wysłano umowę partnerską, oznaczamy jako partnera (z wybranym pakietem)
