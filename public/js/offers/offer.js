@@ -25,13 +25,13 @@ export const OFFER_BRANDS = {
     address: FIRM.address, email: FIRM.email, phone: FIRM.phones, web: FIRM.web,
     foot: `${FIRM.name} · KRS ${FIRM.krs} · NIP ${FIRM.nip} · REGON ${FIRM.regon}`,
     about: 'M2 TAX to kancelaria doradztwa podatkowego założona przez doradców podatkowych Marcina Otrębę i Michała Ruszniaka. Każdą sprawą zajmuje się dwóch doradców podatkowych, dzięki czemu Państwa sprawy prowadzone są z podwójną kontrolą jakości – od bieżących konsultacji, przez interpretacje i opinie, po postępowania, kontrole oraz spory przed sądami administracyjnymi.',
-    facts: [['2 doradców', 'przy każdej sprawie – podwójna kontrola jakości'], ['Nr 14609 i 15009', 'doradcy podatkowi wpisani na listę Krajowej Izby Doradców Podatkowych'], ['Od porady do NSA', 'konsultacje, interpretacje, kontrole, postępowania, WSA i NSA']],
+    facts: [['2 doradców', 'przy każdej sprawie – podwójna kontrola jakości'], ['Doradcy podatkowi', 'wpisani na listę Krajowej Izby Doradców Podatkowych'], ['Od porady do NSA', 'konsultacje, interpretacje, kontrole, postępowania, WSA i NSA']],
     why: ['Każdą sprawą zajmuje się dwóch doradców podatkowych.', 'Doświadczenie w postępowaniach podatkowych, kontrolach i sporach przed WSA i NSA.', 'Jasne zasady wynagrodzenia – abonament, ryczałt albo stawka godzinowa, bez niespodzianek.', 'Współpraca z Państwa księgową lub działem księgowości – nie musicie zmieniać biura.', 'Obowiązkowe ubezpieczenie odpowiedzialności cywilnej doradców podatkowych.'],
     people: ['otreba', 'ruszniak'],
   },
 };
 export const PEOPLE = {
-  ruszniak: { name: 'Michał Ruszniak', initials: 'MR', role: { rkdp: 'Prezes Zarządu · doradca podatkowy nr 15009', m2: 'Partner zarządzający · doradca podatkowy nr 15009' },
+  ruszniak: { name: 'Michał Ruszniak', initials: 'MR', role: { rkdp: 'Prezes Zarządu · doradca podatkowy', m2: 'Partner zarządzający · doradca podatkowy' },
     bio: 'Członek zarządu Dolnośląskiego Oddziału Krajowej Izby Doradców Podatkowych, wykładowca Uniwersytetu DSW we Wrocławiu, prelegent ogólnopolskich konferencji naukowych poświęconych postępowaniom podatkowym. Specjalizuje się w obsłudze małych i średnich firm oraz firm rodzinnych; jako pełnomocnik reprezentuje klientów przed organami podatkowymi i sądami administracyjnymi.' },
   otreba: { name: 'Marcin Otręba', initials: 'MO', role: { m2: 'Partner zarządzający · doradca podatkowy nr 14609', rkdp: 'doradca podatkowy nr 14609' },
     bio: 'Doradca podatkowy, zastępca rzecznika dyscyplinarnego Krajowej Izby Doradców Podatkowych. Prowadzi sprawy z zakresu postępowań podatkowych, kontroli i doradztwa dla przedsiębiorców.' },
