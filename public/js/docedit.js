@@ -3,6 +3,20 @@
 // Formatowanie akapitu (wyrównanie, wcięcia, odstępy) zostaje; poprawiony akapit dostaje jednolity krój pisma
 // z jego głównego fragmentu (np. pogrubienie nagłówka § zostaje). Nieruszane akapity pozostają bez zmian.
 import { h, modal, toast } from './ui.js';
+import { sb } from './store.js';
+
+// ---- zapamiętana treść poprawiona ręcznie (tabela doc_edits); „Od nowa” = xml null ----
+export async function loadEdit(key) {
+  if (!key) return null;
+  const { data } = await sb.from('doc_edits').select('xml, updated_at, updated_by').eq('key', key).maybeSingle();
+  return data?.xml ? data : null;
+}
+export async function saveEdit(key, xml, ids = {}) {
+  if (!key) return;
+  const { error } = await sb.from('doc_edits').upsert({ key, xml, ...ids, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+export const resetEdit = key => saveEdit(key, null);
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const kids = (el, name) => [...el.childNodes].filter(n => n.nodeType === 1 && n.namespaceURI === W && n.localName === name);
@@ -112,7 +126,7 @@ export function editDocumentXml(xml, { title = 'Edycja treści' } = {}) {
     let done = false;
     const finish = v => { if (!done) { done = true; resolve(v); } };
     modal(title, h('div', { class: 'de-wrap' },
-      h('p', { class: 'small', style: { margin: '0 0 10px' } }, 'Popraw tekst bezpośrednio w akapitach. „+ akapit” dodaje nowy pod spodem, „Usuń” usuwa akapit. Zmiany dotyczą tylko tej wysyłki – wzór umowy się nie zmienia. Wyrównanie i wcięcia zostają; poprawiony akapit ma jednolity krój (np. cały pogrubiony nagłówek).'),
+      h('p', { class: 'small', style: { margin: '0 0 10px' } }, 'Popraw tekst bezpośrednio w akapitach. „+ akapit” dodaje nowy pod spodem, „Usuń” usuwa akapit. Poprawki zapiszą się przy tym dokumencie (także do pobrania PDF i kolejnych wysyłek); wzór umowy się nie zmienia. „Od nowa” wygeneruje dokument ze wzoru. Wyrównanie i wcięcia zostają; poprawiony akapit ma jednolity krój (np. cały pogrubiony nagłówek).'),
       list), close => [
       h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { close(); finish(null); } }, 'Anuluj'),
       h('button', { class: 'btn btn-primary btn-sm', onclick: () => {

@@ -1245,6 +1245,10 @@ async function viewOrder(main, id, params) {
   const pdfBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (draft.id && !(await save(true))) return;
     if (!draft.id) return toast('Najpierw zapisz dokument', true);
+    // zapisane ręczne poprawki treści (okno „Wyślij do podpisu” → „Edytuj treść”) – PDF z poprawionej wersji
+    const { loadEdit } = await import('../docedit.js');
+    const sv = await loadEdit(`m2:order:${draft.id}`).catch(() => null);
+    if (sv) { const { orderPdf, downloadBytesPdf } = await import('../umowapdf.js'); toast('PDF z zapisanymi ręcznymi poprawkami'); return downloadBytesPdf(await orderPdf(sv.xml, brand, fileName('pdf')), fileName('pdf')); }
     if (!printOrder(docBlocks(draft, client(), chosenSigners()), fileName('pdf').replace(/\.pdf$/, ''), brand)) toast('Zezwól na wyskakujące okna, aby zapisać PDF', true);
   } }, icon('download'), 'PDF');
   const docxBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
@@ -1264,7 +1268,7 @@ async function viewOrder(main, id, params) {
     const preview = previewDoc(orderHtml(blocks, location.origin + brand.logo, brand), { head: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap"><style>${ORDER_CSS}</style>` });
     sendForSignature({ client: cl, target: { m2_client_id: cl.id, order_id: draft.id }, firm, kind: isUmowa() ? 'umowa_doradcza' : 'zlecenie', title,
       buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, brand, title); }, preview,
-      editable: { xml, pdf: async x => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(x, brand, title); }, preview: x => xmlPreview(x, brand) },
+      editable: { xml, key: `m2:order:${draft.id}`, ids: { m2_client_id: cl.id, order_id: draft.id }, pdf: async x => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(x, brand, title); }, preview: x => xmlPreview(x, brand) },
       onSent: () => { signBox.reload(); draft.status = draft.status === 'projekt' ? 'wyslane' : draft.status; } });
   } }, icon('mail'), 'Wyślij do podpisu');
   const signBox = draft.id ? signPanel({ order_id: draft.id }) : null;

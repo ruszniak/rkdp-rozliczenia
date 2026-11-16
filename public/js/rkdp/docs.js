@@ -235,7 +235,10 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     try {
       if (t === 'umowa') {
         const c = v.contract, T = TEMPLATES[c.tpl];
-        const { bytes, documentXml } = await fillDocx(T.url, contractReplacements(c));
+        const { loadEdit } = await import('../docedit.js');
+        const saved = await loadEdit(`rkdp:umowa:${cl.id}:${c.tpl}`).catch(() => null);
+        if (saved) toast('Umowa z zapisanymi ręcznymi poprawkami (od nowa: „Wyślij do podpisu” → „Od nowa”)');
+        const { bytes, documentXml } = await fillDocx(T.url, contractReplacements(c), { overrideXml: saved?.xml });
         if (format === 'docx') return downloadBytes(bytes, fname('Umowa_RKDP', 'docx'));
         const { downloadContractPdf } = await import('../umowapdf.js');
         return downloadContractPdf(documentXml, fname('Umowa_RKDP', 'pdf'));
@@ -283,7 +286,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       const title = `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150);
       sendForSignature({ client: cl, target: { client_id: cl.id }, firm: 'rkdp', kind: 'umowa', title,
         buildPdf: () => contractPdf(documentXml, title), preview: rkdpContractPreview(docxToHtml(documentXml)),
-        editable: { xml: documentXml, pdf: x => contractPdf(x, title), preview: x => rkdpContractPreview(docxToHtml(x)) } });
+        editable: { xml: documentXml, key: `rkdp:umowa:${cl.id}:${c.tpl}`, ids: { client_id: cl.id }, pdf: x => contractPdf(x, title), preview: x => rkdpContractPreview(docxToHtml(x)) } });
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
   const syncSend = () => { sendBtn.hidden = d.type !== 'upl1'; signBtn.hidden = !['umowa', 'pel'].includes(d.type); };

@@ -26,7 +26,8 @@ const KIND_WORD = { umowa: 'umowę', umowa_doradcza: 'umowę', zlecenie: 'zlecen
 
 // opts: { client: { name, email }, target: { client_id } | { m2_client_id, order_id? }, firm: 'rkdp'|'m2', kind,
 //         title, buildPdf: async () => Uint8Array, preview: string (pełny HTML), fileName, onSent,
-//         editable?: { xml: document.xml, pdf: xml => Promise<Uint8Array>, preview: xml => string } – „Edytuj treść” przed wysyłką }
+//         editable?: { xml: document.xml, key, ids, pdf: xml => Promise<Uint8Array>, preview: xml => string } – „Edytuj treść” przed wysyłką;
+//         poprawiona treść zapisuje się pod kluczem (doc_edits) i jest używana przy kolejnych wysyłkach i PDF, „Od nowa” wraca do wzoru }
 export async function sendForSignature(opts) {
   const { client, target, firm = 'rkdp', kind = 'umowa', onSent, editable } = opts;
   let editedXml = null;   // treść poprawiona ręcznie (tylko dla tej wysyłki)
@@ -45,8 +46,16 @@ export async function sendForSignature(opts) {
   }));
   let pdfP = null;
   const editedBox = h('span', { hidden: true });
-  const markEdited = () => { editedBox.hidden = !editedXml; editedBox.replaceChildren(h('span', { class: 'sign-edited' }, 'Treść zmieniona ręcznie',
-    h('button', { class: 'btn btn-ghost btn-sm de-b', type: 'button', onclick: () => { if (!confirm('Przywrócić treść z wzoru (bez Twoich zmian)?')) return; editedXml = null; pdfP = null; markEdited(); } }, 'Przywróć oryginał'))); };
+  let editedAt = null;
+  const markEdited = () => { editedBox.hidden = !editedXml; editedBox.replaceChildren(h('span', { class: 'sign-edited' },
+    'Treść zmieniona ręcznie' + (editedAt ? ` (zapisana ${new Date(editedAt).toLocaleDateString('pl-PL')})` : ''),
+    h('button', { class: 'btn btn-ghost btn-sm de-b', type: 'button', 'data-tip': 'Wygeneruj dokument od nowa ze wzoru i aktualnych danych – Twoje poprawki zostaną skasowane', onclick: async () => {
+      if (!confirm('Wygenerować dokument od nowa ze wzoru? Twoje ręczne poprawki zostaną skasowane.')) return;
+      try { const { resetEdit } = await import('./docedit.js'); await resetEdit(editable.key); } catch (err) { return fail(err, 'Nie udało się'); }
+      editedXml = null; editedAt = null; pdfP = null; markEdited(); toast('Dokument wygenerowany od nowa ze wzoru');
+    } }, 'Od nowa'))); };
+  // zapamiętana wcześniej wersja ręczna tego dokumentu
+  if (editable?.key) import('./docedit.js').then(m => m.loadEdit(editable.key)).then(r => { if (r && !editedXml) { editedXml = r.xml; editedAt = r.updated_at; pdfP = null; markEdited(); } }).catch(() => {});
   const pdf = () => pdfP ||= buildPdf().catch(e => { pdfP = null; throw e; });
   const body = h('div', {},
     h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, client.name || '—'),
@@ -62,12 +71,14 @@ export async function sendForSignature(opts) {
           setTimeout(() => URL.revokeObjectURL(url), 60000);
         } catch (err) { fail(err, 'Nie udało się przygotować PDF'); } finally { b.disabled = false; }
       } }, icon('download'), 'Podgląd PDF'),
-      editable ? h('button', { class: 'btn btn-ghost btn-sm', 'data-tip': 'Popraw treść dokumentu tylko dla tej wysyłki (wzór się nie zmienia)', onclick: async () => {
+      editable ? h('button', { class: 'btn btn-ghost btn-sm', 'data-tip': 'Popraw treść tego dokumentu – poprawki zapiszą się przy tym kliencie (wzór umowy się nie zmienia)', onclick: async () => {
         const { editDocumentXml } = await import('./docedit.js');
         const x = await editDocumentXml(editedXml || editable.xml, { title: 'Edytuj treść – ' + (s.title || 'dokument') });
         if (x == null) return;
-        editedXml = x; pdfP = null; markEdited();
-        toast('Zmieniono treść – sprawdź „Podgląd PDF” przed wysłaniem');
+        editedXml = x; editedAt = new Date().toISOString(); pdfP = null; markEdited();
+        try { if (editable.key) { const { saveEdit } = await import('./docedit.js'); await saveEdit(editable.key, x, editable.ids || {}); } }
+        catch (err) { fail(err, 'Nie udało się zapisać poprawek (zostaną użyte tylko w tej wysyłce)'); }
+        toast('Zapisano poprawioną treść – sprawdź „Podgląd PDF” przed wysłaniem');
       } }, icon('file'), 'Edytuj treść') : null,
       editedBox),
     h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Uwagi klienta, status i podpisany plik zobaczysz w sekcji „Do podpisu”; dostaniesz też e-mail.'));

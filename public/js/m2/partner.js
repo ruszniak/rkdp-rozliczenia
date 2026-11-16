@@ -181,7 +181,7 @@ export async function partnerContractDialog({ client, pkgKey = 'partner', pkg = 
     h('button', { class: 'btn btn-outline btn-sm', onclick: async e => {
       if (!ready()) return;
       const b = e.currentTarget; b.disabled = true;
-      try { const { orderPdf, downloadBytesPdf } = await import('../umowapdf.js'); downloadBytesPdf(await orderPdf(orderDocumentXml(blocks()), M2_BRAND, title()), fname('pdf')); }
+      try { const { orderPdf, downloadBytesPdf } = await import('../umowapdf.js'); const { loadEdit } = await import('../docedit.js'); const sv = await loadEdit(`m2:partner:${client.id}`).catch(() => null); if (sv) toast('PDF z zapisanymi ręcznymi poprawkami'); downloadBytesPdf(await orderPdf(sv?.xml || orderDocumentXml(blocks()), M2_BRAND, title()), fname('pdf')); }
       catch (err) { fail(err, 'Nie udało się przygotować PDF'); } finally { b.disabled = false; }
     } }, icon('download'), 'PDF'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: () => {
@@ -190,7 +190,7 @@ export async function partnerContractDialog({ client, pkgKey = 'partner', pkg = 
       sendForSignature({ client, target: { m2_client_id: client.id }, firm: 'm2', kind: 'umowa_doradcza', title: t,
         buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, M2_BRAND, t); },
         preview: previewDoc(orderHtml(B, location.origin + M2_BRAND.logo, M2_BRAND), { head: `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap"><style>${ORDER_CSS}</style>` }),
-        editable: { xml, pdf: async x => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(x, M2_BRAND, t); }, preview: x => xmlPreview(x, M2_BRAND) },
+        editable: { xml, key: `m2:partner:${client.id}`, ids: { m2_client_id: client.id }, pdf: async x => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(x, M2_BRAND, t); }, preview: x => xmlPreview(x, M2_BRAND) },
         onSent: async () => {
           close(); toast('Umowa wysłana – status zobaczysz na karcie biura w sekcji „Do podpisu”');
           // biuro, któremu wysłano umowę partnerską, oznaczamy jako partnera (z wybranym pakietem)

@@ -44,14 +44,14 @@ export function fillXml(xml, replacements) {
   return out;
 }
 
-export async function fillDocx(url, replacements) {
+export async function fillDocx(url, replacements, { overrideXml = null } = {}) {
   const buf = await (await fetch(url)).arrayBuffer();
   const files = await unzip(buf);
   const enc = new TextEncoder(), dec = new TextDecoder();
   let documentXml = '';
   for (const f of files) {
     if (f.name === 'word/document.xml') {
-      documentXml = fillXml(dec.decode(f.data), replacements);
+      documentXml = overrideXml || fillXml(dec.decode(f.data), replacements);
       f.data = enc.encode(documentXml);
     }
   }
