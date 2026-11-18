@@ -112,6 +112,50 @@ export async function sendForSignature(opts) {
   ]);
 }
 
+// Własny plik (np. umowa przygotowana poza aplikacją) do podpisu przez link: wybór PDF → podgląd stron dla klienta → to samo okno wysyłki.
+// opts: { client, target, firm, kind?, onSent }
+export function sendFileForSignature(opts) {
+  const inp = h('input', { type: 'file', accept: 'application/pdf,.pdf', hidden: true });
+  inp.addEventListener('change', async () => {
+    const f = inp.files[0]; inp.remove();
+    if (!f) return;
+    if (!/pdf/i.test(f.type) && !/\.pdf$/i.test(f.name)) return toast('Wybierz plik PDF (dokument z Worda zapisz najpierw jako PDF)', true);
+    if (f.size > 10 * 1048576) return toast('Plik jest większy niż 10 MB', true);
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    toast('Przygotowuję podgląd dokumentu…');
+    let preview = null;
+    try { preview = await pdfPagesHtml(bytes.slice()); } catch (e) { console.warn('podgląd PDF', e); }
+    sendForSignature({ ...opts, kind: opts.kind || 'umowa', title: f.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').trim() || 'Umowa',
+      buildPdf: async () => bytes, preview });
+  });
+  document.body.append(inp); inp.click();
+}
+// strony PDF jako obrazy – podgląd na stronie podpisu (klient czyta dokument bez pobierania); limit ~1,4 MB
+async function pdfPagesHtml(bytes) {
+  const url = '/lib/pdfjs/pdf.min.mjs';   // zmienna – bundler nie dołącza biblioteki
+  const lib = await import(/* @vite-ignore */ url);
+  lib.GlobalWorkerOptions.workerSrc = '/lib/pdfjs/pdf.worker.min.mjs';
+  const doc = await lib.getDocument({ data: bytes, isEvalSupported: false }).promise;
+  const n = Math.min(doc.numPages, 40);
+  for (const [w, q] of [[1100, .72], [900, .6], [760, .5], [640, .45]]) {
+    const imgs = []; let size = 0;
+    for (let i = 1; i <= n; i++) {
+      const page = await doc.getPage(i);
+      const vp0 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: w / vp0.width });
+      const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      const url = cv.toDataURL('image/jpeg', q); size += url.length; imgs.push(url);
+      if (size > 1_450_000) break;
+    }
+    if (size <= 1_450_000 && imgs.length === n) return '<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
+      + 'body{margin:0;background:#E9EAEE}img{display:block;width:calc(100% - 32px);max-width:820px;height:auto;margin:16px auto;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.1)}'
+      + '@media(max-width:640px){img{width:100%;margin:0 0 6px;box-shadow:none}}</style></head><body>'
+      + imgs.map((u, i) => `<img src="${u}" alt="Strona ${i + 1}">`).join('') + '</body></html>';
+  }
+  return null;   // za duży – klient pobierze PDF
+}
+
 // gotowy link do podpisu: kopiowanie (także ręczne, gdy przeglądarka nie pozwala)
 function showLink(link, title) {
   const inp = h('input', { class: 'input', readonly: true, value: link, onfocus: e => e.target.select() });

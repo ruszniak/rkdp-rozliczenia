@@ -13,7 +13,7 @@ import { fetchAll } from './rozliczenia.js';
 import { fileTile, dropZone, named, safeName } from './zgloszenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
-import { sendForSignature, signPanel, previewDoc, xmlPreview } from '../podpisy.js';
+import { sendForSignature, sendFileForSignature, signPanel, previewDoc, xmlPreview } from '../podpisy.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
@@ -759,11 +759,14 @@ async function viewClient(main, id) {
   const mattersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Sprawy'),
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => newMatterDialog({ clientId: id }) }, '+ Sprawa')),
   ...(matters.length ? matters.map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` }, h('div', {}, h('b', {}, m.number), ' ', m.title), statusPill(m.status))) : [h('p', { class: 'hint' }, 'Brak spraw.')]));
+  const m2SignBox = signPanel({ m2_client_id: c.id });
   const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Umowy i zlecenia'),
     h('div', { style: { display: 'flex', gap: '6px' } },
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa (abonament)'),
+      h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'Umowa albo inny dokument przygotowany poza aplikacją (PDF) – klient dostanie link: przeczyta, zgłosi uwagi, podpisze i odeśle',
+        onclick: () => sendFileForSignature({ client: c, target: { m2_client_id: c.id }, firm: c.firm === 'rkdp' ? 'rkdp' : 'm2', kind: 'umowa_doradcza', onSent: () => m2SignBox.reload() }) }, 'Własny PDF do podpisu'),
       c.kind !== 'osoba' ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'Program Partner – stała obsługa doradcza biura rachunkowego', onclick: async () => { const { partnerContractDialog } = await import('../m2/partner.js'); partnerContractDialog({ client: c }); } }, '+ Umowa z biurem rachunkowym') : null)),
-  signPanel({ m2_client_id: c.id }),
+  m2SignBox,
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.client_type === 'partner' ? `Partner – biuro rachunkowe${PARTNER_PKG[c.partner_package] ? ` (pakiet ${PARTNER_PKG[c.partner_package]})` : ''}` : null, c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
     h('div', { class: 'two' }, form, h('div', {}, c.client_type === 'partner' ? partnerTasksCard(c) : null, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));

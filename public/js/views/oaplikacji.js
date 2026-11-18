@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.4.1', '16 listopada 2026', [
+    'Własny PDF do podpisu: umowę albo inny dokument przygotowany poza aplikacją wgrywasz jako PDF i wysyłasz klientowi linkiem (e-mail z aplikacji albo sam link) – klient przegląda strony, zgłasza uwagi, podpisuje i odsyła. Przycisk w „Archiwum dokumentów” klienta RKDP i w „Umowy i zlecenia” na karcie klienta M2 TAX.',
     'Dziennik sprawy (M2 TAX): do wpisu można dodać załączniki – skan pisma, protokół, zdjęcie, PDF (do 25 MB); także do wpisów dodanych wcześniej („+ Załącznik”).',
     'Rozliczenia na komputerze: tabele bez osobnego suwaka – cała lista przewija się razem ze stroną, a nagłówek kolumn zostaje u góry.',
     'Moduł M2 TAX: w menu (po lewej i w „Więcej”) są teraz „Zlecenia i umowy” oraz „Oferty M2 TAX”.',

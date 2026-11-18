@@ -3,7 +3,7 @@
 // złożyć w jeden PDF (np. podpisana umowa). Dostęp jak do klienta (RLS + prywatny koszyk „klienci”).
 import { h, icon, toast, fail, modal } from './ui.js';
 import { sb, state } from './store.js';
-import { signPanel } from './podpisy.js';
+import { signPanel, sendFileForSignature } from './podpisy.js';
 import { fileTile, dropZone, pastedFiles, named, safeName } from './views/zgloszenia.js';
 
 export const ARCH_CATS = {
@@ -30,6 +30,8 @@ export function archiveCard(c) {
     h('div', { class: 'arch-add' },
       h('label', { class: 'arch-lbl' }, 'Dodaj jako', catSel),
       h('div', { class: 'row-btns' }, camIn,
+        h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'Umowa albo inny dokument przygotowany poza aplikacją (PDF) – klient dostanie link: przeczyta, zgłosi uwagi, podpisze i odeśle',
+          onclick: () => sendFileForSignature({ client: c, target: { client_id: c.id }, firm: 'rkdp', kind: 'umowa', onSent: () => { signBox.reload(); load(); } }) }, icon('file'), 'Własny PDF do podpisu'),
         h('button', { class: 'btn btn-primary btn-sm cam-btn', type: 'button', onclick: () => camIn.click() }, icon('camera'), 'Zdjęcie / skan telefonem'))),
     dropZone(fs => upload(fs), 'albo wklej Ctrl+V / ⌘V · PDF, zdjęcia, Word, Excel do 25 MB'),
     signBox, chips, list);
