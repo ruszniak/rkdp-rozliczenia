@@ -55,6 +55,14 @@ const ICON_NOTE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" s
 
 const PHONE = () => window.matchMedia('(max-width: 700px)').matches;
 
+// tabela bez własnego przewijania – przewija się cała strona; nagłówek kolumn przykleja się pod paskiem aplikacji
+function syncHeadTop() {
+  const hdr = document.querySelector('.site-header');
+  const hh = hdr && getComputedStyle(hdr).display !== 'none' && getComputedStyle(hdr).position === 'sticky' ? hdr.getBoundingClientRect().height : 0;
+  document.documentElement.style.setProperty('--grid-top', Math.round(hh) + 'px');
+}
+if (typeof window !== 'undefined') window.addEventListener('resize', syncHeadTop);
+
 export async function renderRozliczenia(main, params) {
   const period = /^\d{4}-\d{2}$/.test(params.get('okres') || '') ? params.get('okres') : defaultPeriod();
   const pdate = period + '-01';
@@ -233,6 +241,7 @@ export async function renderRozliczenia(main, params) {
   const fsBtn = h('button', { class: 'btn btn-outline btn-sm btn-ico', 'data-tip': 'Tabela na cały ekran (Esc – wyjście)' });
   const setFs = (on) => {
     document.body.classList.toggle('focus-mode', on);
+    requestAnimationFrame(syncHeadTop);
     fsBtn.replaceChildren(h('span', { html: on ? ICON_FS_EXIT : ICON_FS, style: { display: 'inline-flex' } }));
     fsBtn.setAttribute('aria-label', on ? 'Zamknij pełny ekran' : 'Pełny ekran');
   };
@@ -576,6 +585,7 @@ export async function renderRozliczenia(main, params) {
     const tbody = h('tbody', {}, t.rows.flatMap(c => rowsWithPartners(c, area, cols)));
     const table = h('table', { class: 'grid' }, thead, tbody);
     table._cols = cols;
+    requestAnimationFrame(syncHeadTop);
     return h('div', { class: 'grid-wrap' + (t.inactiveOnly ? ' inactive' : '') }, table);
   }
 

@@ -3383,3 +3383,12 @@ html body .avatar .av-img,html body .av .av-img{border-radius:50%;transform:scal
   html.sidebar-on.side-auto .side-nav:hover .sn-search .sn-l:first-of-type{flex:1}
   .sn-item .sn-l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
+
+/* Rozliczenia i inne tabele .grid na komputerze: jednolita lista bez osobnego przewijania w ramce – przewija się cała strona,
+   nagłówek kolumn zostaje przyklejony pod paskiem aplikacji (--grid-top ustawia rozliczenia.js) */
+@media (min-width:821px){
+  .grid-wrap{max-height:none!important;overflow:visible}
+  .grid-wrap table.grid thead th{top:var(--grid-top,0px)}
+  .grid-wrap table.grid thead th:first-child{border-top-left-radius:var(--r)}
+  .grid-wrap table.grid thead th:last-child{border-top-right-radius:var(--r)}
+}
