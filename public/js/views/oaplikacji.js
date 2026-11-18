@@ -3,8 +3,8 @@ import { h } from '../ui.js';
 import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
-export const APP_VERSION = '2.4.1';
-export const APP_DATE = '2026-11-16';
+export const APP_VERSION = '2.5';
+export const APP_DATE = '19 listopada 2026';
 const DOCS_DATE = '2 listopada 2026 r.';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), KRS 0000812185, NIP 8992871126, REGON 384812329';
@@ -95,6 +95,9 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.5', '19 listopada 2026', [
+    'Nowa karta klienta RKDP: nagłówek z najważniejszymi danymi i przyciskami, zakładki (Przegląd, Dane firmy, Podatki, Dokumenty, Rozmowa, Historia), bieżący miesiąc i lista „Do zrobienia” z przyciskami, dane jako czytelna lista z „Edytuj” w każdej sekcji i „+ uzupełnij” przy pustych polach, uzupełnianie profilu krok po kroku.',
+  ]],
   ['2.4.1', '16 listopada 2026', [
     'Umowy RKDP (ryczałt, KPiR, księgi – spółki i fundacje rodzinne): z zakresu prac kadrowo-płacowych usunięto punkt o PPK i deklaracjach PFRON; w § 9 ust. 9 zostało tylko obowiązkowe OC doradztwa podatkowego; w wynagrodzeniu (księgi) – „opłata za sporządzenie sprawozdania finansowego”; nowe zasady ograniczenia odpowiedzialności (§ 9 ust. 2–3: szkoda rzeczywista, do 10-krotności średniego miesięcznego wynagrodzenia, przy krótszej współpracy – za faktyczny okres); w zakresie (księgi, fundacja) – samo sporządzenie sprawozdania finansowego, bez podpisu i składania.',
     'Nowy wzór umowy RKDP: „Księgi rachunkowe (fundacja rodzinna)” – strona z Rejestru Fundacji Rodzinnych (RFR), CIT-8FR i podatek z art. 24q, sprawozdanie do Szefa KAS, obowiązek informowania o świadczeniach dla beneficjentów. Poprawka we wzorze dla spółek: reprezentant wpisuje się do umowy.',
