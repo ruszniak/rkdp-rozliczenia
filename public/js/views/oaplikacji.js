@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.4.1', '16 listopada 2026', [
+    'Program Partner – nowe pakiety: Biuro Baza 419 zł (2 h, odpowiedź do 2 dni roboczych, pytania tylko przez aplikację), Biuro Partner 650 zł (2 h, do 2 dni, aplikacja, telefon, wideo), Biuro Plus 1190 zł (4 h, do 2 dni, aplikacja, telefon, wideo, spotkania).',
     'Nowe narzędzie „Znaczniki JPK CIT – podpowiedzi” (Dokumenty i narzędzia, Podgląd JPK): propozycja znacznika konta (S_12_1/S_12_2 i PD) z numeru i nazwy konta – wyszukiwarka albo cały plan kont z Excela, wynik do Excela. Narzędzie pomocnicze.',
     'Klienci RKDP: etykieta „Księgowość” / „Doradztwo” przy każdym kliencie, filtr po zakresie i zmiana zbiorcza (⋯ → „Zakres usług – zbiorczo”). Klienci „Doradztwo” nie pojawiają się w Rozliczeniach (księgowość, wyciągi); jeśli mają pracowników, zostają w Płacach.',
     'Własny PDF do podpisu: umowę albo inny dokument przygotowany poza aplikacją wgrywasz jako PDF i wysyłasz klientowi linkiem (e-mail z aplikacji albo sam link) – klient przegląda strony, zgłasza uwagi, podpisuje i odsyła. Przycisk w „Archiwum dokumentów” klienta RKDP i w „Umowy i zlecenia” na karcie klienta M2 TAX.',

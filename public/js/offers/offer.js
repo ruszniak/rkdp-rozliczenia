@@ -75,12 +75,12 @@ export const PARTNER_COMMON = [
 ];
 export function partnerPackages() {
   return [
-    { key: 'baza', name: 'Biuro Baza', tagline: 'Dla biur, którym wystarczą pisemne odpowiedzi doradcy.', price: '249', unit: 'zł netto / mies.',
-      f: { hours: '1 godzina', channels: 'pisemnie przez aplikację rdp.app (zadania dla doradcy)', response: 'do 2 dni roboczych', direct: true, notes: true, rollover: false, implement: '—', two: false, discount: '10%' } },
-    { key: 'partner', name: 'Biuro Partner', tagline: 'Doradca podatkowy pod telefonem dla całego zespołu.', price: '419', unit: 'zł netto / mies.',
-      f: { hours: '2 godziny', channels: 'aplikacja rdp.app (zadania), telefon, wideo', response: '1 dzień roboczy', direct: true, notes: true, rollover: true, implement: 'konsultacje wdrożeniowe', two: false, discount: '15%' } },
-    { key: 'plus', name: 'Biuro Plus', tagline: 'Dla większych biur i na czas wdrożeń JPK CIT i KSeF.', price: '790', unit: 'zł netto / mies. (od)',
-      f: { hours: '4 godziny (lub więcej – do ustalenia)', channels: 'aplikacja rdp.app (zadania), telefon, wideo, spotkania w biurze', response: 'priorytet – w ten sam dzień roboczy', direct: true, notes: true, rollover: true, implement: 'plan kont, znaczniki, test plików, pierwsze wysyłki', two: true, discount: '20%' } },
+    { key: 'baza', name: 'Biuro Baza', tagline: 'Pytania przez aplikację – pisemne odpowiedzi doradcy.', price: '419', unit: 'zł netto / mies.',
+      f: { hours: '2 godziny', channels: 'tylko pisemnie przez aplikację rdp.app (zadania dla doradcy)', response: 'do 2 dni roboczych', direct: true, notes: true, rollover: false, implement: '—', two: false, discount: '10%' } },
+    { key: 'partner', name: 'Biuro Partner', tagline: 'Doradca podatkowy dla całego zespołu – aplikacja, telefon, wideo.', price: '650', unit: 'zł netto / mies.',
+      f: { hours: '2 godziny', channels: 'aplikacja rdp.app (zadania), telefon, wideo', response: 'do 2 dni roboczych', direct: true, notes: true, rollover: true, implement: 'konsultacje wdrożeniowe', two: false, discount: '15%' } },
+    { key: 'plus', name: 'Biuro Plus', tagline: 'Dla większych biur i na czas wdrożeń JPK CIT i KSeF.', price: '1190', unit: 'zł netto / mies.',
+      f: { hours: '4 godziny', channels: 'aplikacja rdp.app (zadania), telefon, wideo, spotkania w biurze', response: 'do 2 dni roboczych', direct: true, notes: true, rollover: true, implement: 'plan kont, znaczniki, test plików, pierwsze wysyłki', two: true, discount: '20%' } },
   ];
 }
 
@@ -240,7 +240,7 @@ export function offerHtml(o, brandKey, { number = '', origin = location.origin }
   <table class="pk-cmp"><thead><tr><th></th>${(P.packages || []).map(pk => `<th class="${pk.key === P.chosen ? 'on' : ''}">${esc(pk.name)}</th>`).join('')}</tr></thead>
   <tbody>${PARTNER_FEATURES.map(([k, label, type]) => `<tr><td class="lab">${esc(label)}</td>${(P.packages || []).map(pk => `<td class="${pk.key === P.chosen ? 'on' : ''}">${fv(pk, k, type)}</td>`).join('')}</tr>`).join('')}
   <tr class="all"><td class="lab">Baza wiedzy, wzory dokumentów, aplikacja JPK CIT i sprawozdania do KRS</td>${(P.packages || []).map(pk => `<td class="${pk.key === P.chosen ? 'on' : ''}"><i class="ok">${ICON_CHECK}</i></td>`).join('')}</tr></tbody></table>
-  <p class="pk-note">Czas pracy liczymy w 15-minutowych odcinkach. W pakiecie Biuro Baza pytania przyjmujemy wyłącznie e-mailem i odpowiadamy na piśmie – bez konsultacji telefonicznych i spotkań online.</p>
+  <p class="pk-note">Czas pracy liczymy w 15-minutowych odcinkach. W pakiecie Biuro Baza pytania przyjmujemy wyłącznie przez aplikację rdp.app i odpowiadamy na piśmie – bez konsultacji telefonicznych i spotkań wideo.</p>
 </section>` : '';
   const scopeKinds = services.filter(k => k !== 'partner');
   const scope = scopeKinds.length ? `
