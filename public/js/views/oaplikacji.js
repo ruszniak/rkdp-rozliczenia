@@ -96,7 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.4.1', '16 listopada 2026', [
-    'Umowy RKDP (ryczałt, KPiR, księgi – spółki i fundacje rodzinne): z zakresu prac kadrowo-płacowych usunięto punkt o PPK i deklaracjach PFRON; w § 9 ust. 9 zostało tylko obowiązkowe OC doradztwa podatkowego; w wynagrodzeniu (księgi) – „opłata za sporządzenie sprawozdania finansowego”.',
+    'Umowy RKDP (ryczałt, KPiR, księgi – spółki i fundacje rodzinne): z zakresu prac kadrowo-płacowych usunięto punkt o PPK i deklaracjach PFRON; w § 9 ust. 9 zostało tylko obowiązkowe OC doradztwa podatkowego; w wynagrodzeniu (księgi) – „opłata za sporządzenie sprawozdania finansowego”; nowe zasady ograniczenia odpowiedzialności (§ 9 ust. 2–3: szkoda rzeczywista, do 10-krotności średniego miesięcznego wynagrodzenia, przy krótszej współpracy – za faktyczny okres).',
     'Nowy wzór umowy RKDP: „Księgi rachunkowe (fundacja rodzinna)” – strona z Rejestru Fundacji Rodzinnych (RFR), CIT-8FR i podatek z art. 24q, sprawozdanie do Szefa KAS, obowiązek informowania o świadczeniach dla beneficjentów. Poprawka we wzorze dla spółek: reprezentant wpisuje się do umowy.',
     'Program Partner – nowe pakiety: Biuro Baza 419 zł (2 h, odpowiedź do 2 dni roboczych, pytania tylko przez aplikację), Biuro Partner 650 zł (2 h, do 2 dni, aplikacja, telefon, wideo), Biuro Plus 1190 zł (4 h, do 2 dni, aplikacja, telefon, wideo, spotkania).',
     'Nowe narzędzie „Znaczniki JPK CIT – podpowiedzi” (Dokumenty i narzędzia, Podgląd JPK): propozycja znacznika konta (S_12_1/S_12_2 i PD) z numeru i nazwy konta – wyszukiwarka albo cały plan kont z Excela, wynik do Excela. Narzędzie pomocnicze.',
