@@ -76,6 +76,11 @@ export async function renderKlienci(main) {
     h('option', { value: 'osobowe' }, 'Spółki osobowe'), h('option', { value: 'kapitalowe' }, 'Sp. z o.o. / S.A.'),
     h('option', { value: 'inne' }, 'Pozostałe'), h('option', { value: 'niekompletne' }, 'Profil do uzupełnienia'));
   groupSel.value = prefs.group;
+  const scopeSel = h('select', { class: 'select', 'aria-label': 'Zakres usług' },
+    h('option', { value: '' }, 'Księgowość i doradztwo'), h('option', { value: 'ksiegowosc' }, 'Tylko księgowość'), h('option', { value: 'doradztwo' }, 'Tylko doradztwo'));
+  scopeSel.value = prefs.scope || '';
+  const scopeOf = c => c.service_scope === 'doradztwo' ? 'doradztwo' : 'ksiegowosc';
+  const scopeTag = c => h('span', { class: 'kl-scope ' + scopeOf(c), title: scopeOf(c) === 'doradztwo' ? 'Tylko doradztwo podatkowe – bez zakładki Rozliczenia (kadry zostają, jeśli są pracownicy)' : 'Księgowość – klient jest w Rozliczeniach' }, scopeOf(c) === 'doradztwo' ? 'Doradztwo' : 'Księgowość');
 
   const tbody = h('tbody');
   const counter = h('span', { class: 'kl-count' });
@@ -87,6 +92,7 @@ export async function renderKlienci(main) {
     const q = prefs.q.trim().toLowerCase();
     return clients.filter(c => {
       if (prefs.status && c.status !== prefs.status) return false;
+      if (prefs.scope && scopeOf(c) !== prefs.scope) return false;
       if (prefs.who === 'moi' && !isMine(c)) return false;
       if (prefs.who === 'uwaga' && !attention(c)) return false;
       if (prefs.group === 'niekompletne') { if (completeness(c, c.client_partners?.length).pct === 100) return false; }
@@ -113,7 +119,7 @@ export async function renderKlienci(main) {
     const nAtt = base.filter(attention).length;
     chips.replaceChildren(...[chip('', 'Wszyscy', base.length), chip('moi', 'Moi', base.filter(isMine).length),
       nAtt || prefs.who === 'uwaga' ? chip('uwaga', 'Do uwagi', nAtt, h('b', { class: 'mj-hot' }, '!')) : null,
-      h('label', { class: 'kl-sel' }, statusSel), h('label', { class: 'kl-sel' }, groupSel)].filter(Boolean));
+      h('label', { class: 'kl-sel' }, statusSel), h('label', { class: 'kl-sel' }, groupSel), h('label', { class: 'kl-sel' }, scopeSel)].filter(Boolean));
     [...chips.childNodes].forEach(n => { if (n.nodeType === 3 && n.textContent === 'null') n.remove(); });
   };
   const render = () => {
@@ -144,7 +150,7 @@ export async function renderKlienci(main) {
         h('td', {}, h('span', { class: 'kl-name' }, h('span', { class: 'kl-ini sm', style: { background: bg, color: fg } }, initials(c.name).slice(0, 2)),
           h('span', {}, h('a', { href: `#/klient/${c.id}`, style: { fontWeight: 600, color: 'var(--ink)', textDecoration: 'none' } }, c.name), sprEl(c),
             c.status !== 'aktywny' ? h('div', {}, h('span', { class: 'badge warn' }, CLIENT_STATUS[c.status])) : null))),
-        h('td', {}, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?')),
+        h('td', {}, h('span', { class: 'badge' }, LEGAL_SHORT[c.legal_form] || '?'), h('div', { style: { marginTop: '4px' } }, scopeTag(c))),
         h('td', { class: 'small' }, taxSummary(c) || h('span', { class: 'muted' }, '—')),
         h('td', {}, progEl(c)),
         h('td', { class: 'small' }, c.phone ? h('a', { href: 'tel:' + c.phone.replace(/\s/g, ''), onclick: e => e.stopPropagation() }, c.phone) : '',
@@ -157,20 +163,61 @@ export async function renderKlienci(main) {
     }));
   };
 
-  const onFilter = () => { Object.assign(prefs, { q: search.value, status: statusSel.value, group: groupSel.value }); savePrefs(prefs); render(); };
+  const onFilter = () => { Object.assign(prefs, { q: search.value, status: statusSel.value, group: groupSel.value, scope: scopeSel.value }); savePrefs(prefs); render(); };
   search.placeholder = 'Nazwa, NIP, e-mail, telefon…';
   let searchTimer;
   search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(onFilter, 180); });
   statusSel.addEventListener('change', onFilter);
   groupSel.addEventListener('change', onFilter);
+  scopeSel.addEventListener('change', onFilter);
+
+  // ---- zakres usług zbiorczo: księgowość (w Rozliczeniach) / tylko doradztwo (bez Rozliczeń) ----
+  const scopeDialog = () => {
+    const sel = new Set();
+    let q = '';
+    const listBox = h('div', { class: 'ks-list' });
+    const info = h('span', { class: 'small muted' });
+    const pool = () => list().filter(c => !q || [c.name, c.nip].some(v => (v || '').toLowerCase().includes(q)));
+    const draw = () => {
+      const rows = pool();
+      info.textContent = `Zaznaczono: ${sel.size}`;
+      listBox.replaceChildren(...rows.map(c => {
+        const cb = h('input', { type: 'checkbox', checked: sel.has(c.id), onchange: () => { cb.checked ? sel.add(c.id) : sel.delete(c.id); info.textContent = `Zaznaczono: ${sel.size}`; } });
+        return h('label', { class: 'ks-row' }, cb, h('span', { class: 'ks-n' }, c.name, h('small', {}, LEGAL_SHORT[c.legal_form] || '')), scopeTag(c));
+      }));
+    };
+    const s2 = h('input', { class: 'input', type: 'search', placeholder: 'Szukaj na liście…', oninput: e => { q = e.target.value.trim().toLowerCase(); draw(); } });
+    const all = h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => { const rows = pool(); const every = rows.every(c => sel.has(c.id)); rows.forEach(c => every ? sel.delete(c.id) : sel.add(c.id)); draw(); } }, 'Zaznacz / odznacz widocznych');
+    const apply = async (scope, close, btn) => {
+      if (!sel.size) return toast('Zaznacz klientów', true);
+      const ids = [...sel];
+      btn.disabled = true;
+      const { error } = await sb.from('clients').update({ service_scope: scope }).in('id', ids);
+      btn.disabled = false;
+      if (error) return fail(error);
+      clients.forEach(c => { if (sel.has(c.id)) c.service_scope = scope; });
+      toast(`Zmieniono ${ids.length} ${ids.length === 1 ? 'klienta' : 'klientów'}: ${scope === 'doradztwo' ? 'tylko doradztwo' : 'księgowość'}`);
+      close(); render();
+    };
+    draw();
+    modal('Zakres usług – zbiorczo', h('div', {},
+      h('p', { class: 'small', style: { margin: '0 0 10px' } }, h('b', {}, 'Księgowość'), ' – klient jest w zakładce Rozliczenia. ', h('b', {}, 'Doradztwo'),
+        ' – klient znika z Rozliczeń (księgowość i wyciągi); jeśli ma pracowników, zostaje w Płacach. Lista pokazuje klientów z bieżących filtrów.'),
+      h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' } }, s2, all, info),
+      listBox), close => [
+      h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+      h('button', { class: 'btn btn-outline btn-sm', onclick: e => apply('doradztwo', close, e.currentTarget) }, 'Ustaw: doradztwo'),
+      h('button', { class: 'btn btn-primary btn-sm', onclick: e => apply('ksiegowosc', close, e.currentTarget) }, 'Ustaw: księgowość'),
+    ], { wide: true });
+  };
 
   const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => {
     const opt = (d, v) => (v ? d[v] || v : '');
     const yn = v => v === true ? 'tak' : v === false ? 'nie' : '';
     downloadCsv('klienci_rkdp.csv', [
-      ['Nazwa', 'Status', 'Forma', 'Księgowość', 'NIP', 'REGON', 'KRS', 'Adres', 'Osoba kontaktowa', 'E-mail', 'Telefon',
+      ['Nazwa', 'Status', 'Zakres usług', 'Forma', 'Księgowość', 'NIP', 'REGON', 'KRS', 'Adres', 'Osoba kontaktowa', 'E-mail', 'Telefon',
         'PIT', 'Zaliczki PIT', 'ZUS', 'CIT', 'VAT', 'VAT-UE', 'Pracownicy', 'Umowa', 'UPL-1', 'Wynagrodzenie netto', 'Księgowa', 'Kadrowa'],
-      ...list().map(c => [c.name, CLIENT_STATUS[c.status], opt(LEGAL_FORM, c.legal_form), opt(BOOKKEEPING, c.bookkeeping),
+      ...list().map(c => [c.name, CLIENT_STATUS[c.status], scopeOf(c) === 'doradztwo' ? 'doradztwo' : 'księgowość', opt(LEGAL_FORM, c.legal_form), opt(BOOKKEEPING, c.bookkeeping),
         c.nip, c.regon, c.krs, c.address, c.contact_person, c.email, c.phone, opt(PIT_FORM, c.pit_form), opt(ADVANCES, c.pit_advances),
         opt(ZUS_TYPE, c.zus_type), opt(CIT_TYPE, c.cit_type), opt(VAT_STATUS, c.vat_status), yn(c.vat_ue), yn(c.has_employees),
         yn(c.contract_signed), yn(c.upl1), c.monthly_fee ?? '',
@@ -258,6 +305,7 @@ export async function renderKlienci(main) {
     h('a', { href: '#/aml' }, h('span', {}, '⛨'), 'AML'),
     h('a', { href: '#/oferty' }, h('span', {}, '₪'), 'Oferty'),
     h('button', { type: 'button', onclick: () => dokumentyDialog().catch(e => fail(e)) }, h('span', {}, '✎'), 'Umowy i pełnomocnictwa'),
+    canEditClients() ? h('button', { type: 'button', onclick: () => { menu.hidden = true; scopeDialog(); } }, h('span', {}, '◧'), 'Zakres usług – zbiorczo') : null,
     h('button', { type: 'button', onclick: () => exportBtn.click() }, h('span', {}, '⬇'), 'Eksport (CSV)'),
     wlBtn ? h('button', { type: 'button', onclick: () => wlBtn.click() }, h('span', {}, '⟳'), 'Biała lista VAT – aktualizacja') : null);
   const moreBtn = h('button', { type: 'button', class: 'kl-icon', 'aria-label': 'Więcej', 'aria-haspopup': 'menu',

@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.4.1', '16 listopada 2026', [
+    'Klienci RKDP: etykieta „Księgowość” / „Doradztwo” przy każdym kliencie, filtr po zakresie i zmiana zbiorcza (⋯ → „Zakres usług – zbiorczo”). Klienci „Doradztwo” nie pojawiają się w Rozliczeniach (księgowość, wyciągi); jeśli mają pracowników, zostają w Płacach.',
     'Własny PDF do podpisu: umowę albo inny dokument przygotowany poza aplikacją wgrywasz jako PDF i wysyłasz klientowi linkiem (e-mail z aplikacji albo sam link) – klient przegląda strony, zgłasza uwagi, podpisuje i odsyła. Przycisk w „Archiwum dokumentów” klienta RKDP i w „Umowy i zlecenia” na karcie klienta M2 TAX.',
     'Dziennik sprawy (M2 TAX): do wpisu można dodać załączniki – skan pisma, protokół, zdjęcie, PDF (do 25 MB); także do wpisów dodanych wcześniej („+ Załącznik”).',
     'Rozliczenia na komputerze: tabele bez osobnego suwaka – cała lista przewija się razem ze stroną, a nagłówek kolumn zostaje u góry.',

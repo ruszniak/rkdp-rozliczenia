@@ -73,7 +73,7 @@ export async function renderRozliczenia(main, params) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie rozliczeń…'));
   const [clients, entries, notes, pEntries, partners] = await Promise.all([
     fetchAll(() => sb.from('clients')
-      .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id,email').order('name')),
+      .select('id,name,status,legal_form,bookkeeping,has_employees,accountant_id,hr_id,email,service_scope').order('name')),
     fetchAll(() => sb.from('checklist_entries').select('id,client_id,task_code,status,updated_by,updated_at,amount,due_date').eq('period', pdate)),
     fetchAll(() => sb.from('period_notes').select('client_id,notes,questions').eq('period', pdate)),
     // kratki wspólników spółek osobowych (PIT, ZUS każdego wspólnika) – tabela może jeszcze nie istnieć
@@ -120,7 +120,7 @@ export async function renderRozliczenia(main, params) {
   }
   const noteMap = new Map(notes.map(n => [n.client_id, n]));
   const clientMap = new Map(clients.map(c => [c.id, c]));
-  const missing = clients.filter(c => c.status === 'aktywny' && !byClient.has(c.id));
+  const missing = clients.filter(c => c.status === 'aktywny' && !byClient.has(c.id) && !(c.service_scope === 'doradztwo' && !c.has_employees));
 
   // kolumny dla obszaru / sekcji
   // pamięć podręczna obliczeń – tabela przerysowuje się bez ponownego liczenia wszystkiego
@@ -157,7 +157,8 @@ export async function renderRozliczenia(main, params) {
   const hasNote = c => !!(noteMap.get(c.id)?.notes?.trim() || noteMap.get(c.id)?.questions?.trim());
   // aktywni liczą się do podsumowań; zawieszeni i zakończeni idą do osobnej tabeli
   const withCells = (area) => {
-    if (!rowsCache.has(area)) rowsCache.set(area, clients.filter(c => cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl')));
+    // klienci „tylko doradztwo” nie są w Rozliczeniach (księgowość, wyciągi); w Płacach zostają, jeśli mają kratki kadrowe
+    if (!rowsCache.has(area)) rowsCache.set(area, clients.filter(c => (area === 'kadry' || c.service_scope !== 'doradztwo') && cellsOf(c, area).length > 0).sort((a, b) => a.name.localeCompare(b.name, 'pl')));
     return rowsCache.get(area);
   };
   const rowsIn = (area) => withCells(area).filter(c => c.status === 'aktywny');
@@ -665,7 +666,7 @@ export async function renderRozliczenia(main, params) {
     }, err => { yearLoading = null; throw err; });
   const yearOpen = e => e && !['done', 'na'].includes(e.status);
   // wyciągi dotyczą klientów z księgami handlowymi (pełna księgowość)
-  function ksiegi(c) { return c.bookkeeping === 'pelna' || (!c.bookkeeping && ['spzoo', 'spolka_akcyjna', 'fundacja_rodzinna'].includes(c.legal_form)); }
+  function ksiegi(c) { return c.service_scope !== 'doradztwo' && (c.bookkeeping === 'pelna' || (!c.bookkeeping && ['spzoo', 'spolka_akcyjna', 'fundacja_rodzinna'].includes(c.legal_form))); }
   const yearClients = () => {
     if (!yearData) return [];
     const field = AREAS.wyciagi.person, q = prefs.q.trim().toLowerCase();
