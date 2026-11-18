@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.4.1', '16 listopada 2026', [
+    'Moduł M2 TAX: w menu (po lewej i w „Więcej”) są teraz „Zlecenia i umowy” oraz „Oferty M2 TAX”.',
     'Rozliczenia (księgowość): w filtrze „Pokaż” nowa opcja „Tylko Rewizor (zaznaczony)” – klienci, którzy w wybranym miesiącu mają Rewizora oznaczonego jako zrobione.',
     'Nowe wzory umów o usługi księgowe RKDP (księgi rachunkowe, KPiR, ryczałt): umowa zawarta z dniem złożenia ostatniego podpisu; powierzenie przetwarzania danych osobowych (RODO) wprost w umowie – bez odrębnej umowy powierzenia; terminy przekazania wyników: ZUS do 12., zaliczki/ryczałt do 18., VAT do 23.; 14 dni na uwagi klienta; 1 wyciąg bankowy = 1 dokument; abonament z góry, nadwyżka i kadry z dołu; licencję Saldeo opłaca RKDP; reklamacja e-mailem z odpowiedzią w 14 dni; PPK i PFRON w kadrach; JPK_V7, JPK_CIT / JPK_PKPIR / JPK_EWP.',
   ]],

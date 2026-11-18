@@ -76,14 +76,14 @@ const MODULES = {
   m2: { label: 'M2 TAX', full: 'rdp.app', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     // ten sam układ zakładek co w RKDP: Pulpit · Klienci · Sprawy · … · Więcej
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
-    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia i umowy', 'm2:zlecenia'], ['#/doradztwo/oferty', 'Oferty M2 TAX', 'm2:oferty', 'm2'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'rdp.app · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
 // konto partnera (biuro rachunkowe w Programie Partner M2 TAX): zadania dla doradców, wzory dla klientów, podgląd JPK
 MODULES.partner = { label: 'M2 TAX', full: 'rdp.app · Partner M2 TAX', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/zadania', need: 'partner',
   tabs: [['#/zadania', 'Zadania', 'm2:zadania'], ['#/wzory', 'Wzory', 'm2:dokumenty'], ['#/jpk', 'JPK', 'm2:jpk'], ['#/sprawozdanie', 'Sprawozdanie KRS', 'p:sf'], ['/pomoc/partner/', 'Pomoc', 'pomoc']] };
-const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', aml: 'klienci', dokumenty: 'dokumenty', zlecenie: 'zlecenia', oferty: 'zlecenia' };
+const M2_PARENT = { sprawa: 'sprawy', klient: 'klienci', aml: 'klienci', dokumenty: 'dokumenty', zlecenie: 'zlecenia' };
 const remembered = () => { try { return localStorage.getItem('rkdp_module'); } catch { return null; } };
 const remember = m => { try { localStorage.setItem('rkdp_module', m); } catch { /* */ } };
 
@@ -113,7 +113,7 @@ const TAB_ICONS = {
   navcfg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
   moje: I.zlecenia, more: I.wiecej, rozmowy: I.rozmowy, pulpit: I.pulpit, rozliczenia: I.rozliczenia, klienci: I.klienci,
   zgloszenia: I.skrzynka, sprawozdania: I.dokumenty, zespol: I.zespol, 'm2:': I.pulpit, 'm2:sprawy': I.dokumenty, 'm2:klienci': I.klienci,
-  'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:zadania': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
+  'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:oferty': I.notatki, 'm2:zadania': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
   jpk: I.jpk, logout: I.wyloguj, default: I.info,
   zlecenia: I.zlecenia, terminy: I.terminy, rok: I.notatki, informacje: I.rozmowy, oferty: I.notatki, aml: I.aml, raport: I.rozliczenia,
   oaplikacji: I.info, pomoc: I.info, 'm2:czas': I.zegar, spotkania: I.terminy,
@@ -263,7 +263,7 @@ function layout(active) {
     const all = [...M.tabs, ...moreAll].filter(x => x[2] !== 'logout' && x[2] !== 'navcfg');
     const GROUPS = [
       ['Codzienna praca', ['pulpit', 'm2:', 'rozliczenia', 'klienci', 'm2:klienci', 'm2:sprawy', 'm2:zadania', 'spotkania', 'rozmowy']],
-      ['Dokumenty', ['sprawozdania', 'm2:dokumenty', 'oferty', 'informacje']],
+      ['Dokumenty', ['sprawozdania', 'm2:dokumenty', 'm2:zlecenia', 'm2:oferty', 'oferty', 'informacje']],
       ['Terminy i kontrola', ['terminy', 'rok', 'aml']],
       ['Zarządzanie', ['m2:czas', 'raport', 'zespol']],
     ];
