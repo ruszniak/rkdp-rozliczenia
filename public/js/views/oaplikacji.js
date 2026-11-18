@@ -96,7 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.5', '19 listopada 2026', [
-    'Nowa karta klienta RKDP: nagłówek z najważniejszymi danymi i przyciskami, zakładki (Przegląd, Dane firmy, Podatki, Dokumenty, Rozmowa, Historia), bieżący miesiąc i lista „Do zrobienia” z przyciskami, dane jako czytelna lista z „Edytuj” w każdej sekcji i „+ uzupełnij” przy pustych polach, uzupełnianie profilu krok po kroku.',
+    'Karta klienta RKDP w odświeżonym wyglądzie (układ bez zmian): nagłówek z krótką nazwą, NIP i KRS do skopiowania, etykietami (status, księgowość/doradztwo, forma, CIT/PIT, VAT, pracownicy), księgową i kadrową oraz przyciskiem „Zadzwoń”; dane w podglądzie jako czytelny tekst zamiast szarych pól.',
   ]],
   ['2.4.1', '16 listopada 2026', [
     'Umowy RKDP (ryczałt, KPiR, księgi – spółki i fundacje rodzinne): z zakresu prac kadrowo-płacowych usunięto punkt o PPK i deklaracjach PFRON; w § 9 ust. 9 zostało tylko obowiązkowe OC doradztwa podatkowego; w wynagrodzeniu (księgi) – „opłata za sporządzenie sprawozdania finansowego”; nowe zasady ograniczenia odpowiedzialności (§ 9 ust. 2–3: szkoda rzeczywista, do 10-krotności średniego miesięcznego wynagrodzenia, przy krótszej współpracy – za faktyczny okres); w zakresie (księgi, fundacja) – samo sporządzenie sprawozdania finansowego, bez podpisu i składania.',
