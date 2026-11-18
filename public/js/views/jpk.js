@@ -287,7 +287,8 @@ export async function renderJpk(main, params) {
     h('div', { class: 'page-head', style: params?.back ? { marginTop: '10px' } : null },
       h('div', {}, 
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Podgląd JPK', infoTip(HELP, 'Podgląd JPK – instrukcja')),
-        h('p', { class: 'sub' }, 'JPK_CIT (JPK_KR_PD, JPK_ST_KR) oraz JPK_PIT: księga przychodów i rozchodów (JPK_PKPIR) i ewidencja przychodów (JPK_EWP) – podgląd, kontrola, Excel i PDF.'))),
+        h('p', { class: 'sub' }, 'JPK_CIT (JPK_KR_PD, JPK_ST_KR) oraz JPK_PIT: księga przychodów i rozchodów (JPK_PKPIR) i ewidencja przychodów (JPK_EWP) – podgląd, kontrola, Excel i PDF.')),
+      (params?.back || params?.mod === 'partner') ? h('a', { class: 'btn btn-outline btn-sm', href: params?.mod === 'm2' ? '#/doradztwo/znaczniki' : '#/znaczniki' }, 'Znaczniki JPK CIT – podpowiedzi') : null),
     zone, area);
   draw();
 }

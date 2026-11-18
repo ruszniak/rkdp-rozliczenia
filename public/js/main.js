@@ -30,6 +30,7 @@ const renderKlient = lazy(() => import('./views/klient.js'), 'renderKlient');
 const renderZespol = lazy(() => import('./views/zespol.js'), 'renderZespol');
 const renderM2 = lazy(() => import('./views/m2.js'), 'renderM2');
 const renderJpk = lazy(() => import('./views/jpk.js'), 'renderJpk');
+const renderZnaczniki = lazy(() => import('./views/znaczniki.js'), 'renderZnaczniki');
 const renderEsf = lazy(() => import('./views/esf.js'), 'renderEsf');
 // licznik nieprzeczytanych rozmów – moduł wątku ładowany w tle
 const unreadBadgeEl = () => { const slot = h('span', { class: 'wt-uslot' }); import('./watek.js').then(m => slot.replaceWith(m.unreadBadge())).catch(() => {}); return slot; };
@@ -426,6 +427,7 @@ async function route(opts = {}) {
       if (v === 'regulamin') c = await renderRegulamin(layout('regulamin'));
       else if (v === 'o-aplikacji') { const m = await import('./views/oaplikacji.js'); c = await m.renderOAplikacji(layout('oaplikacji'), parts[1]); }
       else if (v === 'jpk') c = await renderJpk(layout('m2:jpk'), { mod: 'partner' });
+      else if (v === 'znaczniki') c = await renderZnaczniki(layout('m2:jpk'), { back: '#/jpk' });
       else if (v === 'wzory') c = await renderWzory(layout('m2:dokumenty'), { mod: 'partner', params });
       else if (v === 'sprawozdanie') c = await renderEsf(layout('p:sf'), params, { partner: true });
       else {
@@ -458,6 +460,7 @@ async function route(opts = {}) {
     else if (view === 'doradztwo' && parts[1] === 'zadania') c = await renderZlecenia(layout('m2:zadania'), parts[2] || null);
     else if (!hasModule('rozliczenia') && (view === 'zlecenia' || view === 'zadania' || view === 'moje')) { const id = parts[1] || params.get('zl'); history.replaceState(null, '', '#/doradztwo/zadania' + (id ? '/' + id : '')); c = await renderZlecenia(layout('m2:zadania'), id || null); }
     else if (view === 'doradztwo' && parts[1] === 'jpk' && hasModule('doradztwo')) c = await renderJpk(layout('m2:dokumenty'), { mod: 'm2', back: '#/doradztwo/dokumenty' });
+    else if (view === 'doradztwo' && parts[1] === 'znaczniki' && hasModule('doradztwo')) c = await renderZnaczniki(layout('m2:dokumenty'), { back: '#/doradztwo/dokumenty' });
     else if (view === 'doradztwo' && parts[1] === 'kalkulator' && hasModule('doradztwo')) c = await renderKalkulator(layout('m2:dokumenty'), { mod: 'm2' });
     else if (view === 'doradztwo' && parts[1] === 'wzory' && hasModule('doradztwo')) c = await renderWzory(layout('m2:dokumenty'), { mod: 'm2', params });
     // pulpit doradcy M2 – dla zespołu RKDP bez M2 TAX zamiast niego lista spraw
@@ -467,6 +470,7 @@ async function route(opts = {}) {
     else if (view === 'spotkania') { const m = await import('./spotkania.js'); c = await m.renderSpotkania(layout('spotkania'), parts, params); }
     else if (!hasModule('rozliczenia') && view !== 'zespol') c = await renderM2(layout('m2:'), ['doradztwo'], params);
     else if (view === 'jpk') c = await renderJpk(layout('sprawozdania'), { mod: 'rkdp', back: '#/dokumenty' });
+    else if (view === 'znaczniki') c = await renderZnaczniki(layout('sprawozdania'), { back: '#/dokumenty' });
     else if (view === 'klienci') c = await renderKlienci(layout('klienci'), params);
     else if (view === 'informacje') c = await renderInformacje(layout('informacje'));
     else if (view === 'klient') c = await renderKlient(layout('klienci'), parts[1]);

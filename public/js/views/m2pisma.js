@@ -153,6 +153,7 @@ export async function renderM2Dokumenty(main, params) {
         h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/wzory' : '#/doradztwo/wzory' }, 'Wzory umów i uchwał'),
         h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/kalkulator' : '#/doradztwo/kalkulator' }, 'Kalkulator JDG / spółka'),
         h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/jpk' : '#/doradztwo/jpk' }, 'Podgląd JPK'),
+        h('a', { class: 'btn btn-outline btn-sm', href: rk ? '#/znaczniki' : '#/doradztwo/znaczniki' }, 'Znaczniki JPK CIT'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: pdf }, icon('download'), 'PDF'),
         h('button', { class: 'btn btn-primary btn-sm', onclick: word }, icon('download'), 'Pobierz Word'))),
     h('div', { class: 'pz-layout' },
