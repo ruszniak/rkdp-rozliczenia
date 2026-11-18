@@ -409,7 +409,7 @@ export async function renderRozliczenia(main, params) {
       if (prefs.person === 'none' && c[field]) return false;
       if (prefs.person && !['me', 'none'].includes(prefs.person) && c[field] !== prefs.person) return false;
       if (prefs.show === 'nierozliczeni' && isSettled(c, area)) return false;
-      if (prefs.show === 'rewizor' && byClient.get(c.id)?.get('ksiegowanie')?.status !== 'done') return false;
+      if (prefs.show === 'rewizor' && (byClient.get(c.id)?.get('ksiegowanie')?.status !== 'done' || byClient.get(c.id)?.get('jpk')?.status === 'done')) return false;   // Rewizor zrobiony, JPK VAT jeszcze niewysłany
       if (prefs.show === 'braki' && !hasMissing(c, area)) return false;
       if (prefs.show === 'uwagi' && !hasNote(c)) return false;
       if (prefs.show === 'do_wyslania' && !pendingSend(c, area)) return false;
@@ -626,7 +626,7 @@ export async function renderRozliczenia(main, params) {
       ['do_wyslania', prefs.area === 'kadry' ? 'ZUS do wysłania' : 'JPK VAT do wysłania'],
       ['braki', 'Z brakiem dokumentów'], ['uwagi', 'Z uwagami / pytaniami']];
     if (prefs.area === 'kadry') opts.push(['z_prac', 'Firmy z pracownikami'], ['jdg_bez', 'JDG bez pracowników']);
-    if (prefs.area === 'ksiegowosc') opts.push(['rewizor', 'Tylko Rewizor (zaznaczony)']);
+    if (prefs.area === 'ksiegowosc') opts.push(['rewizor', 'Rewizor zrobiony, VAT niewysłany']);
     if (prefs.area !== 'kadry' && ['z_prac', 'jdg_bez'].includes(prefs.show)) prefs.show = '';
     if (prefs.area !== 'ksiegowosc' && prefs.show === 'rewizor') prefs.show = '';
     showSel.replaceChildren(...opts.map(([v, l]) => h('option', { value: v }, l)));
