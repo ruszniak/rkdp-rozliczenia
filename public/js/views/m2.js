@@ -760,8 +760,8 @@ async function viewClient(main, id) {
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => newMatterDialog({ clientId: id }) }, '+ Sprawa')),
   ...(matters.length ? matters.map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` }, h('div', {}, h('b', {}, m.number), ' ', m.title), statusPill(m.status))) : [h('p', { class: 'hint' }, 'Brak spraw.')]));
   const m2SignBox = signPanel({ m2_client_id: c.id });
-  const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, 'Umowy i zlecenia'),
-    h('div', { style: { display: 'flex', gap: '6px' } },
+  const ordersCard = h('section', { class: 'card section' }, h('div', { class: 'section-head', style: { flexWrap: 'wrap', rowGap: '10px' } }, h('h2', { style: { whiteSpace: 'nowrap' } }, 'Umowy i zlecenia'),
+    h('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } },
       h('a', { class: 'btn btn-outline btn-sm', href: `${BASE}/zlecenie/nowe?typ=umowa&klient=${id}` }, '+ Umowa (abonament)'),
       h('button', { class: 'btn btn-outline btn-sm', type: 'button', 'data-tip': 'Umowa albo inny dokument przygotowany poza aplikacją (PDF) – klient dostanie link: przeczyta, zgłosi uwagi, podpisze i odeśle',
         onclick: () => sendFileForSignature({ client: c, target: { m2_client_id: c.id }, firm: c.firm === 'rkdp' ? 'rkdp' : 'm2', kind: 'umowa_doradcza', onSent: () => m2SignBox.reload() }) }, 'Własny PDF do podpisu'),
