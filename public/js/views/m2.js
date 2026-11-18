@@ -10,6 +10,7 @@ import {
 } from '../m2/dict.js';
 import { docBlocks, orderHtml, ORDER_CSS, printOrder, downloadOrderDocx, orderDocumentXml, brandOf, CONTRACT_DEFAULTS, defaultClientParty, contractSubject, matterTemplate, att1AutoRows, att2AutoRows, att4Mode, poaDefaultScope } from '../m2/order.js';
 import { fetchAll } from './rozliczenia.js';
+import { fileTile, dropZone, named, safeName } from './zgloszenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
 import { sendForSignature, signPanel, previewDoc, xmlPreview } from '../podpisy.js';
@@ -450,11 +451,12 @@ async function viewMatter(main, id, params) {
   }
 
   // ---- karta istniejącej sprawy ----
-  const [deadlines, journal, time, siblings] = await Promise.all([
+  const [deadlines, journal, time, siblings, jFiles] = await Promise.all([
     fetchAll(() => sb.from('m2_deadlines').select('*').eq('matter_id', id).order('due_date')),
     fetchAll(() => sb.from('m2_journal').select('*').eq('matter_id', id).order('entry_date', { ascending: false }).order('created_at', { ascending: false })),
     fetchAll(() => sb.from('m2_time').select('*').eq('matter_id', id).order('work_date', { ascending: false })),
     m.order_id ? fetchAll(() => sb.from('m2_matters').select('id,number,title,status').eq('order_id', m.order_id).order('opened_at')) : Promise.resolve([]),
+    fetchAll(() => sb.from('m2_journal_files').select('*').eq('matter_id', id).order('created_at')).catch(() => []),
   ]);
   const client = (await sb.from('m2_clients').select('id,name,hourly_rate,billing_type').eq('id', m.client_id).maybeSingle()).data;
   const reload = () => viewMatter(main, id, params);
@@ -493,25 +495,63 @@ async function viewMatter(main, id, params) {
       h('td', { class: 'small' }, t.description || ''),
       h('td', {}, h('button', { class: 'btn btn-ghost btn-sm', onclick: async () => { if (!confirm('Usunąć wpis czasu?')) return; const { error } = await sb.from('m2_time').delete().eq('id', t.id); if (error) return fail(error); reload(); } }, '✕'))))))] : []));
 
-  // dziennik
+  // dziennik (z załącznikami: skany pism, protokoły, zdjęcia – schowek „sprawy”, folder sprawy)
   const jNew = { kind: 'notatka', entry_date: todayIso(), title: '', body: '' };
+  let jPending = [];
+  const uploadJournalFiles = async (journalId, files) => {
+    let bad = 0;
+    for (const f0 of files) {
+      const f = named(f0);
+      if (f.size > 25 * 1048576) { toast(`„${f.name}” jest większy niż 25 MB – pominięto`, true); bad++; continue; }
+      const path = `${id}/${crypto.randomUUID().slice(0, 8)}-${safeName(f.name)}`;
+      const { error: e1 } = await sb.storage.from('sprawy').upload(path, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+      if (e1) { bad++; continue; }
+      const { error: e2 } = await sb.from('m2_journal_files').insert({ matter_id: id, journal_id: journalId, path, name: f.name.slice(0, 200), mime: f.type || null, size: f.size });
+      if (e2) { await sb.storage.from('sprawy').remove([path]).catch(() => null); bad++; }
+    }
+    if (bad) toast(`Nie udało się dodać ${bad} ${bad === 1 ? 'pliku' : 'plików'}`, true);
+  };
+  const pendingList = h('div', { class: 'tk-files' });
+  const drawPending = () => pendingList.replaceChildren(...jPending.map((f, i) => fileTile({ name: f.name, size: f.size, mime: f.type, uploaded_by: state.me.id }, { onDelete: () => { jPending.splice(i, 1); drawPending(); } })));
+  const jDrop = dropZone(fs => { jPending.push(...fs.map(named)); drawPending(); }, 'skan pisma, protokół, zdjęcie, PDF (do 25 MB)');
+  const addBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async e => {
+    if (!jNew.title) return toast('Podaj tytuł wpisu', true);
+    e.currentTarget.disabled = true;
+    const { data: row, error } = await sb.from('m2_journal').insert({ matter_id: id, ...jNew, title: jNew.title }).select('id').single();
+    if (error) { addBtn.disabled = false; return fail(error); }
+    if (jPending.length) await uploadJournalFiles(row.id, jPending);
+    toast('Dodano wpis');
+    if (jNew.kind === 'pismo_otrzymane' && confirm('Dodać termin liczony od doręczenia tego pisma?')) deadlineDialog({ matter: m, onSaved: reload });
+    else reload();
+  } }, 'Dodaj wpis');
+  const filesOf = jid => jFiles.filter(f => f.journal_id === jid).map(f => ({ ...f, bucket: 'sprawy' }));
+  const entryFiles = j => {
+    const box = h('div', { class: 'tk-files', style: { marginTop: '6px' } }, ...filesOf(j.id).map(f => fileTile(f, {
+      onDelete: (f.uploaded_by === state.me.id || isAdmin()) ? async () => {
+        if (!confirm(`Usunąć załącznik „${f.name}”?`)) return;
+        const { error } = await sb.from('m2_journal_files').delete().eq('id', f.id);
+        if (error) return fail(error);
+        await sb.storage.from('sprawy').remove([f.path]).catch(() => null);
+        reload();
+      } : null })));
+    const inp = h('input', { type: 'file', multiple: true, hidden: true, onchange: async () => {
+      const fs = [...inp.files]; inp.value = ''; if (!fs.length) return;
+      toast('Wysyłanie…'); await uploadJournalFiles(j.id, fs); reload();
+    } });
+    return h('div', {}, box, h('button', { type: 'button', class: 'btn btn-ghost btn-sm', style: { marginTop: '4px' }, onclick: () => inp.click() }, icon('plus'), 'Załącznik'), inp);
+  };
   const journalCard = h('section', { class: 'card section' },
     h('div', { class: 'section-head' }, h('h2', {}, 'Dziennik sprawy'), h('span', { class: 'hint' }, 'korespondencja, czynności, notatki')),
     fieldsGrid([['kind', 'Rodzaj', 'select', JOURNAL_KIND], ['entry_date', 'Data', 'date'], ['title', 'Tytuł (np. „Wezwanie z US z 10.10”)', 'text', null, true], ['body', 'Treść / ustalenia', 'textarea']], jNew),
+    h('div', { style: { marginTop: '10px' } }, h('div', { class: 'small muted', style: { marginBottom: '6px', fontWeight: 600 } }, 'Załączniki'), jDrop, pendingList),
     h('div', { class: 'row', style: { display: 'flex', justifyContent: 'flex-end', gap: '8px', margin: '10px 0 16px' } },
       h('span', { class: 'hint', style: { alignSelf: 'center' } }, 'Przy piśmie otrzymanym od razu dodaj termin na odpowiedź.'),
-      h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
-        if (!jNew.title) return toast('Podaj tytuł wpisu', true);
-        const { error } = await sb.from('m2_journal').insert({ matter_id: id, ...jNew, title: jNew.title });
-        if (error) return fail(error);
-        toast('Dodano wpis');
-        if (jNew.kind === 'pismo_otrzymane' && confirm('Dodać termin liczony od doręczenia tego pisma?')) deadlineDialog({ matter: m, onSaved: reload });
-        else reload();
-      } }, 'Dodaj wpis')),
+      addBtn),
     h('div', { class: 'timeline' }, ...(journal.length ? journal.map(j => h('div', { class: 'tl-item' },
       h('div', { class: 'tl-date' }, fmtDate(j.entry_date)),
       h('div', {}, h('span', { class: 'badge' }, JOURNAL_KIND[j.kind] || j.kind), ' ', h('b', {}, j.title),
         j.body ? h('p', { class: 'small', style: { whiteSpace: 'pre-wrap', marginTop: '4px' } }, j.body) : null,
+        entryFiles(j),
         h('div', { class: 'small muted' }, (state.members.find(x => x.email === j.author)?.short_name || j.author || ''))))) : [h('p', { class: 'hint' }, 'Brak wpisów.')])));
 
   const others = m.order_id ? siblings.filter(x => x.id !== m.id) : [];

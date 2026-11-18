@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.4.1', '16 listopada 2026', [
+    'Dziennik sprawy (M2 TAX): do wpisu można dodać załączniki – skan pisma, protokół, zdjęcie, PDF (do 25 MB); także do wpisów dodanych wcześniej („+ Załącznik”).',
     'Rozliczenia na komputerze: tabele bez osobnego suwaka – cała lista przewija się razem ze stroną, a nagłówek kolumn zostaje u góry.',
     'Moduł M2 TAX: w menu (po lewej i w „Więcej”) są teraz „Zlecenia i umowy” oraz „Oferty M2 TAX”.',
     'Rozliczenia (księgowość): w filtrze „Pokaż” nowa opcja „Rewizor zrobiony, VAT niewysłany” – klienci, którzy w wybranym miesiącu mają Rewizora oznaczonego jako zrobione, a JPK VAT jeszcze nie jest wysłany.',
