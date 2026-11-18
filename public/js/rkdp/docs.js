@@ -29,6 +29,7 @@ const TEMPLATES = {
   ryczalt: { label: 'Ryczałt od przychodów ewidencjonowanych', url: '/rkdp/umowa-ryczalt.docx', sub: '[ryczałt od przychodów ewidencjonowanych]' },
   kpir: { label: 'Podatkowa księga przychodów i rozchodów', url: '/rkdp/umowa-kpir.docx', sub: '[podatkowa księga przychodów i rozchodów]' },
   ksiegi: { label: 'Księgi rachunkowe (spółki)', url: '/rkdp/umowa-ksiegi.docx', sub: '[księgi rachunkowe]' },
+  fundacja: { label: 'Księgi rachunkowe (fundacja rodzinna)', url: '/rkdp/umowa-fundacja.docx', sub: '[księgi rachunkowe – fundacja rodzinna]' },
 };
 
 // prosty formularz pól: [klucz, etykieta, typ, opcje, szerokie]
@@ -60,12 +61,13 @@ async function loadAdvisor() {
 // ---------- umowa: wartości pól wzoru ----------
 function contractDefaults(c) {
   const a = parseAddress(c?.address);
-  const tpl = c?.bookkeeping === 'ryczalt' ? 'ryczalt' : c?.bookkeeping === 'kpir' ? 'kpir' : (c && !isJdg(c)) ? 'ksiegi' : (c?.pit_form === 'ryczalt' ? 'ryczalt' : 'kpir');
+  const tpl = c?.legal_form === 'fundacja_rodzinna' ? 'fundacja' : c?.bookkeeping === 'ryczalt' ? 'ryczalt' : c?.bookkeeping === 'kpir' ? 'kpir' : (c && !isJdg(c)) ? 'ksiegi' : (c?.pit_form === 'ryczalt' ? 'ryczalt' : 'kpir');
   const n = rkSplit(c?.name);
   return {
     tpl, gender: 'm',
     person: isJdg(c) ? `${n.first} ${n.last}`.trim() : '', firm: isJdg(c) ? c?.name || '' : '',
     address: c?.address || '', nip: c?.nip || '', email: c?.email || '', month: nextMonth(),
+    foundation: c?.name || '',
     company: (c?.name || '').replace(/\s*(sp\.?\s*z\s*o\.?\s*o\.?|spółka z ograniczoną odpowiedzialnością)\s*$/i, '').trim(),
     seat_loc: a.city ? `${a.city}` : '', street: [a.street, a.house + (a.flat ? '/' + a.flat : '')].filter(Boolean).join(' '), zip: a.zip, city: a.city,
     krs: c?.krs || '', regon: c?.regon || '', rep: c?.contact_person || '',
@@ -76,6 +78,10 @@ function contractReplacements(v) {
   const T = TEMPLATES[v.tpl];
   const common = [['[MIESIĄC ROK]', v.month || '[MIESIĄC ROK]'], ['[ADRES E-MAIL]', v.email || '[ADRES E-MAIL]'],
     ['[KWOTA]', amount(v.fee)], ['[LICZBA]', v.docs_limit || '[LICZBA]'], ['[KWOTA]', amount(v.fee_extra)], ['[KWOTA]', amount(v.fee_year)], ['[KWOTA]', amount(v.fee_hr)]];
+  if (v.tpl === 'fundacja') return [[T.sub, T.sub.slice(1, -1)],
+    ['[NAZWA FUNDACJI RODZINNEJ]', v.foundation || '[NAZWA FUNDACJI RODZINNEJ]'], ['[MIEJSCOWOŚĆ]', v.seat_loc || '[MIEJSCOWOŚĆ]'], ['[ULICA, NR]', v.street || '[ULICA, NR]'],
+    ['[KOD POCZTOWY]', v.zip || '[KOD POCZTOWY]'], ['[MIEJSCOWOŚĆ]', v.city || '[MIEJSCOWOŚĆ]'], ['[NUMER RFR]', v.krs || '[NUMER RFR]'],
+    ['[REGON]', v.regon || '[REGON]'], ['[NIP]', v.nip || '[NIP]'], ['[IMIĘ I NAZWISKO – STANOWISKO]', v.rep || '[IMIĘ I NAZWISKO – STANOWISKO]'], ...common];
   if (v.tpl === 'ksiegi') return [[T.sub, T.sub.slice(1, -1)],
     ['[NAZWA SPÓŁKI]', v.company || '[NAZWA SPÓŁKI]'], ['[MIEJSCOWOŚĆ]', v.seat_loc || '[MIEJSCOWOŚĆ]'], ['[ULICA, NR]', v.street || '[ULICA, NR]'],
     ['[KOD POCZTOWY]', v.zip || '[KOD POCZTOWY]'], ['[MIEJSCOWOŚĆ]', v.city || '[MIEJSCOWOŚĆ]'], ['[NUMER KRS]', v.krs || '[NUMER KRS]'],
@@ -158,7 +164,14 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     if (t === 'umowa') {
       const c = v.contract;
       parts.push(grid([['tpl', 'Wzór umowy', 'select', Object.fromEntries(Object.entries(TEMPLATES).map(([k, x]) => [k, x.label])), true]], c, () => build()));
-      if (c.tpl === 'ksiegi') parts.push(grid([
+      if (c.tpl === 'fundacja') parts.push(grid([
+        ['foundation', 'Pełna nazwa fundacji rodzinnej (z „fundacja rodzinna”)', 'text', null, true],
+        ['seat_loc', 'Siedziba – „z siedzibą w …” (np. Wrocławiu)', 'text'], ['street', 'Ulica i numer (bez „ul.”)', 'text'],
+        ['zip', 'Kod pocztowy', 'text'], ['city', 'Miejscowość', 'text'],
+        ['krs', 'Numer w Rejestrze Fundacji Rodzinnych (RFR)', 'text'], ['regon', 'REGON', 'text'], ['nip', 'NIP', 'text'],
+        ['rep', 'Reprezentacja – „imię i nazwisko – członek zarządu”', 'text', null, true],
+      ], c));
+      else if (c.tpl === 'ksiegi') parts.push(grid([
         ['company', 'Nazwa spółki (bez „Sp. z o.o.” – wzór dopisuje sam)', 'text', null, true],
         ['seat_loc', 'Siedziba – „z siedzibą w …” (np. Wrocławiu)', 'text'], ['street', 'Ulica i numer (bez „ul.”)', 'text'],
         ['zip', 'Kod pocztowy', 'text'], ['city', 'Miejscowość', 'text'],
@@ -172,7 +185,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       parts.push(grid([
         ['month', 'Pierwszy miesiąc współpracy (np. listopad 2026)', 'text'], ['email', 'E-mail(e) osób kontaktowych', 'text'],
         ['fee', 'Abonament (zł netto)', 'text'], ['docs_limit', 'Abonament obejmuje do (liczba dokumentów)', 'text'],
-        ['fee_extra', 'Dokument nadwyżkowy (zł netto / szt.)', 'text'], ['fee_year', c.tpl === 'ksiegi' ? 'Sprawozdanie finansowe (zł netto)' : 'Zeznanie roczne PIT (zł netto)', 'text'],
+        ['fee_extra', 'Dokument nadwyżkowy (zł netto / szt.)', 'text'], ['fee_year', ['ksiegi', 'fundacja'].includes(c.tpl) ? 'Sprawozdanie finansowe (zł netto)' : 'Zeznanie roczne PIT (zł netto)', 'text'],
         ['fee_hr', 'Kadry – 1 tytuł zatrudnienia (zł netto)', 'text'],
       ], c), h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Puste pola zostaną w umowie jako [POLE] do uzupełnienia. Treść umowy jest dokładnie z Twojego wzoru.'));
     } else if (t === 'upl1' || t === 'pel' || t === 'pps1') {
