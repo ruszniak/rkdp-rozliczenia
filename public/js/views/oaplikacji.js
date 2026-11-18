@@ -4,7 +4,7 @@ import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
 export const APP_VERSION = '2.5';
-export const APP_DATE = '19 listopada 2026';
+export const APP_DATE = '2026-11-19';
 const DOCS_DATE = '2 listopada 2026 r.';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), KRS 0000812185, NIP 8992871126, REGON 384812329';
