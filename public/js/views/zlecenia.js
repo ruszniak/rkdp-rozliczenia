@@ -270,7 +270,8 @@ export async function openZlecenie(id, onChange) {
     }
     if (office) { toast({ start: 'Powodzenia! Włącz licznik czasu', zglos: 'Wysłano odpowiedź – biuro dostanie e-mail', pytanie: 'Wysłano pytanie do biura', popraw: 'Wysłano dodatkowe pytanie do doradcy', akceptuj: 'Zadanie zamknięte – dziękujemy!', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zadanie', wznow: 'Otwarto ponownie', zakoncz: 'Zadanie zamknięte' }[akcja] || 'Zapisano'); refresh(); return; }
     toast({ start: 'Powodzenia!', pytanie: `Wysłano pytanie – ${boss} dostanie powiadomienie`, zglos: `Zgłoszono wykonanie – ${boss} dostanie powiadomienie`, akceptuj: 'Zaakceptowano', zakoncz: 'Zadanie zamknięte jako wykonane', popraw: 'Odesłano do poprawy', odpowiedz: 'Wysłano odpowiedź', anuluj: 'Anulowano zadanie', wznow: 'Wznowiono' }[akcja] || 'Zapisano');
-    refresh();
+    // akceptacja / zamknięcie kończy sprawę – okno zadania się zamyka; pozostałe akcje odświeżają widok
+    if (['akceptuj', 'zakoncz'].includes(akcja)) { closeFn(); onChange?.(); } else refresh();
   };
   const ask = (title, label, akcja, required, btn) => { const att = []; return modal(title, h('div', { class: 'zl-form' }, h('label', { class: 'field' }, h('span', {}, label), h('textarea', { class: 'input', rows: 4, maxlength: 3000, id: 'zl-ask' })),
       h('div', { class: 'field' }, h('span', {}, 'Załączniki (opcjonalnie)'), pendingBox(att))),
