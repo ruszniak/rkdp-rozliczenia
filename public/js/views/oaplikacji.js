@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.5', '19 listopada 2026', [
+    'Rozliczenia: filtr „Rewizor zrobiony, klient nierozliczony” – Rewizor oznaczony jako zrobiony, ale klient nie jest jeszcze rozliczony (zamiast warunku „VAT niewysłany”).',
     'Zadania: po „Akceptuję – zakończ” (i „Zakończ”) okno zadania od razu się zamyka.',
     'Karta klienta RKDP w odświeżonym wyglądzie (układ bez zmian): nagłówek z krótką nazwą, NIP i KRS do skopiowania, etykietami (status, księgowość/doradztwo, forma, CIT/PIT, VAT, pracownicy), księgową i kadrową oraz przyciskiem „Zadzwoń”; dane w podglądzie jako czytelny tekst zamiast szarych pól.',
   ]],
