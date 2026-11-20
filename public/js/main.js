@@ -215,6 +215,7 @@ function renderWiecej(main) {
     h('div', { class: 'card wq-list' },
       row('#/profil', 'profil', 'Mój profil, Face ID, powiadomienia'),
       obec ? row('#/obecnosc', 'zegar', 'Lista obecności') : null,
+      obec ? row('#/obecnosc/urlopy', 'zegar', 'Urlopy – wnioski') : null,
       lastMore.some(x => x[2] === 'zespol') ? row('#/zespol', 'zespol', 'Zespół i ustawienia') : null,
       themeRow,
       row(isPartner() ? '/pomoc/partner/' : '/pomoc/', 'info', 'Pomoc i instrukcje'),

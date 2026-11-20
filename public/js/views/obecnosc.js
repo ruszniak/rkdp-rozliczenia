@@ -250,6 +250,7 @@ const clientCell = list => list?.length ? h('div', { class: 'ob-cl' }, ...list.s
 
 export async function renderObecnosc(main, sub, params) {
   if (sub === 'zespol') return renderTeam(main, params);
+  if (sub === 'urlopy') return (await import('./urlopy.js')).renderUrlopy(main, params);
   const vis = visibleMembers();
   let member = vis.find(x => x.id === params.get('osoba')) || (state.me.attendance ? state.me : vis[0]);
   if (!member) {
@@ -343,6 +344,7 @@ export async function renderObecnosc(main, sub, params) {
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, member.full_name, infoTip(HELP, 'Lista obecności – instrukcja')),
         h('p', { class: 'sub' }, firmOf(member))),
       h('div', { class: 'ob-actions' },
+        h('a', { class: 'btn btn-outline btn-sm', href: '#/obecnosc/urlopy' }, 'Urlopy'),
         canSeeTeam() ? h('a', { class: 'btn btn-outline btn-sm', href: `#/obecnosc/zespol?m=${m}` }, 'Zespół') : null,
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportPdf(m, people) }, icon('download'), 'PDF'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportXlsx(m, people) }, icon('download'), 'Excel'))),
@@ -374,6 +376,7 @@ async function renderTeam(main, params) {
         h('p', { class: 'sub' }, isAdmin() ? 'Wszyscy pracownicy.' : 'Pracownicy, których listy możesz przeglądać.')),
       h('div', { class: 'ob-actions' },
         h('a', { class: 'btn btn-outline btn-sm', href: '#/obecnosc' }, 'Moja lista'),
+        h('a', { class: 'btn btn-outline btn-sm', href: '#/obecnosc/urlopy' }, 'Urlopy'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportPdf(m, per) }, icon('download'), 'PDF – wszyscy'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportXlsx(m, per) }, icon('download'), 'Excel – wszyscy'))),
     h('div', { class: 'ob-bar' }, h('div', { class: 'ob-month' },

@@ -118,6 +118,10 @@
               const c = D.clients.find(x => x.id === e.cid); if (!c) return; const o = out.get(e.cid) || { client_id: e.cid, name: c.name, n: 0, last_at: e.at, mentioned: false, period: e.per }; o.n++; o.mentioned ||= e.m; if (e.at > o.last_at) { o.last_at = e.at; o.period = e.per; } out.set(e.cid, o); });
             return { data: [...out.values()].sort((a, b) => b.last_at.localeCompare(a.last_at)), error: null };
           }
+          if (fn === 'leave_decide' || fn === 'leave_cancel') { const r = (D.leave_requests || []).find(x => x.id === args.p_id); if (!r) return { data: null, error: { message: 'Brak wniosku' } };
+            if (fn === 'leave_cancel') r.status = 'wycofany'; else { Object.assign(r, { status: args.p_approve ? 'zaakceptowany' : 'odrzucony', decided_by: me.id, decided_at: new Date().toISOString(), decision_note: args.p_note });
+              if (args.p_approve) (args.p_days || []).forEach(d => { D.attendance = (D.attendance || []).filter(a => !(a.member_id === r.member_id && a.day === d)); D.attendance.push({ id: 'at-' + d + r.member_id, member_id: r.member_id, day: d, kind: r.kind, break_min: 0, note: 'Wniosek urlopowy' }); }); }
+            return { data: r.status, error: null }; }
           if (fn === 'set_my_avatar') { me.avatar = args.p_avatar; return { data: null, error: null }; }
           if (fn === 'login_mode') return M.mode ? { data: 'haslo_kod', error: null } : { data: null, error: { message: 'not found' } };
           if (fn === 'auth_state') return { data: { member: true, verified: true, can_set_password: M.canSet ?? true, password_set: false, idle_minutes: M.idle || 240 }, error: null };

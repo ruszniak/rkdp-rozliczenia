@@ -248,6 +248,27 @@ async function onOgloszenie(b: any) {
   return notify(o.audience, 'zgloszenia', { title: 'Co nowego w rdp.app', body: short(String(o.title || ''), 140), url: '/#/pulpit', tag: `og-${o.id}` });
 }
 
+// wnioski urlopowe: nowy / wycofany → akceptujący (administratorzy i osoby z attendance_scope dla domeny pracownika), decyzja → pracownik
+const LEAVE_KIND: Record<string, string> = { urlop: 'urlop wypoczynkowy', urlop_zadanie: 'urlop na żądanie', okolicznosciowy: 'urlop okolicznościowy', opieka: 'opieka nad dzieckiem', bezplatny: 'urlop bezpłatny', wolne: 'dzień wolny / odbiór' };
+async function onUrlop(b: any) {
+  const { data: r } = await db.from('leave_requests').select('id, member_id, kind, date_from, date_to, days, status, decided_by, decision_note').eq('id', String(b.id || '')).maybeSingle();
+  if (!r) return 0;
+  const { data: m } = await db.from('team_members').select('id, full_name, email').eq('id', r.member_id).maybeSingle();
+  const d = (x: string) => x.split('-').reverse().slice(0, 2).join('.');
+  const range = r.date_from === r.date_to ? d(r.date_from) : `${d(r.date_from)}–${d(r.date_to)}`;
+  const what = `${LEAVE_KIND[r.kind] || r.kind} ${range}${r.days ? ` (${r.days} dni rob.)` : ''}`;
+  const ev = String(b.ev || '');
+  if (ev === 'decyzja') {
+    const ok = r.status === 'zaakceptowany';
+    return notify([r.member_id].filter(x => x !== b.actor), 'zgloszenia', { title: ok ? 'Wniosek urlopowy zaakceptowany' : 'Wniosek urlopowy odrzucony', body: [what, r.decision_note ? short(r.decision_note, 100) : ''].filter(Boolean).join(' · '), url: '/#/obecnosc/urlopy', tag: `ur-${r.id}` });
+  }
+  const { data: tm } = await db.from('team_members').select('id, role, active, attendance_scope').eq('active', true);
+  const mail = String(m?.email || '').toLowerCase();
+  const to = (tm || []).filter(x => x.id !== r.member_id && (x.role === 'admin' || (x.attendance_scope && mail.endsWith('@' + String(x.attendance_scope).trim().toLowerCase())))).map(x => x.id);
+  if (!to.length) return 0;
+  return notify(to, 'zgloszenia', { title: ev === 'wycofany' ? 'Wniosek urlopowy wycofany' : 'Nowy wniosek urlopowy', body: `${m?.full_name || 'Pracownik'} · ${what}`, url: '/#/obecnosc/urlopy', tag: `ur-${r.id}` });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Metoda niedozwolona' }, 405);
@@ -268,6 +289,7 @@ Deno.serve(async (req) => {
       if (body.event === 'zlecenie') return json({ sent: await onZlecenie(body) });
       if (body.event === 'spotkanie') return json({ sent: await onSpotkanie(body) });
       if (body.event === 'flush') return json({ sent: await flush() });
+      if (body.event === 'urlop') return json({ sent: await onUrlop(body) });
       if (body.event === 'ogloszenie') return json({ sent: await onOgloszenie(body) });
       return json({ error: 'Nieznane zdarzenie' }, 400);
     }
