@@ -9,6 +9,7 @@ const zl = n => (Math.round((n || 0) * 100) / 100).toLocaleString('pl-PL', { min
 const pct = n => isFinite(n) ? (Math.round(n * 10) / 10).toLocaleString('pl-PL') + '%' : '—';
 const num = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
 const esc = v => String(v ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const roleTxt = r => r.role === 'kadry' ? `kadry: ${num(r.c.employees_count)} os. × ${zl(r.c.fee_employee)}` : r.role;
 const BASIS = { ksiegowa: 'klienci jako księgowa', kadrowa: 'klienci jako kadrowa', obie: 'księgowa i kadrowa' };
 const HELP = `Koszt księgowych – widoczne tylko dla administratora.
 • Dla każdej osoby wpisz, jak jej płacisz: procent przychodu z jej klientów albo stałą kwotę miesięcznie (np. pensja + ZUS pracodawcy albo faktura).
@@ -32,7 +33,7 @@ export async function renderKoszty(main) {
 
   // analiza
   const analyse = () => people.map(m => {
-    const p = pay.get(m.id) || { mode: 'procent', value: 0, basis: 'ksiegowa' };
+    const p = pay.get(m.id) || { mode: 'procent', value: 0, basis: 'obie' };
     const rows = [];
     if (p.basis !== 'kadrowa') active.filter(c => c.accountant_id === m.id).forEach(c => rows.push({ c, role: 'księgowość', rev: accRev(c) }));
     if (p.basis !== 'ksiegowa') active.filter(c => c.hr_id === m.id).forEach(c => rows.push({ c, role: 'kadry', rev: hrRev(c) }));
@@ -45,7 +46,7 @@ export async function renderKoszty(main) {
 
   const saveTimers = new Map();
   const savePay = (id, patch) => {
-    const cur = { member_id: id, mode: 'procent', value: 0, basis: 'ksiegowa', ...(pay.get(id) || {}), ...patch };
+    const cur = { member_id: id, mode: 'procent', value: 0, basis: 'obie', ...(pay.get(id) || {}), ...patch };
     pay.set(id, cur);
     clearTimeout(saveTimers.get(id));
     saveTimers.set(id, setTimeout(async () => {
@@ -59,22 +60,32 @@ export async function renderKoszty(main) {
   const openSet = new Set();
   // edycja abonamentu klienta wprost z analizy – zapis od razu w karcie klienta
   // (księgowość: Abonament; kadry: Obsługa pracownika – zł za osobę × liczba osób)
-  const feeInput = r => {
-    const kadry = r.role === 'kadry', field = kadry ? 'fee_employee' : 'monthly_fee';
-    const cur = r.c[field];
-    const inp = h('input', { class: 'input', inputmode: 'decimal', style: { maxWidth: '120px' }, value: cur ? String(cur).replace('.', ',') : '', placeholder: 'brak',
-      title: kadry ? 'Obsługa pracownika – zł netto za osobę' : 'Abonament – zł netto / mies.' });
-    inp.addEventListener('change', async () => {
+  const saveClient = async (r, patch, el) => {
+    if (el) el.disabled = true;
+    const { error } = await sb.from('clients').update(patch).eq('id', r.c.id);
+    if (el) el.disabled = false;
+    if (error) return fail(error);
+    Object.assign(r.c, patch); toast('Zapisano w karcie klienta'); draw();
+  };
+  const numInput = (val, ph, w, title, onSave) => {
+    const inp = h('input', { class: 'input', inputmode: 'decimal', style: { maxWidth: w }, value: val ? String(val).replace('.', ',') : '', placeholder: ph, title });
+    inp.addEventListener('change', () => {
       const raw = inp.value.trim(), v = raw === '' ? null : num(raw);
-      if (raw !== '' && !(v >= 0)) { toast('Wpisz kwotę', true); return; }
-      inp.disabled = true;
-      const { error } = await sb.from('clients').update({ [field]: v }).eq('id', r.c.id);
-      inp.disabled = false;
-      if (error) return fail(error);
-      r.c[field] = v; toast('Zapisano w karcie klienta'); draw();
+      if (raw !== '' && !(v >= 0)) { toast('Wpisz liczbę', true); return; }
+      onSave(v, inp);
     });
-    return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, inp,
-      h('span', { class: 'small muted' }, kadry ? `zł × ${num(r.c.employees_count) || 0} os.` : 'zł'));
+    return inp;
+  };
+  // edycja wprost z analizy – zapis od razu w karcie klienta
+  // księgowość: Abonament (zł / mies.); kadry: stawka za osobę × liczba osób na liście płac
+  const feeInput = r => {
+    if (r.role !== 'kadry') return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      numInput(r.c.monthly_fee, 'brak', '120px', 'Abonament – zł netto / mies.', (v, el) => saveClient(r, { monthly_fee: v }, el)), h('span', { class: 'small muted' }, 'zł'));
+    return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+      numInput(r.c.fee_employee, 'stawka', '90px', 'Obsługa pracownika – zł netto za osobę', (v, el) => saveClient(r, { fee_employee: v }, el)),
+      h('span', { class: 'small muted' }, 'zł ×'),
+      numInput(r.c.employees_count, 'osób', '70px', 'Liczba osób na liście płac', (v, el) => saveClient(r, { employees_count: v === null ? null : Math.round(v), ...(v > 0 ? { has_employees: true } : {}) }, el)),
+      h('span', { class: 'small muted' }, 'os.'));
   };
   const draw = () => {
     const A = analyse();
@@ -119,7 +130,7 @@ export async function renderKoszty(main) {
         h('button', { class: 'btn btn-outline btn-sm', onclick: e => exportPdf(e.currentTarget, a.m.id) }, `PDF – ${a.m.full_name.split(' ')[0]}`),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportXlsx(a.m.id).catch(fail) }, `Excel – ${a.m.full_name.split(' ')[0]}`)),
       h('table', { class: 'list', style: { marginTop: '8px' } },
-        h('thead', {}, h('tr', {}, ...['Klient', 'Rola', 'Przychód / mies. (netto)', 'Koszt', 'Marża'].map(x => h('th', {}, x)))),
+        h('thead', {}, h('tr', {}, ...['Klient', 'Rola', 'Przychód / mies. (netto) – kadry: stawka × osoby', 'Koszt', 'Marża'].map(x => h('th', {}, x)))),
         h('tbody', {}, ...a.rows.sort((x, y) => y.rev - x.rev || x.c.name.localeCompare(y.c.name, 'pl')).map(r => h('tr', {},
           h('td', {}, h('a', { href: `#/klient/${r.c.id}` }, r.c.name)), h('td', {}, r.role),
           h('td', {}, feeInput(r)),
@@ -150,7 +161,7 @@ export async function renderKoszty(main) {
           { v: r2(a.rev), s: 'money' }, { v: r2(a.cost), s: 'money' }, { v: r2(a.margin), s: 'money' }, isFinite(a.share) ? r2(a.share) : '', { v: r2(a.perClient), s: 'money' }])] },
       { name: 'Klienci', widths: [26, 40, 12, 14, 14, 14], freeze: { row: 1, col: 2 }, rows: [
         H(['Osoba', 'Klient', 'Rola', 'Przychód/mies.', 'Koszt/mies.', 'Marża']),
-        ...A.flatMap(a => [...a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => [a.m.full_name, r.c.name, r.role, { v: r2(r.rev), s: 'money' }, { v: r2(r.cost), s: 'money' }, { v: r2(r.margin), s: 'money' }]),
+        ...A.flatMap(a => [...a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => [a.m.full_name, r.c.name, roleTxt(r), { v: r2(r.rev), s: 'money' }, { v: r2(r.cost), s: 'money' }, { v: r2(r.margin), s: 'money' }]),
           ...(a.rows.length ? [[{ v: a.m.full_name, s: 'header' }, { v: `Razem – ${a.nClients} klientów`, s: 'header' }, { v: '', s: 'header' }, { v: r2(a.rev), s: 'header' }, { v: r2(a.cost), s: 'header' }, { v: r2(a.margin), s: 'header' }]] : [])])] },
     ]);
   };
@@ -166,7 +177,7 @@ export async function renderKoszty(main) {
       ${A.map(a => tr([a.m.full_name, a.p.mode === 'procent' ? `${String(a.p.value || 0).replace('.', ',')}% (${BASIS[a.p.basis]})` : `${zl(a.p.value)} (${BASIS[a.p.basis]})`, a.nClients, zl(a.rev), zl(a.cost), zl(a.margin), pct(a.share)])).join('')}
       ${only ? '' : `<tr class="t"><td>Razem</td><td></td><td></td><td>${zl(T.rev)}</td><td>${zl(T.cost)}</td><td>${zl(T.rev - T.cost)}</td><td>${pct(T.rev ? T.cost / T.rev * 100 : NaN)}</td></tr>`}</tbody></table>
       ${A.filter(a => a.rows.length).map(a => `<h2>${esc(a.m.full_name)}</h2><table><thead><tr><th>Klient</th><th>Rola</th><th>Przychód</th><th>Koszt</th><th>Marża</th></tr></thead><tbody>
-        ${a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => tr([r.c.name, r.role, r.rev ? zl(r.rev) : 'brak abonamentu', zl(r.cost), zl(r.margin)])).join('')}
+        ${a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => tr([r.c.name, roleTxt(r), r.rev ? zl(r.rev) : (r.role === 'kadry' ? 'brak stawki / osób' : 'brak abonamentu'), zl(r.cost), zl(r.margin)])).join('')}
         <tr class="t"><td>Razem – ${a.nClients} klientów</td><td>${esc(a.p.mode === 'procent' ? String(a.p.value || 0).replace('.', ',') + '%' : 'stała kwota')}</td><td>${zl(a.rev)}</td><td>${zl(a.cost)}</td><td>${zl(a.margin)}</td></tr>
         <tr><td colspan="5" style="color:#676b73;border:0;padding-top:6px">Koszt / przychód: <b>${pct(a.share)}</b> · koszt na klienta: <b>${zl(a.perClient)}</b></td></tr></tbody></table>`).join('')}
       </body></html>`;
