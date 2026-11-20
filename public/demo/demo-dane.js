@@ -172,6 +172,7 @@
     m2_signers, m2_clients, m2_contacts: [], m2_matters, m2_deadlines, m2_journal, m2_time, m2_orders, m2_history: [], m2_offers: [],
     offers: [], shared_docs: [], member_profiles: [], member_private: [], member_prefs: [], period_files: [], client_files: [], fin_statements: [], thread_reads: [],
     year_close_entries: [], client_monitor: [], monitor_alerts: [], aml_cases: [], aml_checks: [], rkdp_protocols: [], terms_acceptances: [], auth_devices: [],
+    staff_pay: [{ member_id: 'demo-kasia', mode: 'procent', value: 35, basis: 'ksiegowa' }, { member_id: 'demo-tomek', mode: 'kwota', value: 6500, basis: 'ksiegowa' }, { member_id: 'demo-magda', mode: 'procent', value: 40, basis: 'kadrowa' }],
     leave_requests: [
       { id: 'demo-ur1', member_id: 'demo-kasia', kind: 'urlop', date_from: '2026-12-21', date_to: '2026-12-31', days: 7, note: 'Zastępstwo: Tomek – pilne sprawy klientów', status: 'oczekuje', created_at: '2026-11-18T09:12:00Z' },
       { id: 'demo-ur2', member_id: 'demo-tomek', kind: 'urlop_zadanie', date_from: '2026-11-06', date_to: '2026-11-06', days: 1, note: null, status: 'zaakceptowany', decided_by: 'demo-anna', decided_at: '2026-11-06T07:40:00Z', created_at: '2026-11-06T07:31:00Z' },

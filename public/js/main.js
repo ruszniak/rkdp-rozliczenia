@@ -40,6 +40,7 @@ const renderWzory = lazy(() => import('./views/wzory.js'), 'renderWzory');
 const renderTerminy = lazy(() => import('./views/terminy.js'), 'renderTerminy');
 const renderRok = lazy(() => import('./views/rok.js'), 'renderRok');
 const renderRaport = lazy(() => import('./views/raport.js'), 'renderRaport');
+const renderKoszty = lazy(() => import('./views/koszty.js'), 'renderKoszty');
 // po wyświetleniu pierwszego ekranu pobieramy w tle pozostałe widoki, żeby przełączanie zakładek było natychmiastowe
 const prefetchViews = () => {
   const go = () => {
@@ -73,7 +74,7 @@ const MODULES = {
     more: [['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
       ['#/doradztwo/dokumenty', 'Pisma procesowe – wzory (RKDP i M2 TAX)', 'm2:dokumenty'], ['#/obecnosc/urlopy', 'Urlopy – wnioski urlopowe', 'urlopy'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
-      ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+      ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/koszty', 'Koszt księgowych (tylko Ty)', 'koszty', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'rdp.app', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     // ten sam układ zakładek co w RKDP: Pulpit · Klienci · Sprawy · … · Więcej
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
@@ -116,7 +117,7 @@ const TAB_ICONS = {
   zgloszenia: I.skrzynka, sprawozdania: I.dokumenty, zespol: I.zespol, 'm2:': I.pulpit, 'm2:sprawy': I.dokumenty, 'm2:klienci': I.klienci,
   'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:oferty': I.notatki, 'm2:zadania': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
   jpk: I.jpk, logout: I.wyloguj, default: I.info,
-  zlecenia: I.zlecenia, terminy: I.terminy, urlopy: I.terminy, rok: I.notatki, informacje: I.rozmowy, oferty: I.notatki, aml: I.aml, raport: I.rozliczenia,
+  zlecenia: I.zlecenia, terminy: I.terminy, urlopy: I.terminy, rok: I.notatki, informacje: I.rozmowy, oferty: I.notatki, aml: I.aml, raport: I.rozliczenia, koszty: I.rozliczenia,
   oaplikacji: I.info, pomoc: I.info, 'm2:czas': I.zegar, spotkania: I.terminy,
 };
 TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
@@ -266,7 +267,7 @@ function layout(active) {
       ['Codzienna praca', ['pulpit', 'm2:', 'rozliczenia', 'klienci', 'm2:klienci', 'm2:sprawy', 'm2:zadania', 'spotkania', 'rozmowy']],
       ['Dokumenty', ['sprawozdania', 'm2:dokumenty', 'm2:zlecenia', 'm2:oferty', 'oferty', 'informacje']],
       ['Terminy i kontrola', ['terminy', 'rok', 'aml']],
-      ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'zespol']],
+      ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'koszty', 'zespol']],
     ];
     const BOTTOM = ['pomoc', 'zainstaluj', 'oaplikacji'];
     const SHORT = { zainstaluj: 'Aplikacja na telefon', spotkania: 'Spotkania i grafik', 'm2:dokumenty': 'Pisma procesowe' };
@@ -487,6 +488,7 @@ async function route(opts = {}) {
     else if (view === 'terminy') c = await renderTerminy(layout('terminy'), params);
     else if (view === 'zamkniecie-roku') c = await renderRok(layout('rok'), params);
     else if (view === 'raport' && state.me.role === 'admin') c = await renderRaport(layout('raport'), params);
+    else if (view === 'koszty' && state.me.role === 'admin') c = await renderKoszty(layout('koszty'));
     else if (view === 'rozmowy') c = await renderRozmowy(layout('rozmowy'), params);
     else if (view === 'zgloszenia' && parts[1] && parts[1] !== 'cykliczne' && !params.has('pelne') && (tkRes = await openTicketInThread(parts[1]))) c = tkRes.c;
     else if (view === 'zgloszenia' && !parts[1]) { const f = params.get('f'); history.replaceState(null, '', '#/rozmowy' + (f ? '?f=' + f : '')); c = await renderRozmowy(layout('rozmowy'), new URLSearchParams(f ? { f } : {})); }
