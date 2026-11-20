@@ -180,7 +180,8 @@ export function pelItems(d, p = {}) {
 
 // ============ wspólny wydruk: tło formularza + dane ============
 export function overlayHtml(pages, items, title, origin = location.origin) {
-  const page = (url, n) => `<div class="pg" style="background-image:url('${origin}${url}')">${items.filter(i => i.page === n).map(i => {
+  // tło jako <img> (nie background-image): generator PDF czeka na załadowanie obrazków – bez tego wzór bywał pusty
+  const page = (url, n) => `<div class="pg"><img class="bg" src="${origin}${url}" alt="">${items.filter(i => i.page === n).map(i => {
     if (i.line) return `<span class="ln" style="left:${i.x}pt;top:${i.y}pt;width:${i.line}pt"></span>`;
     const st = [`left:${i.x}pt`, `top:${i.y}pt`, `font-size:${i.size}pt`];
     if (i.w) st.push(`width:${i.w}pt`);
@@ -192,6 +193,7 @@ export function overlayHtml(pages, items, title, origin = location.origin) {
 <style>@page{size:A4;margin:0}html,body{margin:0;padding:0;background:#eee}
 .pg{position:relative;width:595.28pt;height:841.89pt;background-size:100% 100%;background-repeat:no-repeat;background-color:#fff;margin:0 auto 12pt;overflow:hidden;break-after:page;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .pg:last-child{break-after:auto}
+.bg{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
 .v{position:absolute;font-family:Arial,Helvetica,sans-serif;color:#0b2a6b;white-space:nowrap;line-height:1.15;overflow:hidden}
 .v.wrap{white-space:normal;line-height:1.25}.v.b{font-weight:700}
 .ln{position:absolute;border-top:.8pt solid #0b2a6b;height:0}
