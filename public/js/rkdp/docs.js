@@ -279,7 +279,8 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
   }
 
   // UPL-1: e-mail do klienta z wypełnionym formularzem (PDF w załączniku) i linkiem do instrukcji złożenia
-  const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => cl ? sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) : toast('Wybierz klienta', true) }, icon('mail'), 'Wyślij klientowi');
+  const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => !cl ? toast('Wybierz klienta', true)
+    : d.type === 'pel' ? sendUpl1(cl, v.pel, pelnomocnik(), fname('PEL', 'pdf'), 'pel') : sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) }, icon('mail'), 'Wyślij klientowi');
   // umowa: e-mail z linkiem do strony podpisu (podgląd, uwagi, profil zaufany / kwalifikowany / odręcznie); podpisany plik wraca do archiwum klienta
   const signBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (!cl) return toast('Wybierz klienta', true);
@@ -302,7 +303,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
         editable: { xml: documentXml, key: `rkdp:umowa:${cl.id}:${c.tpl}`, ids: { client_id: cl.id }, pdf: x => contractPdf(x, title), preview: x => rkdpContractPreview(docxToHtml(x)) } });
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
-  const syncSend = () => { sendBtn.hidden = d.type !== 'upl1'; signBtn.hidden = !['umowa', 'pel'].includes(d.type); };
+  const syncSend = () => { sendBtn.hidden = !['upl1', 'pel'].includes(d.type); signBtn.hidden = d.type !== 'umowa'; };
   const build0 = build; build = () => { build0(); syncSend(); }; syncSend();
   modal('Dokumenty klienta', box, (close) => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Zamknij'),
@@ -325,38 +326,60 @@ const UPL_TXT = {
   edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do urzędu skarbowego przez e-Doręczenia, a dowód nadania przesłać nam.',
   papier: 'Prosimy wydrukować formularz, podpisać go w części E i odesłać lub przekazać oryginał do naszego biura – złożymy go w urzędzie skarbowym. Można też złożyć go samodzielnie w urzędzie skarbowym.',
 };
-async function sendUpl1(cl, data, pelnomocnik, filename) {
+// ---------- ZUS PEL do klienta e-mailem – klient składa sam (eZUS, e-Doręczenia, osobiście / pocztą) ----------
+const PEL_WAYS = {
+  wszystkie: 'Wszystkie trzy sposoby – klient wybiera',
+  ezus: 'Online w eZUS (profil zaufany, bank, e-dowód)',
+  edoreczenia: 'Podpis zaufany na PDF + wysyłka do ZUS przez e-Doręczenia',
+  papier: 'Osobiście w ZUS lub pocztą – wydruk i podpis odręczny',
+};
+const PEL_TXT = {
+  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w eZUS (zus.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym i wysyłając go do ZUS przez e-Doręczenia,\n• osobiście w dowolnej placówce ZUS albo listem poleconym – po wydrukowaniu i podpisaniu (podpisany oryginał można też przekazać do naszego biura).',
+  ezus: 'Najszybciej złożyć je samodzielnie online w eZUS (zus.pl → eZUS → Katalog usług → „PEL”) – logowanie profilem zaufanym, e-dowodem albo przez bank. Dane do wpisania (m.in. dane pełnomocnika) są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam potwierdzenia UPO.',
+  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do Zakładu Ubezpieczeń Społecznych przez e-Doręczenia, a dowód nadania przesłać nam.',
+  papier: 'Prosimy wydrukować formularz, podpisać go i złożyć osobiście w dowolnej placówce ZUS albo wysłać listem poleconym (podpisany oryginał można też przekazać do naszego biura – złożymy go za Państwa).',
+};
+const MAIL_DOCS = {
+  upl1: { label: 'UPL-1', path: '/upl-1/', ways: UPL_WAYS, txt: UPL_TXT,
+    intro: 'w załączniku przesyłamy wypełnione pełnomocnictwo UPL-1. Dzięki niemu będziemy mogli podpisywać i wysyłać w Państwa imieniu deklaracje podatkowe i pliki JPK do urzędu skarbowego. Prosimy o sprawdzenie danych.',
+    outro: 'Złożenie UPL-1 jest bezpłatne – nie podlega opłacie skarbowej. W razie pytań jesteśmy do dyspozycji.' },
+  pel: { label: 'PEL', path: '/zus-pel/', ways: PEL_WAYS, txt: PEL_TXT,
+    intro: 'w załączniku przesyłamy wypełnione pełnomocnictwo ZUS PEL. Dzięki niemu będziemy mogli wysyłać w Państwa imieniu deklaracje i dokumenty do ZUS oraz załatwiać sprawy przez eZUS. Prosimy o sprawdzenie danych.',
+    outro: 'W razie pytań jesteśmy do dyspozycji.' },
+};
+async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
+  const D = MAIL_DOCS[kind];
   const s = { way: 'wszystkie', to: String(cl.email || '').split(/[;,\s]+/).find(x => x.includes('@')) || '' };
   const link = () => {
     const q = new URLSearchParams();
     if (s.way !== 'wszystkie') q.set('sposob', s.way);
-    if (data.office) q.set('us', data.office.replace(/^Naczelnik /, ''));
-    return `${location.origin}/upl-1/${q.toString() ? '?' + q : ''}`;
+    if (kind === 'upl1' && data.office) q.set('us', data.office.replace(/^Naczelnik /, ''));
+    return `${location.origin}${D.path}${q.toString() ? '?' + q : ''}`;
   };
-  const text = () => `Dzień dobry,\n\nw załączniku przesyłamy wypełnione pełnomocnictwo UPL-1. Dzięki niemu będziemy mogli podpisywać i wysyłać w Państwa imieniu deklaracje podatkowe i pliki JPK do urzędu skarbowego. Prosimy o sprawdzenie danych.\n\n${UPL_TXT[s.way]}\n\nInstrukcja krok po kroku: ${link()}\n\nZłożenie UPL-1 jest bezpłatne – nie podlega opłacie skarbowej. W razie pytań jesteśmy do dyspozycji.`;
-  s.subject = `Pełnomocnictwo UPL-1 – ${cl.name}`; s.body = text();
+  const text = () => `Dzień dobry,\n\n${D.intro}\n\n${D.txt[s.way]}\n\nInstrukcja krok po kroku: ${link()}\n\n${D.outro}`;
+  s.subject = `Pełnomocnictwo ${kind === 'pel' ? 'ZUS PEL' : 'UPL-1'} – ${cl.name}`; s.body = text();
   const body = h('div');
   const draw = () => body.replaceChildren(
     h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · w załączniku: ', h('b', {}, filename)),
-    grid([['way', 'Sposób złożenia (zmienia treść e-maila i instrukcji)', 'select', UPL_WAYS, true], ['to', 'Do (e-mail klienta)', 'email', null, true],
+    grid([['way', 'Sposób złożenia (zmienia treść e-maila i instrukcji)', 'select', D.ways, true], ['to', 'Do (e-mail klienta)', 'email', null, true],
       ['subject', 'Temat', 'text', null, true], ['body', 'Treść (pod spodem dopisze się Twoja stopka)', 'textarea']], s, k => { if (k === 'way') { s.body = text(); draw(); } }),
     h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Link do instrukcji: ', h('a', { href: link(), target: '_blank', rel: 'noopener' }, 'podgląd instrukcji'), ' · e-mail wyjdzie z kancelaria@rkdp.pl, a wiadomość zapisze się w historii klienta.'));
   draw();
   body.querySelector('textarea')?.setAttribute('rows', '12');
-  modal('Wyślij UPL-1 klientowi', body, close => [
+  modal(`Wyślij ${D.label} klientowi`, body, close => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: async e => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.to.trim())) return toast('Wpisz poprawny e-mail klienta', true);
       const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję PDF…';
       try {
         const { buildPdf } = await import('../pdfdoc.js');
-        const bytes = await buildPdf(overlayHtml(UPL1_PAGES, upl1Items(data, pelnomocnik), filename), filename);
+        const bytes = await buildPdf(kind === 'pel' ? overlayHtml(PEL_PAGES, pelItems(data, pelnomocnik), filename) : overlayHtml(UPL1_PAGES, upl1Items(data, pelnomocnik), filename), filename);
         let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
         b.textContent = 'Wysyłam…';
         const { data: r, error } = await sb.functions.invoke('mail', { body: { action: 'send_file', client_id: cl.id, to: s.to.trim(), subject: s.subject, body: s.body,
           attachment: { name: filename.replace(/_/g, ' '), type: 'application/pdf', base64: btoa(bin) } } });
         if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
-        toast(`Wysłano UPL-1 do ${s.to.trim()}`); close();
+        toast(`Wysłano ${D.label} do ${s.to.trim()}`); close();
       } catch (err) { fail(err, 'Nie udało się wysłać e-maila'); b.disabled = false; b.textContent = 'Wyślij e-mail'; }
     } }, icon('mail'), 'Wyślij e-mail'),
   ]);
