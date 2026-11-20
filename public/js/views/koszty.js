@@ -56,18 +56,48 @@ export async function renderKoszty(main) {
   };
 
   const body = h('div');
+  const openSet = new Set();
+  // edycja abonamentu klienta wprost z analizy – zapis od razu w karcie klienta
+  // (księgowość: Abonament; kadry: Obsługa pracownika – zł za osobę × liczba osób)
+  const feeInput = r => {
+    const kadry = r.role === 'kadry', field = kadry ? 'fee_employee' : 'monthly_fee';
+    const cur = r.c[field];
+    const inp = h('input', { class: 'input', inputmode: 'decimal', style: { maxWidth: '120px' }, value: cur ? String(cur).replace('.', ',') : '', placeholder: 'brak',
+      title: kadry ? 'Obsługa pracownika – zł netto za osobę' : 'Abonament – zł netto / mies.' });
+    inp.addEventListener('change', async () => {
+      const raw = inp.value.trim(), v = raw === '' ? null : num(raw);
+      if (raw !== '' && !(v >= 0)) { toast('Wpisz kwotę', true); return; }
+      inp.disabled = true;
+      const { error } = await sb.from('clients').update({ [field]: v }).eq('id', r.c.id);
+      inp.disabled = false;
+      if (error) return fail(error);
+      r.c[field] = v; toast('Zapisano w karcie klienta'); draw();
+    });
+    return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, inp,
+      h('span', { class: 'small muted' }, kadry ? `zł × ${num(r.c.employees_count) || 0} os.` : 'zł'));
+  };
   const draw = () => {
     const A = analyse();
     const T = A.reduce((t, a) => ({ rev: t.rev + a.rev, cost: t.cost + a.cost }), { rev: 0, cost: 0 });
     const settings = h('div', { class: 'card list-wrap' }, h('table', { class: 'list' },
-      h('thead', {}, h('tr', {}, ...['Osoba', 'Jak płacę', 'Wartość', 'Podstawa', 'Uwagi'].map(x => h('th', {}, x)))),
+      h('thead', {}, h('tr', {}, ...['Osoba', 'Wynagrodzenie (kwota / %)', 'Podstawa', 'Uwagi'].map(x => h('th', {}, x)))),
       h('tbody', {}, ...A.map(({ m, p }) => h('tr', {},
         h('td', { 'data-label': 'Osoba' }, h('b', {}, m.full_name)),
-        h('td', { 'data-label': 'Jak płacę' }, (() => { const s = h('select', { class: 'select', onchange: e => savePay(m.id, { mode: e.target.value }) },
-          h('option', { value: 'procent' }, '% przychodu z klientów'), h('option', { value: 'kwota' }, 'stała kwota / mies.')); s.value = p.mode; return s; })()),
-        h('td', { 'data-label': 'Wartość' }, h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-          h('input', { class: 'input', inputmode: 'decimal', style: { maxWidth: '120px' }, value: p.value ? String(p.value).replace('.', ',') : '', placeholder: '0',
-            onchange: e => savePay(m.id, { value: num(e.target.value) }) }), h('span', { class: 'muted' }, p.mode === 'procent' ? '%' : 'zł'))),
+        h('td', { 'data-label': 'Wynagrodzenie' }, (() => {
+          // jedna kwota + przełącznik jednostki: zł / mies. albo % przychodu z klientów
+          const unit = mode => h('button', { type: 'button', class: 'btn btn-sm ' + (p.mode === mode ? 'btn-primary' : 'btn-ghost'), style: { minWidth: '44px', padding: '0 10px' },
+            title: mode === 'kwota' ? 'Stała kwota miesięcznie' : 'Procent przychodu z klientów tej osoby',
+            onclick: () => { if (p.mode !== mode) savePay(m.id, { mode }); } }, mode === 'kwota' ? 'zł' : '%');
+          return h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+            h('input', { class: 'input', inputmode: 'decimal', style: { maxWidth: '130px' }, value: p.value ? String(p.value).replace('.', ',') : '', placeholder: '0',
+              onchange: e => {
+                const v = num(e.target.value);
+                // ponad 100% to na pewno kwota – przełącz sam
+                if (p.mode === 'procent' && v > 100) { toast('Ponad 100% – zapisuję jako kwotę w zł'); savePay(m.id, { value: v, mode: 'kwota' }); }
+                else savePay(m.id, { value: v });
+              } }),
+            h('div', { style: { display: 'inline-flex', border: '1px solid var(--line, #e3e5ea)', borderRadius: '8px', overflow: 'hidden' } }, unit('kwota'), unit('procent')));
+        })()),
         h('td', { 'data-label': 'Podstawa' }, (() => { const s = h('select', { class: 'select', onchange: e => savePay(m.id, { basis: e.target.value }) },
           ...Object.entries(BASIS).map(([k, l]) => h('option', { value: k }, l))); s.value = p.basis; return s; })()),
         h('td', { 'data-label': 'Uwagi' }, h('input', { class: 'input', value: p.note || '', maxlength: 500, placeholder: 'np. umowa B2B, z ZUS pracodawcy', onchange: e => savePay(m.id, { note: e.target.value }) })))))));
@@ -82,12 +112,14 @@ export async function renderKoszty(main) {
         h('td', { 'data-label': 'Koszt / przychód' }, pct(a.share)),
         h('td', { 'data-label': 'Na klienta' }, zl(a.perClient)))),
         h('tr', { style: { fontWeight: 700 } }, h('td', {}, 'Razem'), h('td', {}, ''), h('td', {}, zl(T.rev)), h('td', {}, zl(T.cost)), h('td', {}, zl(T.rev - T.cost)), h('td', {}, pct(T.rev ? T.cost / T.rev * 100 : NaN)), h('td', {}, '')))));
-    const details = A.filter(a => a.rows.length).map(a => h('details', { class: 'card', style: { padding: '12px 16px', marginTop: '10px' } },
+    const details = A.filter(a => a.rows.length).map(a => h('details', { class: 'card', style: { padding: '12px 16px', marginTop: '10px' }, open: openSet.has(a.m.id) || null,
+        ontoggle: e => { e.currentTarget.open ? openSet.add(a.m.id) : openSet.delete(a.m.id); } },
       h('summary', { style: { cursor: 'pointer', fontWeight: 600 } }, `${a.m.full_name} – ${a.nClients} klientów · koszt ${zl(a.cost)} · marża ${zl(a.margin)}`),
       h('table', { class: 'list', style: { marginTop: '8px' } },
-        h('thead', {}, h('tr', {}, ...['Klient', 'Rola', 'Przychód', 'Koszt', 'Marża'].map(x => h('th', {}, x)))),
-        h('tbody', {}, ...a.rows.sort((x, y) => y.rev - x.rev).map(r => h('tr', {},
-          h('td', {}, h('a', { href: `#/klient/${r.c.id}` }, r.c.name)), h('td', {}, r.role), h('td', {}, r.rev ? zl(r.rev) : h('span', { class: 'muted' }, 'brak abonamentu')),
+        h('thead', {}, h('tr', {}, ...['Klient', 'Rola', 'Przychód / mies. (netto)', 'Koszt', 'Marża'].map(x => h('th', {}, x)))),
+        h('tbody', {}, ...a.rows.sort((x, y) => y.rev - x.rev || x.c.name.localeCompare(y.c.name, 'pl')).map(r => h('tr', {},
+          h('td', {}, h('a', { href: `#/klient/${r.c.id}` }, r.c.name)), h('td', {}, r.role),
+          h('td', {}, feeInput(r)),
           h('td', {}, zl(r.cost)), h('td', { style: { color: r.margin < 0 ? '#A4462F' : '' } }, zl(r.margin))))))));
     body.replaceChildren(
       h('div', { class: 'tiles' },

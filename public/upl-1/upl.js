@@ -7,7 +7,7 @@
     const sec = document.getElementById(way);
     if (sec) {
       sec.classList.add('on');
-      sec.parentNode.insertBefore(sec, document.getElementById('ezus'));   // polecony sposób na początku
+      const first = document.querySelector('section.way'); if (first && first !== sec) first.parentNode.insertBefore(sec, first);   // polecony sposób na początku
     }
   }
   const us = (q.get('us') || '').slice(0, 120);

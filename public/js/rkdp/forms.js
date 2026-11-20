@@ -295,3 +295,37 @@ export async function overlayPdfBytes(pages, items) {
   }
   return doc.save();
 }
+
+// ============ Wniosek o przyznanie / odebranie dostępu do konta organizacji w e-Urzędzie Skarbowym (UKO) ============
+export const UKO_PAGES = ['/rkdp/uko-1.png'];
+export function ukoDefaults({ client = {}, reps = '' } = {}) {
+  const a = parseAddress(client.address);
+  const repsText = reps || client.contact_person || '';
+  const first = parseReps(repsText)[0] || { first: '', last: '' };
+  return {
+    office: '', purpose: 'przyznanie', access: 'rozszerzony',
+    client_nip: digits(client.nip), client_name: client.name || '',
+    c_street: a.street, c_house: a.house, c_flat: a.flat, c_zip: a.zip, c_city: a.city, client_phone: client.phone || '',
+    u_pesel: '', u_last: first.last || '', u_first: first.first || '', reps: repsText,
+  };
+}
+export function ukoItems(d) {
+  const it = [];
+  const at = (x, y, text, o = {}) => { if (text) it.push({ page: 1, x, y, text: o.keep ? String(text) : up(text), size: o.size || 9.5, w: o.w || 480 }); };
+  const check = (bx, by) => it.push({ page: 1, x: bx + 1.3, y: by + 2.6, text: 'X', size: 9, bold: true });
+  at(48, 145, d.office, { w: 500 });
+  if (d.purpose === 'przyznanie') check(95.1, 191.1); else if (d.purpose === 'odebranie') check(325.8, 191.1);
+  if (d.client_nip) it.push(...glyphComb(1, 44.4, 261.0, 252.2, NIP_COMB, digits(d.client_nip)));
+  at(48, 291, d.client_name, { w: 510, size: (d.client_name || '').length > 75 ? 8 : 9.5 });
+  at(48, 320, d.c_street, { w: 270 }); at(330, 320, d.c_house, { w: 115 }); at(454, 320, d.c_flat, { w: 100 });
+  at(48, 355, d.c_zip, { w: 100 }); at(159, 355, d.c_city, { w: 200 }); at(370, 355, d.client_phone, { keep: true, w: 180 });
+  if (d.purpose === 'przyznanie') { if (d.access === 'podstawowy') check(45.4, 398.2); else if (d.access === 'rozszerzony') check(45.4, 415.3); }
+  if (d.u_pesel) it.push(...glyphComb(1, 44.4, 282.3, 466.2, '└' + '────┴'.repeat(10) + '────┘', digits(d.u_pesel)));
+  at(48, 506, d.u_last, { w: 240 }); at(302, 506, d.u_first, { w: 250 });
+  const rows = [572, 636, 701];
+  parseReps(d.reps).slice(0, 3).forEach((r, i) => {
+    at(72, rows[i], r.last, { w: 280 }); at(370, rows[i], r.first, { w: 190 });
+    at(72, rows[i] + 32, r.role, { w: 280 });
+  });
+  return it;
+}

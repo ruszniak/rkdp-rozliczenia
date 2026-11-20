@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.6', '20 listopada 2026', [
+    'Wniosek o dostęp do konta organizacji w e-Urzędzie Skarbowym (UKO) z karty klienta: PDF na danych klienta i wysyłka z instrukcją /e-us-dostep/.',
     'Koszt księgowych (tylko administrator): wynagrodzenie jako % przychodu z klientów albo stała kwota – przychód, koszt, marża na osobę i na klienta, eksport do Excela i PDF.',
     'Klienci: nowy filtr po księgowej i kadrowej (także „bez księgowej”) oraz „⬇ Eksport” – wyfiltrowana lista do Excela, PDF lub CSV.',
     'ZAW-FA z aplikacji: Karta klienta → Umowy i pełnomocnictwa → ZAW-FA – formularz na danych klienta (osoba uprawniona = osoba po stronie klienta), PDF i wysyłka e-mailem z instrukcją złożenia.',

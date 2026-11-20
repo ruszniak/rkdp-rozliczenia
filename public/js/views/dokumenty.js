@@ -46,6 +46,7 @@ export async function renderDokumenty(main) {
       tile('UPL-1', 'Pełnomocnictwo do podpisywania deklaracji składanych elektronicznie (urząd skarbowy).', doc('upl1'), ['PDF']),
       tile('PEL', 'Pełnomocnictwo do ZUS (PUE ZUS / e-ZUS).', doc('pel'), ['PDF']),
       tile('PPS-1', 'Pełnomocnictwo szczególne w sprawie podatkowej.', doc('pps1'), ['PDF']),
+      tile('Konto organizacji e-US', 'Wniosek o przyznanie / odebranie dostępu do konta organizacji w e-Urzędzie Skarbowym – na danych klienta.', doc('uko'), ['PDF']),
       tile('ZAW-FA', 'Uprawnienia KSeF dla osoby po stronie klienta (spółka bez pieczęci) – PDF i wysyłka z instrukcją.', doc('zawfa'), ['PDF']),
       tile('Pełnomocnictwo procesowe', 'Do WSA i NSA – na papierze firmowym RKDP.', doc('procesowe'), ['PDF', 'Word'])),
     group('Spółki',
