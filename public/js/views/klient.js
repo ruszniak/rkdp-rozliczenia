@@ -31,6 +31,7 @@ const SECTIONS = [
     ['legal_form', 'Forma prawna', 'select', LEGAL_FORM, always],
     ['service_scope', 'Zakres usług', 'select', SERVICE_SCOPE, always],
     ['bookkeeping', 'Rodzaj księgowości', 'select', BOOKKEEPING, c => c.service_scope !== 'doradztwo'],
+    ['first_period', 'Pierwszy miesiąc obrachunkowy', 'month', null, always],
     ['nip', 'NIP', 'text', null, always],
     ['regon', 'REGON', 'text', null, always],
     ['krs', 'KRS', 'text', null, c => isCompany(c.legal_form) || isPartnership(c.legal_form) || c.legal_form === 'fundacja_stowarzyszenie'],
@@ -88,6 +89,7 @@ function inputFor(type, options, value, disabled) {
     s.value = value === null || value === undefined ? '' : String(value);
     return s;
   }
+  if (type === 'month') return h('input', { class: 'input', type: 'month', value: value ? String(value).slice(0, 7) : '', disabled });
   return h('input', { class: 'input', type: type === 'number' ? 'number' : type, step: type === 'number' ? 'any' : null,
     value: value ?? '', disabled });
 }
@@ -96,6 +98,7 @@ function readInput(type, el) {
   if (v === '') return null;
   if (type === 'bool') return v === 'true';
   if (type === 'number') return Number(v.replace(',', '.'));
+  if (type === 'month') return /^\d{4}-\d{2}$/.test(v) ? v + '-01' : null;
   return v;
 }
 
@@ -107,6 +110,7 @@ function describeValue(field, v) {
     legal_form: LEGAL_FORM, bookkeeping: BOOKKEEPING, pit_form: PIT_FORM, pit_advances: ADVANCES, cit_advances: CIT_ADVANCES,
     zus_type: ZUS_TYPE, cit_type: CIT_TYPE, vat_status: VAT_STATUS, service_scope: SERVICE_SCOPE };
   if (field === 'assignee_id') return memberById(v)?.short_name || '?';
+  if (field === 'first_period' && /^\d{4}-\d{2}/.test(String(v))) return new Date(String(v).slice(0, 7) + '-15').toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
   return dicts[field]?.[v] || String(v);
 }
 
@@ -164,7 +168,7 @@ export async function renderKlient(main, id) {
         hint ? h('p', { class: 'hint', style: { marginBottom: visible.length ? '14px' : 0 } }, hint) : null,
         visible.length ? h('div', { class: 'form-grid' }, visible.map(([key, label, type, options, , wide]) => {
           const el = inputFor(type, options, draft[key], !editable);
-          el.addEventListener(type === 'select' || type === 'bool' ? 'change' : 'input', () => {
+          el.addEventListener(type === 'select' || type === 'bool' || type === 'month' ? 'change' : 'input', () => {
             draft[key] = readInput(type, el); markDirty(); afterEdit?.();
             if (['legal_form', 'pit_form', 'cit_type', 'zus_type', 'has_employees', 'vat_status', 'contract_signed', 'service_scope'].includes(key)) {
               renderSections(); renderPartners();

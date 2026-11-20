@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.6', '20 listopada 2026', [
+    'Karta klienta: nowe pole „Pierwszy miesiąc obrachunkowy” – klient pojawia się w Rozliczeniach (i na liście „klientów bez listy”) dopiero od tego miesiąca.',
     'Nowa instrukcja dla klienta „Na start: KSeF w SaldeoSMART” – własny certyfikat KSeF w Saldeo (bez uprawnień dla biura), faktury sprzed podłączenia, zatwierdzanie i wystawianie faktur, dane księgowej i kadrowej klienta.',
     'Instrukcje dla klientów wysyłasz teraz z aplikacji (kancelaria@rkdp.pl, Twoja stopka, zapis w historii klienta) – wybierz klienta, a dane uzupełnią się same.',
     'ZUS PEL klient składa sam – jak UPL-1: Karta klienta → Umowy i pełnomocnictwa → PEL → „Wyślij klientowi” (e-mail z PDF i instrukcją: eZUS, podpis zaufany + e-Doręczenia albo osobiście / pocztą). Instrukcja także w Dokumenty i narzędzia → Instrukcje dla klientów.',
