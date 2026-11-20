@@ -123,7 +123,9 @@ export async function renderKoszty(main) {
         h('tbody', {}, ...a.rows.sort((x, y) => y.rev - x.rev || x.c.name.localeCompare(y.c.name, 'pl')).map(r => h('tr', {},
           h('td', {}, h('a', { href: `#/klient/${r.c.id}` }, r.c.name)), h('td', {}, r.role),
           h('td', {}, feeInput(r)),
-          h('td', {}, zl(r.cost)), h('td', { style: { color: r.margin < 0 ? '#A4462F' : '' } }, zl(r.margin))))))));
+          h('td', {}, zl(r.cost)), h('td', { style: { color: r.margin < 0 ? '#A4462F' : '' } }, zl(r.margin)))),
+          h('tr', { style: { fontWeight: 700 } }, h('td', {}, `Razem – ${a.nClients} klientów`), h('td', {}, a.p.mode === 'procent' ? `${String(a.p.value || 0).replace('.', ',')}%` : 'stała kwota'),
+            h('td', {}, zl(a.rev)), h('td', {}, zl(a.cost)), h('td', { style: { color: a.margin < 0 ? '#A4462F' : '' } }, zl(a.margin)))))));
     body.replaceChildren(
       h('div', { class: 'tiles' },
         ...[[zl(T.rev), 'Przychód z abonamentów / mies.'], [zl(T.cost), 'Koszt księgowych / mies.'], [zl(T.rev - T.cost), 'Marża / mies.'], [pct(T.rev ? T.cost / T.rev * 100 : NaN), 'Koszt / przychód']]
@@ -148,7 +150,8 @@ export async function renderKoszty(main) {
           { v: r2(a.rev), s: 'money' }, { v: r2(a.cost), s: 'money' }, { v: r2(a.margin), s: 'money' }, isFinite(a.share) ? r2(a.share) : '', { v: r2(a.perClient), s: 'money' }])] },
       { name: 'Klienci', widths: [26, 40, 12, 14, 14, 14], freeze: { row: 1, col: 2 }, rows: [
         H(['Osoba', 'Klient', 'Rola', 'Przychód/mies.', 'Koszt/mies.', 'Marża']),
-        ...A.flatMap(a => a.rows.map(r => [a.m.full_name, r.c.name, r.role, { v: r2(r.rev), s: 'money' }, { v: r2(r.cost), s: 'money' }, { v: r2(r.margin), s: 'money' }]))] },
+        ...A.flatMap(a => [...a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => [a.m.full_name, r.c.name, r.role, { v: r2(r.rev), s: 'money' }, { v: r2(r.cost), s: 'money' }, { v: r2(r.margin), s: 'money' }]),
+          ...(a.rows.length ? [[{ v: a.m.full_name, s: 'header' }, { v: `Razem – ${a.nClients} klientów`, s: 'header' }, { v: '', s: 'header' }, { v: r2(a.rev), s: 'header' }, { v: r2(a.cost), s: 'header' }, { v: r2(a.margin), s: 'header' }]] : [])])] },
     ]);
   };
   const exportPdf = async (btn, only) => {
@@ -157,13 +160,15 @@ export async function renderKoszty(main) {
     const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Koszt ${esc(who || 'księgowych')}</title><style>
       @page{size:A4;margin:14mm}body{font:9pt/1.4 Arial,Helvetica,sans-serif;color:#1d1a16;margin:0}h1{font-size:15pt;margin:0 0 2px}h2{font-size:11pt;margin:16px 0 6px}
       p.m{color:#676b73;margin:0 0 12px}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:8pt;color:#5e564c;border-bottom:1.2pt solid #7A5A37;padding:4px}
-      td{border-bottom:.5pt solid #e3d9ca;padding:4px;vertical-align:top}tr{break-inside:avoid}tr.t td{font-weight:700}</style></head><body>
+      td{border-bottom:.5pt solid #e3d9ca;padding:4px;vertical-align:top}td:nth-child(n+3){white-space:nowrap;text-align:right}th:nth-child(n+3){text-align:right}tr{break-inside:avoid}tr.t td{font-weight:700}</style></head><body>
       <h1>${who ? 'Koszt – ' + esc(who) : 'Koszt księgowych'}</h1><p class="m">RKDP · abonamenty aktywnych klientów · stan na ${new Date().toLocaleDateString('pl-PL')} · dokument wewnętrzny</p>
       <table><thead><tr><th>Osoba</th><th>Jak płacę</th><th>Klientów</th><th>Przychód / mies.</th><th>Koszt / mies.</th><th>Marża</th><th>Koszt / przychód</th></tr></thead><tbody>
       ${A.map(a => tr([a.m.full_name, a.p.mode === 'procent' ? `${String(a.p.value || 0).replace('.', ',')}% (${BASIS[a.p.basis]})` : `${zl(a.p.value)} (${BASIS[a.p.basis]})`, a.nClients, zl(a.rev), zl(a.cost), zl(a.margin), pct(a.share)])).join('')}
       ${only ? '' : `<tr class="t"><td>Razem</td><td></td><td></td><td>${zl(T.rev)}</td><td>${zl(T.cost)}</td><td>${zl(T.rev - T.cost)}</td><td>${pct(T.rev ? T.cost / T.rev * 100 : NaN)}</td></tr>`}</tbody></table>
       ${A.filter(a => a.rows.length).map(a => `<h2>${esc(a.m.full_name)}</h2><table><thead><tr><th>Klient</th><th>Rola</th><th>Przychód</th><th>Koszt</th><th>Marża</th></tr></thead><tbody>
-        ${a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => tr([r.c.name, r.role, r.rev ? zl(r.rev) : 'brak abonamentu', zl(r.cost), zl(r.margin)])).join('')}</tbody></table>`).join('')}
+        ${a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => tr([r.c.name, r.role, r.rev ? zl(r.rev) : 'brak abonamentu', zl(r.cost), zl(r.margin)])).join('')}
+        <tr class="t"><td>Razem – ${a.nClients} klientów</td><td>${esc(a.p.mode === 'procent' ? String(a.p.value || 0).replace('.', ',') + '%' : 'stała kwota')}</td><td>${zl(a.rev)}</td><td>${zl(a.cost)}</td><td>${zl(a.margin)}</td></tr>
+        <tr><td colspan="5" style="color:#676b73;border:0;padding-top:6px">Koszt / przychód: <b>${pct(a.share)}</b> · koszt na klienta: <b>${zl(a.perClient)}</b></td></tr></tbody></table>`).join('')}
       </body></html>`;
     btn.disabled = true;
     try { const { downloadPdf } = await import('../pdfdoc.js'); await downloadPdf(html, `Koszt_${who ? slug(who) : 'ksiegowych'}_${new Date().toLocaleDateString('sv-SE')}`); }
