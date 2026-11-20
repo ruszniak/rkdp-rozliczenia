@@ -5,20 +5,26 @@ import { sb, state, memberById } from '../store.js';
 // adres w domenie biura: imię.nazwisko@rkdp.pl (bez polskich znaków) – do poprawienia w oknie
 const alias = m => m?.full_name ? m.full_name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').split(/\s+/).slice(0, 2).join('.') + '@rkdp.pl' : '';
 const OFFICE_TEL = '883 643 565';
+// dane księgowej i kadrowej do treści e-maila
+const kontakt = f => {
+  const line = (rola, n, e, t) => n ? `${rola}: ${n}${e ? `, ${e}` : ''}${t ? `, tel. ${t}` : ''}` : '';
+  const ls = [line('Państwa księgowa / księgowy', f.k, f.ke, f.kt), line('Kadry i płace', f.h, f.he, f.ht)].filter(Boolean);
+  return ls.length ? `\n\nKto się Państwem zajmuje:\n${ls.join('\n')}` : '';
+};
 
 export const INSTRUKCJE = [
-  { key: 'po-rejestracji', title: 'Po rejestracji spółki w KRS', path: '/po-rejestracji/', personal: true,
+  { key: 'po-rejestracji', title: 'Po rejestracji spółki w KRS', path: '/po-rejestracji/',
     desc: 'CRBR, rachunek bankowy spółki (NIP-8, kapitał) i PCC-3 – kroki z terminami.',
     subject: 'Spółka zarejestrowana w KRS – kolejne kroki',
     body: (link) => `Szanowni Państwo,\n\ngratuluję rejestracji spółki w KRS. W związku z tym proszę o realizację kilku niezbędnych kroków organizacyjnych:\n\n1. Zgłoszenie spółki do Centralnego Rejestru Beneficjentów Rzeczywistych (CRBR) – w ciągu 14 dni od wpisu do KRS. Bez zgłoszenia w CRBR nie będzie możliwe otwarcie rachunku bankowego spółki.\n2. Założenie rachunku bankowego spółki – po założeniu proszę o przesłanie skanu potwierdzenia otwarcia rachunku na mój adres e-mail.\n3. PCC-3 – złożenie deklaracji i zapłata podatku (spółki założone przez S24) – w ciągu 14 dni od zawarcia umowy spółki.\n\nInstrukcja krok po kroku: ${link}\n\nW razie problemów proszę o kontakt – pomogę krok po kroku.` },
   { key: 'saldeo-ksef', title: 'Na start: KSeF w SaldeoSMART', path: '/saldeo-ksef/',
     desc: 'Po nawiązaniu współpracy: własny certyfikat KSeF w Saldeo (bez uprawnień dla biura), pobranie wcześniejszych faktur, zatwierdzanie i wystawianie faktur; kto jest księgową i kadrową klienta.',
-    fields: [['firma', 'Nazwa klienta (na górze strony)', {}, true], ['k', 'Księgowa / księgowy'], ['ke', 'E-mail księgowej', { type: 'email' }], ['kt', 'Telefon księgowej', { type: 'tel' }],
+    fields: [['k', 'Księgowa / księgowy'], ['ke', 'E-mail księgowej', { type: 'email' }], ['kt', 'Telefon księgowej', { type: 'tel' }],
       ['h', 'Kadry i płace (puste – bez kadr)'], ['he', 'E-mail kadrowej', { type: 'email' }], ['ht', 'Telefon kadrowej', { type: 'tel' }]],
     prefill: c => { const a = memberById(c.accountant_id), r = memberById(c.hr_id);
-      return { firma: c.name || '', k: a?.full_name || '', ke: alias(a), kt: a ? OFFICE_TEL : '', h: r?.full_name || '', he: alias(r), ht: r ? OFFICE_TEL : '' }; },
+      return { k: a?.full_name || '', ke: alias(a), kt: a ? OFFICE_TEL : '', h: r?.full_name || '', he: alias(r), ht: r ? OFFICE_TEL : '' }; },
     subject: 'Na start: KSeF w SaldeoSMART',
-    body: (link) => `Dzień dobry,\n\ndziękujemy za rozpoczęcie współpracy. Faktury z KSeF będziemy otrzymywać przez SaldeoSMART. Prosimy o połączenie Saldeo z KSeF własnym certyfikatem KSeF firmy – nie trzeba nadawać w KSeF uprawnień dla naszego biura.\n\nW instrukcji opisaliśmy krok po kroku:\n1. wygenerowanie certyfikatów KSeF,\n2. dodanie ich w SaldeoSMART,\n3. pobranie faktur, które trafiły do KSeF przed podłączeniem certyfikatu,\n4. zatwierdzanie faktur kosztowych,\n5. wystawianie faktur sprzedaży do KSeF.\nZnajdą tam Państwo także dane kontaktowe swojej księgowej i osoby od kadr.\n\nInstrukcja: ${link}\n\nW razie pytań jesteśmy do dyspozycji.` },
+    body: (link, f) => `Dzień dobry,\n\ndziękujemy za rozpoczęcie współpracy. Faktury z KSeF będziemy otrzymywać przez SaldeoSMART. Prosimy o połączenie Saldeo z KSeF własnym certyfikatem KSeF firmy – nie trzeba nadawać w KSeF uprawnień dla naszego biura.\n\nW instrukcji opisaliśmy krok po kroku:\n1. wygenerowanie certyfikatów KSeF,\n2. dodanie ich w SaldeoSMART,\n3. pobranie faktur, które trafiły do KSeF przed podłączeniem certyfikatu,\n4. zatwierdzanie faktur kosztowych,\n5. wystawianie faktur sprzedaży do KSeF.\n\nInstrukcja: ${link}${kontakt(f)}\n\nW razie pytań jesteśmy do dyspozycji.` },
   { key: 'upl-1', title: 'Jak złożyć UPL-1', path: '/upl-1/',
     desc: 'Trzy sposoby złożenia pełnomocnictwa UPL-1: e-Urząd Skarbowy, podpis zaufany + e-Doręczenia, papier.',
     subject: 'Pełnomocnictwo UPL-1 – instrukcja',
@@ -48,13 +54,11 @@ export function instrukcjaDialog(item) {
   fields.forEach(([k]) => { f[k] ??= ''; });
   let client = null, bodyEdited = false;
   const link = () => {
-    const q = new URLSearchParams();
-    for (const [k] of fields) if (String(f[k] || '').trim()) q.set(k, String(f[k]).trim());
-    return `${location.origin}${item.path}${q.toString() ? '?' + q : ''}`;
+    return `${location.origin}${item.path}`;   // zwykły link do instrukcji – dane osób są w treści e-maila
   };
   const out = h('input', { class: 'input', readonly: true, onfocus: e => e.target.select() });
   const bodyTa = h('textarea', { class: 'input', rows: 10, maxlength: 7000, oninput: e => { f.body = e.target.value; bodyEdited = true; } });
-  const upd = () => { out.value = link(); if (!bodyEdited) { f.body = item.body(link()); bodyTa.value = f.body; } };
+  const upd = () => { out.value = link(); if (!bodyEdited) { f.body = item.body(link(), f); bodyTa.value = f.body; } };
   const field = (label, k, attrs = {}) => h('label', { class: 'field' }, h('span', {}, label),
     h('input', { class: 'input', value: f[k], maxlength: 120, ...attrs, oninput: e => { f[k] = e.target.value; upd(); } }));
   const copy = async () => { try { await navigator.clipboard.writeText(link()); toast('Link skopiowany'); } catch { out.select(); toast('Zaznaczono link – skopiuj Ctrl+C'); } };
