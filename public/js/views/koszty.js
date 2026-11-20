@@ -115,6 +115,9 @@ export async function renderKoszty(main) {
     const details = A.filter(a => a.rows.length).map(a => h('details', { class: 'card', style: { padding: '12px 16px', marginTop: '10px' }, open: openSet.has(a.m.id) || null,
         ontoggle: e => { e.currentTarget.open ? openSet.add(a.m.id) : openSet.delete(a.m.id); } },
       h('summary', { style: { cursor: 'pointer', fontWeight: 600 } }, `${a.m.full_name} – ${a.nClients} klientów · koszt ${zl(a.cost)} · marża ${zl(a.margin)}`),
+      h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end', margin: '8px 0 0' } },
+        h('button', { class: 'btn btn-outline btn-sm', onclick: e => exportPdf(e.currentTarget, a.m.id) }, `PDF – ${a.m.full_name.split(' ')[0]}`),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => exportXlsx(a.m.id).catch(fail) }, `Excel – ${a.m.full_name.split(' ')[0]}`)),
       h('table', { class: 'list', style: { marginTop: '8px' } },
         h('thead', {}, h('tr', {}, ...['Klient', 'Rola', 'Przychód / mies. (netto)', 'Koszt', 'Marża'].map(x => h('th', {}, x)))),
         h('tbody', {}, ...a.rows.sort((x, y) => y.rev - x.rev || x.c.name.localeCompare(y.c.name, 'pl')).map(r => h('tr', {},
@@ -130,12 +133,15 @@ export async function renderKoszty(main) {
       h('h2', { style: { margin: '22px 0 4px', fontSize: '17px' } }, 'Na klienta'), ...details);
   };
 
-  const exportXlsx = async () => {
-    const A = analyse();
+  const slug = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  // only = id osoby → eksport tylko jej (jej klienci)
+  const exportXlsx = async (only) => {
+    const A = analyse().filter(a => !only || a.m.id === only);
+    const who = only ? A[0]?.m.full_name : '';
     const { downloadXlsx } = await import('../xlsx.js');
     const H = a => a.map(v => ({ v, s: 'header' }));
     const r2 = n => Math.round((n || 0) * 100) / 100;
-    downloadXlsx(`Koszt_ksiegowych_${new Date().toLocaleDateString('sv-SE')}.xlsx`, [
+    downloadXlsx(`Koszt_${who ? slug(who) : 'ksiegowych'}_${new Date().toLocaleDateString('sv-SE')}.xlsx`, [
       { name: 'Osoby', widths: [26, 16, 10, 20, 10, 16, 16, 16, 14, 16], freeze: { row: 1, col: 1 }, rows: [
         H(['Osoba', 'Jak płacę', 'Wartość', 'Podstawa', 'Klientów', 'Przychód/mies.', 'Koszt/mies.', 'Marża', 'Koszt/przychód %', 'Koszt na klienta']),
         ...A.map(a => [a.m.full_name, a.p.mode === 'procent' ? '% przychodu' : 'stała kwota', num(a.p.value), BASIS[a.p.basis], a.nClients,
@@ -145,22 +151,22 @@ export async function renderKoszty(main) {
         ...A.flatMap(a => a.rows.map(r => [a.m.full_name, r.c.name, r.role, { v: r2(r.rev), s: 'money' }, { v: r2(r.cost), s: 'money' }, { v: r2(r.margin), s: 'money' }]))] },
     ]);
   };
-  const exportPdf = async (btn) => {
-    const A = analyse(), T = A.reduce((t, a) => ({ rev: t.rev + a.rev, cost: t.cost + a.cost }), { rev: 0, cost: 0 });
+  const exportPdf = async (btn, only) => {
+    const A = analyse().filter(a => !only || a.m.id === only), who = only ? A[0]?.m.full_name : '', T = A.reduce((t, a) => ({ rev: t.rev + a.rev, cost: t.cost + a.cost }), { rev: 0, cost: 0 });
     const tr = cells => `<tr>${cells.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`;
-    const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Koszt księgowych</title><style>
+    const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Koszt ${esc(who || 'księgowych')}</title><style>
       @page{size:A4;margin:14mm}body{font:9pt/1.4 Arial,Helvetica,sans-serif;color:#1d1a16;margin:0}h1{font-size:15pt;margin:0 0 2px}h2{font-size:11pt;margin:16px 0 6px}
       p.m{color:#676b73;margin:0 0 12px}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:8pt;color:#5e564c;border-bottom:1.2pt solid #7A5A37;padding:4px}
       td{border-bottom:.5pt solid #e3d9ca;padding:4px;vertical-align:top}tr{break-inside:avoid}tr.t td{font-weight:700}</style></head><body>
-      <h1>Koszt księgowych</h1><p class="m">RKDP · abonamenty aktywnych klientów · stan na ${new Date().toLocaleDateString('pl-PL')} · dokument wewnętrzny</p>
+      <h1>${who ? 'Koszt – ' + esc(who) : 'Koszt księgowych'}</h1><p class="m">RKDP · abonamenty aktywnych klientów · stan na ${new Date().toLocaleDateString('pl-PL')} · dokument wewnętrzny</p>
       <table><thead><tr><th>Osoba</th><th>Jak płacę</th><th>Klientów</th><th>Przychód / mies.</th><th>Koszt / mies.</th><th>Marża</th><th>Koszt / przychód</th></tr></thead><tbody>
       ${A.map(a => tr([a.m.full_name, a.p.mode === 'procent' ? `${String(a.p.value || 0).replace('.', ',')}% (${BASIS[a.p.basis]})` : `${zl(a.p.value)} (${BASIS[a.p.basis]})`, a.nClients, zl(a.rev), zl(a.cost), zl(a.margin), pct(a.share)])).join('')}
-      <tr class="t"><td>Razem</td><td></td><td></td><td>${zl(T.rev)}</td><td>${zl(T.cost)}</td><td>${zl(T.rev - T.cost)}</td><td>${pct(T.rev ? T.cost / T.rev * 100 : NaN)}</td></tr></tbody></table>
+      ${only ? '' : `<tr class="t"><td>Razem</td><td></td><td></td><td>${zl(T.rev)}</td><td>${zl(T.cost)}</td><td>${zl(T.rev - T.cost)}</td><td>${pct(T.rev ? T.cost / T.rev * 100 : NaN)}</td></tr>`}</tbody></table>
       ${A.filter(a => a.rows.length).map(a => `<h2>${esc(a.m.full_name)}</h2><table><thead><tr><th>Klient</th><th>Rola</th><th>Przychód</th><th>Koszt</th><th>Marża</th></tr></thead><tbody>
         ${a.rows.slice().sort((x, y) => y.rev - x.rev).map(r => tr([r.c.name, r.role, r.rev ? zl(r.rev) : 'brak abonamentu', zl(r.cost), zl(r.margin)])).join('')}</tbody></table>`).join('')}
       </body></html>`;
     btn.disabled = true;
-    try { const { downloadPdf } = await import('../pdfdoc.js'); await downloadPdf(html, `Koszt_ksiegowych_${new Date().toLocaleDateString('sv-SE')}`); }
+    try { const { downloadPdf } = await import('../pdfdoc.js'); await downloadPdf(html, `Koszt_${who ? slug(who) : 'ksiegowych'}_${new Date().toLocaleDateString('sv-SE')}`); }
     catch (e) { fail(e, 'Nie udało się przygotować PDF'); }
     btn.disabled = false;
   };
@@ -171,8 +177,8 @@ export async function renderKoszty(main) {
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Koszt księgowych', infoTip(HELP, 'Koszt księgowych – instrukcja')),
         h('p', { class: 'sub' }, 'Ile kosztuje Cię każda osoba w stosunku do przychodu z jej klientów.')),
       h('div', { class: 'ob-actions' },
-        h('button', { class: 'btn btn-outline btn-sm', onclick: e => exportPdf(e.currentTarget) }, 'PDF'),
-        h('button', { class: 'btn btn-primary btn-sm', onclick: () => exportXlsx().catch(fail) }, 'Excel'))),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: e => exportPdf(e.currentTarget) }, 'PDF – wszyscy'),
+        h('button', { class: 'btn btn-primary btn-sm', onclick: () => exportXlsx().catch(fail) }, 'Excel – wszyscy'))),
     body);
   draw();
 }
