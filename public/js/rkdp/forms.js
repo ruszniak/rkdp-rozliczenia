@@ -1,4 +1,4 @@
-// Formularze urzędowe RKDP wypełniane na oryginalnych wzorach: UPL-1 (US) i PEL (ZUS).
+// Formularze urzędowe RKDP wypełniane na oryginalnych wzorach: UPL-1 (US), PEL (ZUS) i ZAW-FA (KSeF).
 // Współrzędne w punktach PDF (A4, początek w lewym górnym rogu).
 import { printHtml } from '../ui.js';
 import { parseAddress, splitName, parseReps, isFirstName as isFirst } from '../m2/pps1.js';
@@ -204,3 +204,49 @@ export function printOverlay(pages, items, title) {
 
 export const UPL1_PAGES = ['/rkdp/upl1-1.png', '/rkdp/upl1-2.png'];
 export const PEL_PAGES = ['/rkdp/pel-1.png', '/rkdp/pel-2.png', '/rkdp/pel-3.png'];
+
+// ============ ZAW-FA(3) – nadanie uprawnień KSeF (składa klient; osoba uprawniona = osoba po stronie klienta) ============
+export const ZAW_PAGES = ['/rkdp/zawfa-1.png', '/rkdp/zawfa-2.png'];
+export function zawDefaults({ client = {}, reps = '' } = {}) {
+  const osoba = client.legal_form === 'jdg' || client.kind === 'osoba';
+  const n = rkSplit(client.name);
+  const repsText = reps || (osoba ? `${n.first} ${n.last}`.trim() : client.contact_person || '');
+  const first = parseReps(repsText)[0] || { first: '', last: '' };
+  return {
+    client_nip: digits(client.nip), office: '', purpose: 'nadanie', client_kind: osoba ? 'osoba' : 'firma',
+    client_name: osoba ? `${n.last}, ${n.first}` : (client.name || ''),
+    client_phone: client.phone || '', client_email: String(client.email || '').split(/[;,\s]+/).find(x => x.includes('@')) || '',
+    u_idtype: 'pesel', u_id: '', u_last: first.last || '', u_first: first.first || '',
+    u_phone: client.phone || '', u_email: String(client.email || '').split(/[;,\s]+/).find(x => x.includes('@')) || '',
+    reps: repsText,
+  };
+}
+export function zawItems(d) {
+  const it = [];
+  const at = (page, x, y, text, o = {}) => { if (text) it.push({ page, x, y, text: o.keep ? String(text) : up(text), size: o.size || 9.5, w: o.w || 480 }); };
+  const check = (page, bx, by) => it.push({ page, x: bx + 2.6, y: by + 5.8, text: 'X', size: 10, bold: true });
+  // 1. NIP podmiotu
+  if (d.client_nip) it.push(...glyphComb(1, 58.3, 224.0, 35.6, NIP_COMB, digits(d.client_nip)));
+  // A. urząd i cel
+  at(1, 56, 222.5, d.office, { w: 500 });
+  const P = { nadanie: [54.0, 240.4], odebranie: [157.9, 240.4], wszystkie: [285.5, 240.4] }[d.purpose];
+  if (P) check(1, P[0], P[1]);
+  // B. podmiot
+  if (d.client_kind === 'firma') check(1, 123.1, 329.3);
+  at(1, 56, 360.5, d.client_name, { w: 510, size: (d.client_name || '').length > 70 ? 8 : 9.5 });
+  at(1, 56, 408, d.client_phone, { keep: true }); at(1, 56, 432.5, d.client_email, { keep: true });
+  // C. osoba uprawniona
+  if (d.purpose !== 'wszystkie') {
+    if (d.u_idtype === 'nip') check(1, 120.9, 495.1); else if (d.u_idtype === 'pesel') check(1, 251.6, 495.1);
+    if (d.u_id) it.push(...glyphComb(1, 215.6, 397.5, 521.5, '└' + '────┴'.repeat(10) + '────┘', digits(d.u_id)));
+    at(1, 56, 551.5, d.u_last, { w: 180 }); at(1, 250, 551.5, d.u_first, { w: 150 });
+    at(1, 56, 647, d.u_phone, { keep: true }); at(1, 56, 671, d.u_email, { keep: true });
+  }
+  // E. podpisujący (str. 2)
+  const rows = [69.5, 117.5, 165.5, 213.5];
+  parseReps(d.reps).slice(0, 4).forEach((r, i) => {
+    at(2, 56, rows[i], r.last, { w: 270 }); at(2, 337, rows[i], r.first, { w: 220 });
+    if (d.client_kind === 'firma') at(2, 56, rows[i] + 24, r.role, { w: 270 });
+  });
+  return it;
+}

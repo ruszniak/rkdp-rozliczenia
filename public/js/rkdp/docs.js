@@ -3,7 +3,7 @@ import { h, toast, fail, icon, modal, printHtml } from '../ui.js';
 import { sb, state, canEditClients } from '../store.js';
 import { sendForSignature, rkdpContractPreview } from '../podpisy.js';
 import { fillDocx, docxToHtml, downloadBytes } from '../docx.js';
-import { upl1Defaults, upl1Items, pelDefaults, pelItems, printOverlay, overlayHtml, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
+import { upl1Defaults, upl1Items, pelDefaults, pelItems, zawDefaults, zawItems, ZAW_PAGES, printOverlay, overlayHtml, UPL1_PAGES, PEL_PAGES, RKDP_DELIVERY, RKDP_CONTACT, rkSplit } from './forms.js';
 import { pps1Defaults, printPps1, parseAddress, BOX4_LABELS } from '../m2/pps1.js';
 import { US_NAMES, OFFICE_NAMES } from '../urzedy.js';
 import { poaBlocks, printableHtml, buildOrderDocx, RKDP_BRAND } from '../m2/order.js';
@@ -22,6 +22,7 @@ export const DOC_TYPES = {
   umowa: 'Umowa o usługi księgowe (wzór RKDP)',
   upl1: 'UPL-1 – pełnomocnictwo do podpisywania deklaracji (US)',
   pel: 'PEL – pełnomocnictwo ZUS',
+  zawfa: 'ZAW-FA – uprawnienia KSeF (osoba po stronie klienta)',
   pps1: 'PPS-1 – pełnomocnictwo szczególne (US)',
   procesowe: 'Pełnomocnictwo procesowe (WSA, NSA) – papier firmowy RKDP',
 };
@@ -109,6 +110,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       contract: contractDefaults(cl),
       upl1: upl1Defaults({ client: cl || {} }),
       pel: pelDefaults({ client: cl || {} }),
+      zawfa: zawDefaults({ client: cl || {} }),
       pps1: (() => {
         const x = pps1Defaults({ client: { ...(cl || {}), kind }, params: {}, signer: null, scope: 'Reprezentowanie Mocodawcy w sprawie podatkowej – we wszystkich czynnościach w tej sprawie, w tym do składania i odbioru pism, przeglądania akt, składania wyjaśnień, wniosków i środków zaskarżenia.' });
         if (kind === 'osoba') { const n = rkSplit(cl?.name); x.client_name = `${n.last}, ${n.first}`; x.reps = `${n.first} ${n.last}`.trim(); } else x.reps = repsText;
@@ -232,6 +234,19 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
           ['fee', '80. Opłata skarbowa', 'select', { dolaczono: 'dołączono dowód zapłaty', w3dni: 'dowód w ciągu 3 dni', brak: 'nie zaznaczaj' }],
         ], x));
       }
+    } else if (t === 'zawfa') {
+      parts.push(h('p', { class: 'hint', style: { margin: '0 0 10px' } }, 'ZAW-FA składa klient (spółka bez pieczęci elektronicznej). W części C wpisz osobę po stronie klienta – zwykle członka zarządu – która dostanie uprawnienia w KSeF i wygeneruje certyfikat firmy. Nie wpisuj tu księgowej.'),
+        grid([
+          ['office', 'Poz. 5 – urząd skarbowy klienta', 'list', US_NAMES, true],
+          ['purpose', 'Poz. 6 – cel', 'select', { nadanie: '1. nadanie uprawnień', odebranie: '2. odebranie uprawnień', wszystkie: '3. odebranie wszelkich nadanych uprawnień' }],
+          ['client_kind', 'Poz. 7 – rodzaj podmiotu', 'select', { firma: 'Podmiot niebędący osobą fizyczną', osoba: 'Osoba fizyczna (nie zaznaczaj)' }],
+          ['client_nip', 'Poz. 1 – NIP klienta', 'text'], ['client_name', 'Poz. 8 – nazwa pełna', 'text', null, true],
+          ['client_phone', 'Poz. 9 – telefon firmy', 'text'], ['client_email', 'Poz. 10 – e-mail firmy (obowiązkowy)', 'text'],
+          ['u_first', 'Poz. 14 – osoba uprawniona: imię', 'text'], ['u_last', 'Poz. 13 – nazwisko', 'text'],
+          ['u_idtype', 'Poz. 11 – identyfikator', 'select', { pesel: 'PESEL', nip: 'NIP' }], ['u_id', 'Poz. 12 – PESEL / NIP (nie zapisuje się – można zostawić puste do wpisania ręcznie)', 'text'],
+          ['u_phone', 'Poz. 19 – telefon osoby', 'text'], ['u_email', 'Poz. 20 – e-mail osoby (obowiązkowy)', 'text'],
+          ['reps', 'Część E – podpisujący (max 3) – „Jan Kowalski – prezes zarządu”, każda osoba w osobnej linii', 'textarea'],
+        ], v.zawfa));
     } else if (t === 'procesowe') {
       parts.push(h('p', { class: 'small', style: { margin: '0 0 10px' } }, 'Pełnomocnik: ', h('b', {}, `${advisor.full_name} – doradca podatkowy, nr wpisu ${advisor.license_no || '—'}`)),
         grid([['organ', 'Sąd', 'text', null, true], ['scope', 'Zakres – „do reprezentowania Mocodawcy …” (puste = przed wskazanym sądem)', 'textarea'],
@@ -259,6 +274,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       if (format === 'docx' && t !== 'procesowe') return toast('Formularz urzędowy pobierasz jako PDF', true);
       if (t === 'upl1') return printOverlay(UPL1_PAGES, upl1Items(v.upl1, pelnomocnik()), fname('UPL-1', 'pdf')) || toast('Zezwól na wyskakujące okna', true);
       if (t === 'pel') return printOverlay(PEL_PAGES, pelItems(v.pel, pelnomocnik()), fname('PEL', 'pdf')) || toast('Zezwól na wyskakujące okna', true);
+      if (t === 'zawfa') return printOverlay(ZAW_PAGES, zawItems(v.zawfa), fname('ZAW-FA', 'pdf')) || toast('Zezwól na wyskakujące okna', true);
       if (t === 'pps1') {
         const p = pelnomocnik();
         const signer = p.mode === 'doradca' ? p : { full_name: p.full_name, nip: p.nip, pesel: p.pesel, ae_address: p.ae_address };
@@ -280,7 +296,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
 
   // UPL-1: e-mail do klienta z wypełnionym formularzem (PDF w załączniku) i linkiem do instrukcji złożenia
   const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => !cl ? toast('Wybierz klienta', true)
-    : d.type === 'pel' ? sendUpl1(cl, v.pel, pelnomocnik(), fname('PEL', 'pdf'), 'pel') : sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) }, icon('mail'), 'Wyślij klientowi');
+    : d.type === 'pel' ? sendUpl1(cl, v.pel, pelnomocnik(), fname('PEL', 'pdf'), 'pel') : d.type === 'zawfa' ? sendUpl1(cl, v.zawfa, null, fname('ZAW-FA', 'pdf'), 'zawfa') : sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) }, icon('mail'), 'Wyślij klientowi');
   // umowa: e-mail z linkiem do strony podpisu (podgląd, uwagi, profil zaufany / kwalifikowany / odręcznie); podpisany plik wraca do archiwum klienta
   const signBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (!cl) return toast('Wybierz klienta', true);
@@ -303,7 +319,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
         editable: { xml: documentXml, key: `rkdp:umowa:${cl.id}:${c.tpl}`, ids: { client_id: cl.id }, pdf: x => contractPdf(x, title), preview: x => rkdpContractPreview(docxToHtml(x)) } });
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
-  const syncSend = () => { sendBtn.hidden = !['upl1', 'pel'].includes(d.type); signBtn.hidden = d.type !== 'umowa'; };
+  const syncSend = () => { sendBtn.hidden = !['upl1', 'pel', 'zawfa'].includes(d.type); signBtn.hidden = d.type !== 'umowa'; };
   const build0 = build; build = () => { build0(); syncSend(); }; syncSend();
   modal('Dokumenty klienta', box, (close) => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Zamknij'),
@@ -339,7 +355,22 @@ const PEL_TXT = {
   edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do Zakładu Ubezpieczeń Społecznych przez e-Doręczenia, a dowód nadania przesłać nam.',
   papier: 'Prosimy wydrukować formularz, podpisać go i złożyć osobiście w dowolnej placówce ZUS albo wysłać listem poleconym (podpisany oryginał można też przekazać do naszego biura – złożymy go za Państwa).',
 };
+const ZAW_WAYS = {
+  wszystkie: 'Wszystkie trzy sposoby – klient wybiera',
+  ezus: 'Online w e-Urzędzie Skarbowym (formularz ZAW-FA)',
+  edoreczenia: 'Podpisany PDF (podpis zaufany) – pismo ogólne w e-US',
+  papier: 'Na papierze – podpis zarządu, oryginał do urzędu skarbowego',
+};
+const ZAW_TXT = {
+  wszystkie: 'Zawiadomienie można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA) – dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym lub kwalifikowanym i wysyłając go jako pismo ogólne w e-Urzędzie Skarbowym,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji (zgodnie z KRS) w urzędzie skarbowym albo listem poleconym.',
+  ezus: 'Najprościej złożyć je online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA). Dane do wpisania są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam UPO.',
+  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym lub kwalifikowanym (osoby uprawnione do reprezentacji zgodnie z KRS) i wysłać go jako pismo ogólne do urzędu skarbowego w e-Urzędzie Skarbowym, a potwierdzenie przesłać nam.',
+  papier: 'Prosimy wydrukować formularz, podpisać go w części E (osoby uprawnione do reprezentacji zgodnie z KRS) i złożyć w urzędzie skarbowym albo wysłać listem poleconym.',
+};
 const MAIL_DOCS = {
+  zawfa: { label: 'ZAW-FA', path: '/zaw-fa/', ways: ZAW_WAYS, txt: ZAW_TXT,
+    intro: 'w załączniku przesyłamy wypełnione zawiadomienie ZAW-FA. Wskazuje ono osobę z Państwa firmy uprawnioną do korzystania z Krajowego Systemu e-Faktur (KSeF) w imieniu spółki – po jego przetworzeniu ta osoba zaloguje się do KSeF i wygeneruje certyfikat firmy. Prosimy o sprawdzenie danych.',
+    outro: 'W razie pytań jesteśmy do dyspozycji.' },
   upl1: { label: 'UPL-1', path: '/upl-1/', ways: UPL_WAYS, txt: UPL_TXT,
     intro: 'w załączniku przesyłamy wypełnione pełnomocnictwo UPL-1. Dzięki niemu będziemy mogli podpisywać i wysyłać w Państwa imieniu deklaracje podatkowe i pliki JPK do urzędu skarbowego. Prosimy o sprawdzenie danych.',
     outro: 'Złożenie UPL-1 jest bezpłatne – nie podlega opłacie skarbowej. W razie pytań jesteśmy do dyspozycji.' },
@@ -353,11 +384,11 @@ async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
   const link = () => {
     const q = new URLSearchParams();
     if (s.way !== 'wszystkie') q.set('sposob', s.way);
-    if (kind === 'upl1' && data.office) q.set('us', data.office.replace(/^Naczelnik /, ''));
+    if (['upl1', 'zawfa'].includes(kind) && data.office) q.set('us', data.office.replace(/^Naczelnik /, ''));
     return `${location.origin}${D.path}${q.toString() ? '?' + q : ''}`;
   };
   const text = () => `Dzień dobry,\n\n${D.intro}\n\n${D.txt[s.way]}\n\nInstrukcja krok po kroku: ${link()}\n\n${D.outro}`;
-  s.subject = `Pełnomocnictwo ${kind === 'pel' ? 'ZUS PEL' : 'UPL-1'} – ${cl.name}`; s.body = text();
+  s.subject = kind === 'zawfa' ? `Zawiadomienie ZAW-FA (KSeF) – ${cl.name}` : `Pełnomocnictwo ${kind === 'pel' ? 'ZUS PEL' : 'UPL-1'} – ${cl.name}`; s.body = text();
   const body = h('div');
   const draw = () => body.replaceChildren(
     h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · w załączniku: ', h('b', {}, filename)),
@@ -373,7 +404,7 @@ async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
       const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję PDF…';
       try {
         const { buildPdf } = await import('../pdfdoc.js');
-        const bytes = await buildPdf(kind === 'pel' ? overlayHtml(PEL_PAGES, pelItems(data, pelnomocnik), filename) : overlayHtml(UPL1_PAGES, upl1Items(data, pelnomocnik), filename), filename);
+        const bytes = await buildPdf(kind === 'zawfa' ? overlayHtml(ZAW_PAGES, zawItems(data), filename) : kind === 'pel' ? overlayHtml(PEL_PAGES, pelItems(data, pelnomocnik), filename) : overlayHtml(UPL1_PAGES, upl1Items(data, pelnomocnik), filename), filename);
         let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
         b.textContent = 'Wysyłam…';
         const { data: r, error } = await sb.functions.invoke('mail', { body: { action: 'send_file', client_id: cl.id, to: s.to.trim(), subject: s.subject, body: s.body,
