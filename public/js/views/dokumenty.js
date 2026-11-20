@@ -3,6 +3,7 @@ import { h, fail, infoTip } from '../ui.js';
 import { sb, hasModule } from '../store.js';
 import { dokumentyDialog } from '../rkdp/docs.js';
 import { WZORY } from '../tools/wzory.js';
+import { INSTRUKCJE, instrukcjaDialog } from '../tools/instrukcje.js';
 
 const HELP = `Tu wygenerujesz każdy dokument z aplikacji:
 • Kliknij kafelek, wybierz klienta i uzupełnij dane – większość pól wypełnia się sama z karty klienta, KRS lub Twojego profilu.
@@ -35,6 +36,8 @@ export async function renderDokumenty(main) {
       h('div', {},
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Generowanie dokumentów', infoTip(HELP, 'Generowanie dokumentów – instrukcja')),
         h('p', { class: 'sub' }, 'Umowy, pełnomocnictwa, protokoły, oferty i raporty – wszystko w jednym miejscu.'))),
+    group('Instrukcje dla klientów',
+      ...INSTRUKCJE.map(it => tile(it.title, it.desc, () => instrukcjaDialog(it), ['Link']))),
     group('Umowy i oferty',
       tile('Umowa o usługi księgowe', 'Wzór RKDP – ryczałt, KPiR albo księgi rachunkowe. Dane klienta i wynagrodzenie wypełniają się same.', doc('umowa'), ['PDF', 'Word']),
       tile('Oferta na usługi', 'Profesjonalna oferta RKDP: księgowość, kadry, doradztwo podatkowe – z wyceną z umów.', '#/oferty/nowa', ['PDF']),

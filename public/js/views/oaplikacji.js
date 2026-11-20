@@ -3,8 +3,8 @@ import { h } from '../ui.js';
 import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
-export const APP_VERSION = '2.5';
-export const APP_DATE = '2026-11-19';
+export const APP_VERSION = '2.6';
+export const APP_DATE = '2026-11-20';
 const DOCS_DATE = '2 listopada 2026 r.';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), KRS 0000812185, NIP 8992871126, REGON 384812329';
@@ -95,6 +95,10 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.6', '20 listopada 2026', [
+    'Instrukcje dla klientów w jednym miejscu: Dokumenty i narzędzia → „Instrukcje dla klientów” – link do skopiowania, otwarcia albo wysłania e-mailem.',
+    'Nowa instrukcja dla klienta „Spółka zarejestrowana w KRS – co dalej”: CRBR, rachunek bankowy (NIP-8, kapitał) i PCC-3 z terminami; z nazwą klienta i danymi opiekuna (na ten adres klient wysyła potwierdzenie otwarcia rachunku).',
+  ]],
   ['2.5', '19 listopada 2026', [
     'Rozliczenia: filtr „Rewizor zrobiony, klient nierozliczony” – Rewizor oznaczony jako zrobiony, ale klient nie jest jeszcze rozliczony (zamiast warunku „VAT niewysłany”).',
     'Zadania: po „Akceptuję – zakończ” (i „Zakończ”) okno zadania od razu się zamyka.',
