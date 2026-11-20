@@ -208,7 +208,7 @@ export const UPL1_PAGES = ['/rkdp/upl1-1.png', '/rkdp/upl1-2.png'];
 export const PEL_PAGES = ['/rkdp/pel-1.png', '/rkdp/pel-2.png', '/rkdp/pel-3.png'];
 
 // ============ ZAW-FA(3) – nadanie uprawnień KSeF (składa klient; osoba uprawniona = osoba po stronie klienta) ============
-export const ZAW_PAGES = ['/rkdp/zawfa-1.png', '/rkdp/zawfa-2.png'];
+export const ZAW_PAGES = ['/rkdp/zawfa3-1.png', '/rkdp/zawfa3-2.png'];
 export function zawDefaults({ client = {}, reps = '' } = {}) {
   const osoba = client.legal_form === 'jdg' || client.kind === 'osoba';
   const n = rkSplit(client.name);
