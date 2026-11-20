@@ -2,7 +2,7 @@
 // lub odrzuca. Po akceptacji dni robocze z wniosku trafiają do listy obecności. Wniosek można pobrać jako PDF do podpisu.
 import { h, toast, fail, modal, infoTip, printHtml } from '../ui.js';
 import { sb, state, memberById, isAdmin } from '../store.js';
-import { KINDS, holidays, visibleMembers } from './obecnosc.js';
+import { KINDS, holidays } from './obecnosc.js';
 
 export const LEAVE_KINDS = ['urlop', 'urlop_zadanie', 'okolicznosciowy', 'opieka', 'bezplatny', 'wolne'];
 const STATUS = { oczekuje: ['Czeka na decyzję', 'warn'], zaakceptowany: ['Zaakceptowany', 'ok'], odrzucony: ['Odrzucony', ''], wycofany: ['Wycofany', ''] };
@@ -34,7 +34,12 @@ export function workDays(from, to) {
   return out;
 }
 
-const canDecide = r => isAdmin() || (r.member_id !== state.me.id && visibleMembers().some(m => m.id === r.member_id));
+// akceptuje administrator albo osoba z attendance_scope dla domeny pracownika (jak w bazie: can_decide_leave)
+const canDecide = r => {
+  if (isAdmin()) return true;
+  const scope = (state.me.attendance_scope || '').trim().toLowerCase();
+  return !!scope && r.member_id !== state.me.id && (memberById(r.member_id)?.email || '').toLowerCase().endsWith('@' + scope);
+};
 
 export function leavePdf(r) {
   const m = memberById(r.member_id) || {}, dec = r.decided_by ? memberById(r.decided_by) : null;
@@ -146,11 +151,11 @@ export async function renderUrlopy(main, params) {
 
   main.replaceChildren(...[
     h('div', { class: 'page-head' },
-      h('div', {}, h('p', { class: 'eyebrow' }, 'Lista obecności'),
+      h('div', {}, h('p', { class: 'eyebrow' }, 'Zespół'),
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Urlopy', infoTip(HELP, 'Urlopy – instrukcja')),
         h('p', { class: 'sub' }, `Wnioski urlopowe ${year} – składanie, akceptacja i PDF do podpisu.`)),
       h('div', { class: 'ob-actions' },
-        h('a', { class: 'btn btn-outline btn-sm', href: '#/obecnosc' }, 'Lista obecności'),
+        state.me.attendance || isAdmin() || state.me.attendance_scope ? h('a', { class: 'btn btn-outline btn-sm', href: '#/obecnosc' }, 'Lista obecności') : null,
         h('button', { class: 'btn btn-primary btn-sm', onclick: () => newLeaveDialog(reload) }, 'Nowy wniosek'))),
     h('div', { class: 'ob-bar' }, h('div', { class: 'ob-month' },
       h('button', { class: 'icon-btn', 'aria-label': 'Poprzedni rok', onclick: () => { location.hash = `#/obecnosc/urlopy?rok=${year - 1}`; } }, '‹'),

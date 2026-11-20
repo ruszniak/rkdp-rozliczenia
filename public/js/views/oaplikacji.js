@@ -96,7 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.6', '20 listopada 2026', [
-    'Wnioski urlopowe (propozycja Weroniki): Lista obecności → Urlopy → „Nowy wniosek” – rodzaj, daty, uwagi; dni robocze liczą się same. Przełożony dostaje powiadomienie i akceptuje lub odrzuca, a po akceptacji dni urlopu same wpisują się do listy obecności. Wniosek w PDF do podpisu.',
+    'Wnioski urlopowe (propozycja Weroniki): menu → Urlopy (na telefonie Więcej → Urlopy) → „Nowy wniosek” – rodzaj, daty, uwagi; dni robocze liczą się same. Przełożony dostaje powiadomienie i akceptuje lub odrzuca, a po akceptacji dni urlopu same wpisują się do listy obecności. Wniosek w PDF do podpisu.',
     'Instrukcje dla klientów w jednym miejscu: Dokumenty i narzędzia → „Instrukcje dla klientów” – link do skopiowania, otwarcia albo wysłania e-mailem.',
     'Nowa instrukcja dla klienta „Spółka zarejestrowana w KRS – co dalej”: CRBR, rachunek bankowy (NIP-8, kapitał) i PCC-3 z terminami; z nazwą klienta i danymi opiekuna (na ten adres klient wysyła potwierdzenie otwarcia rachunku).',
   ]],

@@ -72,12 +72,12 @@ const MODULES = {
     // „Więcej” – rzadziej używane miejsca (też w wyszukiwarce Ctrl K)
     more: [['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
-      ['#/doradztwo/dokumenty', 'Pisma procesowe – wzory (RKDP i M2 TAX)', 'm2:dokumenty'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
+      ['#/doradztwo/dokumenty', 'Pisma procesowe – wzory (RKDP i M2 TAX)', 'm2:dokumenty'], ['#/obecnosc/urlopy', 'Urlopy – wnioski urlopowe', 'urlopy'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
       ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'rdp.app', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     // ten sam układ zakładek co w RKDP: Pulpit · Klienci · Sprawy · … · Więcej
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
-    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia i umowy', 'm2:zlecenia'], ['#/doradztwo/oferty', 'Oferty M2 TAX', 'm2:oferty', 'm2'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia i umowy', 'm2:zlecenia'], ['#/doradztwo/oferty', 'Oferty M2 TAX', 'm2:oferty', 'm2'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/obecnosc/urlopy', 'Urlopy – wnioski urlopowe', 'urlopy'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'rdp.app · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -116,7 +116,7 @@ const TAB_ICONS = {
   zgloszenia: I.skrzynka, sprawozdania: I.dokumenty, zespol: I.zespol, 'm2:': I.pulpit, 'm2:sprawy': I.dokumenty, 'm2:klienci': I.klienci,
   'm2:kalendarz': I.terminy, 'm2:zlecenia': I.zlecenia, 'm2:oferty': I.notatki, 'm2:zadania': I.zlecenia, 'm2:zgloszenia': I.skrzynka, 'm2:spotkania': I.zegar, 'm2:dokumenty': I.dokumenty,
   jpk: I.jpk, logout: I.wyloguj, default: I.info,
-  zlecenia: I.zlecenia, terminy: I.terminy, rok: I.notatki, informacje: I.rozmowy, oferty: I.notatki, aml: I.aml, raport: I.rozliczenia,
+  zlecenia: I.zlecenia, terminy: I.terminy, urlopy: I.terminy, rok: I.notatki, informacje: I.rozmowy, oferty: I.notatki, aml: I.aml, raport: I.rozliczenia,
   oaplikacji: I.info, pomoc: I.info, 'm2:czas': I.zegar, spotkania: I.terminy,
 };
 TAB_ICONS['m2:jpk'] = TAB_ICONS.jpk;
@@ -215,7 +215,6 @@ function renderWiecej(main) {
     h('div', { class: 'card wq-list' },
       row('#/profil', 'profil', 'Mój profil, Face ID, powiadomienia'),
       obec ? row('#/obecnosc', 'zegar', 'Lista obecności') : null,
-      obec ? row('#/obecnosc/urlopy', 'zegar', 'Urlopy – wnioski') : null,
       lastMore.some(x => x[2] === 'zespol') ? row('#/zespol', 'zespol', 'Zespół i ustawienia') : null,
       themeRow,
       row(isPartner() ? '/pomoc/partner/' : '/pomoc/', 'info', 'Pomoc i instrukcje'),
@@ -267,7 +266,7 @@ function layout(active) {
       ['Codzienna praca', ['pulpit', 'm2:', 'rozliczenia', 'klienci', 'm2:klienci', 'm2:sprawy', 'm2:zadania', 'spotkania', 'rozmowy']],
       ['Dokumenty', ['sprawozdania', 'm2:dokumenty', 'm2:zlecenia', 'm2:oferty', 'oferty', 'informacje']],
       ['Terminy i kontrola', ['terminy', 'rok', 'aml']],
-      ['Zarządzanie', ['m2:czas', 'raport', 'zespol']],
+      ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'zespol']],
     ];
     const BOTTOM = ['pomoc', 'zainstaluj', 'oaplikacji'];
     const SHORT = { zainstaluj: 'Aplikacja na telefon', spotkania: 'Spotkania i grafik', 'm2:dokumenty': 'Pisma procesowe' };
@@ -452,7 +451,7 @@ async function route(opts = {}) {
   const view = parts[0] || startMod || (hasModule('rozliczenia') ? 'pulpit' : 'doradztwo');
   const m2key = 'm2:' + (M2_PARENT[parts[1]] || parts[1] || '');
   try {
-    if (view === 'obecnosc') c = await renderObecnosc(layout(m2only ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
+    if (view === 'obecnosc') c = await renderObecnosc(layout(parts[1] === 'urlopy' ? 'urlopy' : m2only ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
     else if (view === 'regulamin') c = await renderRegulamin(layout('regulamin'));
     else if (view === 'o-aplikacji') { const m = await import('./views/oaplikacji.js'); c = await m.renderOAplikacji(layout('oaplikacji'), parts[1]); }
     else if (view === 'wiecej') { const m2 = m2only; renderWiecej(layout(m2 ? 'm2:wiecej' : 'wiecej')); }
