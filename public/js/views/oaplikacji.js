@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.6', '20 listopada 2026', [
+    'Klienci: nowy filtr po księgowej i kadrowej (także „bez księgowej”).',
     'ZAW-FA z aplikacji: Karta klienta → Umowy i pełnomocnictwa → ZAW-FA – formularz na danych klienta (osoba uprawniona = osoba po stronie klienta), PDF i wysyłka e-mailem z instrukcją złożenia.',
     'Karta klienta: nowe pole „Pierwszy miesiąc obrachunkowy” – klient pojawia się w Rozliczeniach (i na liście „klientów bez listy”) dopiero od tego miesiąca.',
     'Nowa instrukcja dla klienta „Na start: KSeF w SaldeoSMART” – własny certyfikat KSeF w Saldeo (bez uprawnień dla biura), faktury sprzed podłączenia, zatwierdzanie i wystawianie faktur, dane księgowej i kadrowej klienta.',

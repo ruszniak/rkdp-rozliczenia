@@ -79,6 +79,14 @@ export async function renderKlienci(main) {
   const scopeSel = h('select', { class: 'select', 'aria-label': 'Zakres usług' },
     h('option', { value: '' }, 'Księgowość i doradztwo'), h('option', { value: 'ksiegowosc' }, 'Tylko księgowość'), h('option', { value: 'doradztwo' }, 'Tylko doradztwo'));
   scopeSel.value = prefs.scope || '';
+  // filtr po osobie: księgowa (a:id) albo kadrowa (h:id); „bez księgowej” – a:-
+  const people = key => [...new Set(clients.map(c => c[key]).filter(Boolean))].map(id => memberById(id)).filter(Boolean).sort((x, y) => (x.full_name || '').localeCompare(y.full_name || '', 'pl'));
+  const personSel = h('select', { class: 'select', 'aria-label': 'Księgowa / kadrowa' },
+    h('option', { value: '' }, 'Wszystkie księgowe'),
+    h('optgroup', { label: 'Księgowa' }, ...people('accountant_id').map(m => h('option', { value: 'a:' + m.id }, m.full_name)), h('option', { value: 'a:-' }, 'bez księgowej')),
+    h('optgroup', { label: 'Kadry i płace' }, ...people('hr_id').map(m => h('option', { value: 'h:' + m.id }, m.full_name))));
+  personSel.value = prefs.person || '';
+  if (personSel.value !== (prefs.person || '')) prefs.person = '';
   const scopeOf = c => c.service_scope === 'doradztwo' ? 'doradztwo' : 'ksiegowosc';
   const scopeTag = c => h('span', { class: 'kl-scope ' + scopeOf(c), title: scopeOf(c) === 'doradztwo' ? 'Tylko doradztwo podatkowe – bez zakładki Rozliczenia (kadry zostają, jeśli są pracownicy)' : 'Księgowość – klient jest w Rozliczeniach' }, scopeOf(c) === 'doradztwo' ? 'Doradztwo' : 'Księgowość');
 
@@ -93,6 +101,10 @@ export async function renderKlienci(main) {
     return clients.filter(c => {
       if (prefs.status && c.status !== prefs.status) return false;
       if (prefs.scope && scopeOf(c) !== prefs.scope) return false;
+      if (prefs.person) {
+        const [k, id] = prefs.person.split(':'), v = k === 'h' ? c.hr_id : c.accountant_id;
+        if (id === '-' ? !!v : v !== id) return false;
+      }
       if (prefs.who === 'moi' && !isMine(c)) return false;
       if (prefs.who === 'uwaga' && !attention(c)) return false;
       if (prefs.group === 'niekompletne') { if (completeness(c, c.client_partners?.length).pct === 100) return false; }
@@ -119,7 +131,7 @@ export async function renderKlienci(main) {
     const nAtt = base.filter(attention).length;
     chips.replaceChildren(...[chip('', 'Wszyscy', base.length), chip('moi', 'Moi', base.filter(isMine).length),
       nAtt || prefs.who === 'uwaga' ? chip('uwaga', 'Do uwagi', nAtt, h('b', { class: 'mj-hot' }, '!')) : null,
-      h('label', { class: 'kl-sel' }, statusSel), h('label', { class: 'kl-sel' }, groupSel), h('label', { class: 'kl-sel' }, scopeSel)].filter(Boolean));
+      h('label', { class: 'kl-sel' }, statusSel), h('label', { class: 'kl-sel' }, groupSel), h('label', { class: 'kl-sel' }, scopeSel), h('label', { class: 'kl-sel' }, personSel)].filter(Boolean));
     [...chips.childNodes].forEach(n => { if (n.nodeType === 3 && n.textContent === 'null') n.remove(); });
   };
   const render = () => {
@@ -163,13 +175,14 @@ export async function renderKlienci(main) {
     }));
   };
 
-  const onFilter = () => { Object.assign(prefs, { q: search.value, status: statusSel.value, group: groupSel.value, scope: scopeSel.value }); savePrefs(prefs); render(); };
+  const onFilter = () => { Object.assign(prefs, { q: search.value, status: statusSel.value, group: groupSel.value, scope: scopeSel.value, person: personSel.value }); savePrefs(prefs); render(); };
   search.placeholder = 'Nazwa, NIP, e-mail, telefon…';
   let searchTimer;
   search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(onFilter, 180); });
   statusSel.addEventListener('change', onFilter);
   groupSel.addEventListener('change', onFilter);
   scopeSel.addEventListener('change', onFilter);
+  personSel.addEventListener('change', onFilter);
 
   // ---- zakres usług zbiorczo: księgowość (w Rozliczeniach) / tylko doradztwo (bez Rozliczeń) ----
   const scopeDialog = () => {
