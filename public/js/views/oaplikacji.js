@@ -96,6 +96,8 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.6', '20 listopada 2026', [
+    'Nowa instrukcja dla klienta „Na start: KSeF w SaldeoSMART” – własny certyfikat KSeF w Saldeo (bez uprawnień dla biura), faktury sprzed podłączenia, zatwierdzanie i wystawianie faktur, dane księgowej i kadrowej klienta.',
+    'Instrukcje dla klientów wysyłasz teraz z aplikacji (kancelaria@rkdp.pl, Twoja stopka, zapis w historii klienta) – wybierz klienta, a dane uzupełnią się same.',
     'ZUS PEL klient składa sam – jak UPL-1: Karta klienta → Umowy i pełnomocnictwa → PEL → „Wyślij klientowi” (e-mail z PDF i instrukcją: eZUS, podpis zaufany + e-Doręczenia albo osobiście / pocztą). Instrukcja także w Dokumenty i narzędzia → Instrukcje dla klientów.',
     'Wnioski urlopowe (propozycja Weroniki): menu → Urlopy (na telefonie Więcej → Urlopy) → „Nowy wniosek” – rodzaj, daty, uwagi; dni robocze liczą się same. Przełożony dostaje powiadomienie i akceptuje lub odrzuca, a po akceptacji dni urlopu same wpisują się do listy obecności. Wniosek w PDF do podpisu.',
     'Instrukcje dla klientów w jednym miejscu: Dokumenty i narzędzia → „Instrukcje dla klientów” – link do skopiowania, otwarcia albo wysłania e-mailem.',

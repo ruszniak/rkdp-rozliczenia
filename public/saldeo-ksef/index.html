@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Na start: KSeF w SaldeoSMART – instrukcja</title>
+<meta name="description" content="Jak połączyć KSeF z SaldeoSMART własnym certyfikatem, pobrać wcześniejsze faktury, zatwierdzać faktury kosztowe i wystawiać faktury do KSeF.">
+<link rel="icon" href="/favicon-v7.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/umow/doc.css">
+<style>
+.toc{list-style:none;padding:0;margin:22px 0 6px;border-top:1px solid var(--line)}
+.toc li{margin:0;border-bottom:1px solid var(--line)}
+.toc a{display:flex;gap:14px;align-items:baseline;padding:11px 2px;text-decoration:none;color:var(--ink);font-weight:600}
+.toc a span{font-family:var(--serif);color:var(--accent);min-width:18px}
+.toc a em{font-style:normal;font-weight:400;color:var(--muted);font-size:15px;margin-left:auto;text-align:right}
+@media (max-width:560px){.toc a{flex-wrap:wrap}.toc a em{margin-left:32px;text-align:left;width:100%}}
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0 4px}
+.person{border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.person small{display:block;color:var(--muted);font-size:13px;margin-bottom:2px}
+.person b{display:block;font-family:var(--serif);font-weight:600;font-size:18px;margin-bottom:6px}
+.person a{display:block;font-size:15px;word-break:break-all}
+.path{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 14px;font-size:14px}
+.path span{border:1px solid var(--line);border-radius:4px;padding:3px 9px;background:#fff}
+.path i{font-style:normal;color:var(--muted)}
+.cmp{width:100%;border-collapse:collapse;font-size:15px;margin:10px 0 16px}
+.cmp th,.cmp td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+.cmp th{font-weight:600;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header><div class="in"><span class="brand"><img src="/logo-rdp.svg" alt="rdp.app" width="32" height="32"><span>KSeF w SaldeoSMART</span></span><span class="appname">rdp.app</span></div></header>
+<main>
+<p class="kicker" id="firma" hidden></p>
+<h1>Na start: KSeF w SaldeoSMART</h1>
+<p class="meta">Instrukcja dla klientów biura · aktualna na listopad 2026 r.</p>
+
+<p>Szanowni Państwo,</p>
+<p>dziękujemy za rozpoczęcie współpracy. Faktury będziemy otrzymywać z Krajowego Systemu e-Faktur (KSeF) przez <strong>SaldeoSMART</strong> – Państwa konto w Saldeo jest połączone z naszym biurem. Poniżej opisujemy, jak to raz skonfigurować i jak potem na co dzień pracować z fakturami.</p>
+
+<section id="zespol" hidden>
+<h2>Kto się Państwem zajmuje</h2>
+<div class="team" id="team"></div>
+</section>
+
+<div class="box hl">
+<p><strong>Najważniejsze: łączą Państwo Saldeo z KSeF własnym certyfikatem KSeF firmy.</strong> Nie trzeba – i prosimy nie – nadawać w KSeF uprawnień dla naszego biura rachunkowego. Faktury pobiera i wysyła Państwa konto Saldeo, a my księgujemy je z Saldeo.</p>
+</div>
+
+<ol class="toc">
+<li><a href="#certyfikat"><span>1</span>Wygeneruj certyfikaty KSeF<em>raz – ok. 15 minut</em></a></li>
+<li><a href="#saldeo"><span>2</span>Dodaj certyfikaty w SaldeoSMART<em>raz – ok. 5 minut</em></a></li>
+<li><a href="#wczesniejsze"><span>3</span>Pobierz faktury sprzed podłączenia<em>raz, na start</em></a></li>
+<li><a href="#zatwierdzanie"><span>4</span>Zatwierdzaj faktury kosztowe<em>na bieżąco</em></a></li>
+<li><a href="#wystawianie"><span>5</span>Wystawiaj faktury sprzedaży do KSeF<em>na bieżąco</em></a></li>
+</ol>
+
+<section id="certyfikat">
+<h2>1. Wygeneruj certyfikaty KSeF</h2>
+<p>Certyfikat to „klucz”, którym Saldeo loguje się do KSeF w imieniu Państwa firmy. Potrzebne są <strong>dwa certyfikaty</strong>: do logowania w KSeF (pobieranie i wysyłanie faktur) oraz do trybu offline (wystawianie faktur, gdy KSeF ma awarię).</p>
+<ol>
+<li>Wejdź do <a href="https://ap.ksef.mf.gov.pl/web/" target="_blank" rel="noopener">Aplikacji Podatnika KSeF</a> (albo do Modułu Certyfikatów i Uprawnień: <a href="https://mcu.mf.gov.pl/web/" target="_blank" rel="noopener">mcu.mf.gov.pl</a>).</li>
+<li>Zaloguj się <strong>profilem zaufanym</strong>, e-dowodem albo podpisem kwalifikowanym. Jako identyfikator wybierz <strong>NIP firmy</strong>, wpisz NIP i kliknij <strong>„Uwierzytelnij”</strong>. W spółce loguje się osoba uprawniona do reprezentacji (np. członek zarządu).</li>
+<li>W menu po lewej wybierz <strong>„Certyfikaty”</strong> → <strong>„Wnioskuj o certyfikat”</strong>.</li>
+<li>Wpisz nazwę (np. „Saldeo – online”) i ustal <strong>hasło do klucza</strong>. Zapisz je w bezpiecznym miejscu – <strong>hasła nie da się odzyskać</strong>. Kliknij „Generuj” – pobierze się plik klucza <strong>.key</strong>.</li>
+<li>Jako cel wybierz <strong>„Uwierzytelnienie w systemie KSeF”</strong> i wyślij wniosek.</li>
+<li>Gdy status zmieni się z „W realizacji” na wydany (przycisk „Odśwież”), kliknij <strong>„Pobierz certyfikat”</strong> – zapisze się plik <strong>.crt</strong>.</li>
+<li>Powtórz kroki 3–6 dla drugiego certyfikatu – jako cel wybierz <strong>„Podpis linku do weryfikacji wystawcy”</strong> (tryb offline).</li>
+</ol>
+<p class="small">Masz teraz cztery pliki (dwa .key i dwa .crt) i hasła. Nie przekazuj ich nikomu – także nam. Certyfikaty mają datę ważności: przed jej upływem wygeneruj nowe i podmień je w Saldeo (krok 2).</p>
+</section>
+
+<section id="saldeo">
+<h2>2. Dodaj certyfikaty w SaldeoSMART</h2>
+<p>Robi to <strong>administrator Państwa konta w Saldeo</strong>.</p>
+<div class="path" aria-label="Ścieżka w Saldeo"><span>Konfiguracja (ikona koła zębatego)</span><i>→</i><span>Konfiguracja KSeF</span><i>→</i><span>Certyfikaty</span><i>→</i><span>Dodaj certyfikat</span></div>
+<ol>
+<li>Zaloguj się do SaldeoSMART i otwórz <strong>Konfiguracja → Konfiguracja KSeF</strong>.</li>
+<li>Kliknij <strong>„Dodaj certyfikat”</strong> i wybierz typ <strong>„Uwierzytelnienie w KSeF”</strong>.</li>
+<li>Wskaż plik <strong>.crt</strong> (Certyfikat) i <strong>.key</strong> (Klucz), wpisz <strong>hasło do klucza</strong> z kroku 1 i zapisz.</li>
+<li>Powtórz dla drugiego certyfikatu – typ <strong>„Offline (podpis linku)”</strong>.</li>
+<li>Sprawdź, czy oba certyfikaty są na liście z aktywnym statusem. Od tej chwili Saldeo samo, co jakiś czas, pobiera nowe faktury z KSeF.</li>
+</ol>
+<p class="small">Jeśli w Saldeo pracuje kilka osób z Państwa firmy, administrator nadaje im w <strong>Użytkownicy</strong> uprawnienie <strong>„Prawo do KSeF”</strong> – do pobierania faktur, a osobom wystawiającym faktury także do wysyłania.</p>
+</section>
+
+<section id="wczesniejsze">
+<h2>3. Pobierz faktury sprzed podłączenia certyfikatu</h2>
+<p>Saldeo automatycznie pobiera faktury od chwili dodania certyfikatu. Faktury, które trafiły do KSeF <strong>wcześniej</strong> (np. od początku miesiąca, od którego prowadzimy księgi), trzeba pobrać raz ręcznie:</p>
+<div class="path"><span>Lista dokumentów</span><i>→</i><span>Pobierz z KSeF</span></div>
+<ol>
+<li>Otwórz <strong>Lista dokumentów</strong> i kliknij <strong>„Pobierz z KSeF”</strong>.</li>
+<li>Wybierz <strong>„Faktury kosztowe”</strong> (zakupy).</li>
+<li>Ustaw okres – <strong>datę rejestracji w KSeF</strong> od pierwszego dnia miesiąca, od którego prowadzimy Państwa księgowość – i kliknij <strong>„Szukaj”</strong>.</li>
+<li>Zaznacz faktury (wyszarzone są już pobrane), wybierz typ dokumentu i kliknij <strong>„Pobierz”</strong>.</li>
+<li>Powtórz dla <strong>„Faktury sprzedażowe”</strong>, jeśli faktury sprzedaży wystawiali Państwo poza Saldeo (np. w innym programie albo w aplikacji KSeF).</li>
+<li>Wynik sprawdzisz w <strong>Centrum powiadomień</strong>.</li>
+</ol>
+</section>
+
+<section id="zatwierdzanie">
+<h2>4. Zatwierdzaj faktury kosztowe</h2>
+<p>Do KSeF trafia każda faktura wystawiona na Państwa NIP – także pomyłkowa albo prywatna. Dlatego prosimy, żeby przed księgowaniem Państwo je <strong>zatwierdzali</strong>: księgujemy faktury zatwierdzone.</p>
+<ol>
+<li>W <strong>Lista dokumentów</strong> przejrzyj nowe faktury kosztowe.</li>
+<li>Ustaw status: <strong>„zatwierdzona”</strong> – faktura firmowa do zaksięgowania, albo <strong>„odrzucona”</strong> – faktura nie dotyczy firmy, jest błędna albo do korekty.</li>
+<li>Przy fakturze możesz dodać komentarz (np. „samochód – 50% VAT”, „do korekty – zła ilość”) – zobaczymy go przy księgowaniu.</li>
+</ol>
+<table class="cmp">
+<tr><th>Status</th><th>Co to znaczy dla nas</th></tr>
+<tr><td>zatwierdzona</td><td>księgujemy w koszty</td></tr>
+<tr><td>odrzucona</td><td>nie księgujemy – prosimy o komentarz, dlaczego</td></tr>
+<tr><td>nieoznaczona</td><td>czeka na Państwa decyzję – zapytamy o nią przed zamknięciem miesiąca</td></tr>
+</table>
+<p class="small">Faktury i dokumenty spoza KSeF (np. paragony, faktury zagraniczne, bilety) dodają Państwo do Saldeo jak dotąd – zdjęciem w aplikacji mobilnej, mailem albo plikiem.</p>
+</section>
+
+<section id="wystawianie">
+<h2>5. Wystawiaj faktury sprzedaży do KSeF</h2>
+<div class="path"><span>Faktury</span><i>→</i><span>Wystaw fakturę</span><i>→</i><span>Dodaj i wyślij do KSeF</span></div>
+<ol>
+<li>W module <strong>faktur</strong> Saldeo wystaw nową fakturę. Wpisz <strong>NIP nabywcy</strong> – dane kontrahenta podpowiedzą się same.</li>
+<li>Sprawdź pozycje, stawki VAT, termin i sposób płatności.</li>
+<li>Kliknij <strong>„Dodaj i wyślij do KSeF”</strong>. Możesz też najpierw zapisać fakturę jako szkic, a później kliknąć <strong>„Wyślij do KSeF”</strong> (w fakturze albo na liście dokumentów).</li>
+<li>Faktura jest wystawiona, gdy KSeF nada jej <strong>numer KSeF</strong> – sprawdź status przy fakturze. Taką fakturę widzimy od razu w Saldeo.</li>
+<li>Gdy KSeF ma awarię, Saldeo wystawi fakturę w <strong>trybie offline</strong> (dzięki certyfikatowi offline z kroku 1) i wyśle ją do KSeF po przywróceniu działania.</li>
+</ol>
+<p class="small">Błędnej faktury przesłanej do KSeF nie da się usunąć ani poprawić – wystawia się <strong>fakturę korygującą</strong>. W razie wątpliwości prosimy o kontakt przed wystawieniem.</p>
+</section>
+
+<h2>Instrukcje SaldeoSMART</h2>
+<p>Szczegółowe instrukcje ze zrzutami ekranu przygotował producent programu:</p>
+<ul>
+<li><a href="https://pomoc.saldeosmart.pl/hc/pl/articles/33521915474205-KSeF-2-0-instrukcja-dla-klienta-biura" target="_blank" rel="noopener">KSeF 2.0 – instrukcja dla klienta biura</a></li>
+<li><a href="https://pomoc.saldeosmart.pl/hc/pl/articles/32606785241629-Certyfikaty-KSeF-w-SaldeoSMART" target="_blank" rel="noopener">Certyfikaty KSeF w SaldeoSMART</a></li>
+<li><a href="https://pomoc.saldeosmart.pl/hc/pl/articles/11035530506397-Instrukcja-pobierania-faktur-z-KSeF-instrukcja-dla-firm" target="_blank" rel="noopener">Pobieranie faktur z KSeF – instrukcja dla firm</a></li>
+</ul>
+
+<h2>Masz pytanie?</h2>
+<p>Napisz albo zadzwoń do swojej księgowej – dane są na górze tej strony. Kontakt z biurem: <a href="tel:+48883643565">883 643 565</a> · <a href="mailto:kancelaria@rkdp.pl">kancelaria@rkdp.pl</a>.</p>
+</main>
+<footer><div class="in">RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Beaty Artemskiej 11/44, 52-234 Wrocław<br>NIP 8992871126 · KRS 0000812185 · tel. 883 643 565 · kancelaria@rkdp.pl</div></footer>
+<script src="/saldeo-ksef/sk.js"></script>
+</body>
+</html>
