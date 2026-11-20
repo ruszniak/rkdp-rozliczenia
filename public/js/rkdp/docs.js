@@ -403,8 +403,8 @@ async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.to.trim())) return toast('Wpisz poprawny e-mail klienta', true);
       const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję PDF…';
       try {
-        const { buildPdf } = await import('../pdfdoc.js');
-        const bytes = await buildPdf(kind === 'zawfa' ? overlayHtml(ZAW_PAGES, zawItems(data), filename) : kind === 'pel' ? overlayHtml(PEL_PAGES, pelItems(data, pelnomocnik), filename) : overlayHtml(UPL1_PAGES, upl1Items(data, pelnomocnik), filename), filename);
+        const { overlayPdfBytes } = await import('./forms.js');
+        const bytes = kind === 'zawfa' ? await overlayPdfBytes(ZAW_PAGES, zawItems(data)) : kind === 'pel' ? await overlayPdfBytes(PEL_PAGES, pelItems(data, pelnomocnik)) : await overlayPdfBytes(UPL1_PAGES, upl1Items(data, pelnomocnik));
         let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
         b.textContent = 'Wysyłam…';
         const { data: r, error } = await sb.functions.invoke('mail', { body: { action: 'send_file', client_id: cl.id, to: s.to.trim(), subject: s.subject, body: s.body,

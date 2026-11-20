@@ -252,3 +252,46 @@ export function zawItems(d) {
   });
   return it;
 }
+
+// ============ PDF formularza bez renderowania HTML: wzór (PNG) + dane rysowane na płótnie → pdf-lib ============
+// Pewniejsze niż zrzut HTML (Safari i wolne łącze potrafiły zgubić tło formularza w załączniku e-maila).
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Nie udało się wczytać wzoru formularza: ' + src)); i.src = src; });
+export async function overlayPdfBytes(pages, items) {
+  const { PDFDocument } = await import('../lib/pdf-vendor.js');
+  const doc = await PDFDocument.create();
+  const W = 595.28, H = 841.89, K = 2.5;   // pt → px (ok. 180 dpi)
+  for (let n = 1; n <= pages.length; n++) {
+    const img = await loadImg(pages[n - 1]);
+    try { await img.decode(); } catch { /* */ }
+    const cv = document.createElement('canvas'); cv.width = Math.round(W * K); cv.height = Math.round(H * K);
+    const g = cv.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+    g.drawImage(img, 0, 0, cv.width, cv.height);
+    g.fillStyle = '#0b2a6b'; g.strokeStyle = '#0b2a6b'; g.textBaseline = 'top';
+    for (const i of items.filter(x => x.page === n)) {
+      if (i.line) { g.lineWidth = 0.8 * K; g.beginPath(); g.moveTo(i.x * K, i.y * K); g.lineTo((i.x + i.line) * K, i.y * K); g.stroke(); continue; }
+      const fs = i.size * K;
+      g.font = `${i.bold ? '700 ' : ''}${fs}px Arial, Helvetica, sans-serif`;
+      const top = i.y * K + fs * 0.075;
+      if (i.wrap && i.w) {
+        const words = String(i.text).split(/\s+/); let line = '', y = top; const lh = fs * 1.25, maxY = i.h ? (i.y + i.h) * K : Infinity;
+        for (const wd of words) {
+          const t = line ? line + ' ' + wd : wd;
+          if (g.measureText(t).width > i.w * K && line) { if (y + lh > maxY + 1) break; g.fillText(line, i.x * K, y); line = wd; y += lh; } else line = t;
+        }
+        if (line && y + fs <= maxY + lh) g.fillText(line, i.x * K, y);
+        continue;
+      }
+      let x = i.x * K;
+      if (i.center && i.w) x += (i.w * K - g.measureText(String(i.text)).width) / 2;
+      g.save();
+      if (i.w && !i.center) { g.beginPath(); g.rect(i.x * K, i.y * K - fs, i.w * K, fs * 3); g.clip(); }
+      g.fillText(String(i.text), x, top);
+      g.restore();
+    }
+    const jpg = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9));
+    const emb = await doc.embedJpg(new Uint8Array(await jpg.arrayBuffer()));
+    doc.addPage([W, H]).drawImage(emb, { x: 0, y: 0, width: W, height: H });
+  }
+  return doc.save();
+}
