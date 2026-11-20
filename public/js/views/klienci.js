@@ -131,7 +131,8 @@ export async function renderKlienci(main) {
     const nAtt = base.filter(attention).length;
     chips.replaceChildren(...[chip('', 'Wszyscy', base.length), chip('moi', 'Moi', base.filter(isMine).length),
       nAtt || prefs.who === 'uwaga' ? chip('uwaga', 'Do uwagi', nAtt, h('b', { class: 'mj-hot' }, '!')) : null,
-      h('label', { class: 'kl-sel' }, statusSel), h('label', { class: 'kl-sel' }, groupSel), h('label', { class: 'kl-sel' }, scopeSel), h('label', { class: 'kl-sel' }, personSel)].filter(Boolean));
+      h('label', { class: 'kl-sel' }, statusSel), h('label', { class: 'kl-sel' }, groupSel), h('label', { class: 'kl-sel' }, scopeSel), h('label', { class: 'kl-sel' }, personSel),
+      h('button', { type: 'button', class: 'zl-chip', title: 'Eksport tej listy do Excela, PDF lub CSV', onclick: () => exportDialog() }, '⬇ Eksport')].filter(Boolean));
     [...chips.childNodes].forEach(n => { if (n.nodeType === 3 && n.textContent === 'null') n.remove(); });
   };
   const render = () => {
@@ -224,19 +225,65 @@ export async function renderKlienci(main) {
     ], { wide: true });
   };
 
-  const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => {
+  // eksport tego, co widać po filtrach: Excel (.xlsx), PDF, CSV
+  const filterLabel = () => [
+    prefs.status ? CLIENT_STATUS[prefs.status] : 'wszystkie statusy',
+    prefs.group ? groupSel.selectedOptions[0]?.textContent : '',
+    prefs.scope ? scopeSel.selectedOptions[0]?.textContent : '',
+    prefs.person ? (prefs.person.startsWith('h:') ? 'kadry: ' : 'księgowa: ') + personSel.selectedOptions[0]?.textContent : '',
+    prefs.who === 'moi' ? 'moi klienci' : prefs.who === 'uwaga' ? 'do uwagi' : '',
+    prefs.q.trim() ? `szukane: „${prefs.q.trim()}”` : '',
+  ].filter(Boolean).join(' · ');
+  const exportRows = (full) => {
     const opt = (d, v) => (v ? d[v] || v : '');
     const yn = v => v === true ? 'tak' : v === false ? 'nie' : '';
-    downloadCsv('klienci_rkdp.csv', [
-      ['Nazwa', 'Status', 'Zakres usług', 'Forma', 'Księgowość', 'NIP', 'REGON', 'KRS', 'Adres', 'Osoba kontaktowa', 'E-mail', 'Telefon',
-        'PIT', 'Zaliczki PIT', 'ZUS', 'CIT', 'VAT', 'VAT-UE', 'Pracownicy', 'Umowa', 'UPL-1', 'Wynagrodzenie netto', 'Księgowa', 'Kadrowa'],
-      ...list().map(c => [c.name, CLIENT_STATUS[c.status], scopeOf(c) === 'doradztwo' ? 'doradztwo' : 'księgowość', opt(LEGAL_FORM, c.legal_form), opt(BOOKKEEPING, c.bookkeeping),
-        c.nip, c.regon, c.krs, c.address, c.contact_person, c.email, c.phone, opt(PIT_FORM, c.pit_form), opt(ADVANCES, c.pit_advances),
-        opt(ZUS_TYPE, c.zus_type), opt(CIT_TYPE, c.cit_type), opt(VAT_STATUS, c.vat_status), yn(c.vat_ue), yn(c.has_employees),
-        yn(c.contract_signed), yn(c.upl1), c.monthly_fee ?? '',
-        memberById(c.accountant_id)?.short_name || '', memberById(c.hr_id)?.short_name || '']),
+    const basic = [['Nazwa', c => c.name, 42], ['NIP', c => c.nip || '', 13], ['Forma', c => opt(LEGAL_SHORT, c.legal_form) || opt(LEGAL_FORM, c.legal_form), 12],
+      ['Status', c => CLIENT_STATUS[c.status] || '', 11], ['Zakres', c => scopeOf(c) === 'doradztwo' ? 'doradztwo' : 'księgowość', 11],
+      ['Osoba kontaktowa', c => c.contact_person || '', 22], ['E-mail', c => c.email || '', 28], ['Telefon', c => c.phone || '', 14],
+      ['Księgowa', c => memberById(c.accountant_id)?.full_name || '', 18], ['Kadrowa', c => memberById(c.hr_id)?.full_name || '', 18]];
+    const extra = [['Księgowość', c => opt(BOOKKEEPING, c.bookkeeping), 18], ['REGON', c => c.regon || '', 12], ['KRS', c => c.krs || '', 12], ['Adres', c => c.address || '', 36],
+      ['PIT', c => opt(PIT_FORM, c.pit_form), 16], ['Zaliczki PIT', c => opt(ADVANCES, c.pit_advances), 12], ['ZUS', c => opt(ZUS_TYPE, c.zus_type), 16], ['CIT', c => opt(CIT_TYPE, c.cit_type), 14],
+      ['VAT', c => opt(VAT_STATUS, c.vat_status), 16], ['VAT-UE', c => yn(c.vat_ue), 8], ['Pracownicy', c => yn(c.has_employees), 10], ['Umowa', c => yn(c.contract_signed), 8],
+      ['UPL-1', c => yn(c.upl1), 8], ['Pierwszy miesiąc', c => c.first_period ? c.first_period.slice(0, 7) : '', 12], ['Abonament netto', c => c.monthly_fee ?? '', 12]];
+    const cols = full ? [...basic, ...extra] : basic;
+    return { cols, rows: list().map(c => cols.map(([, f]) => f(c))) };
+  };
+  const stamp = () => new Date().toLocaleDateString('sv-SE');
+  const exportDialog = () => {
+    const st = { full: false };
+    const n = list().length;
+    const fullCb = h('input', { type: 'checkbox', onchange: e => { st.full = e.target.checked; } });
+    modal('Eksport listy klientów', h('div', {},
+      h('p', { style: { margin: '0 0 6px' } }, h('b', {}, `${n} klientów`), ' – dokładnie ta lista, którą masz po filtrach.'),
+      h('p', { class: 'small muted', style: { margin: '0 0 12px' } }, 'Filtry: ', filterLabel() || 'brak'),
+      h('label', { class: 'check small' }, fullCb, 'Wszystkie kolumny (podatki, VAT, ZUS, umowa, abonament) – w PDF tylko podstawowe')),
+    close => [
+      h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { const { cols, rows } = exportRows(st.full); downloadCsv(`klienci_${stamp()}.csv`, [cols.map(c => c[0]), ...rows]); close(); } }, 'CSV'),
+      h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
+        const { cols, rows } = exportRows(false);
+        const esc = v => String(v ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+        const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Klienci</title><style>
+          @page{size:A4 landscape;margin:12mm}body{font:8.5pt/1.35 Arial,Helvetica,sans-serif;color:#1d1a16;margin:0}
+          h1{font-size:14pt;margin:0 0 2px}p.m{color:#676b73;margin:0 0 10px;font-size:8.5pt}
+          table{width:100%;border-collapse:collapse}th{text-align:left;font-size:7.5pt;color:#5e564c;border-bottom:1.2pt solid #7A5A37;padding:4px 4px}
+          td{border-bottom:.5pt solid #e3d9ca;padding:4px 4px;vertical-align:top;word-break:break-word}tr{break-inside:avoid}td.n{color:#9a8f80;width:18px}</style></head><body>
+          <h1>Klienci RKDP – ${n}</h1><p class="m">${esc(filterLabel() || 'wszyscy')} · stan na ${new Date().toLocaleDateString('pl-PL')}</p>
+          <table><thead><tr><th>#</th>${cols.map(c => `<th>${esc(c[0])}</th>`).join('')}</tr></thead><tbody>
+          ${rows.map((r, i) => `<tr><td class="n">${i + 1}</td>${r.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+        const b = document.activeElement; if (b) b.disabled = true;
+        try { const { downloadPdf } = await import('../pdfdoc.js'); await downloadPdf(html, `Klienci_${stamp()}`); close(); }
+        catch (e) { fail(e, 'Nie udało się przygotować PDF'); if (b) b.disabled = false; }
+      } }, 'PDF'),
+      h('button', { class: 'btn btn-primary btn-sm', onclick: async () => {
+        const { cols, rows } = exportRows(st.full);
+        const { downloadXlsx } = await import('../xlsx.js');
+        downloadXlsx(`klienci_${stamp()}.xlsx`, [{ name: 'Klienci', widths: cols.map(c => c[2]), freeze: { row: 1, col: 1 },
+          rows: [cols.map(c => ({ v: c[0], s: 'header' })), ...rows.map(r => r.map(v => typeof v === 'number' ? v : String(v ?? '')))] }]);
+        close();
+      } }, 'Excel'),
     ]);
-  } }, icon('download'), 'Eksport');
+  };
+  const exportBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: exportDialog }, icon('download'), 'Eksport');
 
   const addBtn = canEditClients()
     ? h('button', { class: 'btn btn-primary', onclick: async () => {
@@ -319,7 +366,7 @@ export async function renderKlienci(main) {
     h('a', { href: '#/oferty' }, h('span', {}, '₪'), 'Oferty'),
     h('button', { type: 'button', onclick: () => dokumentyDialog().catch(e => fail(e)) }, h('span', {}, '✎'), 'Umowy i pełnomocnictwa'),
     canEditClients() ? h('button', { type: 'button', onclick: () => { menu.hidden = true; scopeDialog(); } }, h('span', {}, '◧'), 'Zakres usług – zbiorczo') : null,
-    h('button', { type: 'button', onclick: () => exportBtn.click() }, h('span', {}, '⬇'), 'Eksport (CSV)'),
+    h('button', { type: 'button', onclick: () => exportBtn.click() }, h('span', {}, '⬇'), 'Eksport listy (Excel, PDF)'),
     wlBtn ? h('button', { type: 'button', onclick: () => wlBtn.click() }, h('span', {}, '⟳'), 'Biała lista VAT – aktualizacja') : null);
   const moreBtn = h('button', { type: 'button', class: 'kl-icon', 'aria-label': 'Więcej', 'aria-haspopup': 'menu',
     onclick: e => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, '⋯');
