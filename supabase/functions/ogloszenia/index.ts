@@ -32,10 +32,10 @@ async function send(id: string) {
   const [{ data: ms }, { data: pf }, { data: st }] = await Promise.all([
     admin.from('team_members').select('id, full_name, email, active').in('id', ids),
     admin.from('member_profiles').select('member_id, notify_email, notify_window').in('member_id', ids),
-    admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url']),
+    admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url', 'app_mail_from']),
   ]);
   const S = Object.fromEntries((st || []).map((x: any) => [x.key, (x.value || '').trim()]));
-  const from = S.mail_from || S.mail_sender || SMTP_USER, app = (S.app_url || 'https://app.ruszniak.io').replace(/\/$/, '');
+  const from = S.app_mail_from || S.mail_from || S.mail_sender || SMTP_USER, app = (S.app_url || 'https://app.ruszniak.io').replace(/\/$/, '');
   const P = new Map((pf || []).map((r: any) => [r.member_id, r]));
   const items: string[] = Array.isArray(o.items) ? o.items.map(String) : [];
   const link = `${app}/#/pulpit`;

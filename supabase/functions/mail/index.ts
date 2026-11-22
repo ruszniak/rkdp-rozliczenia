@@ -61,6 +61,7 @@ const smtpOn = () => !!(SMTP_USER && SMTP_PASS);
 const transport = () => smtp || (smtp = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: SMTP_USER, pass: SMTP_PASS } }));
 // ---------- stopki mailowe zespołu z rkdp.pl/stopki (strona w repozytorium ruszniak/rkdp) ----------
 const FROM_NAME = 'RKDP | Kancelaria';
+const TEAM_FROM = 'rdp.app – zadania';
 let sigCache: { at: number; map: Map<string, string> } | null = null;
 // klucze: imię i nazwisko z nagłówka sekcji oraz części adresów e-mail ze stopki (np. „weronika.rzepkowska”) – działa też po zmianie nazwiska
 const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').replace(/Ł/g, 'L').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -88,9 +89,11 @@ const htmlToText = (h: string) => h.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(d
 const escH = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const bodyHtml = (t: string) => `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;">${escH(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#7A5A37;">$1</a>').replace(/\n/g, '<br>')}</div>`;
 
-async function sendMail(cfg: { sub: string; from: string }, fromName: string, to: string, subject: string, text: string, html?: string, bcc: string[] = [], attachments: any[] = []) {
+async function sendMail(cfg: { sub: string; from: string; appFrom?: string }, fromName: string, to: string, subject: string, text: string, html?: string, bcc: string[] = [], attachments: any[] = []) {
   if (smtpOn()) {
-    try { await transport().sendMail({ from: { name: fromName, address: cfg.from }, replyTo: cfg.from, to, ...(bcc.length ? { bcc } : {}), subject, text, ...(html ? { html } : {}), ...(attachments.length ? { attachments } : {}) }); return; }
+    // powiadomienia dla zespołu (zadania) – z adresu aplikacji (app@ruszniak.io); wiadomości do klientów RKDP – z kancelaria@rkdp.pl
+    const addr = fromName === TEAM_FROM && cfg.appFrom ? cfg.appFrom : cfg.from;
+    try { await transport().sendMail({ from: { name: fromName, address: addr }, replyTo: addr, to, ...(bcc.length ? { bcc } : {}), subject, text, ...(html ? { html } : {}), ...(attachments.length ? { attachments } : {}) }); return; }
     catch (e) { const m = String((e as Error).message || e); if (/Invalid login|Username and Password|535|534/i.test(m)) throw new Error('not_authorized: SMTP – nieprawidłowe hasło aplikacji (' + m.slice(0, 120) + ')'); throw e; }
   }
   if (attachments.length) throw new Error('Załączniki wymagają wysyłki przez SMTP (sekrety SMTP_USER i SMTP_PASS).');
@@ -106,9 +109,9 @@ async function sendMail(cfg: { sub: string; from: string }, fromName: string, to
   if (!r.ok) throw new Error('gmail ' + r.status + ': ' + (await r.text()).slice(0, 180));
 }
 async function config() {
-  const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_sender', 'mail_from']);
+  const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_sender', 'mail_from', 'app_mail_from']);
   const m = Object.fromEntries((data || []).map((x: any) => [x.key, (x.value || '').trim()]));
-  return { sub: m.mail_sender || '', from: m.mail_from || m.mail_sender || '' };
+  return { sub: m.mail_sender || '', from: m.mail_from || m.mail_sender || '', appFrom: m.app_mail_from || '' };
 }
 
 // stopka osoby wysyłającej (HTML z rkdp.pl/stopki) albo tekstowa
@@ -306,7 +309,7 @@ async function zlecenieMail(b: any, cfg: { sub: string; from: string }): Promise
     await admin.from('notify_queue').insert({ member_id: to.id, channel: 'mail', category: 'zadania', title: subject, body: text, html, url: link });
     return { sent: 0, queued: 1 };
   }
-  try { await sendMail(cfg, 'RKDP | Zadania', toAddr, subject, text, html); return { sent: 1 }; }
+  try { await sendMail(cfg, TEAM_FROM, toAddr, subject, text, html); return { sent: 1 }; }
   catch (e) { console.error('zlecenie mail', e); return { sent: 0, error: String((e as Error).message || e).slice(0, 200) }; }
 }
 
@@ -329,7 +332,7 @@ async function flushMail(cfg: { sub: string; from: string }) {
     const done = () => admin.from('notify_queue').update({ sent_at: new Date().toISOString() }).in('id', items.map((i: any) => i.id));
     if (!emailOk(addr)) { await done(); continue; }
     try {
-      if (items.length === 1) await sendMail(cfg, 'RKDP | Zadania', addr, items[0].title, items[0].body || '', items[0].html || undefined);
+      if (items.length === 1) await sendMail(cfg, TEAM_FROM, addr, items[0].title, items[0].body || '', items[0].html || undefined);
       else {
         const when = (d: string) => new Date(d).toLocaleString('pl-PL', { timeZone: 'Europe/Warsaw', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
         const subject = `Powiadomienia z rdp.app (${items.length})`;
@@ -339,7 +342,7 @@ async function flushMail(cfg: { sub: string; from: string }) {
           + `<h2 style="margin:0 0 12px;font-size:19px">Powiadomienia z przerwy (${items.length})</h2>`
           + items.map((i: any) => `<div style="padding:10px 0;border-bottom:1px solid #E5E8EF"><div style="color:#5E6577;font-size:12px">${when(i.created_at)}</div><a href="${i.url || APP_URL}" style="color:#2D4A8A;font-weight:700;text-decoration:none">${escH(i.title)}</a></div>`).join('')
           + `<p style="color:#5E564C;font-size:12px;margin-top:16px">Te powiadomienia przyszły poza Twoimi godzinami powiadomień. Godziny zmienisz w aplikacji: Mój profil.</p></div>`;
-        await sendMail(cfg, 'RKDP | Zadania', addr, subject, text, html);
+        await sendMail(cfg, TEAM_FROM, addr, subject, text, html);
       }
       await done(); sent++;
     } catch (e) { console.error('flush mail', e); }

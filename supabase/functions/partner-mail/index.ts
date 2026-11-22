@@ -16,9 +16,10 @@ const isPartner = (m: any) => (m?.modules || []).includes('partner') && !(m?.mod
 const first = (n: string) => String(n || '').split(' ')[0];
 
 async function settings() {
-  const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url']);
+  const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url', 'app_mail_from']);
   const m = Object.fromEntries((data || []).map((x: any) => [x.key, (x.value || '').trim()]));
-  return { from: m.mail_from || m.mail_sender || SMTP_USER, app: (m.app_url || 'https://app.ruszniak.io').replace(/\/$/, '') };
+  // biura partnerskie (klienci M2 TAX) i doradcy – z adresu aplikacji (app@ruszniak.io)
+  return { from: m.app_mail_from || m.mail_from || m.mail_sender || SMTP_USER, app: (m.app_url || 'https://app.ruszniak.io').replace(/\/$/, '') };
 }
 
 async function send(b: any) {

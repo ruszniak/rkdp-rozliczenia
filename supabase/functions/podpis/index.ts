@@ -101,16 +101,19 @@ ${att}${paras}${m.button && !placed ? btnHtml : ''}
   const textOut = `${m.text.replace('{button}', m.button ? m.button.url : '')}${m.button && !m.text.includes(m.button.url) ? `\n\n${m.button.label}: ${m.button.url}` : ''}\n\nPozdrawiamy,\nZespół ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}\n\n--\n${APP_LINE}\n${FIRM_FOOT[firm]}`;
   return { html, text: textOut, from: APP_FROM[firm] };
 }
-async function sendApp(S: { from: string; app: string }, me: any, to: string, subject: string, m: AppMail, attachments: any[] = []) {
+async function sendApp(S: { from: string; appFrom: string; app: string }, me: any, to: string, subject: string, m: AppMail, attachments: any[] = []) {
   const x = appMail(S.app, m);
-  await transport().sendMail({ from: { name: x.from, address: S.from }, replyTo: me?.email && emailOk(me.email) ? { name: me.full_name || x.from, address: me.email } : S.from, to, subject, text: x.text, html: x.html, ...(attachments.length ? { attachments } : {}) });
+  const addr = m.firm === 'm2' ? S.appFrom : S.from;
+  await transport().sendMail({ from: { name: x.from, address: addr }, replyTo: me?.email && emailOk(me.email) ? { name: me.full_name || x.from, address: me.email } : addr, to, subject, text: x.text, html: x.html, ...(attachments.length ? { attachments } : {}) });
   return x.text;
 }
 
 async function settings() {
-  const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url']);
+  const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url', 'app_mail_from']);
   const m = Object.fromEntries((data || []).map((x: any) => [x.key, (x.value || '').trim()]));
-  return { from: m.mail_from || m.mail_sender || SMTP_USER, app: (m.app_url || 'https://app.ruszniak.io').replace(/\/$/, '') };
+  const from = m.mail_from || m.mail_sender || SMTP_USER;
+  // kancelaria@rkdp.pl – klienci RKDP; app@ruszniak.io – klienci M2 TAX i powiadomienia dla zespołu
+  return { from, appFrom: m.app_mail_from || from, app: (m.app_url || 'https://app.ruszniak.io').replace(/\/$/, '') };
 }
 
 // stopka osoby wysyłającej z rkdp.pl/stopki (jak w funkcji „mail”)
@@ -155,7 +158,7 @@ async function notifyTeam(r: any, subject: string, head: string, text: string, i
     const to = (ms || []).map((m: any) => m.email).filter((e: string) => emailOk(String(e || '')));
     if (!to.length || !SMTP_USER || !SMTP_PASS) return;
     const link = r.order_id ? `${S.app}/#/doradztwo/zlecenie/${r.order_id}` : r.client_id ? `${S.app}/#/klient/${r.client_id}` : `${S.app}/#/doradztwo/klient/${r.m2_client_id}`;
-    await transport().sendMail({ from: { name: 'rdp.app – podpisy', address: S.from }, to, subject: subject.slice(0, 200), text,
+    await transport().sendMail({ from: { name: 'rdp.app – podpisy', address: S.appFrom }, to, subject: subject.slice(0, 200), text,
       html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px"><p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Podpis · rdp.app</p><h2 style="margin:0 0 12px;font-size:19px">${escH(head)}</h2>${inner}<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">${r.order_id ? 'Otwórz dokument w aplikacji' : 'Otwórz kartę klienta'}</a></p><p style="color:#6B7280;font-size:12px">${escH(foot)}</p></div>` });
   } catch (e) { console.error('mail zespół', e); }
 }
@@ -450,7 +453,7 @@ Deno.serve(async (req: Request) => {
       const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#1C1F26;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:6px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">Zobacz ofertę</a></p>`;
       const html = bodyHtml(textBody) + btn + (sig.sigHtml ? '<br>' + sig.sigHtml : bodyHtml(sig.text));
       try {
-        await transport().sendMail({ from: { name: FROM_NAME[firm], address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
+        await transport().sendMail({ from: { name: FROM_NAME[firm], address: firm === 'm2' ? S.appFrom : S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
       } catch (e) {
         await admin.from('shared_docs').update({ revoked_at: new Date().toISOString() }).eq('id', sd.id);
         return json({ error: 'send_failed', detail: String((e as Error).message || e).slice(0, 300) }, 200);
