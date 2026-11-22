@@ -19,7 +19,7 @@
 //             e-mail z aplikacji (ZAW-FA, UPL-1, PEL, UKO, instrukcje) – szablon rdp.app z logo kancelarii, odpowiedź wraca do osoby wysyłającej
 //             PDF nie jest załącznikiem: zapis w <klient>/wysylka/ + link /pobierz/?t=… ważny 30 dni (tabela doc_links)
 //  • file_link – publiczne { token, count? }: dane pliku i krótki link do pobrania (po 30 dniach – wygasł)
-//  E-maile do klientów (umowy, odpowiedzi, egzemplarze, dokumenty) wychodzą jako „rdp.app · RKDP” / „rdp.app · M2 TAX” (appMail).
+//  E-maile do klientów (umowy, odpowiedzi, egzemplarze, dokumenty) wychodzą jako „RKDP | Kancelaria” (kancelaria@rkdp.pl) / „rdp.app · M2 TAX” (appMail).
 //  • offer_mail – zalogowany: { offer_id, to, subject, body } – e-mail do klienta z linkiem do oferty (podgląd bez logowania, #/wynik/<token>)
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -70,7 +70,7 @@ function cleanPoints(list: unknown) {
 const m2Sig = (me: any) => ({ sigHtml: '', text: ['', 'Pozdrawiam serdecznie,', me?.full_name || '', 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska', 'ul. Zwycięska 3, 53-033 Wrocław', 'kancelaria@m2tax.pl · tel. 883 643 565 · www.m2tax.pl'].filter(Boolean).join('\n') });
 
 // ---------- e-mail z aplikacji: logo kancelarii, treść, przycisk, stopka rdp.app (bez osobistej stopki) ----------
-const APP_FROM: Record<string, string> = { rkdp: 'rdp.app · RKDP', m2: 'rdp.app · M2 TAX' };
+const APP_FROM: Record<string, string> = { rkdp: 'RKDP | Kancelaria', m2: 'rdp.app · M2 TAX' };
 const FIRM_FOOT: Record<string, string> = {
   rkdp: 'RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Czereśniowa 28d, 55-010 Ozorzyce · kancelaria: ul. Beaty Artemskiej 11/44, 52-234 Wrocław · tel. 883 643 565 · kancelaria@rkdp.pl · rkdp.pl',
   m2: 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska · ul. Zwycięska 3, 53-033 Wrocław · tel. 883 643 565 · kancelaria@m2tax.pl · m2tax.pl',
