@@ -100,6 +100,8 @@ const NEWS = [
     'Nowa wersja umowy pod tym samym linkiem: edycja treści (zmiany zaznaczają się klientowi automatycznie) albo własny PDF; klient podpisuje tylko najnowszą wersję, poprzednie zostają w historii.',
     'Odpowiadają: klienci RKDP – Michał, klienci M2 TAX – Michał i Marcin.',
     'Edycja nowej wersji: uwagi klienta widać obok treści umowy, „Przejdź do § …” przenosi do wskazanego paragrafu.',
+    'E-mail do klienta po odpowiedzi jest krótki („odnieśliśmy się do Państwa uwag” + link); na stronie klient może zgłosić kolejne uwagi albo zaakceptować stanowisko – wtedy dostajesz powiadomienie i „Wyślij do podpisu” (e-mail „Umowa czeka na podpis”).',
+    'Po podpisie klienta: „Wgraj egzemplarz podpisany przez nas” – klient pobiera swój egzemplarz obu stron z tego samego linku (dostaje e-mail).',
     'Długą uwagę klienta dzielisz na punkty (numerowane dzielą się same) i każdy oceniasz osobno, z komentarzem; okno odpowiedzi otwiera się na cały ekran.',
   ]],
   ['2.6', '20 listopada 2026', [

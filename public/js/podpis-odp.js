@@ -74,7 +74,9 @@ function editText(html, title, notes = []) {
 }
 
 // r: { id, title, email, firm, version, changes, status, notes: [...] }
-export async function replyDialog(r, onDone) {
+// opts.final – „Wyślij do podpisu” po uzgodnieniach: e-mail „umowa czeka na podpis” (z nową wersją albo bez zmian)
+export async function replyDialog(r, onDone, opts = {}) {
+  const final = !!opts.final;
   const { data: full, error } = await sb.from('sign_requests').select('doc_html').eq('id', r.id).maybeSingle();
   if (error) return fail(error);
   const oldHtml = full?.doc_html ? fullDoc(full.doc_html) : '';
@@ -122,7 +124,8 @@ export async function replyDialog(r, onDone) {
     });
     return `Dzień dobry,\n\ndziękujemy za uwagi do dokumentu.${lines.length ? ' Nasze stanowisko:\n\n' + lines.join('\n') : '\n'}\n\nW razie pytań jesteśmy do dyspozycji.`;
   };
-  ta.value = tpl();
+  ta.value = final ? 'Dziękujemy za uzgodnienia. Umowa czeka na Państwa podpis.' : tpl();
+  if (final) touched = true;
   ta.addEventListener('input', () => { touched = true; });
   const regen = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { touched = false; ta.value = tpl(); } }, 'Wstaw od nowa ze stanowiska');
   const refresh = () => { if (!touched) ta.value = tpl(); };
@@ -171,13 +174,14 @@ export async function replyDialog(r, onDone) {
   const changes = h('input', { class: 'input', maxlength: 2000, placeholder: 'np. § 12 ust. 2 – okres wypowiedzenia 2 miesiące' });
   const verInfo = h('p', { class: 'small', hidden: true });
   const changesBox = h('label', { class: 'field wide', hidden: true }, h('span', {}, 'Co się zmieniło (klient zobaczy to nad treścią)'), changes);
-  const sendBtn = h('button', { class: 'btn btn-primary btn-sm' }, icon('mail'), 'Wyślij odpowiedź');
+  const sendLabel = has => final ? (has ? `Wyślij wersję ${next} do podpisu` : 'Wyślij do podpisu (bez zmian)') : has ? `Wyślij odpowiedź i wersję ${next}` : 'Wyślij odpowiedź';
+  const sendBtn = h('button', { class: 'btn btn-primary btn-sm' }, icon('mail'), sendLabel(false));
   const setMode = m => {
     mode = m;
     modeBtns.forEach(b => b.classList.toggle('on', b.dataset.m === m));
     const has = m !== 'none' && (newHtml || newBytes);
     changesBox.hidden = !has; verInfo.hidden = !has;
-    sendBtn.replaceChildren(icon('mail'), has ? `Wyślij odpowiedź i wersję ${next}` : 'Wyślij odpowiedź');
+    sendBtn.replaceChildren(icon('mail'), sendLabel(has));
   };
   const pickEdit = async () => {
     const x = await editText(newHtml && mode === 'edit' ? newHtml : oldHtml, `Wersja ${next} – edytuj treść`, notes);
@@ -221,17 +225,17 @@ export async function replyDialog(r, onDone) {
       pending.length ? h('p', { class: 'hint', style: { margin: '0 0 8px' } }, 'Przy każdej uwadze (albo każdym punkcie) zaznacz: przyjmuję / częściowo / nie przyjmuję i ewentualnie dopisz komentarz – stanowisko wpisze się do odpowiedzi.') : null,
       thread),
     h('div', { class: 'odp-right' },
-    h('label', { class: 'field wide' }, h('span', {}, 'Twoja odpowiedź (klient zobaczy ją na stronie dokumentu i dostanie e-mail; stopka dopisze się sama)'), ta),
+    h('label', { class: 'field wide' }, h('span', {}, final ? 'Wiadomość na stronie umowy (klient dostanie e-mail „umowa czeka na podpis” z linkiem)' : 'Twoje stanowisko – klient przeczyta je na stronie dokumentu (e-mail: krótka informacja, że odnieśliśmy się do uwag, i link)'), ta),
     h('div', { class: 'row-btns', style: { justifyContent: 'flex-end' } }, regen),
     h('h4', { class: 'odp-h' }, 'Nowa wersja dokumentu (opcjonalnie)'),
     h('div', { class: 'row-btns' }, ...modeBtns),
     verInfo, changesBox,
     h('p', { class: 'hint', style: { marginTop: '6px' } }, 'Nowa wersja trafia pod ten sam link – klient zobaczy zaznaczone zmiany i podpisze tylko najnowszą. Poprzednia zostaje w historii.')));
 
-  modal('Odpowiedz na uwagi', body, close => {
+  modal(final ? 'Wyślij umowę do podpisu' : 'Odpowiedz na uwagi', body, close => {
     sendBtn.onclick = async () => {
       const text = ta.value.trim();
-      if (text.length < 2) return toast('Wpisz odpowiedź dla klienta', true);
+      if (!final && text.length < 2) return toast('Wpisz odpowiedź dla klienta', true);
       const withVer = mode !== 'none' && (newHtml || newBytes);
       if (withVer && !changes.value.trim()) return toast('Opisz krótko, co się zmieniło w nowej wersji', true);
       sendBtn.disabled = true;
@@ -244,12 +248,12 @@ export async function replyDialog(r, onDone) {
           version = { attachment: { base64: b64(bytes) }, doc_html: newHtml || null, changes: changes.value.trim() };
         }
         sendBtn.textContent = 'Wysyłam…';
-        const { data: x, error: e } = await sb.functions.invoke('podpis', { body: { action: 'reply', id: r.id, text,
+        const { data: x, error: e } = await sb.functions.invoke('podpis', { body: { action: 'reply', id: r.id, text, final,
           verdicts: pending.map(n => ({ id: n.id, verdict: noteVerdict(n) })).filter(x => x.verdict), version } });
         if (e || x?.error) throw new Error(x?.detail || x?.error || e.message);
         close();
         if (x.mail_error) toast('Odpowiedź zapisana, ale e-mail się nie wysłał – skopiuj link i wyślij klientowi', true);
-        else toast(r.email ? `Wysłano odpowiedź${version ? ` i wersję ${x.version}` : ''}: ${r.email}` : 'Zapisano odpowiedź – wyślij klientowi link');
+        else toast(r.email ? `Wysłano ${final ? 'do podpisu' : 'odpowiedź'}${version ? ` i wersję ${x.version}` : ''}: ${r.email}` : 'Zapisano odpowiedź – wyślij klientowi link');
         if (!r.email || x.mail_error) { try { await navigator.clipboard.writeText(x.link); } catch { /* */ } }
         onDone?.(x);
       } catch (err) { fail(err, 'Nie udało się wysłać odpowiedzi'); sendBtn.disabled = false; setMode(mode); }

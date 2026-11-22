@@ -169,6 +169,27 @@ function showLink(link, title) {
 }
 
 // Panel „Do podpisu”: filter = { client_id } | { order_id } | { m2_client_id }
+// egzemplarz podpisany przez obie strony → klient pobiera go z tego samego linku (e-mail z aplikacji)
+function uploadFinal(r, done) {
+  const inp = h('input', { type: 'file', accept: '.pdf,.xml,.xades,.p7s,.p7m,.zip,.asice,.asics', hidden: true });
+  inp.addEventListener('change', async () => {
+    const f = inp.files[0]; inp.remove(); if (!f) return;
+    if (f.size > 10 * 1048576) return toast('Plik jest większy niż 10 MB', true);
+    if (!confirm(`Wgrać „${f.name}” jako egzemplarz podpisany przez obie strony?${r.email ? `\n\nKlient (${r.email}) dostanie e-mail z linkiem do pobrania.` : '\n\nProśba nie ma e-maila – link do strony skopiujesz i wyślesz sam.'}`)) return;
+    try {
+      const bytes = new Uint8Array(await f.arrayBuffer()); let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      toast('Wysyłam egzemplarz…');
+      const { data: x, error: e } = await sb.functions.invoke('podpis', { body: { action: 'final', id: r.id, attachment: { base64: btoa(bin), name: f.name } } });
+      if (e || x?.error) throw new Error(x?.error || e.message);
+      if (x.mailed) toast(`Wysłano klientowi link do egzemplarza: ${r.email}`);
+      else { try { await navigator.clipboard.writeText(x.link); } catch { /* */ } toast(x.mail_error ? 'Zapisano, ale e-mail się nie wysłał – link skopiowany' : 'Zapisano egzemplarz – link do strony skopiowany', !!x.mail_error); }
+      done?.();
+    } catch (err) { fail(err, 'Nie udało się wgrać egzemplarza'); }
+  });
+  document.body.append(inp); inp.click();
+}
+
 export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } = {}) {
   const box = h('div', { class: 'sign-box', hidden: true });
   const d = v => v ? new Date(v).toLocaleDateString('pl-PL') : '';
@@ -178,7 +199,7 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
     window.open(data.url, '_blank', 'noopener');
   }
   async function load() {
-    let q = sb.from('sign_requests').select('id, title, email, status, token, kind, created_at, opened_at, signed_at, expires_at, firm, version, changes, sign_notes(id, body, author, created_at, from_client, verdict, version)');
+    let q = sb.from('sign_requests').select('id, title, email, status, token, kind, created_at, opened_at, signed_at, expires_at, firm, version, changes, accepted_at, final_at, final_name, sign_notes(id, body, author, created_at, from_client, verdict, version, kind)');
     for (const [k, v] of Object.entries(filter)) q = q.eq(k, v);
     const { data, error } = await q.order('created_at', { ascending: false }).limit(12);
     if (error || (!data?.length && emptyHidden)) { box.hidden = true; return; }
@@ -187,9 +208,10 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
       const expired = r.status === 'wyslano' && new Date(r.expires_at) < new Date();
       const notes = (r.sign_notes || []).sort((a, b) => a.created_at.localeCompare(b.created_at));
       const last = notes[notes.length - 1];
-      const waiting = !!last && last.from_client !== false;   // ostatnie słowo klienta – czeka na odpowiedź
-      const [label, cls] = r.status === 'podpisano' ? ['podpisano ' + d(r.signed_at), 'ok'] : r.status === 'anulowano' ? ['anulowano', 'off']
-        : expired ? ['link wygasł', 'off'] : waiting ? ['uwagi klienta – czeka na odpowiedź', 'warn'] : last ? ['odpowiedziano ' + d(last.created_at), 'info']
+      const accepted = r.status === 'wyslano' && !!r.accepted_at;   // klient zaakceptował stanowisko – przygotować umowę do podpisu
+      const waiting = !accepted && !!last && last.from_client !== false;   // ostatnie słowo klienta – czeka na odpowiedź
+      const [label, cls] = r.status === 'podpisano' ? [r.final_at ? 'podpisano przez obie strony · egzemplarz wysłany ' + d(r.final_at) : 'podpisano ' + d(r.signed_at) + ' – wgraj nasz podpis', 'ok'] : r.status === 'anulowano' ? ['anulowano', 'off']
+        : expired ? ['link wygasł', 'off'] : accepted ? ['klient zaakceptował – wyślij umowę do podpisu', 'warn'] : waiting ? ['uwagi klienta – czeka na odpowiedź', 'warn'] : last ? ['odpowiedziano ' + d(last.created_at), 'info']
         : r.opened_at ? ['otwarto ' + d(r.opened_at), 'info'] : ['wysłano ' + d(r.created_at), 'info'];
       const mayReply = r.status === 'wyslano' && (state.me?.role === 'admin' || (r.firm === 'm2' && state.me?.id === 'c66817f8-61a2-4605-a503-07cbcf9d47d5'));
       const link = `${location.origin}/podpis/?t=${r.token}`;
@@ -200,12 +222,18 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
             h('span', { class: 'small muted' }, ` · ${r.email || 'link skopiowany'} · ${d(r.created_at)}`)),
           h('span', { class: 'sign-st ' + cls }, label),
           h('span', { class: 'row-btns' },
-            mayReply && notes.length ? h('button', { class: 'btn btn-sm ' + (waiting ? 'btn-primary' : 'btn-outline'), type: 'button', 'data-tip': 'Odpowiedz klientowi na uwagi i ewentualnie wyślij nową wersję dokumentu pod tym samym linkiem', onclick: async () => {
+            mayReply && notes.length ? h('button', { class: 'btn btn-sm ' + (accepted ? 'btn-primary' : 'btn-outline'), type: 'button', 'data-tip': 'Umowa do podpisu po uzgodnieniach: nowa wersja albo bez zmian – klient dostanie e-mail, że umowa czeka na podpis', onclick: async () => {
+              const { replyDialog } = await import('./podpis-odp.js');
+              replyDialog({ ...r, notes }, () => load(), { final: true });
+            } }, icon('file'), 'Wyślij do podpisu') : null,
+            mayReply && notes.length && !accepted ? h('button', { class: 'btn btn-sm ' + (waiting ? 'btn-primary' : 'btn-outline'), type: 'button', 'data-tip': 'Odpowiedz klientowi na uwagi i ewentualnie wyślij nową wersję dokumentu pod tym samym linkiem', onclick: async () => {
               const { replyDialog } = await import('./podpis-odp.js');
               replyDialog({ ...r, notes }, () => load());
             } }, icon('mail'), 'Odpowiedz') : null,
             h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => open(r, 'original') }, 'PDF'),
             r.status === 'podpisano' ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => open(r, 'signed') }, 'Podpisany plik') : null,
+            r.status === 'podpisano' && r.final_at ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', 'data-tip': 'Egzemplarz podpisany przez obie strony (klient pobiera go z linku)', onclick: () => open(r, 'final') }, 'Egzemplarz obu stron') : null,
+            r.status === 'podpisano' ? h('button', { class: 'btn btn-sm ' + (r.final_at ? 'btn-ghost' : 'btn-primary'), type: 'button', 'data-tip': 'Wgraj umowę podpisaną także przez nas – klient dostanie e-mail z linkiem do pobrania swojego egzemplarza', onclick: () => uploadFinal(r, load) }, icon('paperclip'), r.final_at ? 'Podmień egzemplarz' : 'Wgraj egzemplarz podpisany przez nas') : null,
             active ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('Skopiowano link do podpisu'); } catch { prompt('Link do podpisu:', link); } } }, 'Kopiuj link') : null,
             active ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
               if (!confirm(`Anulować prośbę o podpis „${r.title}”? Link u klienta przestanie działać.`)) return;
@@ -214,6 +242,7 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
               toast('Anulowano prośbę o podpis'); load();
             } }, 'Anuluj') : null)),
         ...notes.map(n => {
+          if (n.kind === 'akceptacja') return h('div', { class: 'sign-note acc' }, h('small', {}, `Klient zaakceptował stanowisko${n.author ? ' – ' + n.author : ''} · ${new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}`), 'Prosi o przygotowanie umowy do podpisu.');
           const office = n.from_client === false, when = new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' });
           return h('div', { class: 'sign-note' + (office ? ' office' : '') }, h('small', {},
             office ? `Odpowiedź – ${n.author || 'biuro'} · ${when}${n.version > 1 ? ` · z wersją ${n.version}` : ''}` : `Uwagi klienta${n.author ? ' – ' + n.author : ''} · ${when}${n.version && r.version > 1 ? ` · do wersji ${n.version}` : ''}`,

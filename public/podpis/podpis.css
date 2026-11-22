@@ -9,3 +9,8 @@
 .notes .n.office{background:#fff;border-left-color:var(--ink);padding-left:14px}
 .notes .vd{display:inline-block;margin-left:8px;font-size:13px;color:var(--accent-2);border:1px solid var(--line-2);border-radius:4px;padding:0 6px;white-space:nowrap}
 .notes h3{margin:0 0 2px;font-size:17px}
+.decide{border:1px solid var(--accent);padding:14px 18px;margin:14px 0}
+.decide p{margin:0 0 10px}
+.decided{border-left:3px solid var(--accent);padding:8px 14px;margin:14px 0;color:var(--accent-2)}
+#final{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+#final a.btn-p{display:inline-block;text-decoration:none}

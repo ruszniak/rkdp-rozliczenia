@@ -3559,3 +3559,5 @@ fieldset.kl-form:disabled .partner{border-color:var(--line)}
 .odp-go{margin-top:4px}.odp-go .btn{padding:2px 8px;font-size:12.5px}
 @media (max-width:900px){.odp-ed-wrap.with-side{grid-template-columns:1fr}.odp-side{order:-1;max-height:30vh}.odp-edit{height:60vh}}
 :root[data-theme="dark"] .odp-n{background:rgba(245,158,11,.12)}:root[data-theme="dark"] .odp-n.office{background:rgba(59,130,246,.12)}
+.sign-note.acc{border-left-color:#16A34A;background:#F0FDF4}.sign-note.acc small{color:#166534}
+:root[data-theme="dark"] .sign-note.acc{background:rgba(22,163,74,.12)}

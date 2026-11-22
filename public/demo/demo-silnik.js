@@ -1,6 +1,7 @@
 // Wersja demonstracyjna: atrapa bazy danych w przeglądarce (dane z demo-dane.js – wyłącznie fikcyjne)
 (function () {
   const D = window.MOCK_DATA;
+  if (D._sr_more) { D.sign_requests.push(...D._sr_more); delete D._sr_more; }
   const as = 'demo@przyklad.pl';
   const loggedIn = true;
   const me = D.team_members.find(m => m.email === as);
@@ -142,11 +143,15 @@
           }
           return { data: null, error: null };
         },
-        functions: { invoke: async (name, { body }) => name === 'podpis' && body.action === 'reply' ? (() => {
+        functions: { invoke: async (name, { body }) => name === 'podpis' && body.action === 'final' ? (() => {
+          const r = D.sign_requests.find(x => x.id === body.id); r.final_at = new Date().toISOString(); r.final_name = r.title + ' – podpisana przez obie strony.pdf'; window.__final = body.attachment.name;
+          return { data: { ok: true, link: location.origin + '/podpis/?t=' + r.token, mailed: true } };
+        })() : name === 'podpis' && body.action === 'reply' ? (() => {
           const r = D.sign_requests.find(x => x.id === body.id); const now = new Date().toISOString();
           (body.verdicts || []).forEach(v => { const n = D.sign_notes.find(x => x.id === v.id); if (n) n.verdict = v.verdict; });
           if (body.version) { D.sign_versions.push({ id: uuid(), request_id: r.id, version: r.version, doc_html: r.doc_html, changes: r.changes }); r.version += 1; r.doc_html = body.version.doc_html; r.changes = body.version.changes; }
-          D.sign_notes.push({ id: uuid(), request_id: r.id, body: body.text, author: me.full_name + ', M2 TAX', from_client: false, version: r.version, verdict: null, created_at: now });
+          if (body.final || body.version) r.accepted_at = null;
+          D.sign_notes.push({ id: uuid(), request_id: r.id, body: body.text || 'Umowa czeka na Państwa podpis.', author: me.full_name + ', M2 TAX', from_client: false, version: r.version, verdict: null, kind: body.final ? 'do_podpisu' : body.version ? 'wersja' : 'odpowiedz', created_at: now });
           window.__reply = body;
           return { data: { ok: true, link: location.origin + '/podpis/?t=' + r.token, version: r.version } };
         })() : name === 'mail' ? ({ data: body.action === 'status' ? { ready: false } : { sent: body.client_ids.length, results: body.client_ids.map(id => ({ client_id: id, ok: true })) } }) : name === 'docs' ? ({ data: { sent: false, reason: 'not_configured' } }) : name === 'monitor' ? (() => {

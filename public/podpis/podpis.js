@@ -93,8 +93,32 @@
           if (r.error) { nErr.textContent = r.error; nErr.hidden = false; return; }
           notes = notes.concat([{ body: txt, author: who, created_at: new Date().toISOString(), version: ver, from_client: true }]); drawNotes(notes);
           document.getElementById('noteTxt').value = ''; form.hidden = true;
-          notesBox.insertAdjacentHTML('beforeend', '<p class="sent">Uwagi zostały wysłane. Odezwiemy się wkrótce.</p>');
+          notesBox.insertAdjacentHTML('beforeend', '<p class="sent">Wysłane do biura. Odpowiedź zobaczysz tutaj i dostaniesz e-mailem.</p>');
+          decideState();
         }).catch(function () { btn.disabled = false; btn.textContent = 'Wyślij uwagi'; nErr.textContent = 'Brak połączenia – spróbuj ponownie.'; nErr.hidden = false; });
+    });
+    // po odpowiedzi biura (bez nowej wersji): akceptacja stanowiska albo kolejne uwagi
+    var decideBox = document.getElementById('decide'), decided = document.getElementById('decided');
+    var decideState = function () {
+      var lastOffice = -1; notes.forEach(function (n, i) { if (n.from_client === false) lastOffice = i; });
+      var after = lastOffice >= 0 ? notes.slice(lastOffice + 1) : [];
+      var office = lastOffice >= 0 ? notes[lastOffice] : null;
+      var accepted = after.some(function (n) { return n.kind === 'akceptacja'; });
+      decideBox.hidden = !(d.status === 'wyslano' && office && office.kind !== 'wersja' && office.kind !== 'do_podpisu' && !after.length);
+      decided.hidden = !(d.status === 'wyslano' && accepted);
+    };
+    decideState();
+    document.getElementById('moreBtn').addEventListener('click', function () { form.hidden = false; document.getElementById('noteTxt').focus(); });
+    document.getElementById('accBtn').addEventListener('click', function () {
+      var b = this, aErr = document.getElementById('accErr'); b.disabled = true; b.textContent = 'Wysyłam…'; aErr.hidden = true;
+      var who = document.getElementById('noteWho').value.trim();
+      fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept', token: token, author: who }) })
+        .then(function (r) { return r.json(); }).then(function (r) {
+          b.disabled = false; b.textContent = 'Akceptuję stanowisko biura';
+          if (r.error) { aErr.textContent = r.error; aErr.hidden = false; return; }
+          notes = notes.concat([{ body: 'Akceptuję stanowisko biura. Proszę o przygotowanie umowy do podpisu.', author: who, created_at: new Date().toISOString(), version: ver, from_client: true, kind: 'akceptacja' }]);
+          drawNotes(notes); decideState();
+        }).catch(function () { b.disabled = false; b.textContent = 'Akceptuję stanowisko biura'; aErr.textContent = 'Brak połączenia – spróbuj ponownie.'; aErr.hidden = false; });
     });
     if (d.firm === 'm2') {   // M2 TAX: dane kontaktowe kancelarii
       document.getElementById('contact').innerHTML = 'Zadzwoń: <a href="tel:+48883643565">883 643 565</a> · napisz: <a href="mailto:kancelaria@m2tax.pl">kancelaria@m2tax.pl</a>.';
@@ -112,7 +136,10 @@
     ways.forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); pick(a.dataset.way); step(1); }); });
     pick('pz');
     if (d.status === 'podpisano') { step(3); document.getElementById('up').hidden = true; document.getElementById('done').hidden = false;
-      document.querySelector('#done p').textContent = 'Podpisany dokument dotarł do nas ' + new Date(d.signed_at).toLocaleDateString('pl-PL') + '. Jeśli chcesz wysłać poprawioną wersję – skontaktuj się z biurem.'; return; }
+      document.querySelector('#done p').textContent = 'Podpisany dokument dotarł do nas ' + new Date(d.signed_at).toLocaleDateString('pl-PL') + '.' + (d.final && d.final.url ? '' : ' Gdy podpiszemy go po naszej stronie, Twój egzemplarz pojawi się tutaj – wyślemy też e-mail.');
+      if (d.final && d.final.url) { document.getElementById('final').hidden = false; var fd = document.getElementById('finalDl'); fd.href = d.final.url; if (d.final.name) fd.setAttribute('download', d.final.name);
+        document.querySelector('#done h2').textContent = 'Umowa podpisana przez obie strony'; document.getElementById('done').scrollIntoView({ block: 'center' }); }
+      return; }
     // wgrywanie
     var input = document.getElementById('file'), drop = document.getElementById('drop'), send = document.getElementById('send'), err = document.getElementById('err');
     var file = null;
