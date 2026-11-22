@@ -82,11 +82,11 @@
     };
     var ptHtml = function (n, p, i) {
       var key = n.id + ':' + i, open = roundPts.some(function (r) { return r.key === key; });
-      return '<div class="pt' + (p.v ? ' v-' + p.v : '') + '"><div class="pt-h"><b>' + esc(p.n || 'Uwaga') + '</b>' + (p.v && VD[p.v] ? '<span class="vd">' + VD[p.v] + '</span>' : '') + '</div>'
+      return '<div class="pt' + (p.v ? ' v-' + p.v : '') + '"><div class="pt-h"><b>' + esc(p.n || 'Uwaga') + '</b>' + (p.v && VD[p.v] ? '<span class="vd vd-' + p.v + '">' + VD[p.v] + '</span>' : '') + '</div>'
         + (p.a ? '<div class="pt-q">' + esc(p.t.length > 220 ? p.t.slice(0, 220) + '…' : p.t) + '</div><div class="pt-t">' + (p.a === 'ok' ? 'Akceptuję stanowisko kancelarii.' : esc(p.x || '')) + '</div>'
           : '<div class="pt-t">' + esc(p.t) + '</div>')
         + (p.c ? '<div class="pt-c"><b>Kancelaria:</b> ' + esc(p.c) + '</div>' : '')
-        + (open ? '<div class="pr" data-k="' + key + '"><div class="pr-b"><button type="button" class="btn-s" data-a="ok">Akceptuję</button><button type="button" class="btn-s" data-a="uwaga">Mam uwagę</button></div>'
+        + (open ? '<div class="pr" data-k="' + key + '"><p class="pr-ok" hidden>Kancelaria przyjęła tę propozycję – nie wymaga odpowiedzi. <button type="button" class="lnk">Mam jednak uwagę</button></p><div class="pr-b"><button type="button" class="btn-s" data-a="ok">Akceptuję</button><button type="button" class="btn-s" data-a="uwaga">Mam uwagę</button></div>'
           + '<textarea rows="3" maxlength="3000" placeholder="Twoja odpowiedź do tego punktu" hidden></textarea></div>' : '')
         + '</div>';
     };
@@ -104,10 +104,17 @@
             : esc(n.kind === 'akceptacja' ? 'Akceptuję stanowisko kancelarii. Proszę o przygotowanie umowy do podpisu.' : n.body)) + '</div>';
       }).join('') : '';
       notesBox.querySelectorAll('.pr').forEach(function (el) {
-        var k = el.dataset.k, ta = el.querySelector('textarea'), bs = el.querySelectorAll('button');
+        var k = el.dataset.k, ta = el.querySelector('textarea'), bs = el.querySelectorAll('.pr-b button');
         var r0 = roundPts.filter(function (r) { return r.key === k; })[0];
         if (!resp[k]) resp[k] = { a: r0 && r0.p.v === 'przyjete' ? 'ok' : '', x: '' };
-        var paint = function () { bs.forEach(function (b) { b.classList.toggle('on', b.dataset.a === resp[k].a); }); ta.hidden = resp[k].a !== 'uwaga'; el.parentNode.classList.toggle('need', !resp[k].a); };
+        var okBox = el.querySelector('.pr-ok'), pb = el.querySelector('.pr-b');
+        var compact = r0 && r0.p.v === 'przyjete' && resp[k].a === 'ok' && !resp[k].open;
+        okBox.querySelector('button').addEventListener('click', function () { resp[k].open = true; paint(); });
+        var paint = function () {
+          compact = r0 && r0.p.v === 'przyjete' && resp[k].a === 'ok' && !resp[k].open;
+          okBox.hidden = !compact; pb.hidden = !!compact;
+          bs.forEach(function (b) { b.classList.toggle('on', b.dataset.a === resp[k].a); }); ta.hidden = resp[k].a !== 'uwaga'; el.parentNode.classList.toggle('need', !resp[k].a);
+        };
         bs.forEach(function (b) { b.addEventListener('click', function () { resp[k].a = b.dataset.a; paint(); if (b.dataset.a === 'uwaga') ta.focus(); }); });
         ta.value = resp[k].x; ta.addEventListener('input', function () { resp[k].x = ta.value; });
         paint();
