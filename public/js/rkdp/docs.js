@@ -348,13 +348,13 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
 const UPL_WAYS = {
   wszystkie: 'Wszystkie trzy sposoby – klient wybiera',
   ezus: 'Online w e-Urzędzie Skarbowym (profil zaufany, bank, e-dowód)',
-  edoreczenia: 'Podpis zaufany na PDF + wysyłka przez e-Doręczenia',
+  edoreczenia: 'Podpis zaufany na PDF + e-Doręczenia lub pismo ogólne w e-US',
   papier: 'Na papierze – wydruk, podpis, oryginał do biura lub urzędu',
 };
 const UPL_TXT = {
-  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (podatki.gov.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym i wysyłając go do urzędu skarbowego przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu prosimy odesłać lub przekazać oryginał do naszego biura (złożymy go w urzędzie) albo złożyć go w urzędzie skarbowym.',
+  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (podatki.gov.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym i wysyłając go do urzędu skarbowego przez e-Doręczenia albo jako pismo ogólne w e-Urzędzie Skarbowym,\n• na papierze – po wydrukowaniu i podpisaniu prosimy odesłać lub przekazać oryginał do naszego biura (złożymy go w urzędzie) albo złożyć go w urzędzie skarbowym.',
   ezus: 'Najszybciej złożyć je samodzielnie online w e-Urzędzie Skarbowym (podatki.gov.pl) – logowanie profilem zaufanym, e-dowodem albo przez bank. Dane do wpisania (m.in. dane pełnomocnika) są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam potwierdzenia UPO.',
-  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do urzędu skarbowego przez e-Doręczenia, a dowód nadania przesłać nam.',
+  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do urzędu skarbowego przez e-Doręczenia albo jako pismo ogólne w e-Urzędzie Skarbowym, a potwierdzenie przesłać nam.',
   papier: 'Prosimy wydrukować formularz, podpisać go w części E i odesłać lub przekazać oryginał do naszego biura – złożymy go w urzędzie skarbowym. Można też złożyć go samodzielnie w urzędzie skarbowym.',
 };
 // ---------- ZUS PEL do klienta e-mailem – klient składa sam (eZUS, e-Doręczenia, osobiście / pocztą) ----------
@@ -373,23 +373,23 @@ const PEL_TXT = {
 const ZAW_WAYS = {
   wszystkie: 'Wszystkie trzy sposoby – klient wybiera',
   ezus: 'Online w e-Urzędzie Skarbowym (formularz ZAW-FA)',
-  edoreczenia: 'Podpisany PDF (podpis zaufany) – pismo ogólne w e-US',
+  edoreczenia: 'Podpisany PDF (podpis zaufany) – pismo ogólne w e-US lub e-Doręczenia',
   papier: 'Na papierze – podpis zarządu, oryginał do urzędu skarbowego',
 };
 const ZAW_TXT = {
-  wszystkie: 'Zawiadomienie można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA) – dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym lub kwalifikowanym i wysyłając go jako pismo ogólne w e-Urzędzie Skarbowym,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji (zgodnie z KRS) w urzędzie skarbowym albo listem poleconym.',
+  wszystkie: 'Zawiadomienie można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA) – dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym lub kwalifikowanym i wysyłając go do urzędu skarbowego jako pismo ogólne w e-Urzędzie Skarbowym albo przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji (zgodnie z KRS) w urzędzie skarbowym albo listem poleconym.',
   ezus: 'Najprościej złożyć je online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA). Dane do wpisania są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam UPO.',
-  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym lub kwalifikowanym (osoby uprawnione do reprezentacji zgodnie z KRS) i wysłać go jako pismo ogólne do urzędu skarbowego w e-Urzędzie Skarbowym, a potwierdzenie przesłać nam.',
+  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym lub kwalifikowanym (osoby uprawnione do reprezentacji zgodnie z KRS) i wysłać go do urzędu skarbowego jako pismo ogólne w e-Urzędzie Skarbowym albo przez e-Doręczenia, a potwierdzenie przesłać nam.',
   papier: 'Prosimy wydrukować formularz, podpisać go w części E (osoby uprawnione do reprezentacji zgodnie z KRS) i złożyć w urzędzie skarbowym albo wysłać listem poleconym.',
 };
 const UKO_WAYS = {
   wszystkie: 'Oba sposoby – klient wybiera',
-  edoreczenia: 'Podpisany PDF (profil zaufany / kwalifikowany) – pismo ogólne w e-US',
+  edoreczenia: 'Podpisany PDF (profil zaufany / kwalifikowany) – pismo ogólne w e-US lub e-Doręczenia',
   papier: 'Na papierze – podpis reprezentantów, oryginał do urzędu skarbowego',
 };
 const UKO_TXT = {
-  wszystkie: 'Wniosek można złożyć:\n• elektronicznie – podpisując załączony PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysyłając go jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji w urzędzie skarbowym właściwym w sprawach ewidencji (osobiście lub pocztą).',
-  edoreczenia: 'Prosimy podpisać załączony PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysłać go jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym, a potwierdzenie (UPO) przesłać nam.',
+  wszystkie: 'Wniosek można złożyć:\n• elektronicznie – podpisując załączony PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysyłając go do urzędu skarbowego jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym albo przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji w urzędzie skarbowym właściwym w sprawach ewidencji (osobiście lub pocztą).',
+  edoreczenia: 'Prosimy podpisać załączony PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysłać go do urzędu skarbowego jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym albo przez e-Doręczenia, a potwierdzenie (UPO lub dowód nadania) przesłać nam.',
   papier: 'Prosimy wydrukować wniosek, podpisać go (osoby uprawnione do reprezentacji zgodnie z KRS) i złożyć w urzędzie skarbowym właściwym w sprawach ewidencji – osobiście albo listem poleconym.',
 };
 const MAIL_DOCS = {
