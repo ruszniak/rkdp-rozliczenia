@@ -309,7 +309,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     } catch (e) { fail(e, 'Nie udało się wygenerować dokumentu'); }
   }
 
-  // UPL-1: e-mail do klienta z wypełnionym formularzem (PDF w załączniku) i linkiem do instrukcji złożenia
+  // UPL-1: e-mail do klienta z wypełnionym formularzem (PDF do pobrania linkiem ważnym 30 dni) i linkiem do instrukcji złożenia
   const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => !cl ? toast('Wybierz klienta', true)
     : d.type === 'pel' ? sendUpl1(cl, v.pel, pelnomocnik(), fname('PEL', 'pdf'), 'pel') : d.type === 'zawfa' ? sendUpl1(cl, v.zawfa, null, fname('ZAW-FA', 'pdf'), 'zawfa') : d.type === 'uko' ? sendUpl1(cl, v.uko, null, fname('Wniosek_UKO', 'pdf'), 'uko') : sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) }, icon('mail'), 'Wyślij klientowi');
   // umowa: e-mail z linkiem do strony podpisu (podgląd, uwagi, profil zaufany / kwalifikowany / odręcznie); podpisany plik wraca do archiwum klienta
@@ -352,9 +352,9 @@ const UPL_WAYS = {
   papier: 'Na papierze – wydruk, podpis, oryginał do biura lub urzędu',
 };
 const UPL_TXT = {
-  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (podatki.gov.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym i wysyłając go do urzędu skarbowego przez e-Doręczenia albo jako pismo ogólne w e-Urzędzie Skarbowym,\n• na papierze – po wydrukowaniu i podpisaniu prosimy odesłać lub przekazać oryginał do naszego biura (złożymy go w urzędzie) albo złożyć go w urzędzie skarbowym.',
-  ezus: 'Najszybciej złożyć je samodzielnie online w e-Urzędzie Skarbowym (podatki.gov.pl) – logowanie profilem zaufanym, e-dowodem albo przez bank. Dane do wpisania (m.in. dane pełnomocnika) są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam potwierdzenia UPO.',
-  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do urzędu skarbowego przez e-Doręczenia albo jako pismo ogólne w e-Urzędzie Skarbowym, a potwierdzenie przesłać nam.',
+  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (podatki.gov.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w pobranym formularzu,\n• podpisując pobrany PDF podpisem zaufanym i wysyłając go do urzędu skarbowego przez e-Doręczenia albo jako pismo ogólne w e-Urzędzie Skarbowym,\n• na papierze – po wydrukowaniu i podpisaniu prosimy odesłać lub przekazać oryginał do naszego biura (złożymy go w urzędzie) albo złożyć go w urzędzie skarbowym.',
+  ezus: 'Najszybciej złożyć je samodzielnie online w e-Urzędzie Skarbowym (podatki.gov.pl) – logowanie profilem zaufanym, e-dowodem albo przez bank. Dane do wpisania (m.in. dane pełnomocnika) są w pobranym formularzu. Po wysłaniu prosimy o przesłanie nam potwierdzenia UPO.',
+  edoreczenia: 'Prosimy podpisać pobrany PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do urzędu skarbowego przez e-Doręczenia albo jako pismo ogólne w e-Urzędzie Skarbowym, a potwierdzenie przesłać nam.',
   papier: 'Prosimy wydrukować formularz, podpisać go w części E i odesłać lub przekazać oryginał do naszego biura – złożymy go w urzędzie skarbowym. Można też złożyć go samodzielnie w urzędzie skarbowym.',
 };
 // ---------- ZUS PEL do klienta e-mailem – klient składa sam (eZUS, e-Doręczenia, osobiście / pocztą) ----------
@@ -365,9 +365,9 @@ const PEL_WAYS = {
   papier: 'Osobiście w ZUS lub pocztą – wydruk i podpis odręczny',
 };
 const PEL_TXT = {
-  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w eZUS (zus.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym i wysyłając go do ZUS przez e-Doręczenia,\n• osobiście w dowolnej placówce ZUS albo listem poleconym – po wydrukowaniu i podpisaniu (podpisany oryginał można też przekazać do naszego biura).',
-  ezus: 'Najszybciej złożyć je samodzielnie online w eZUS (zus.pl → eZUS → Katalog usług → „PEL”) – logowanie profilem zaufanym, e-dowodem albo przez bank. Dane do wpisania (m.in. dane pełnomocnika) są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam potwierdzenia UPO.',
-  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do Zakładu Ubezpieczeń Społecznych przez e-Doręczenia, a dowód nadania przesłać nam.',
+  wszystkie: 'Pełnomocnictwo można złożyć na jeden z trzech sposobów:\n• online w eZUS (zus.pl) – najszybciej, logowanie profilem zaufanym, e-dowodem albo przez bank; dane do wpisania są w pobranym formularzu,\n• podpisując pobrany PDF podpisem zaufanym i wysyłając go do ZUS przez e-Doręczenia,\n• osobiście w dowolnej placówce ZUS albo listem poleconym – po wydrukowaniu i podpisaniu (podpisany oryginał można też przekazać do naszego biura).',
+  ezus: 'Najszybciej złożyć je samodzielnie online w eZUS (zus.pl → eZUS → Katalog usług → „PEL”) – logowanie profilem zaufanym, e-dowodem albo przez bank. Dane do wpisania (m.in. dane pełnomocnika) są w pobranym formularzu. Po wysłaniu prosimy o przesłanie nam potwierdzenia UPO.',
+  edoreczenia: 'Prosimy podpisać pobrany PDF podpisem zaufanym (gov.pl – „Podpisz dokument elektronicznie”) i wysłać podpisany plik do Zakładu Ubezpieczeń Społecznych przez e-Doręczenia, a dowód nadania przesłać nam.',
   papier: 'Prosimy wydrukować formularz, podpisać go i złożyć osobiście w dowolnej placówce ZUS albo wysłać listem poleconym (podpisany oryginał można też przekazać do naszego biura – złożymy go za Państwa).',
 };
 const ZAW_WAYS = {
@@ -377,9 +377,9 @@ const ZAW_WAYS = {
   papier: 'Na papierze – podpis zarządu, oryginał do urzędu skarbowego',
 };
 const ZAW_TXT = {
-  wszystkie: 'Zawiadomienie można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA) – dane do wpisania są w załączonym formularzu,\n• podpisując załączony PDF podpisem zaufanym lub kwalifikowanym i wysyłając go do urzędu skarbowego jako pismo ogólne w e-Urzędzie Skarbowym albo przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji (zgodnie z KRS) w urzędzie skarbowym albo listem poleconym.',
-  ezus: 'Najprościej złożyć je online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA). Dane do wpisania są w załączonym formularzu. Po wysłaniu prosimy o przesłanie nam UPO.',
-  edoreczenia: 'Prosimy podpisać załączony PDF podpisem zaufanym lub kwalifikowanym (osoby uprawnione do reprezentacji zgodnie z KRS) i wysłać go do urzędu skarbowego jako pismo ogólne w e-Urzędzie Skarbowym albo przez e-Doręczenia, a potwierdzenie przesłać nam.',
+  wszystkie: 'Zawiadomienie można złożyć na jeden z trzech sposobów:\n• online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA) – dane do wpisania są w pobranym formularzu,\n• podpisując pobrany PDF podpisem zaufanym lub kwalifikowanym i wysyłając go do urzędu skarbowego jako pismo ogólne w e-Urzędzie Skarbowym albo przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji (zgodnie z KRS) w urzędzie skarbowym albo listem poleconym.',
+  ezus: 'Najprościej złożyć je online w e-Urzędzie Skarbowym (Dokumenty → Złóż dokument → ZAW-FA). Dane do wpisania są w pobranym formularzu. Po wysłaniu prosimy o przesłanie nam UPO.',
+  edoreczenia: 'Prosimy podpisać pobrany PDF podpisem zaufanym lub kwalifikowanym (osoby uprawnione do reprezentacji zgodnie z KRS) i wysłać go do urzędu skarbowego jako pismo ogólne w e-Urzędzie Skarbowym albo przez e-Doręczenia, a potwierdzenie przesłać nam.',
   papier: 'Prosimy wydrukować formularz, podpisać go w części E (osoby uprawnione do reprezentacji zgodnie z KRS) i złożyć w urzędzie skarbowym albo wysłać listem poleconym.',
 };
 const UKO_WAYS = {
@@ -388,22 +388,22 @@ const UKO_WAYS = {
   papier: 'Na papierze – podpis reprezentantów, oryginał do urzędu skarbowego',
 };
 const UKO_TXT = {
-  wszystkie: 'Wniosek można złożyć:\n• elektronicznie – podpisując załączony PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysyłając go do urzędu skarbowego jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym albo przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji w urzędzie skarbowym właściwym w sprawach ewidencji (osobiście lub pocztą).',
-  edoreczenia: 'Prosimy podpisać załączony PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysłać go do urzędu skarbowego jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym albo przez e-Doręczenia, a potwierdzenie (UPO lub dowód nadania) przesłać nam.',
+  wszystkie: 'Wniosek można złożyć:\n• elektronicznie – podpisując pobrany PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysyłając go do urzędu skarbowego jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym albo przez e-Doręczenia,\n• na papierze – po wydrukowaniu i podpisaniu przez osoby uprawnione do reprezentacji w urzędzie skarbowym właściwym w sprawach ewidencji (osobiście lub pocztą).',
+  edoreczenia: 'Prosimy podpisać pobrany PDF profilem zaufanym lub podpisem kwalifikowanym (wszystkie osoby zgodnie z reprezentacją w KRS) i wysłać go do urzędu skarbowego jako załącznik do pisma ogólnego w e-Urzędzie Skarbowym albo przez e-Doręczenia, a potwierdzenie (UPO lub dowód nadania) przesłać nam.',
   papier: 'Prosimy wydrukować wniosek, podpisać go (osoby uprawnione do reprezentacji zgodnie z KRS) i złożyć w urzędzie skarbowym właściwym w sprawach ewidencji – osobiście albo listem poleconym.',
 };
 const MAIL_DOCS = {
   uko: { label: 'wniosek UKO', title: 'Dostęp do konta organizacji w e-Urzędzie Skarbowym', path: '/e-us-dostep/', ways: UKO_WAYS, txt: UKO_TXT,
-    intro: 'w załączniku przesyłamy wypełniony wniosek o przyznanie dostępu do konta organizacji w e-Urzędzie Skarbowym. Po jego rozpatrzeniu wskazana osoba będzie mogła załatwiać sprawy spółki w e-Urzędzie Skarbowym (a przy dostępie rozszerzonym – nadawać dostęp kolejnym osobom). Prosimy o sprawdzenie danych.',
+    intro: 'przesyłamy wypełniony wniosek o przyznanie dostępu do konta organizacji w e-Urzędzie Skarbowym. Po jego rozpatrzeniu wskazana osoba będzie mogła załatwiać sprawy spółki w e-Urzędzie Skarbowym (a przy dostępie rozszerzonym – nadawać dostęp kolejnym osobom). Plik PDF pobiorą Państwo przyciskiem „Pobierz PDF” w tej wiadomości – link działa przez 30 dni. Prosimy o sprawdzenie danych.',
     outro: 'W razie pytań jesteśmy do dyspozycji.' },
   zawfa: { label: 'ZAW-FA', title: 'ZAW-FA – dostęp do KSeF', path: '/zaw-fa/', ways: ZAW_WAYS, txt: ZAW_TXT,
-    intro: 'w załączniku przesyłamy wypełnione zawiadomienie ZAW-FA. Wskazuje ono osobę z Państwa firmy uprawnioną do korzystania z Krajowego Systemu e-Faktur (KSeF) w imieniu spółki – po jego przetworzeniu ta osoba zaloguje się do KSeF i wygeneruje certyfikat firmy. Prosimy o sprawdzenie danych.',
+    intro: 'przesyłamy wypełnione zawiadomienie ZAW-FA. Wskazuje ono osobę z Państwa firmy uprawnioną do korzystania z Krajowego Systemu e-Faktur (KSeF) w imieniu spółki – po jego przetworzeniu ta osoba zaloguje się do KSeF i wygeneruje certyfikat firmy. Plik PDF pobiorą Państwo przyciskiem „Pobierz PDF” w tej wiadomości – link działa przez 30 dni. Prosimy o sprawdzenie danych.',
     outro: 'W razie pytań jesteśmy do dyspozycji.' },
   upl1: { label: 'UPL-1', title: 'Pełnomocnictwo UPL-1', path: '/upl-1/', ways: UPL_WAYS, txt: UPL_TXT,
-    intro: 'w załączniku przesyłamy wypełnione pełnomocnictwo UPL-1. Dzięki niemu będziemy mogli podpisywać i wysyłać w Państwa imieniu deklaracje podatkowe i pliki JPK do urzędu skarbowego. Prosimy o sprawdzenie danych.',
+    intro: 'przesyłamy wypełnione pełnomocnictwo UPL-1. Dzięki niemu będziemy mogli podpisywać i wysyłać w Państwa imieniu deklaracje podatkowe i pliki JPK do urzędu skarbowego. Plik PDF pobiorą Państwo przyciskiem „Pobierz PDF” w tej wiadomości – link działa przez 30 dni. Prosimy o sprawdzenie danych.',
     outro: 'Złożenie UPL-1 jest bezpłatne – nie podlega opłacie skarbowej. W razie pytań jesteśmy do dyspozycji.' },
   pel: { label: 'PEL', title: 'Pełnomocnictwo ZUS PEL', path: '/zus-pel/', ways: PEL_WAYS, txt: PEL_TXT,
-    intro: 'w załączniku przesyłamy wypełnione pełnomocnictwo ZUS PEL. Dzięki niemu będziemy mogli wysyłać w Państwa imieniu deklaracje i dokumenty do ZUS oraz załatwiać sprawy przez eZUS. Prosimy o sprawdzenie danych.',
+    intro: 'przesyłamy wypełnione pełnomocnictwo ZUS PEL. Dzięki niemu będziemy mogli wysyłać w Państwa imieniu deklaracje i dokumenty do ZUS oraz załatwiać sprawy przez eZUS. Plik PDF pobiorą Państwo przyciskiem „Pobierz PDF” w tej wiadomości – link działa przez 30 dni. Prosimy o sprawdzenie danych.',
     outro: 'W razie pytań jesteśmy do dyspozycji.' },
 };
 async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
@@ -419,7 +419,7 @@ async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
   s.subject = kind === 'uko' ? `Wniosek o dostęp do konta organizacji w e-US – ${cl.name}` : kind === 'zawfa' ? `Zawiadomienie ZAW-FA (KSeF) – ${cl.name}` : `Pełnomocnictwo ${kind === 'pel' ? 'ZUS PEL' : 'UPL-1'} – ${cl.name}`; s.body = text();
   const body = h('div');
   const draw = () => body.replaceChildren(
-    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · w załączniku: ', h('b', {}, filename)),
+    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · plik do pobrania linkiem (30 dni, bez załącznika): ', h('b', {}, filename)),
     grid([['way', 'Sposób złożenia (zmienia treść e-maila i instrukcji)', 'select', D.ways, true], ['to', 'Do (e-mail klienta)', 'email', null, true],
       ['subject', 'Temat', 'text', null, true], ['body', 'Treść – e-mail wyjdzie z rdp.app z logo RKDP, odpowiedź klienta wróci do Ciebie', 'textarea']], s, k => { if (k === 'way') { s.body = text(); draw(); } }),
     h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Link do instrukcji: ', h('a', { href: link(), target: '_blank', rel: 'noopener' }, 'podgląd instrukcji'), ' · e-mail wyjdzie z kancelaria@rkdp.pl, a wiadomość zapisze się w historii klienta.'));

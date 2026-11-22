@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.7', '22 listopada 2026', [
+    'UPL-1, ZUS PEL, ZAW-FA i wniosek UKO nie idą już jako załącznik: klient dostaje w e-mailu przycisk „Pobierz PDF”, link działa 30 dni (mniej danych w skrzynkach, RODO).',
     'E-maile z UPL-1, ZAW-FA i wnioskiem UKO: podpisany PDF klient może wysłać do urzędu skarbowego przez e-Urząd Skarbowy (pismo ogólne) albo przez e-Doręczenia.',
     'Uwagi podzielone na punkty klient widzi na stronie umowy tak jak w aplikacji: pod każdym punktem ocenę (przyjęte / częściowo / nieprzyjęte) i komentarz kancelarii. Przy każdym punkcie klikasz „Akceptuję” albo „Mam uwagę” z odpowiedzią – kolejne uwagi wracają do aplikacji jako punkty do oceny.',
     'W e-mailach „rdp.app” jest linkiem do aplikacji (app.ruszniak.io).',

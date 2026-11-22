@@ -17,6 +17,8 @@
 //  • final  – zalogowany: { id, attachment: { base64, name, type } } – egzemplarz podpisany przez obie strony → archiwum + e-mail do klienta z linkiem do pobrania
 //  • doc_mail – zalogowany: { client_id, to, subject, body, attachment?: { name, base64 }, doc?: { kicker, title, button: { url, label } } }
 //             e-mail z aplikacji (ZAW-FA, UPL-1, PEL, UKO, instrukcje) – szablon rdp.app z logo kancelarii, odpowiedź wraca do osoby wysyłającej
+//             PDF nie jest załącznikiem: zapis w <klient>/wysylka/ + link /pobierz/?t=… ważny 30 dni (tabela doc_links)
+//  • file_link – publiczne { token, count? }: dane pliku i krótki link do pobrania (po 30 dniach – wygasł)
 //  E-maile do klientów (umowy, odpowiedzi, egzemplarze, dokumenty) wychodzą jako „rdp.app · RKDP” / „rdp.app · M2 TAX” (appMail).
 //  • offer_mail – zalogowany: { offer_id, to, subject, body } – e-mail do klienta z linkiem do oferty (podgląd bez logowania, #/wynik/<token>)
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -74,7 +76,7 @@ const FIRM_FOOT: Record<string, string> = {
   m2: 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska · ul. Zwycięska 3, 53-033 Wrocław · tel. 883 643 565 · kancelaria@m2tax.pl · m2tax.pl',
 };
 const APP_LINE = 'Wiadomość wysłana z rdp.app (app.ruszniak.io) by @RKDP (rkdp.pl)';
-type AppMail = { firm: string; kicker?: string; title: string; text: string; button?: { url: string; label: string } | null; attachment?: string | null };
+type AppMail = { firm: string; kicker?: string; title: string; text: string; button?: { url: string; label: string } | null; attachment?: string | null; download?: { name: string; url: string; until: string } | null };
 function appMail(app: string, m: AppMail) {
   const firm = m.firm === 'm2' ? 'm2' : 'rkdp';
   const F = 'font-family:Arial,Helvetica,sans-serif';
@@ -99,6 +101,8 @@ function appMail(app: string, m: AppMail) {
     ? `<img src="${app}/m2tax-logo.png" width="200" alt="M2 TAX Doradcy Podatkowi" style="display:block;width:200px;max-width:60%;height:auto;border:0">`
     : `<img src="${app}/logo-rkdp.png" width="190" alt="RKDP spółka doradztwa podatkowego" style="display:block;width:190px;max-width:60%;height:auto;border:0">`;
   const att = m.attachment ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:4px 0 18px;border:1px solid #E6DFD4"><tr><td style="padding:12px 14px;${F};font-size:14px;color:#1D1A16"><span style="display:inline-block;border:1px solid #CDBFAA;color:#7A5A37;font-size:10px;font-weight:bold;padding:6px 5px;margin-right:10px;vertical-align:middle">PDF</span><b style="vertical-align:middle">${escH(m.attachment)}</b> <span style="color:#5F584E;font-size:12px;vertical-align:middle">· w załączniku</span></td></tr></table>` : '';
+  // plik do pobrania linkiem (zamiast załącznika) – link ważny 30 dni
+  const dl = m.download ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:4px 0 20px;border:1px solid #E6DFD4"><tr><td style="padding:14px 16px;${F};font-size:14px;color:#1D1A16"><span style="display:inline-block;border:1px solid #CDBFAA;color:#7A5A37;font-size:10px;font-weight:bold;padding:6px 5px;margin-right:10px;vertical-align:middle">PDF</span><b style="vertical-align:middle">${escH(m.download.name)}</b><br><span style="display:block;margin:6px 0 12px;color:#5F584E;font-size:12.5px">Plik do pobrania – link ważny do ${escH(m.download.until)}. Plik nie jest dołączony do wiadomości.</span><a href="${escH(m.download.url)}" style="display:inline-block;padding:11px 20px;background:#2E2A25;border-radius:6px;${F};font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none">Pobierz PDF</a></td></tr></table>` : '';
   const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escH(m.title)}</title></head>
 <body style="margin:0;padding:0;background:#F4F1EC">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F1EC"><tr><td align="center" style="padding:20px 12px">
@@ -107,7 +111,7 @@ function appMail(app: string, m: AppMail) {
 <tr><td style="padding:30px 36px 14px">
 ${m.kicker ? `<p style="margin:0 0 10px;${F};font-size:12px;font-weight:bold;color:#7A5A37">${escH(m.kicker)}</p>` : ''}
 <h1 style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-weight:600;font-size:25px;line-height:1.25;color:#1D1A16">${escH(m.title)}</h1>
-${att}${paras}${m.button && !placed ? btnHtml : ''}
+${att}${dl}${paras}${m.button && !placed ? btnHtml : ''}
 <p style="margin:6px 0 0;${F};font-size:15px;line-height:1.6;color:#1D1A16">Pozdrawiamy,<br><b>Zespół ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}</b></p>
 </td></tr>
 <tr><td style="padding:22px 36px 26px;background:#FAF8F4;border-top:1px solid #E6DFD4">
@@ -118,7 +122,7 @@ ${att}${paras}${m.button && !placed ? btnHtml : ''}
 <p style="margin:12px 0 0;${F};font-size:11.5px;line-height:1.55;color:#6B645A">${escH(FIRM_FOOT[firm])}</p>
 </td></tr>
 </table></td></tr></table></body></html>`;
-  const textOut = `${m.text.replace('{button}', m.button ? m.button.url : '')}${m.button && !m.text.includes(m.button.url) ? `\n\n${m.button.label}: ${m.button.url}` : ''}\n\nPozdrawiamy,\nZespół ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}\n\n--\n${APP_LINE}\n${FIRM_FOOT[firm]}`;
+  const textOut = `${m.download ? `Pobierz ${m.download.name} (link ważny do ${m.download.until}): ${m.download.url}\n\n` : ''}${m.text.replace('{button}', m.button ? m.button.url : '')}${m.button && !m.text.includes(m.button.url) ? `\n\n${m.button.label}: ${m.button.url}` : ''}\n\nPozdrawiamy,\nZespół ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}\n\n--\n${APP_LINE}\n${FIRM_FOOT[firm]}`;
   return { html, text: textOut, from: APP_FROM[firm] };
 }
 async function sendApp(S: { from: string; appFrom: string; app: string }, me: any, to: string, subject: string, m: AppMail, attachments: any[] = []) {
@@ -249,6 +253,18 @@ Deno.serve(async (req: Request) => {
       if ((r.version || 1) > 1) { const { data: pv } = await admin.from('sign_versions').select('doc_html').eq('request_id', r.id).eq('version', r.version - 1).maybeSingle(); prev = pv?.doc_html || ''; }
       return json({ title: r.title, client: clientName(r), firm: r.firm, kind: r.kind, status: r.status, signed_at: r.signed_at, expires_at: r.expires_at, file: { name: fileName, url },
         html: r.doc_html || '', prev_html: prev, version: r.version || 1, changes: r.changes || '', notes: notes || [], accepted_at: r.accepted_at, final });
+    }
+
+    // ===== plik wysłany klientowi linkiem (zamiast załącznika) – ważny 30 dni =====
+    if (action === 'file_link') {
+      if (!validToken(body.token)) return json({ error: 'Link jest nieprawidłowy.' }, 400);
+      const { data: l } = await admin.from('doc_links').select('id, path, name, title, firm, expires_at, downloads').eq('token', body.token).maybeSingle();
+      if (!l) return json({ error: 'Link jest nieprawidłowy.' }, 404);
+      if (new Date(l.expires_at) < new Date()) return json({ error: 'expired', title: l.title, name: l.name, firm: l.firm, expires_at: l.expires_at }, 410);
+      const { data: su } = await admin.storage.from(BUCKET).createSignedUrl(l.path, 300, { download: l.name });
+      if (!su?.signedUrl) return json({ error: 'Plik jest chwilowo niedostępny – spróbuj za chwilę.' }, 500);
+      if (body.count === true) await admin.from('doc_links').update({ downloads: (l.downloads || 0) + 1, last_download_at: new Date().toISOString() }).eq('id', l.id);
+      return json({ title: l.title, name: l.name, firm: l.firm, expires_at: l.expires_at, url: su.signedUrl });
     }
 
     // ===== uwagi klienta do dokumentu =====
@@ -486,16 +502,30 @@ Deno.serve(async (req: Request) => {
       const bu = d.button && /^https:\/\/[^\s"<>]+$/.test(String(d.button.url || '')) ? { url: String(d.button.url).slice(0, 500), label: String(d.button.label || 'Otwórz').slice(0, 80) } : null;
       const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
       const S = await settings();
+      // plik nie idzie jako załącznik – zapis w archiwum wysyłek i link do pobrania ważny 30 dni (strona /pobierz/)
+      let download: { name: string; url: string; until: string } | null = null, linkId: string | null = null;
+      if (att) {
+        const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+        const path = `${c.id}/wysylka/${crypto.randomUUID().slice(0, 8)}-${safeName(filename)}`;
+        const { error: eu } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: false });
+        if (eu) return json({ error: 'Nie udało się zapisać pliku do wysłania' }, 500);
+        const token = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
+        const exp = new Date(Date.now() + 30 * 86400000);
+        const { data: dlr, error: ed } = await admin.from('doc_links').insert({ token, client_id: c.id, path, name: filename, title: String(d.title || subject).slice(0, 140), firm: 'rkdp', email: to, created_by: memberId, expires_at: exp.toISOString() }).select('id').single();
+        if (ed) { console.error(ed); await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się przygotować linku do pobrania' }, 500); }
+        linkId = dlr.id;
+        download = { name: filename, url: `${S.app}/pobierz/?t=${token}`, until: exp.toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' }) };
+      }
       let textBody = text0;
       try {
-        textBody = await sendApp(S, me, to, subject, { firm: 'rkdp', kicker: String(d.kicker || '').slice(0, 60) || undefined, title: String(d.title || subject).slice(0, 140), text: text0, button: bu, attachment: filename || null },
-          att ? [{ filename, content: b64, encoding: 'base64', contentType: 'application/pdf' }] : []);
+        textBody = await sendApp(S, me, to, subject, { firm: 'rkdp', kicker: String(d.kicker || '').slice(0, 60) || undefined, title: String(d.title || subject).slice(0, 140), text: text0, button: bu, download });
       } catch (e) {
+        if (linkId) await admin.from('doc_links').update({ expires_at: new Date().toISOString() }).eq('id', linkId);
         const m = String((e as Error).message || e);
         await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, status: 'blad', error: m.slice(0, 300), sent_by: memberId });
         return json({ error: 'send_failed', detail: m.slice(0, 300) }, 200);
       }
-      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + (filename ? `\n\n[załącznik: ${filename}]` : ''), sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
+      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + (filename ? `\n\n[plik do pobrania przez 30 dni: ${filename}]` : ''), sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
       return json({ ok: true, sent: 1 });
     }
 
