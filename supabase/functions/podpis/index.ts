@@ -192,13 +192,13 @@ Deno.serve(async (req: Request) => {
       if (error) return json({ error }, 410);
       if (r.status !== 'wyslano') return json({ error: 'Dokument jest już podpisany.' }, 400);
       const author = String(body.author || '').replace(/\s+/g, ' ').trim().slice(0, 120) || null;
-      const text = 'Akceptuję stanowisko biura. Proszę o przygotowanie umowy do podpisu.';
+      const text = 'Akceptuję stanowisko kancelarii. Proszę o przygotowanie umowy do podpisu.';
       await admin.from('sign_notes').insert({ request_id: r.id, body: text, author, version: r.version || 1, kind: 'akceptacja' });
       await admin.from('sign_requests').update({ accepted_at: new Date().toISOString() }).eq('id', r.id);
       const who = author ? `${author} (${clientName(r) || 'klient'})` : (clientName(r) || 'Klient');
       await notifyTeam(r, `Klient zaakceptował – przygotuj umowę do podpisu: ${r.title} – ${clientName(r)}`, 'Klient zaakceptował stanowisko – przygotuj umowę do podpisu',
-        `${who} zaakceptował(a) stanowisko biura do dokumentu „${r.title}”.\n\nPrzygotuj umowę do podpisu: w aplikacji sekcja „Do podpisu” → „Wyślij do podpisu” (nowa wersja albo bez zmian). Klient dostanie e-mail, że umowa czeka na podpis.`,
-        `<p><b>${escH(who)}</b> zaakceptował(a) stanowisko biura do dokumentu „${escH(r.title)}”.</p>`,
+        `${who} zaakceptował(a) stanowisko kancelarii do dokumentu „${r.title}”.\n\nPrzygotuj umowę do podpisu: w aplikacji sekcja „Do podpisu” → „Wyślij do podpisu” (nowa wersja albo bez zmian). Klient dostanie e-mail, że umowa czeka na podpis.`,
+        `<p><b>${escH(who)}</b> zaakceptował(a) stanowisko kancelarii do dokumentu „${escH(r.title)}”.</p>`,
         'Przygotuj umowę do podpisu: sekcja „Do podpisu” → „Wyślij do podpisu” (nowa wersja z uzgodnionymi zmianami albo bez zmian). Klient dostanie e-mail, że umowa czeka na podpis.');
       return json({ ok: true });
     }

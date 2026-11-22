@@ -8,7 +8,7 @@
 <link rel="icon" href="/favicon-v7.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/umow/doc.css">
 <link rel="stylesheet" href="/upl-1/upl.css">
-<link rel="stylesheet" href="/podpis/podpis.css?v=3">
+<link rel="stylesheet" href="/podpis/podpis.css?v=4">
 </head>
 <body>
 <header><div class="in"><span class="brand"><img src="/logo-rdp.svg" alt="rdp.app" width="32" height="32"><span>Podpis dokumentu</span></span><span class="appname">rdp.app</span></div></header>
@@ -35,11 +35,11 @@
   <p class="small" id="dlname"></p>
   <div class="notes" id="notes" hidden></div>
   <div class="decide" id="decide" hidden>
-    <p><b>Biuro odniosło się do Państwa uwag.</b> Jeśli zgadzają się Państwo ze stanowiskiem biura, kliknij „Akceptuję” – przygotujemy umowę do podpisu i wyślemy e-mail, gdy będzie gotowa. Możesz też zgłosić kolejne uwagi.</p>
-    <div class="doc-acts"><button class="btn-p" type="button" id="accBtn">Akceptuję stanowisko biura</button><button class="btn-s" type="button" id="moreBtn">Zgłoś kolejne uwagi</button></div>
+    <p><b>Kancelaria odniosła się do Państwa uwag.</b> Jeśli zgadzają się Państwo ze stanowiskiem kancelarii, kliknij „Akceptuję” – przygotujemy umowę do podpisu i wyślemy e-mail, gdy będzie gotowa. Możesz też zgłosić kolejne uwagi.</p>
+    <div class="doc-acts"><button class="btn-p" type="button" id="accBtn">Akceptuję stanowisko kancelarii</button><button class="btn-s" type="button" id="moreBtn">Zgłoś kolejne uwagi</button></div>
     <p class="err" id="accErr" hidden></p>
   </div>
-  <p class="decided" id="decided" hidden>Zaakceptowali Państwo stanowisko biura. Przygotowujemy umowę do podpisu – dostaną Państwo e-mail, gdy będzie gotowa (pod tym samym linkiem).</p>
+  <p class="decided" id="decided" hidden>Zaakceptowali Państwo stanowisko kancelarii. Przygotowujemy umowę do podpisu – dostaną Państwo e-mail, gdy będzie gotowa (pod tym samym linkiem).</p>
   <form class="note-form" id="noteForm" hidden>
     <label for="noteTxt"><b id="noteLbl">Twoje uwagi do dokumentu</b></label>
     <textarea id="noteTxt" rows="5" maxlength="4000" placeholder="Np. „W § 2 proszę dopisać…”, „Błędny adres – poprawny to…”"></textarea>
@@ -47,7 +47,7 @@
     <input id="noteWho" maxlength="120" autocomplete="name">
     <p class="err" id="noteErr" hidden></p>
     <div class="doc-acts"><button class="btn-p" type="submit" id="noteSend">Wyślij uwagi</button><button class="btn-s" type="button" id="noteCancel">Anuluj</button></div>
-    <p class="small">Uwagi trafią od razu do biura. Odpowiedź zobaczysz na tej stronie i dostaniesz ją e-mailem; w razie zmian przygotujemy nową wersję dokumentu pod tym samym linkiem.</p>
+    <p class="small">Uwagi trafią od razu do kancelarii. Odpowiedź zobaczysz na tej stronie i dostaniesz ją e-mailem; w razie zmian przygotujemy nową wersję dokumentu pod tym samym linkiem.</p>
   </form>
 </section>
 
@@ -104,7 +104,7 @@
 
 <section class="card-s done" id="done" hidden>
   <h2 class="h">Dziękujemy. Dokument dotarł do nas</h2>
-  <p>Podpisany plik jest już w naszym biurze. Nic więcej nie musisz robić – w razie potrzeby skontaktujemy się z Tobą.</p>
+  <p>Podpisany plik jest już w naszej kancelarii. Nic więcej nie musisz robić – w razie potrzeby skontaktujemy się z Tobą.</p>
   <div id="final" hidden>
     <p>Twój egzemplarz, podpisany przez obie strony:</p>
     <p><a class="btn-p" id="finalDl" href="#" download>Pobierz swój egzemplarz</a></p>
@@ -117,7 +117,7 @@
 
 <footer><div class="in" id="foot">RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Beaty Artemskiej 11/44, 52-234 Wrocław<br>NIP 8992871126 · KRS 0000812185 · tel. 883 643 565 · kancelaria@rkdp.pl</div></footer>
 <script src="/config.js"></script>
-<script src="/podpis/diff.js?v=3"></script>
-<script src="/podpis/podpis.js?v=3"></script>
+<script src="/podpis/diff.js?v=4"></script>
+<script src="/podpis/podpis.js?v=4"></script>
 </body>
 </html>
