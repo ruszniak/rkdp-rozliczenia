@@ -75,6 +75,8 @@ export async function renderZespol(main) {
         firm === 'jpk' ? h('div', { class: 'tm-field' }, h('span', {}, 'Biuro'), officeSel(m.partner_client_id, v => update(m, { partner_client_id: v, modules: partnerMods(v) }))) : null,
         firm === 'jpk' && !m.partner_client_id ? h('p', { class: 'small muted', style: { margin: '4px 0 0' } }, 'Bez wybranego biura konto widzi tylko podgląd JPK. Po wybraniu biura – także zadania dla doradców i wzory.') : null,
         h('div', { class: 'tm-field' }, h('span', {}, 'Zakres'), seg(Object.entries(ROLE).map(([k, v]) => [k, v]), m.role, self || firm === 'jpk', k => update(m, { role: k }))),
+        ['doradztwo', 'oba'].includes(firm) ? h('div', { class: 'tm-field' }, h('span', {}, 'Sprawy M2 TAX'), seg([['all', 'Wszystkie'], ['own', 'Tylko przypisane', 'Widzi tylko sprawy, w których jest doradcą prowadzącym, drugim doradcą albo asystentką – i klientów tych spraw. Dostęp dajesz, dopisując ją do sprawy.']], m.m2_scope || 'all', self, k => update(m, { m2_scope: k }))) : null,
+        ['doradztwo', 'oba'].includes(firm) && m.m2_scope === 'own' ? h('p', { class: 'small muted', style: { margin: '4px 0 0' } }, 'Widzi tylko sprawy M2 TAX, do których jest dopisana (doradca prowadzący, drugi doradca albo asystent), ich klientów i zlecenia – bez pozostałych klientów i ofert M2 TAX.') : null,
         self ? h('p', { class: 'small muted', style: { margin: '4px 0 0' } }, 'Swojego dostępu nie możesz zmienić.') : null),
       h('section', { class: 'tm-sec' }, h('h3', {}, 'Konto'),
         sw(m.active, self, v => update(m, { active: v }), m.active ? 'Konto aktywne' : 'Konto zablokowane', 'Zablokowanie działa natychmiast'),

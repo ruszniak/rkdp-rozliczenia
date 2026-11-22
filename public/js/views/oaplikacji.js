@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.7', '22 listopada 2026', [
+    'Zespół i ustawienia: przy osobie z M2 TAX wybór „Sprawy M2 TAX – wszystkie / tylko przypisane”. Przy „tylko przypisane” osoba widzi tylko sprawy, do których jest dopisana (prowadzący, drugi doradca, asystent), ich klientów i zlecenia.',
     'UPL-1, ZUS PEL, ZAW-FA i wniosek UKO nie idą już jako załącznik: klient dostaje w e-mailu przycisk „Pobierz PDF”, link działa 30 dni (mniej danych w skrzynkach, RODO).',
     'E-maile z UPL-1, ZAW-FA i wnioskiem UKO: podpisany PDF klient może wysłać do urzędu skarbowego przez e-Urząd Skarbowy (pismo ogólne) albo przez e-Doręczenia.',
     'Uwagi podzielone na punkty klient widzi na stronie umowy tak jak w aplikacji: pod każdym punktem ocenę (przyjęte / częściowo / nieprzyjęte) i komentarz kancelarii. Przy każdym punkcie klikasz „Akceptuję” albo „Mam uwagę” z odpowiedzią – kolejne uwagi wracają do aplikacji jako punkty do oceny.',
