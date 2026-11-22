@@ -3535,5 +3535,10 @@ fieldset.kl-form:disabled .partner{border-color:var(--line)}
 .odp-v.on[data-v="odrzucone"]{background:#FEE2E2;border-color:#DC2626;color:#7F1D1D}
 .odp-m.on,.odp-m.on:hover{background:#EEF2FF!important;color:#1E3A8A!important;border:1px solid #818CF8!important;font-weight:700}
 :root[data-theme="dark"] .odp-m.on{background:rgba(99,102,241,.2)!important;color:#C7D2FE!important}
-.odp-edit{display:block;width:100%;height:min(70vh,760px);border:1px solid var(--line);border-radius:8px;background:#E9EAEE}
+.odp-edit{display:block;width:100%;height:calc(100vh - 270px);min-height:360px;border:1px solid var(--line);border-radius:8px;background:#E9EAEE}
+.odp-ed-wrap.with-side{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.odp-side{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 270px);overflow:auto;padding-right:2px}
+.odp-side>b{font-size:14px}
+.odp-go{margin-top:4px}.odp-go .btn{padding:2px 8px;font-size:12.5px}
+@media (max-width:900px){.odp-ed-wrap.with-side{grid-template-columns:1fr}.odp-side{order:-1;max-height:30vh}.odp-edit{height:60vh}}
 :root[data-theme="dark"] .odp-n{background:rgba(245,158,11,.12)}:root[data-theme="dark"] .odp-n.office{background:rgba(59,130,246,.12)}

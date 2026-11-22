@@ -24,7 +24,19 @@ const editableDoc = html => { if (!html) return false; const d = new DOMParser()
 const printable = html => html.replace(/<\/head>/i, '<style>body{background:#fff!important}.paper{max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;border-radius:0!important}@page{size:A4;margin:18mm 20mm}</style></head>');
 
 // edycja treści w kartce dokumentu (bez skryptów, tylko tekst); zwraca pełny HTML albo null
-function editText(html, title) {
+// przejście w treści do paragrafu wskazanego w uwadze (np. „§ 9 ust. 8”) i podświetlenie go
+function goTo(doc, para) {
+  if (!doc) return false;
+  const want = para.replace(/\s+/g, ' ').trim();
+  const els = [...doc.querySelectorAll('.paper > *, .paper p, .paper div, .paper h1, .paper h2, .paper h3')];
+  const hit = els.find(e => e.textContent.replace(/\s+/g, ' ').trim() === want) || els.find(e => e.textContent.replace(/\s+/g, ' ').trim().startsWith(want + ' ') || e.textContent.replace(/\s+/g, ' ').trim().startsWith(want + '.'));
+  if (!hit) return false;
+  hit.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  hit.style.transition = 'background .3s'; hit.style.background = '#FEF3C7'; setTimeout(() => { hit.style.background = ''; }, 1800);
+  return true;
+}
+
+function editText(html, title, notes = []) {
   return new Promise(resolve => {
     const frame = h('iframe', { class: 'odp-edit', title: 'Treść dokumentu', sandbox: 'allow-same-origin' });
     frame.srcdoc = html;
@@ -35,9 +47,19 @@ function editText(html, title) {
       const st = doc.createElement('style'); st.id = 'odp-ed'; st.textContent = '.paper{outline:none}.paper:focus{box-shadow:0 0 0 3px rgba(37,99,235,.35)}'; doc.head.append(st);
     }, { once: true });
     let done = false;
+    // uwagi klienta obok treści – widać, co poprawić; „§ 9” przenosi do paragrafu
+    const side = notes.length ? h('aside', { class: 'odp-side' }, h('b', {}, 'Uwagi klienta'),
+      ...notes.map(n => {
+        const office = n.from_client === false;
+        const paras = [...new Set((n.body.match(/§\s*\d+[a-z]?/gi) || []).map(x => x.replace(/\s+/, ' ')))];
+        return h('div', { class: 'odp-n' + (office ? ' office' : '') },
+          h('small', {}, `${office ? (n.author || 'Biuro') : 'Klient' + (n.author ? ' – ' + n.author : '')} · ${dt(n.created_at)}`, n.verdict ? h('span', { class: 'odp-vd' }, VERDICT_WORD[n.verdict]) : null),
+          h('div', { class: 'odp-b' }, n.body),
+          paras.length ? h('div', { class: 'row-btns odp-go' }, ...paras.map(pp => h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { if (!goTo(frame.contentDocument, pp)) toast(`Nie znalazłem „${pp}” w treści`, true); } }, `Przejdź do ${pp}`))) : null);
+      })) : null;
     modal(title, h('div', {},
       h('p', { class: 'small', style: { margin: '0 0 8px' } }, 'Kliknij w tekst i popraw go jak w edytorze. Po zapisaniu zmiany zaznaczą się klientowi automatycznie (dodane i usunięte słowa).'),
-      frame), close => [
+      h('div', { class: 'odp-ed-wrap' + (side ? ' with-side' : '') }, frame, side)), close => [
       h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { close(); if (!done) { done = true; resolve(null); } } }, 'Anuluj'),
       h('button', { class: 'btn btn-primary btn-sm', onclick: () => {
         const doc = frame.contentDocument; if (!doc) return;
@@ -46,6 +68,8 @@ function editText(html, title) {
         done = true; close(); resolve(out);
       } }, 'Zapisz treść'),
     ], { wide: true });
+    const bs = document.querySelectorAll('.modal-back'), m = bs[bs.length - 1]?.firstChild;
+    if (m) { m.classList.add('odp-ed-modal'); m.style.maxWidth = side ? '1440px' : '1100px'; }
   });
 }
 
@@ -99,7 +123,7 @@ export async function replyDialog(r, onDone) {
     sendBtn.replaceChildren(icon('mail'), has ? `Wyślij odpowiedź i wersję ${next}` : 'Wyślij odpowiedź');
   };
   const pickEdit = async () => {
-    const x = await editText(newHtml && mode === 'edit' ? newHtml : oldHtml, `Wersja ${next} – edytuj treść`);
+    const x = await editText(newHtml && mode === 'edit' ? newHtml : oldHtml, `Wersja ${next} – edytuj treść`, notes);
     if (x == null) return;
     newHtml = x; newBytes = null;
     try {
