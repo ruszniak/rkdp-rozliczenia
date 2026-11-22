@@ -3523,7 +3523,24 @@ fieldset.kl-form:disabled .partner{border-color:var(--line)}
 .sign-vd.przyjete{background:#DCFCE7;color:#166534}.sign-vd.czesciowo{background:#FEF3C7;color:#92400E}.sign-vd.odrzucone{background:#FEE2E2;color:#991B1B}
 :root[data-theme="dark"] .sign-note.office{background:rgba(59,130,246,.12)}:root[data-theme="dark"] .sign-note.office small{color:#93C5FD}
 .odp-h{margin:14px 0 6px;font-size:14px}
-.odp-thread{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;margin-bottom:6px}
+.odp-thread{display:flex;flex-direction:column;gap:10px;margin-bottom:6px}
+/* odpowiedź na uwagi – pełne okno, rozmowa po lewej, odpowiedź po prawej */
+.modal.odp-full{width:calc(100vw - 32px);max-width:1600px;height:calc(100vh - 32px);max-height:none;display:flex;flex-direction:column}
+.modal.odp-full>.odp-grid,.modal.odp-full>div:nth-child(2){flex:1 1 auto;min-height:0}
+.odp-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,1fr);gap:24px;min-height:0}
+.odp-left,.odp-right{min-height:0;overflow:auto;padding-right:4px}
+.odp-left{max-height:calc(100vh - 170px)}.odp-right{max-height:calc(100vh - 170px)}
+.odp-ta{min-height:260px;font-size:14.5px;line-height:1.55}
+.odp-tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.odp-pt{margin-top:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:8px}
+.odp-pt.v-przyjete{border-color:#86EFAC}.odp-pt.v-czesciowo{border-color:#FCD34D}.odp-pt.v-odrzucone{border-color:#FCA5A5}
+.odp-pt-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+.odp-pt .odp-b{margin:4px 0}.odp-pt .odp-b.first{font-weight:600}
+.odp-cut{display:block;width:100%;margin:2px 0;padding:1px 0;border:0;border-top:1px dashed var(--line);background:none;font:inherit;font-size:12px;color:var(--muted);text-align:left;cursor:pointer;opacity:.55}
+.odp-cut:hover{opacity:1;color:#2563EB;border-top-color:#2563EB}
+.odp-c{display:block;width:100%;margin-top:6px;font-size:13.5px}
+:root[data-theme="dark"] .odp-pt{background:var(--panel)}
+@media (max-width:900px){.odp-grid{grid-template-columns:1fr}.odp-left,.odp-right{max-height:none;overflow:visible}.modal.odp-full{height:auto;max-height:calc(100vh - 16px);overflow:auto}}
 .odp-n{padding:8px 12px;border-left:3px solid #F59E0B;background:#FFFBEB;border-radius:6px;font-size:14px}
 .odp-n.office{border-left-color:#2563EB;background:#EFF6FF}
 .odp-n small{display:block;font-size:12px;font-weight:600;color:var(--muted)}

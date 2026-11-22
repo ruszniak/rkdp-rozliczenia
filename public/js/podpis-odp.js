@@ -69,7 +69,7 @@ function editText(html, title, notes = []) {
       } }, 'Zapisz treść'),
     ], { wide: true });
     const bs = document.querySelectorAll('.modal-back'), m = bs[bs.length - 1]?.firstChild;
-    if (m) { m.classList.add('odp-ed-modal'); m.style.maxWidth = side ? '1440px' : '1100px'; }
+    if (m) { m.classList.add('odp-ed-modal', 'odp-full'); m.style.maxWidth = ''; }
   });
 }
 
@@ -84,28 +84,85 @@ export async function replyDialog(r, onDone) {
   const verdict = {};
   // treść odpowiedzi – szablon odświeża się po wyborze oceny, dopóki nie zaczniesz pisać sam
   let touched = false;
-  const ta = h('textarea', { class: 'input', rows: 9 });
+  const ta = h('textarea', { class: 'input odp-ta', rows: 12 });
+
+  // podział długiej uwagi na punkty: akapity; nowy punkt zaczyna się od „1.”, „2)”, „§ 5”… (można dzielić i łączyć ręcznie)
+  const paras = n => n.body.replace(/\r/g, '').split(/\n\s*\n+/).map(x => x.trim()).filter(Boolean);
+  const isHead = t => /^(\d{1,2}[.)]\s|§\s*\d|[a-z][.)]\s)/i.test(t);
+  const split = {};   // id uwagi → { on, cuts: Set(indeksów akapitów rozpoczynających punkt), v: {start: werdykt}, c: {start: komentarz} }
+  pending.forEach(n => {
+    const ps = paras(n); const cuts = new Set([0]); ps.forEach((t, i) => { if (i && isHead(t)) cuts.add(i); });
+    split[n.id] = { on: cuts.size >= 2, cuts, v: {}, c: {}, ps };
+  });
+  const groups = sp => { const st = [...sp.cuts].sort((x, y) => x - y); return st.map((s0, k) => ({ start: s0, items: sp.ps.slice(s0, st[k + 1] ?? sp.ps.length) })); };
+  const titleOf = t => { const l = t.split('\n')[0].trim(); return l.length > 90 ? l.slice(0, 90) + '…' : l; };
+  const ptName = (g, k, gs) => {
+    if (!isHead(g.items[0])) return k === 0 ? 'Wstęp' : k === gs.length - 1 ? 'Zakończenie' : 'Fragment';
+    const m = g.items[0].match(/^(\d{1,2})[.)]\s/); return 'Punkt ' + (m ? m[1] : gs.slice(0, k + 1).filter(x => isHead(x.items[0])).length);
+  };
+  const noteVerdict = n => {
+    const sp = split[n.id];
+    if (!sp?.on) return verdict[n.id];
+    const vs = groups(sp).map(g => sp.v[g.start]).filter(Boolean);
+    if (!vs.length) return undefined;
+    return vs.every(x => x === 'przyjete') ? 'przyjete' : vs.every(x => x === 'odrzucone') ? 'odrzucone' : 'czesciowo';
+  };
   const tpl = () => {
-    const lines = pending.filter(n => verdict[n.id]).map(n => `– „${short(n.body)}” – ${VERDICT_WORD[verdict[n.id]]}.`);
-    return `Dzień dobry,\n\ndziękujemy za uwagi do dokumentu.${lines.length ? ' Nasze stanowisko:\n' + lines.join('\n') : '\n'}\n\nW razie pytań jesteśmy do dyspozycji.`;
+    const lines = [];
+    pending.forEach(n => {
+      const sp = split[n.id];
+      if (sp?.on) {
+        groups(sp).forEach((g, k) => {
+          const v = sp.v[g.start], c = (sp.c[g.start] || '').trim();
+          if (!v && !c) return;
+          const t = titleOf(g.items[0]);
+          lines.push(`${/^\d{1,2}[.)]\s/.test(t) ? '' : '– '}${isHead(g.items[0]) ? t : '„' + short(g.items.join(' ')) + '”'} – ${v ? VERDICT_WORD[v] : 'uwaga'}${c ? ': ' + c : '.'}`);
+        });
+      } else if (verdict[n.id]) lines.push(`– „${short(n.body)}” – ${VERDICT_WORD[verdict[n.id]]}.`);
+    });
+    return `Dzień dobry,\n\ndziękujemy za uwagi do dokumentu.${lines.length ? ' Nasze stanowisko:\n\n' + lines.join('\n') : '\n'}\n\nW razie pytań jesteśmy do dyspozycji.`;
   };
   ta.value = tpl();
   ta.addEventListener('input', () => { touched = true; });
+  const regen = h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { touched = false; ta.value = tpl(); } }, 'Wstaw od nowa ze stanowiska');
   const refresh = () => { if (!touched) ta.value = tpl(); };
+
+  const vButtons = (get, set) => {
+    const btns = VERDICTS.map(([k, label]) => h('button', { class: 'btn btn-ghost btn-sm odp-v' + (get() === k ? ' on' : ''), type: 'button', 'data-v': k, onclick: () => {
+      set(get() === k ? undefined : k); btns.forEach(b => b.classList.toggle('on', b.dataset.v === get())); refresh();
+    } }, label));
+    return h('div', { class: 'row-btns odp-vs' }, ...btns);
+  };
+  const renderPending = (n, host) => {
+    const sp = split[n.id];
+    if (!sp.on) {
+      host.replaceChildren(h('div', { class: 'odp-b' }, n.body),
+        h('div', { class: 'odp-tools' }, vButtons(() => verdict[n.id], v => { verdict[n.id] = v; }),
+          sp.ps.length > 1 ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: () => { sp.on = true; renderPending(n, host); refresh(); } }, '✂ Podziel na punkty') : null));
+      return;
+    }
+    const gs = groups(sp);
+    host.replaceChildren(
+      h('div', { class: 'odp-tools' }, h('span', { class: 'small muted' }, `Podzielone na ${gs.length} ${gs.length === 1 ? 'punkt' : gs.length < 5 ? 'punkty' : 'punktów'} – oceń każdy osobno. „✂” dzieli punkt w tym miejscu, „Połącz” scala z poprzednim.`),
+        h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { sp.on = false; renderPending(n, host); refresh(); } }, 'Cała uwaga naraz')),
+      ...gs.map((g, k) => h('div', { class: 'odp-pt' + (sp.v[g.start] ? ' v-' + sp.v[g.start] : '') },
+        h('div', { class: 'odp-pt-h' }, h('b', {}, ptName(g, k, gs)),
+          k ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { sp.cuts.delete(g.start); renderPending(n, host); refresh(); } }, '⤒ Połącz z poprzednim') : null),
+        ...g.items.map((t, j) => [
+          j ? h('button', { class: 'odp-cut', type: 'button', title: 'Zacznij tu nowy punkt', onclick: () => { sp.cuts.add(g.start + j); renderPending(n, host); refresh(); } }, '✂ podziel tutaj') : null,
+          h('div', { class: 'odp-b' + (j === 0 ? ' first' : '') }, t)]).flat(),
+        vButtons(() => sp.v[g.start], v => { sp.v[g.start] = v; renderPending(n, host); }),
+        (() => { const inp = h('input', { class: 'input odp-c', placeholder: 'Komentarz do punktu (opcjonalnie) – np. proponujemy 2 miesiące', value: sp.c[g.start] || '' });
+          inp.addEventListener('input', () => { sp.c[g.start] = inp.value; refresh(); }); return inp; })())));
+  };
 
   const thread = h('div', { class: 'odp-thread' }, ...notes.map(n => {
     const office = n.from_client === false;
     const row = h('div', { class: 'odp-n' + (office ? ' office' : '') },
       h('small', {}, `${office ? (n.author || 'Biuro') : 'Klient' + (n.author ? ' – ' + n.author : '')} · ${dt(n.created_at)}${n.version ? ` · ${office ? 'wersja' : 'do wersji'} ${n.version}` : ''}`,
-        n.verdict ? h('span', { class: 'odp-vd' }, VERDICT_WORD[n.verdict]) : null),
-      h('div', { class: 'odp-b' }, n.body));
-    if (!office && !n.verdict) {
-      const btns = VERDICTS.map(([k, label]) => h('button', { class: 'btn btn-ghost btn-sm odp-v', type: 'button', 'data-v': k, onclick: () => {
-        verdict[n.id] = verdict[n.id] === k ? undefined : k;
-        btns.forEach(b => b.classList.toggle('on', b.dataset.v === verdict[n.id])); refresh();
-      } }, label));
-      row.append(h('div', { class: 'row-btns odp-vs' }, ...btns));
-    }
+        n.verdict ? h('span', { class: 'odp-vd' }, VERDICT_WORD[n.verdict]) : null));
+    if (!office && !n.verdict) { const host = h('div'); row.append(host); renderPending(n, host); }
+    else row.append(h('div', { class: 'odp-b' }, n.body));
     return row;
   }));
 
@@ -157,15 +214,19 @@ export async function replyDialog(r, onDone) {
     h('button', { class: 'btn btn-ghost btn-sm odp-m', type: 'button', 'data-m': 'pdf', onclick: pickPdf }, icon('file'), `Wersja ${next}: wgraj PDF`),
   ].filter(Boolean);
 
-  const body = h('div', { class: 'odp' },
-    h('p', { class: 'small', style: { margin: '0 0 10px' } }, h('b', {}, r.title), ` · wersja ${ver} · ${r.email ? 'odpowiedź pójdzie na ' + r.email : 'prośba bez e-maila – odpowiedź pojawi się na stronie, link wyślesz sam'}`),
-    h('h4', { class: 'odp-h' }, 'Rozmowa z klientem'), thread,
-    pending.length ? h('p', { class: 'hint', style: { margin: '4px 0 10px' } }, 'Przy każdej uwadze zaznacz: przyjmuję / częściowo / nie przyjmuję – klient zobaczy ocenę przy swojej uwadze.') : null,
+  const body = h('div', { class: 'odp odp-grid' },
+    h('div', { class: 'odp-left' },
+      h('p', { class: 'small', style: { margin: '0 0 6px' } }, h('b', {}, r.title), ` · wersja ${ver} · ${r.email ? 'odpowiedź pójdzie na ' + r.email : 'prośba bez e-maila – odpowiedź pojawi się na stronie, link wyślesz sam'}`),
+      h('h4', { class: 'odp-h' }, 'Rozmowa z klientem'),
+      pending.length ? h('p', { class: 'hint', style: { margin: '0 0 8px' } }, 'Przy każdej uwadze (albo każdym punkcie) zaznacz: przyjmuję / częściowo / nie przyjmuję i ewentualnie dopisz komentarz – stanowisko wpisze się do odpowiedzi.') : null,
+      thread),
+    h('div', { class: 'odp-right' },
     h('label', { class: 'field wide' }, h('span', {}, 'Twoja odpowiedź (klient zobaczy ją na stronie dokumentu i dostanie e-mail; stopka dopisze się sama)'), ta),
+    h('div', { class: 'row-btns', style: { justifyContent: 'flex-end' } }, regen),
     h('h4', { class: 'odp-h' }, 'Nowa wersja dokumentu (opcjonalnie)'),
     h('div', { class: 'row-btns' }, ...modeBtns),
     verInfo, changesBox,
-    h('p', { class: 'hint', style: { marginTop: '6px' } }, 'Nowa wersja trafia pod ten sam link – klient zobaczy zaznaczone zmiany i podpisze tylko najnowszą. Poprzednia zostaje w historii.'));
+    h('p', { class: 'hint', style: { marginTop: '6px' } }, 'Nowa wersja trafia pod ten sam link – klient zobaczy zaznaczone zmiany i podpisze tylko najnowszą. Poprzednia zostaje w historii.')));
 
   modal('Odpowiedz na uwagi', body, close => {
     sendBtn.onclick = async () => {
@@ -184,7 +245,7 @@ export async function replyDialog(r, onDone) {
         }
         sendBtn.textContent = 'Wysyłam…';
         const { data: x, error: e } = await sb.functions.invoke('podpis', { body: { action: 'reply', id: r.id, text,
-          verdicts: Object.entries(verdict).filter(([, v]) => v).map(([id, v]) => ({ id, verdict: v })), version } });
+          verdicts: pending.map(n => ({ id: n.id, verdict: noteVerdict(n) })).filter(x => x.verdict), version } });
         if (e || x?.error) throw new Error(x?.detail || x?.error || e.message);
         close();
         if (x.mail_error) toast('Odpowiedź zapisana, ale e-mail się nie wysłał – skopiuj link i wyślij klientowi', true);
@@ -195,4 +256,6 @@ export async function replyDialog(r, onDone) {
     };
     return [h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'), sendBtn];
   }, { wide: true });
+  const bs = document.querySelectorAll('.modal-back'), m = bs[bs.length - 1]?.firstChild;
+  if (m) { m.classList.add('odp-full'); m.style.maxWidth = ''; }
 }

@@ -100,6 +100,7 @@ const NEWS = [
     'Nowa wersja umowy pod tym samym linkiem: edycja treści (zmiany zaznaczają się klientowi automatycznie) albo własny PDF; klient podpisuje tylko najnowszą wersję, poprzednie zostają w historii.',
     'Odpowiadają: klienci RKDP – Michał, klienci M2 TAX – Michał i Marcin.',
     'Edycja nowej wersji: uwagi klienta widać obok treści umowy, „Przejdź do § …” przenosi do wskazanego paragrafu.',
+    'Długą uwagę klienta dzielisz na punkty (numerowane dzielą się same) i każdy oceniasz osobno, z komentarzem; okno odpowiedzi otwiera się na cały ekran.',
   ]],
   ['2.6', '20 listopada 2026', [
     'Wniosek o dostęp do konta organizacji w e-Urzędzie Skarbowym (UKO) z karty klienta: PDF na danych klienta i wysyłka z instrukcją /e-us-dostep/.',
