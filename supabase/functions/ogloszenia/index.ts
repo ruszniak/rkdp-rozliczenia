@@ -50,12 +50,12 @@ async function send(id: string) {
     const text = [hi, '', o.title, '', ...items.map(t => '• ' + t), '', o.url ? `Więcej: ${o.url}` : '', `Otwórz aplikację: ${link}`, '',
       'Po zalogowaniu zobaczysz to samo w okienku „Co nowego”. Nie odpowiadaj na tego maila.'].filter((x, i, a) => !(x === '' && a[i - 1] === '')).join('\n');
     const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#1D1A16;max-width:600px">`
-      + `<p style="margin:0 0 6px;color:#2D4A8A;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Co nowego w rdp.app</p>`
+      + `<p style="margin:0 0 6px;color:#2D4A8A;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Co nowego w <a href="https://app.ruszniak.io" style="color:#2D4A8A;font-weight:bold;text-decoration:none">rdp.app</a></p>`
       + `<h2 style="margin:0 0 12px;font-size:19px">${escH(o.title)}</h2><p style="margin:0 0 10px">${escH(hi)}</p>`
       + `<ul style="padding-left:20px;margin:0 0 12px">${items.map(t => `<li style="margin:0 0 8px">${escH(t)}</li>`).join('')}</ul>`
       + (o.url ? `<p><a href="${escH(o.url)}" style="color:#2D4A8A;font-weight:700">Więcej</a></p>` : '')
       + `<p style="margin:18px 0"><a href="${link}" style="background:#2D4A8A;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">Otwórz aplikację</a></p>`
-      + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z rdp.app – nie odpowiadaj na nią. Po zalogowaniu zobaczysz to samo w okienku „Co nowego”.</p></div>`;
+      + `<p style="color:#5E564C;font-size:12px">Wiadomość wysłana automatycznie z <a href="https://app.ruszniak.io" style="color:#5E564C;font-weight:bold;text-decoration:none">rdp.app</a> – nie odpowiadaj na nią. Po zalogowaniu zobaczysz to samo w okienku „Co nowego”.</p></div>`;
     if (!windowOpen(pr?.notify_window)) {
       await admin.from('notify_queue').insert({ member_id: m.id, channel: 'mail', category: 'zadania', title: subject, body: text, html, url: link });
       queued++; continue;

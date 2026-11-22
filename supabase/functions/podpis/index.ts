@@ -8,9 +8,11 @@
 //  • upload – publiczne, multipart { token, file }: podpisany plik → archiwum klienta + e-mail do osoby, która wysłała prośbę
 //  • cancel – zalogowany: { id } – anulowanie prośby (link przestaje działać)
 //  • file   – zalogowany: { id, which: 'original' | 'signed' } – link do pobrania pliku (też dla klientów M2 bez archiwum)
-//  • reply  – zalogowany: { id, text, verdicts: [{ id, verdict }], to?, subject?, version?: { attachment: { base64 }, doc_html?, changes } }
+//  • reply  – zalogowany: { id, text, verdicts: [{ id, verdict, points? }], to?, subject?, version?: { attachment: { base64 }, doc_html?, changes } }
 //             odpowiedź biura na uwagi klienta (strona podpisu + e-mail) i opcjonalnie nowa wersja dokumentu pod tym samym linkiem;
 //             RKDP – odpowiada tylko administrator, M2 TAX – administrator i Marcin
+//  • respond – publiczne { token, author, points: [{ note, i, a: 'ok'|'uwaga', x }] }: odpowiedź klienta do każdego punktu stanowiska kancelarii
+//             (wszystkie „ok” = akceptacja stanowiska); punkty uwag zapisane w sign_notes.points
 //  • accept – publiczne { token, author }: klient akceptuje stanowisko kancelarii → e-mail do zespołu (przygotować umowę do podpisu)
 //  • final  – zalogowany: { id, attachment: { base64, name, type } } – egzemplarz podpisany przez obie strony → archiwum + e-mail do klienta z linkiem do pobrania
 //  • doc_mail – zalogowany: { client_id, to, subject, body, attachment?: { name, base64 }, doc?: { kicker, title, button: { url, label } } }
@@ -45,6 +47,24 @@ const KIND_CAT: Record<string, string> = { pel: 'pelnomocnictwo' };
 const clientName = (r: any) => r.clients?.name || r.m2_clients?.name || '';
 const M2_REPLY = ['c66817f8-61a2-4605-a503-07cbcf9d47d5'];   // Marcin – odpowiada na uwagi klientów M2 TAX (obok administratora)
 const VERDICT: Record<string, string> = { przyjete: 'przyjęte', czesciowo: 'częściowo przyjęte', odrzucone: 'nieprzyjęte' };
+// punkt uwagi: n – etykieta, t – treść, v/c – ocena i komentarz kancelarii, a/x – odpowiedź klienta, pv/pc – wcześniejsza ocena/komentarz
+const cut = (t: unknown, n: number) => String(t ?? '').replace(/\r/g, '').trim().slice(0, n);
+function cleanPoints(list: unknown) {
+  if (!Array.isArray(list)) return null;
+  const out = list.slice(0, 40).map((p: any) => {
+    const o: Record<string, string> = {};
+    if (!p || typeof p !== 'object') return null;
+    o.n = cut(p.n, 80); o.t = cut(p.t, 6000);
+    if (VERDICT[p.v]) o.v = p.v;
+    if (cut(p.c, 3000)) o.c = cut(p.c, 3000);
+    if (p.a === 'ok' || p.a === 'uwaga') o.a = p.a;
+    if (cut(p.x, 3000)) o.x = cut(p.x, 3000);
+    if (VERDICT[p.pv]) o.pv = p.pv;
+    if (cut(p.pc, 3000)) o.pc = cut(p.pc, 3000);
+    return o;
+  }).filter(Boolean);
+  return out.length ? out : null;
+}
 const m2Sig = (me: any) => ({ sigHtml: '', text: ['', 'Pozdrawiam serdecznie,', me?.full_name || '', 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska', 'ul. Zwycięska 3, 53-033 Wrocław', 'kancelaria@m2tax.pl · tel. 883 643 565 · www.m2tax.pl'].filter(Boolean).join('\n') });
 
 // ---------- e-mail z aplikacji: logo kancelarii, treść, przycisk, stopka rdp.app (bez osobistej stopki) ----------
@@ -53,7 +73,7 @@ const FIRM_FOOT: Record<string, string> = {
   rkdp: 'RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Czereśniowa 28d, 55-010 Ozorzyce · kancelaria: ul. Beaty Artemskiej 11/44, 52-234 Wrocław · tel. 883 643 565 · kancelaria@rkdp.pl · rkdp.pl',
   m2: 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska · ul. Zwycięska 3, 53-033 Wrocław · tel. 883 643 565 · kancelaria@m2tax.pl · m2tax.pl',
 };
-const APP_LINE = 'Wiadomość wysłana z rdp.app by @RKDP (rkdp.pl)';
+const APP_LINE = 'Wiadomość wysłana z rdp.app (app.ruszniak.io) by @RKDP (rkdp.pl)';
 type AppMail = { firm: string; kicker?: string; title: string; text: string; button?: { url: string; label: string } | null; attachment?: string | null };
 function appMail(app: string, m: AppMail) {
   const firm = m.firm === 'm2' ? 'm2' : 'rkdp';
@@ -93,7 +113,7 @@ ${att}${paras}${m.button && !placed ? btnHtml : ''}
 <tr><td style="padding:22px 36px 26px;background:#FAF8F4;border-top:1px solid #E6DFD4">
 <table role="presentation" cellpadding="0" cellspacing="0"><tr>
 <td valign="middle" style="padding-right:12px"><div style="width:34px;height:34px;line-height:34px;border-radius:8px;background:#1F2229;color:#ffffff;text-align:center;${F};font-size:13px;font-weight:bold">rdp.</div></td>
-<td valign="middle" style="${F};font-size:13px;line-height:1.5;color:#3B362F">Wiadomość wysłana z <b>rdp.app</b> by <a href="https://rkdp.pl" style="color:#7A5A37;font-weight:bold;text-decoration:none">@RKDP</a></td>
+<td valign="middle" style="${F};font-size:13px;line-height:1.5;color:#3B362F">Wiadomość wysłana z <a href="https://app.ruszniak.io" style="color:#3B362F;font-weight:bold;text-decoration:none">rdp.app</a> by <a href="https://rkdp.pl" style="color:#7A5A37;font-weight:bold;text-decoration:none">@RKDP</a></td>
 </tr></table>
 <p style="margin:12px 0 0;${F};font-size:11.5px;line-height:1.55;color:#6B645A">${escH(FIRM_FOOT[firm])}</p>
 </td></tr>
@@ -159,7 +179,7 @@ async function notifyTeam(r: any, subject: string, head: string, text: string, i
     if (!to.length || !SMTP_USER || !SMTP_PASS) return;
     const link = r.order_id ? `${S.app}/#/doradztwo/zlecenie/${r.order_id}` : r.client_id ? `${S.app}/#/klient/${r.client_id}` : `${S.app}/#/doradztwo/klient/${r.m2_client_id}`;
     await transport().sendMail({ from: { name: 'rdp.app – podpisy', address: S.appFrom }, to, subject: subject.slice(0, 200), text,
-      html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px"><p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Podpis · rdp.app</p><h2 style="margin:0 0 12px;font-size:19px">${escH(head)}</h2>${inner}<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">${r.order_id ? 'Otwórz dokument w aplikacji' : 'Otwórz kartę klienta'}</a></p><p style="color:#6B7280;font-size:12px">${escH(foot)}</p></div>` });
+      html: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#111827;max-width:560px"><p style="margin:0 0 6px;color:#2563EB;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px">Podpis · <a href="https://app.ruszniak.io" style="color:#2563EB;font-weight:bold;text-decoration:none">rdp.app</a></p><h2 style="margin:0 0 12px;font-size:19px">${escH(head)}</h2>${inner}<p style="margin:18px 0"><a href="${link}" style="background:#2563EB;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:700">${r.order_id ? 'Otwórz dokument w aplikacji' : 'Otwórz kartę klienta'}</a></p><p style="color:#6B7280;font-size:12px">${escH(foot)}</p></div>` });
   } catch (e) { console.error('mail zespół', e); }
 }
 
@@ -222,7 +242,7 @@ Deno.serve(async (req: Request) => {
         const { data: su } = await admin.storage.from(BUCKET).createSignedUrl(orig.path, 3600, { download: orig.name.endsWith('.pdf') ? orig.name : orig.name + '.pdf' });
         url = su?.signedUrl || '';
       }
-      const { data: notes } = await admin.from('sign_notes').select('id, body, author, from_client, created_at, version, verdict, kind').eq('request_id', r.id).order('created_at');
+      const { data: notes } = await admin.from('sign_notes').select('id, body, author, from_client, created_at, version, verdict, kind, points').eq('request_id', r.id).order('created_at');
       let final = null;
       if (r.final_path) { const { data: fu } = await admin.storage.from(BUCKET).createSignedUrl(r.final_path, 3600, { download: r.final_name || `${r.title} – egzemplarz.pdf` }); final = { name: r.final_name || '', url: fu?.signedUrl || '', at: r.final_at }; }
       let prev = '';
@@ -249,6 +269,48 @@ Deno.serve(async (req: Request) => {
         `<p><b>${escH(who)}</b> zgłosił(a) uwagi do dokumentu „${escH(r.title)}”:</p><blockquote style="margin:12px 0;padding:10px 14px;background:#F3F4F6;border-left:3px solid #2563EB;border-radius:6px;white-space:pre-wrap">${escH(text)}</blockquote>`,
         `Odpowiedz w aplikacji: sekcja „Do podpisu” → „Odpowiedz”. Klient zobaczy odpowiedź na stronie umowy i dostanie e-mail; możesz od razu dołączyć nową wersję umowy pod tym samym linkiem.`);
       return json({ ok: true });
+    }
+
+    // ===== klient odpowiada na stanowisko kancelarii punkt po punkcie =====
+    if (action === 'respond') {
+      if (!validToken(body.token)) return json({ error: 'Link jest nieprawidłowy.' }, 400);
+      const { r, error } = await byToken(body.token);
+      if (error) return json({ error }, 410);
+      if (r.status !== 'wyslano') return json({ error: 'Dokument jest już podpisany.' }, 400);
+      const author = String(body.author || '').replace(/\s+/g, ' ').trim().slice(0, 120) || null;
+      const asked = (Array.isArray(body.points) ? body.points : []).slice(0, 60);
+      const ids = [...new Set(asked.map((p: any) => String(p?.note || '')))].filter(Boolean);
+      const { data: src } = ids.length ? await admin.from('sign_notes').select('id, points').eq('request_id', r.id).eq('from_client', true).in('id', ids) : { data: [] };
+      const pts: any[] = [];
+      for (const p of asked) {
+        const sp = (src || []).find((x: any) => x.id === p?.note)?.points?.[Number(p?.i)];
+        if (!sp || (p.a !== 'ok' && p.a !== 'uwaga')) continue;
+        const x = cut(p.x, 3000);
+        if (p.a === 'uwaga' && x.length < 2) return json({ error: `Wpisz uwagę do: ${sp.n || 'punktu'}.` }, 400);
+        pts.push({ n: sp.n || '', t: cut(sp.t, 1500), pv: sp.v, pc: sp.c, a: p.a, ...(p.a === 'uwaga' ? { x } : {}) });
+      }
+      if (!pts.length) return json({ error: 'Zaznacz odpowiedź przy punktach.' }, 400);
+      const points = cleanPoints(pts);
+      const allOk = pts.every(p => p.a === 'ok');
+      const text = allOk ? 'Akceptuję stanowisko kancelarii. Proszę o przygotowanie umowy do podpisu.'
+        : pts.map(p => `${p.n || 'Uwaga'}: ${p.a === 'ok' ? 'akceptuję stanowisko kancelarii.' : p.x}`).join('\n\n');
+      const { error: e1 } = await admin.from('sign_notes').insert({ request_id: r.id, body: text.slice(0, 8000), author, version: r.version || 1, kind: allOk ? 'akceptacja' : 'uwaga', points });
+      if (e1) { console.error(e1); return json({ error: 'Nie udało się zapisać odpowiedzi – spróbuj ponownie.' }, 500); }
+      const who = author ? `${author} (${clientName(r) || 'klient'})` : (clientName(r) || 'Klient');
+      if (allOk) {
+        await admin.from('sign_requests').update({ accepted_at: new Date().toISOString() }).eq('id', r.id);
+        await notifyTeam(r, `Klient zaakceptował – przygotuj umowę do podpisu: ${r.title} – ${clientName(r)}`, 'Klient zaakceptował stanowisko – przygotuj umowę do podpisu',
+          `${who} zaakceptował(a) stanowisko kancelarii do każdego punktu dokumentu „${r.title}”.\n\nPrzygotuj umowę do podpisu: w aplikacji sekcja „Do podpisu” → „Wyślij do podpisu”.`,
+          `<p><b>${escH(who)}</b> zaakceptował(a) stanowisko kancelarii do każdego punktu dokumentu „${escH(r.title)}”.</p>`,
+          'Przygotuj umowę do podpisu: sekcja „Do podpisu” → „Wyślij do podpisu” (nowa wersja z uzgodnionymi zmianami albo bez zmian).');
+      } else {
+        const n = pts.filter(p => p.a === 'uwaga').length;
+        await notifyTeam(r, `Kolejne uwagi do dokumentu: ${r.title} – ${clientName(r)}`, `Klient odpowiedział – uwagi do ${n} ${n === 1 ? 'punktu' : 'punktów'}`,
+          `${who} odpowiedział(a) na stanowisko kancelarii do dokumentu „${r.title}”:\n\n${text}\n\nOdpowiedz w aplikacji: sekcja „Do podpisu” → „Odpowiedz”.`,
+          `<p><b>${escH(who)}</b> odpowiedział(a) na stanowisko kancelarii do dokumentu „${escH(r.title)}”:</p><blockquote style="margin:12px 0;padding:10px 14px;background:#F3F4F6;border-left:3px solid #2563EB;border-radius:6px;white-space:pre-wrap">${escH(text)}</blockquote>`,
+          'Odpowiedz w aplikacji: sekcja „Do podpisu” → „Odpowiedz”. Każdy punkt ocenisz osobno.');
+      }
+      return json({ ok: true, accepted: allOk, note: { body: text, author, created_at: new Date().toISOString(), version: r.version || 1, from_client: true, kind: allOk ? 'akceptacja' : 'uwaga', points } });
     }
 
     // ===== klient akceptuje stanowisko kancelarii =====
@@ -340,7 +402,10 @@ Deno.serve(async (req: Request) => {
         await admin.from('sign_requests').update({ version: nv, doc_html: docHtml, file_id: fileId, file_path: fileId ? null : path, changes, expires_at: exp, accepted_at: null }).eq('id', r.id);
         ver = nv; newVer = true;
       }
-      for (const x of verdicts) await admin.from('sign_notes').update({ verdict: x.verdict }).eq('id', x.id).eq('request_id', r.id).eq('from_client', true);
+      for (const x of verdicts) {
+        const pts = cleanPoints(x.points);
+        await admin.from('sign_notes').update({ verdict: x.verdict, ...(pts ? { points: pts } : {}) }).eq('id', x.id).eq('request_id', r.id).eq('from_client', true);
+      }
       const firmName = r.firm === 'm2' ? 'M2 TAX' : 'RKDP';
       if (final && text.length < 2) text = newVer ? `Przesyłamy wersję ${ver} umowy uwzględniającą uzgodnienia – czeka na Państwa podpis.` : 'Umowa czeka na Państwa podpis.';
       if (final && !newVer) await admin.from('sign_requests').update({ accepted_at: null, expires_at: new Date(Math.max(new Date(r.expires_at).getTime(), Date.now() + 14 * 86400000)).toISOString() }).eq('id', r.id);

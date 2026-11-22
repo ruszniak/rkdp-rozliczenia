@@ -199,7 +199,7 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
     window.open(data.url, '_blank', 'noopener');
   }
   async function load() {
-    let q = sb.from('sign_requests').select('id, title, email, status, token, kind, created_at, opened_at, signed_at, expires_at, firm, version, changes, accepted_at, final_at, final_name, sign_notes(id, body, author, created_at, from_client, verdict, version, kind)');
+    let q = sb.from('sign_requests').select('id, title, email, status, token, kind, created_at, opened_at, signed_at, expires_at, firm, version, changes, accepted_at, final_at, final_name, sign_notes(id, body, author, created_at, from_client, verdict, version, kind, points)');
     for (const [k, v] of Object.entries(filter)) q = q.eq(k, v);
     const { data, error } = await q.order('created_at', { ascending: false }).limit(12);
     if (error || (!data?.length && emptyHidden)) { box.hidden = true; return; }
@@ -246,7 +246,11 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
           const office = n.from_client === false, when = new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' });
           return h('div', { class: 'sign-note' + (office ? ' office' : '') }, h('small', {},
             office ? `Odpowiedź – ${n.author || 'biuro'} · ${when}${n.version > 1 ? ` · z wersją ${n.version}` : ''}` : `Uwagi klienta${n.author ? ' – ' + n.author : ''} · ${when}${n.version && r.version > 1 ? ` · do wersji ${n.version}` : ''}`,
-            n.verdict ? h('span', { class: 'sign-vd ' + n.verdict }, { przyjete: 'przyjęte', czesciowo: 'częściowo', odrzucone: 'nieprzyjęte' }[n.verdict]) : null), n.body);
+            n.verdict ? h('span', { class: 'sign-vd ' + n.verdict }, { przyjete: 'przyjęte', czesciowo: 'częściowo', odrzucone: 'nieprzyjęte' }[n.verdict]) : null),
+            !office && n.verdict && Array.isArray(n.points) && n.points.length ? h('div', {}, ...n.points.map(p => h('div', { class: 'sign-pt' },
+              h('b', {}, (p.n || 'Uwaga') + (p.v ? ' – ' + { przyjete: 'przyjęte', czesciowo: 'częściowo', odrzucone: 'nieprzyjęte' }[p.v] : p.a === 'ok' ? ' – klient akceptuje' : '')),
+              p.a === 'uwaga' && p.x ? h('div', {}, 'Klient: ' + p.x) : !p.a && p.n ? h('div', { class: 'muted' }, p.t.length > 160 ? p.t.slice(0, 160) + '…' : p.t) : !p.n ? h('div', {}, p.t) : null,
+              p.c ? h('div', {}, 'Nasz komentarz: ' + p.c) : null))) : n.body);
         }));
     }) : [h('p', { class: 'hint' }, 'Nic nie wysłano jeszcze do podpisu.')]));
   }

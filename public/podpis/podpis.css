@@ -14,3 +14,14 @@
 .decided{border-left:3px solid var(--accent);padding:8px 14px;margin:14px 0;color:var(--accent-2)}
 #final{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 #final a.btn-p{display:inline-block;text-decoration:none}
+.notes .pt{border:1px solid var(--line);padding:10px 14px;margin:10px 0 0;background:#fff}
+.notes .pt.v-przyjete{border-left:3px solid #4D7C3A}.notes .pt.v-czesciowo{border-left:3px solid #B7791F}.notes .pt.v-odrzucone{border-left:3px solid #9B2C2C}
+.notes .pt.need{box-shadow:0 0 0 1px var(--accent)}
+.notes .pt-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.notes .pt-t{white-space:pre-wrap}
+.notes .pt-q{white-space:pre-wrap;color:var(--muted);font-size:14px;margin-bottom:4px}
+.notes .pt-c{margin-top:8px;padding:8px 12px;border-left:2px solid var(--ink);background:#FAF8F4;white-space:pre-wrap}
+.notes .pr{margin-top:10px}
+.notes .pr-b{display:flex;gap:8px;flex-wrap:wrap}
+.notes .pr-b .on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.notes .pr textarea{width:100%;box-sizing:border-box;margin-top:8px;font:inherit;padding:8px 10px;border:1px solid var(--line-2)}

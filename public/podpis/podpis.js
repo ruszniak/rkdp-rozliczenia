@@ -68,15 +68,50 @@
     // uwagi
     var notesBox = document.getElementById('notes'), form = document.getElementById('noteForm'), nErr = document.getElementById('noteErr');
     var VD = { przyjete: 'przyjęte', czesciowo: 'częściowo przyjęte', odrzucone: 'nieprzyjęte' };
+    var resp = {}, roundPts = [];
+    // otwarta runda: ostatnia wiadomość to odpowiedź kancelarii (bez nowej wersji) – klient odpowiada przy każdym punkcie
+    var openRound = function (list) {
+      var L = -1, P = -1; list.forEach(function (n, i) { if (n.from_client === false) { P = L; L = i; } });
+      if (d.status !== 'wyslano' || L < 0 || list[L].kind !== 'odpowiedz' || L < list.length - 1) return [];
+      var out = [];
+      list.slice(P + 1, L).forEach(function (n) {
+        if (n.from_client === false || n.kind === 'akceptacja' || !n.id || !Array.isArray(n.points)) return;
+        n.points.forEach(function (p, i) { if (p.v && p.a !== 'ok') out.push({ note: n.id, i: i, p: p, key: n.id + ':' + i }); });
+      });
+      return out;
+    };
+    var ptHtml = function (n, p, i) {
+      var key = n.id + ':' + i, open = roundPts.some(function (r) { return r.key === key; });
+      return '<div class="pt' + (p.v ? ' v-' + p.v : '') + '"><div class="pt-h"><b>' + esc(p.n || 'Uwaga') + '</b>' + (p.v && VD[p.v] ? '<span class="vd">' + VD[p.v] + '</span>' : '') + '</div>'
+        + (p.a ? '<div class="pt-q">' + esc(p.t.length > 220 ? p.t.slice(0, 220) + '…' : p.t) + '</div><div class="pt-t">' + (p.a === 'ok' ? 'Akceptuję stanowisko kancelarii.' : esc(p.x || '')) + '</div>'
+          : '<div class="pt-t">' + esc(p.t) + '</div>')
+        + (p.c ? '<div class="pt-c"><b>Kancelaria:</b> ' + esc(p.c) + '</div>' : '')
+        + (open ? '<div class="pr" data-k="' + key + '"><div class="pr-b"><button type="button" class="btn-s" data-a="ok">Akceptuję</button><button type="button" class="btn-s" data-a="uwaga">Mam uwagę</button></div>'
+          + '<textarea rows="3" maxlength="3000" placeholder="Twoja odpowiedź do tego punktu" hidden></textarea></div>' : '')
+        + '</div>';
+    };
     var drawNotes = function (list) {
       var talk = list.some(function (n) { return n.from_client === false; });
+      roundPts = openRound(list);
       notesBox.hidden = !list.length;
       notesBox.innerHTML = list.length ? '<h3>' + (talk ? 'Rozmowa z kancelarią' : 'Zgłoszone uwagi') + '</h3>' + list.map(function (n) {
         var office = n.from_client === false;
-        return '<div class="n' + (office ? ' office' : '') + '"><small>' + esc(n.author || 'Ty') + ' · ' + new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
+        var pts = !office && Array.isArray(n.points) && n.points.length && (n.verdict || n.points.some(function (p) { return p.a; }));
+        return '<div class="n' + (office ? ' office' : '') + '"><small>' + esc(n.author || (office ? 'Kancelaria' : 'Ty')) + ' · ' + new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
           + (n.version && ver > 1 ? ' · ' + (office ? 'wersja ' : 'do wersji ') + n.version : '')
-          + (n.verdict && VD[n.verdict] ? '<span class="vd">' + VD[n.verdict] + '</span>' : '') + '</small>' + esc(n.kind === 'akceptacja' ? 'Akceptuję stanowisko kancelarii. Proszę o przygotowanie umowy do podpisu.' : n.body) + '</div>';
+          + (n.verdict && VD[n.verdict] && !pts ? '<span class="vd">' + VD[n.verdict] + '</span>' : '') + '</small>'
+          + (pts ? n.points.map(function (p, i) { return ptHtml(n, p, i); }).join('')
+            : esc(n.kind === 'akceptacja' ? 'Akceptuję stanowisko kancelarii. Proszę o przygotowanie umowy do podpisu.' : n.body)) + '</div>';
       }).join('') : '';
+      notesBox.querySelectorAll('.pr').forEach(function (el) {
+        var k = el.dataset.k, ta = el.querySelector('textarea'), bs = el.querySelectorAll('button');
+        var r0 = roundPts.filter(function (r) { return r.key === k; })[0];
+        if (!resp[k]) resp[k] = { a: r0 && r0.p.v === 'przyjete' ? 'ok' : '', x: '' };
+        var paint = function () { bs.forEach(function (b) { b.classList.toggle('on', b.dataset.a === resp[k].a); }); ta.hidden = resp[k].a !== 'uwaga'; el.parentNode.classList.toggle('need', !resp[k].a); };
+        bs.forEach(function (b) { b.addEventListener('click', function () { resp[k].a = b.dataset.a; paint(); if (b.dataset.a === 'uwaga') ta.focus(); }); });
+        ta.value = resp[k].x; ta.addEventListener('input', function () { resp[k].x = ta.value; });
+        paint();
+      });
       if (talk) { document.getElementById('noteBtn').textContent = 'Odpowiedz kancelarii'; document.getElementById('noteLbl').textContent = 'Odpowiedz albo zgłoś kolejne uwagi'; }
     };
     var notes = d.notes || []; drawNotes(notes);
@@ -106,7 +141,32 @@
       var accepted = after.some(function (n) { return n.kind === 'akceptacja'; });
       decideBox.hidden = !(d.status === 'wyslano' && office && office.kind !== 'wersja' && office.kind !== 'do_podpisu' && !after.length);
       decided.hidden = !(d.status === 'wyslano' && accepted);
+      var pm = !decideBox.hidden && roundPts.length > 0;
+      document.getElementById('respBtn').hidden = !pm;
+      document.getElementById('decTxt').innerHTML = pm
+        ? '<b>Kancelaria odniosła się do każdego punktu Państwa uwag.</b> Przy każdym punkcie powyżej kliknij „Akceptuję” albo „Mam uwagę” (i wpisz odpowiedź), a potem „Wyślij odpowiedź”. Jeśli wszystko jest zaakceptowane, przygotujemy umowę do podpisu.'
+        : '<b>Kancelaria odniosła się do Państwa uwag.</b> Jeśli zgadzają się Państwo ze stanowiskiem kancelarii, kliknij „Akceptuję” – przygotujemy umowę do podpisu i wyślemy e-mail, gdy będzie gotowa. Możesz też zgłosić kolejne uwagi.';
+      document.getElementById('accBtn').textContent = pm ? 'Akceptuję całe stanowisko' : 'Akceptuję stanowisko kancelarii';
     };
+    document.getElementById('respBtn').addEventListener('click', function () {
+      var b = this, aErr = document.getElementById('accErr'); aErr.hidden = true;
+      var miss = roundPts.filter(function (r) { var x = resp[r.key] || {}; return !x.a || (x.a === 'uwaga' && (x.x || '').trim().length < 2); });
+      if (miss.length) {
+        aErr.textContent = 'Uzupełnij odpowiedź przy: ' + miss.map(function (r) { return r.p.n || 'uwadze'; }).join(', ') + '.'; aErr.hidden = false;
+        var el = notesBox.querySelector('.pr[data-k="' + miss[0].key + '"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      b.disabled = true; b.textContent = 'Wysyłam…';
+      var who = document.getElementById('noteWho').value.trim();
+      fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'respond', token: token, author: who,
+        points: roundPts.map(function (r) { return { note: r.note, i: r.i, a: resp[r.key].a, x: resp[r.key].x }; }) }) })
+        .then(function (r) { return r.json(); }).then(function (r) {
+          b.disabled = false; b.textContent = 'Wyślij odpowiedź';
+          if (r.error) { aErr.textContent = r.error; aErr.hidden = false; return; }
+          notes = notes.concat([r.note]); drawNotes(notes); decideState();
+          if (!r.accepted) notesBox.insertAdjacentHTML('beforeend', '<p class="sent">Wysłane do kancelarii. Odpowiedź zobaczysz tutaj i dostaniesz e-mailem.</p>');
+        }).catch(function () { b.disabled = false; b.textContent = 'Wyślij odpowiedź'; aErr.textContent = 'Brak połączenia – spróbuj ponownie.'; aErr.hidden = false; });
+    });
     decideState();
     document.getElementById('moreBtn').addEventListener('click', function () { form.hidden = false; document.getElementById('noteTxt').focus(); });
     document.getElementById('accBtn').addEventListener('click', function () {
@@ -114,11 +174,11 @@
       var who = document.getElementById('noteWho').value.trim();
       fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept', token: token, author: who }) })
         .then(function (r) { return r.json(); }).then(function (r) {
-          b.disabled = false; b.textContent = 'Akceptuję stanowisko kancelarii';
+          b.disabled = false; decideState();
           if (r.error) { aErr.textContent = r.error; aErr.hidden = false; return; }
           notes = notes.concat([{ body: 'Akceptuję stanowisko kancelarii. Proszę o przygotowanie umowy do podpisu.', author: who, created_at: new Date().toISOString(), version: ver, from_client: true, kind: 'akceptacja' }]);
           drawNotes(notes); decideState();
-        }).catch(function () { b.disabled = false; b.textContent = 'Akceptuję stanowisko kancelarii'; aErr.textContent = 'Brak połączenia – spróbuj ponownie.'; aErr.hidden = false; });
+        }).catch(function () { b.disabled = false; decideState(); aErr.textContent = 'Brak połączenia – spróbuj ponownie.'; aErr.hidden = false; });
     });
     if (d.firm === 'm2') {   // M2 TAX: dane kontaktowe kancelarii
       document.getElementById('contact').innerHTML = 'Zadzwoń: <a href="tel:+48883643565">883 643 565</a> · napisz: <a href="mailto:kancelaria@m2tax.pl">kancelaria@m2tax.pl</a>.';

@@ -96,6 +96,8 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.7', '22 listopada 2026', [
+    'Uwagi podzielone na punkty klient widzi na stronie umowy tak jak w aplikacji: pod każdym punktem ocenę (przyjęte / częściowo / nieprzyjęte) i komentarz kancelarii. Przy każdym punkcie klikasz „Akceptuję” albo „Mam uwagę” z odpowiedzią – kolejne uwagi wracają do aplikacji jako punkty do oceny.',
+    'W e-mailach „rdp.app” jest linkiem do aplikacji (app.ruszniak.io).',
     'Odpowiedź na uwagi klienta do umowy: w „Do podpisu” przycisk „Odpowiedz” – ocena każdej uwagi (przyjmuję / częściowo / nie), odpowiedź e-mailem i na stronie umowy.',
     'Nowa wersja umowy pod tym samym linkiem: edycja treści (zmiany zaznaczają się klientowi automatycznie) albo własny PDF; klient podpisuje tylko najnowszą wersję, poprzednie zostają w historii.',
     'Odpowiadają: klienci RKDP – Michał, klienci M2 TAX – Michał i Marcin.',

@@ -148,7 +148,7 @@
           return { data: { ok: true, link: location.origin + '/podpis/?t=' + r.token, mailed: true } };
         })() : name === 'podpis' && body.action === 'reply' ? (() => {
           const r = D.sign_requests.find(x => x.id === body.id); const now = new Date().toISOString();
-          (body.verdicts || []).forEach(v => { const n = D.sign_notes.find(x => x.id === v.id); if (n) n.verdict = v.verdict; });
+          (body.verdicts || []).forEach(v => { const n = D.sign_notes.find(x => x.id === v.id); if (n) { n.verdict = v.verdict; if (v.points) n.points = v.points; } });
           if (body.version) { D.sign_versions.push({ id: uuid(), request_id: r.id, version: r.version, doc_html: r.doc_html, changes: r.changes }); r.version += 1; r.doc_html = body.version.doc_html; r.changes = body.version.changes; }
           if (body.final || body.version) r.accepted_at = null;
           D.sign_notes.push({ id: uuid(), request_id: r.id, body: body.text || 'Umowa czeka na Państwa podpis.', author: me.full_name + ', M2 TAX', from_client: false, version: r.version, verdict: null, kind: body.final ? 'do_podpisu' : body.version ? 'wersja' : 'odpowiedz', created_at: now });

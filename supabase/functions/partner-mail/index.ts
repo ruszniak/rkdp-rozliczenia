@@ -75,7 +75,7 @@ async function send(b: any) {
       + (z.priority === 'pilne' ? '<div><b style="color:#A4462F">PILNE</b></div>' : '')
       + (note ? `<p style="margin:12px 0 4px;color:#7A5A37;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em">${escH(LBL[ev] || 'Wiadomość')}</p><p style="white-space:pre-wrap;background:#F8F5F0;padding:10px 12px;border-radius:8px;margin:0">${escH(note.slice(0, 4000))}</p>` : '')
       + `<p style="margin:18px 0"><a href="${link}" style="background:#7A5A37;color:#fff;text-decoration:none;padding:11px 20px;border-radius:30px;font-weight:700">${escH(cta)}</a></p>`
-      + `<p style="color:#8A8C92;font-size:12px">Nie odpowiadaj na tego maila – pisz w zadaniu w aplikacji rdp.app.${forOffice ? '<br>M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p. · kancelaria@m2tax.pl · 883 643 565' : ''}</p></div>`;
+      + `<p style="color:#8A8C92;font-size:12px">Nie odpowiadaj na tego maila – pisz w zadaniu w aplikacji <a href="https://app.ruszniak.io" style="color:#8A8C92;font-weight:bold;text-decoration:none">rdp.app</a>.${forOffice ? '<br>M2 TAX Doradcy Podatkowi Otręba Ruszniak sp. p. · kancelaria@m2tax.pl · 883 643 565' : ''}</p></div>`;
     try {
       await transport().sendMail({ from: { name: forOffice ? 'M2 TAX Doradcy Podatkowi' : 'rdp.app – zadania biur', address: S.from }, to: addr, subject, text, html });
       sent++;

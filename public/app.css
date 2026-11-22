@@ -3561,3 +3561,5 @@ fieldset.kl-form:disabled .partner{border-color:var(--line)}
 :root[data-theme="dark"] .odp-n{background:rgba(245,158,11,.12)}:root[data-theme="dark"] .odp-n.office{background:rgba(59,130,246,.12)}
 .sign-note.acc{border-left-color:#16A34A;background:#F0FDF4}.sign-note.acc small{color:#166534}
 :root[data-theme="dark"] .sign-note.acc{background:rgba(22,163,74,.12)}
+
+.sign-pt{margin:6px 0 0;padding:6px 0 0;border-top:1px dashed var(--line,#E5E7EB)}.sign-pt b{display:block;font-size:13px}.sign-pt div{white-space:pre-wrap}
