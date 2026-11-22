@@ -102,6 +102,8 @@ const NEWS = [
     'Edycja nowej wersji: uwagi klienta widać obok treści umowy, „Przejdź do § …” przenosi do wskazanego paragrafu.',
     'E-mail do klienta po odpowiedzi jest krótki („odnieśliśmy się do Państwa uwag” + link); na stronie klient może zgłosić kolejne uwagi albo zaakceptować stanowisko kancelarii – wtedy dostajesz powiadomienie i „Wyślij do podpisu” (e-mail „Umowa czeka na podpis”).',
     'Po podpisie klienta: „Wgraj egzemplarz podpisany przez nas” – klient pobiera swój egzemplarz obu stron z tego samego linku (dostaje e-mail).',
+    'Menu: „Zadania” zaraz pod „Sprawami” – dla wszystkich (RKDP i M2 TAX).',
+    'E-maile do klientów z aplikacji (umowy, odpowiedzi na uwagi, ZAW-FA, UPL-1, PEL, UKO, instrukcje) mają nowy wygląd: logo RKDP albo M2 TAX, przycisk i stopka „wysłana z rdp.app by @RKDP”; bez osobistej stopki, odpowiedź klienta wraca do osoby, która wysłała. Klienci RKDP dostają je z kancelaria@rkdp.pl, klienci M2 TAX i powiadomienia dla zespołu – z app@ruszniak.io.',
     'Długą uwagę klienta dzielisz na punkty (numerowane dzielą się same) i każdy oceniasz osobno, z komentarzem; okno odpowiedzi otwiera się na cały ekran.',
   ]],
   ['2.6', '20 listopada 2026', [
