@@ -2,7 +2,7 @@
 // Wspólne dla: umowy księgowej RKDP, ZUS PEL (karta klienta RKDP), zlecenia i umowy doradczej (M2 TAX / RKDP),
 // umowy z biurem rachunkowym (Program Partner M2 TAX).
 import { h, icon, toast, fail, modal } from './ui.js';
-import { sb } from './store.js';
+import { sb, state } from './store.js';
 import { docxToHtml } from './docx.js';
 
 const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -131,7 +131,7 @@ export function sendFileForSignature(opts) {
   document.body.append(inp); inp.click();
 }
 // strony PDF jako obrazy – podgląd na stronie podpisu (klient czyta dokument bez pobierania); limit ~1,4 MB
-async function pdfPagesHtml(bytes) {
+export async function pdfPagesHtml(bytes) {
   const url = '/lib/pdfjs/pdf.min.mjs';   // zmienna – bundler nie dołącza biblioteki
   const lib = await import(/* @vite-ignore */ url);
   lib.GlobalWorkerOptions.workerSrc = '/lib/pdfjs/pdf.worker.min.mjs';
@@ -178,7 +178,7 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
     window.open(data.url, '_blank', 'noopener');
   }
   async function load() {
-    let q = sb.from('sign_requests').select('id, title, email, status, token, kind, created_at, opened_at, signed_at, expires_at, sign_notes(body, author, created_at)');
+    let q = sb.from('sign_requests').select('id, title, email, status, token, kind, created_at, opened_at, signed_at, expires_at, firm, version, changes, sign_notes(id, body, author, created_at, from_client, verdict, version)');
     for (const [k, v] of Object.entries(filter)) q = q.eq(k, v);
     const { data, error } = await q.order('created_at', { ascending: false }).limit(12);
     if (error || (!data?.length && emptyHidden)) { box.hidden = true; return; }
@@ -186,15 +186,24 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
     box.replaceChildren(h('h3', {}, title), ...(data.length ? data.map(r => {
       const expired = r.status === 'wyslano' && new Date(r.expires_at) < new Date();
       const notes = (r.sign_notes || []).sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const last = notes[notes.length - 1];
+      const waiting = !!last && last.from_client !== false;   // ostatnie słowo klienta – czeka na odpowiedź
       const [label, cls] = r.status === 'podpisano' ? ['podpisano ' + d(r.signed_at), 'ok'] : r.status === 'anulowano' ? ['anulowano', 'off']
-        : expired ? ['link wygasł', 'off'] : notes.length ? ['uwagi klienta', 'warn'] : r.opened_at ? ['otwarto ' + d(r.opened_at), 'info'] : ['wysłano ' + d(r.created_at), 'info'];
+        : expired ? ['link wygasł', 'off'] : waiting ? ['uwagi klienta – czeka na odpowiedź', 'warn'] : last ? ['odpowiedziano ' + d(last.created_at), 'info']
+        : r.opened_at ? ['otwarto ' + d(r.opened_at), 'info'] : ['wysłano ' + d(r.created_at), 'info'];
+      const mayReply = r.status === 'wyslano' && (state.me?.role === 'admin' || (r.firm === 'm2' && state.me?.id === 'c66817f8-61a2-4605-a503-07cbcf9d47d5'));
       const link = `${location.origin}/podpis/?t=${r.token}`;
       const active = r.status === 'wyslano' && !expired;
       return h('div', { class: 'sign-row' },
         h('div', { class: 'sign-top' },
-          h('div', { class: 'sign-t' }, h('b', {}, r.title), h('span', { class: 'small muted' }, ` · ${r.email || 'link skopiowany'} · ${d(r.created_at)}`)),
+          h('div', { class: 'sign-t' }, h('b', {}, r.title), (r.version || 1) > 1 ? h('span', { class: 'sign-ver', 'data-tip': r.changes || '' }, `wersja ${r.version}`) : null,
+            h('span', { class: 'small muted' }, ` · ${r.email || 'link skopiowany'} · ${d(r.created_at)}`)),
           h('span', { class: 'sign-st ' + cls }, label),
           h('span', { class: 'row-btns' },
+            mayReply && notes.length ? h('button', { class: 'btn btn-sm ' + (waiting ? 'btn-primary' : 'btn-outline'), type: 'button', 'data-tip': 'Odpowiedz klientowi na uwagi i ewentualnie wyślij nową wersję dokumentu pod tym samym linkiem', onclick: async () => {
+              const { replyDialog } = await import('./podpis-odp.js');
+              replyDialog({ ...r, notes }, () => load());
+            } }, icon('mail'), 'Odpowiedz') : null,
             h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => open(r, 'original') }, 'PDF'),
             r.status === 'podpisano' ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => open(r, 'signed') }, 'Podpisany plik') : null,
             active ? h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('Skopiowano link do podpisu'); } catch { prompt('Link do podpisu:', link); } } }, 'Kopiuj link') : null,
@@ -204,7 +213,12 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
               if (e || x?.error) return fail(e || new Error(x.error));
               toast('Anulowano prośbę o podpis'); load();
             } }, 'Anuluj') : null)),
-        ...notes.map(n => h('div', { class: 'sign-note' }, h('small', {}, `Uwagi klienta${n.author ? ' – ' + n.author : ''} · ${new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}`), n.body)));
+        ...notes.map(n => {
+          const office = n.from_client === false, when = new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' });
+          return h('div', { class: 'sign-note' + (office ? ' office' : '') }, h('small', {},
+            office ? `Odpowiedź – ${n.author || 'biuro'} · ${when}${n.version > 1 ? ` · z wersją ${n.version}` : ''}` : `Uwagi klienta${n.author ? ' – ' + n.author : ''} · ${when}${n.version && r.version > 1 ? ` · do wersji ${n.version}` : ''}`,
+            n.verdict ? h('span', { class: 'sign-vd ' + n.verdict }, { przyjete: 'przyjęte', czesciowo: 'częściowo', odrzucone: 'nieprzyjęte' }[n.verdict]) : null), n.body);
+        }));
     }) : [h('p', { class: 'hint' }, 'Nic nie wysłano jeszcze do podpisu.')]));
   }
   box.reload = load;

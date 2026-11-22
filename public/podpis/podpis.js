@@ -27,14 +27,34 @@
     if (d.file && d.file.url) dl.href = d.file.url;
     else { dl.hidden = true; document.getElementById('dlname').textContent = 'Plik PDF jest chwilowo niedostępny – odśwież stronę albo skontaktuj się z biurem.'; }
     // podgląd treści (izolowana ramka bez skryptów)
-    if (d.html) {
-      var view = document.getElementById('view'), frame = document.getElementById('frame'), full = document.getElementById('fullBtn');
-      frame.srcdoc = /^<!doctype/i.test(d.html) ? d.html : '<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
+    var wrap = function (html) {
+      return /^<!doctype/i.test(html) ? html : '<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'
         + 'html{font-size:11pt}body{margin:0;background:#E9EAEE;color:#1c1d21;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;line-height:1.4}'
         + '.paper{max-width:760px;margin:18px auto;background:#fff;padding:44px 60px 56px;box-shadow:0 2px 10px rgba(0,0,0,.08);border-radius:4px}'
         + '.lh{text-align:center;margin-bottom:18px}.lh img{width:190px;height:auto}p{margin:0}.tab{display:inline-block;width:36pt}'
         + '@media(max-width:640px){html{font-size:10pt}.paper{margin:0;padding:22px 16px 30px;border-radius:0;box-shadow:none}.lh img{width:150px}p[style*=justify]{text-align:left!important}}'
-        + '</style></head><body><div class="paper"><div class="lh"><img src="' + location.origin + '/logo-rkdp.png" alt="RKDP"></div>' + d.html + '</div></body></html>';
+        + '</style></head><body><div class="paper"><div class="lh"><img src="' + location.origin + '/logo-rkdp.png" alt="RKDP"></div>' + html + '</div></body></html>';
+    };
+    var ver = d.version || 1;
+    if (ver > 1) {   // nowa wersja po uwagach: informacja, zmiany zaznaczone w treści
+      var vb = document.getElementById('ver'), marked = null;
+      if (d.html && d.prev_html && window.DocDiff) { try { marked = window.DocDiff.mark(wrap(d.html), wrap(d.prev_html)); } catch (e) { marked = null; } }
+      var what = d.changes || (marked && marked.labels.length ? 'Zmienione: ' + marked.labels.join(', ') + '.' : '');
+      vb.innerHTML = '<b>Wersja ' + ver + ' – uwzględnia Państwa uwagi</b>' + (what ? '<p>' + esc(what) + '</p>' : '')
+        + (marked && marked.count ? '<span class="leg">W treści poniżej: <ins>dodane</ins> <del>usunięte</del></span><button type="button" class="lnk" id="verTgl">Pokaż tekst bez zaznaczeń</button>' : '')
+        + '<span class="leg">Podpisać można tylko tę, najnowszą wersję.</span>';
+      vb.hidden = false;
+      document.getElementById('ttl').textContent = d.title + ' – wersja ' + ver;
+      var acc = document.getElementById('acceptBtn'); acc.textContent = 'Akceptuję wersję ' + ver + ' – przejdź do podpisu'; acc.hidden = d.status !== 'wyslano';
+      acc.addEventListener('click', function () { var w = box.querySelector('.ways'); if (w) w.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    }
+    if (d.html) {
+      var view = document.getElementById('view'), frame = document.getElementById('frame'), full = document.getElementById('fullBtn');
+      var showMarked = !!(marked && marked.count);
+      var paint = function () { frame.srcdoc = showMarked ? marked.html : wrap(d.html); };
+      paint();
+      var tgl = document.getElementById('verTgl');
+      if (tgl) tgl.addEventListener('click', function () { showMarked = !showMarked; tgl.textContent = showMarked ? 'Pokaż tekst bez zaznaczeń' : 'Pokaż zmiany względem wersji ' + (ver - 1); paint(); });
       view.hidden = false; full.hidden = false;
       var closeBtn = null;
       var setFull = function (on) {
@@ -47,11 +67,17 @@
     }
     // uwagi
     var notesBox = document.getElementById('notes'), form = document.getElementById('noteForm'), nErr = document.getElementById('noteErr');
+    var VD = { przyjete: 'przyjęte', czesciowo: 'częściowo przyjęte', odrzucone: 'nieprzyjęte' };
     var drawNotes = function (list) {
+      var talk = list.some(function (n) { return n.from_client === false; });
       notesBox.hidden = !list.length;
-      notesBox.innerHTML = list.length ? '<b>Zgłoszone uwagi</b>' + list.map(function (n) {
-        return '<div class="n"><small>' + esc(n.author || 'Ty') + ' · ' + new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' }) + '</small>' + esc(n.body) + '</div>';
+      notesBox.innerHTML = list.length ? '<h3>' + (talk ? 'Rozmowa z biurem' : 'Zgłoszone uwagi') + '</h3>' + list.map(function (n) {
+        var office = n.from_client === false;
+        return '<div class="n' + (office ? ' office' : '') + '"><small>' + esc(n.author || 'Ty') + ' · ' + new Date(n.created_at).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
+          + (n.version && ver > 1 ? ' · ' + (office ? 'wersja ' : 'do wersji ') + n.version : '')
+          + (n.verdict && VD[n.verdict] ? '<span class="vd">' + VD[n.verdict] + '</span>' : '') + '</small>' + esc(n.body) + '</div>';
       }).join('') : '';
+      if (talk) { document.getElementById('noteBtn').textContent = 'Odpowiedz biuru'; document.getElementById('noteLbl').textContent = 'Odpowiedz albo zgłoś kolejne uwagi'; }
     };
     var notes = d.notes || []; drawNotes(notes);
     document.getElementById('noteBtn').addEventListener('click', function () { form.hidden = false; document.getElementById('noteTxt').focus(); });
@@ -65,7 +91,7 @@
         .then(function (r) { return r.json(); }).then(function (r) {
           btn.disabled = false; btn.textContent = 'Wyślij uwagi';
           if (r.error) { nErr.textContent = r.error; nErr.hidden = false; return; }
-          notes = notes.concat([{ body: txt, author: who, created_at: new Date().toISOString() }]); drawNotes(notes);
+          notes = notes.concat([{ body: txt, author: who, created_at: new Date().toISOString(), version: ver, from_client: true }]); drawNotes(notes);
           document.getElementById('noteTxt').value = ''; form.hidden = true;
           notesBox.insertAdjacentHTML('beforeend', '<p class="sent">Uwagi zostały wysłane. Odezwiemy się wkrótce.</p>');
         }).catch(function () { btn.disabled = false; btn.textContent = 'Wyślij uwagi'; nErr.textContent = 'Brak połączenia – spróbuj ponownie.'; nErr.hidden = false; });

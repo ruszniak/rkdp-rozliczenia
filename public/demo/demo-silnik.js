@@ -25,6 +25,7 @@
       const pick = x => { if (m[2] === '*') return { ...x }; const o = {}; m[2].split(',').forEach(k => o[k.trim()] = x[k.trim()]); return o; };
       if (rel === 'm2_clients' && row.client_id) { const t = (D[rel] || []).find(x => x.id === row.client_id); out[rel] = t ? pick(t) : null; }
       else if (rel === 'm2_orders' && row.order_id) { const t = (D[rel] || []).find(x => x.id === row.order_id); out[rel] = t ? pick(t) : null; }
+      else if (rel === 'sign_notes') out[rel] = (D[rel] || []).filter(x => x.request_id === row.id).map(pick);
       else out[rel] = (D[rel] || []).filter(x => x.client_id === row.id).map(pick);
     }
     return out;
@@ -141,7 +142,14 @@
           }
           return { data: null, error: null };
         },
-        functions: { invoke: async (name, { body }) => name === 'mail' ? ({ data: body.action === 'status' ? { ready: false } : { sent: body.client_ids.length, results: body.client_ids.map(id => ({ client_id: id, ok: true })) } }) : name === 'docs' ? ({ data: { sent: false, reason: 'not_configured' } }) : name === 'monitor' ? (() => {
+        functions: { invoke: async (name, { body }) => name === 'podpis' && body.action === 'reply' ? (() => {
+          const r = D.sign_requests.find(x => x.id === body.id); const now = new Date().toISOString();
+          (body.verdicts || []).forEach(v => { const n = D.sign_notes.find(x => x.id === v.id); if (n) n.verdict = v.verdict; });
+          if (body.version) { D.sign_versions.push({ id: uuid(), request_id: r.id, version: r.version, doc_html: r.doc_html, changes: r.changes }); r.version += 1; r.doc_html = body.version.doc_html; r.changes = body.version.changes; }
+          D.sign_notes.push({ id: uuid(), request_id: r.id, body: body.text, author: me.full_name + ', M2 TAX', from_client: false, version: r.version, verdict: null, created_at: now });
+          window.__reply = body;
+          return { data: { ok: true, link: location.origin + '/podpis/?t=' + r.token, version: r.version } };
+        })() : name === 'mail' ? ({ data: body.action === 'status' ? { ready: false } : { sent: body.client_ids.length, results: body.client_ids.map(id => ({ client_id: id, ok: true })) } }) : name === 'docs' ? ({ data: { sent: false, reason: 'not_configured' } }) : name === 'monitor' ? (() => {
           const c = D.clients.find(x => x.id === body.client_id); const ex = D.client_monitor.find(x => x.client_id === body.client_id);
           const snap = { vat: { status: 'Czynny', accounts: ['1'], name: c?.name }, krs: c?.krs ? { found: true, board: ['Jan Nowicki'], owners: ['Jan Nowicki'] } : null };
           if (ex) ex.checked_at = new Date().toISOString(); else D.client_monitor.push({ id: crypto.randomUUID(), module: 'rkdp', client_id: body.client_id, snapshot: snap, checked_at: new Date().toISOString() });

@@ -1,1 +1,11 @@
-/* Podpis dokumentu: wszystkie style w /umow/doc.css (wspólny wygląd stron dla klientów) */
+/* Podpis dokumentu: wspólny wygląd w /umow/doc.css; tu tylko wersje dokumentu i rozmowa */
+.ver{border:1px solid var(--accent);padding:14px 18px;margin:14px 0 4px;display:flex;flex-direction:column;gap:6px}
+.ver b{color:var(--accent);font-size:15px}
+.ver p{margin:0;font-size:16px}
+.ver .lnk{background:none;border:0;padding:0;font:inherit;font-size:15px;color:var(--accent);text-decoration:underline;text-underline-offset:3px;cursor:pointer;align-self:flex-start}
+.ver .leg{font-size:14px;color:var(--muted)}
+.ver .leg ins{background:#DDF0D8;color:#14532D;text-decoration:none;padding:0 3px}
+.ver .leg del{background:#FBE1DC;color:#7F1D1D;padding:0 3px}
+.notes .n.office{background:#fff;border-left-color:var(--ink);padding-left:14px}
+.notes .vd{display:inline-block;margin-left:8px;font-size:13px;color:var(--accent-2);border:1px solid var(--line-2);border-radius:4px;padding:0 6px;white-space:nowrap}
+.notes h3{margin:0 0 2px;font-size:17px}

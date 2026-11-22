@@ -3516,3 +3516,24 @@ fieldset.kl-form:disabled .section{padding-top:18px;padding-bottom:16px}
 fieldset.kl-form:disabled .partner{border-color:var(--line)}
 .kl-view-hint{background:var(--soft,#F4F5F7);color:var(--muted);font-size:13.5px;padding:10px 14px;border:1px solid var(--line)}
 @media (max-width:820px){fieldset.kl-form:disabled .form-grid{row-gap:8px}}
+/* odpowiedź na uwagi klienta i wersje dokumentu do podpisu */
+.sign-ver{display:inline-block;margin-left:8px;font-size:12px;font-weight:700;color:#3730A3;background:#EEF2FF;border-radius:6px;padding:1px 7px}
+.sign-note.office{border-left-color:#2563EB;background:#EFF6FF}.sign-note.office small{color:#1D4ED8}
+.sign-vd{display:inline-block;margin-left:8px;font-size:11.5px;font-weight:700;border-radius:6px;padding:0 7px;background:#F3F4F6;color:#374151}
+.sign-vd.przyjete{background:#DCFCE7;color:#166534}.sign-vd.czesciowo{background:#FEF3C7;color:#92400E}.sign-vd.odrzucone{background:#FEE2E2;color:#991B1B}
+:root[data-theme="dark"] .sign-note.office{background:rgba(59,130,246,.12)}:root[data-theme="dark"] .sign-note.office small{color:#93C5FD}
+.odp-h{margin:14px 0 6px;font-size:14px}
+.odp-thread{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;margin-bottom:6px}
+.odp-n{padding:8px 12px;border-left:3px solid #F59E0B;background:#FFFBEB;border-radius:6px;font-size:14px}
+.odp-n.office{border-left-color:#2563EB;background:#EFF6FF}
+.odp-n small{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.odp-b{white-space:pre-wrap;margin:2px 0}
+.odp-vd{margin-left:8px;font-size:11.5px;font-weight:700;color:#166534}
+.odp-vs{margin-top:6px}
+.odp-v.on[data-v="przyjete"]{background:#DCFCE7;border-color:#16A34A;color:#14532D}
+.odp-v.on[data-v="czesciowo"]{background:#FEF3C7;border-color:#D97706;color:#78350F}
+.odp-v.on[data-v="odrzucone"]{background:#FEE2E2;border-color:#DC2626;color:#7F1D1D}
+.odp-m.on,.odp-m.on:hover{background:#EEF2FF!important;color:#1E3A8A!important;border:1px solid #818CF8!important;font-weight:700}
+:root[data-theme="dark"] .odp-m.on{background:rgba(99,102,241,.2)!important;color:#C7D2FE!important}
+.odp-edit{display:block;width:100%;height:min(70vh,760px);border:1px solid var(--line);border-radius:8px;background:#E9EAEE}
+:root[data-theme="dark"] .odp-n{background:rgba(245,158,11,.12)}:root[data-theme="dark"] .odp-n.office{background:rgba(59,130,246,.12)}

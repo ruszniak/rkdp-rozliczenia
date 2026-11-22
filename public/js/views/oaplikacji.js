@@ -3,8 +3,8 @@ import { h } from '../ui.js';
 import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
-export const APP_VERSION = '2.6';
-export const APP_DATE = '2026-11-20';
+export const APP_VERSION = '2.7';
+export const APP_DATE = '2026-11-22';
 const DOCS_DATE = '2 listopada 2026 r.';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), KRS 0000812185, NIP 8992871126, REGON 384812329';
@@ -95,6 +95,11 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.7', '22 listopada 2026', [
+    'Odpowiedź na uwagi klienta do umowy: w „Do podpisu” przycisk „Odpowiedz” – ocena każdej uwagi (przyjmuję / częściowo / nie), odpowiedź e-mailem i na stronie umowy.',
+    'Nowa wersja umowy pod tym samym linkiem: edycja treści (zmiany zaznaczają się klientowi automatycznie) albo własny PDF; klient podpisuje tylko najnowszą wersję, poprzednie zostają w historii.',
+    'Odpowiadają: klienci RKDP – Michał, klienci M2 TAX – Michał i Marcin.',
+  ]],
   ['2.6', '20 listopada 2026', [
     'Wniosek o dostęp do konta organizacji w e-Urzędzie Skarbowym (UKO) z karty klienta: PDF na danych klienta i wysyłka z instrukcją /e-us-dostep/.',
     'Koszt księgowych (tylko administrator): wynagrodzenie jako % przychodu z klientów albo stała kwota – przychód, koszt, marża na osobę i na klienta, eksport do Excela i PDF.',

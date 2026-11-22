@@ -8,7 +8,7 @@
 <link rel="icon" href="/favicon-v7.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/umow/doc.css">
 <link rel="stylesheet" href="/upl-1/upl.css">
-<link rel="stylesheet" href="/podpis/podpis.css">
+<link rel="stylesheet" href="/podpis/podpis.css?v=2">
 </head>
 <body>
 <header><div class="in"><span class="brand"><img src="/logo-rdp.svg" alt="rdp.app" width="32" height="32"><span>Podpis dokumentu</span></span><span class="appname">rdp.app</span></div></header>
@@ -24,22 +24,24 @@
 <section class="card-s">
   <h2 class="h">1. Przeczytaj dokument</h2>
   <p>Sprawdź treść i swoje dane. Jeśli coś się nie zgadza albo masz pytania – zgłoś uwagi, zanim podpiszesz.</p>
+  <div class="ver" id="ver" hidden></div>
   <div class="doc-view" id="view" hidden><iframe id="frame" title="Treść dokumentu" sandbox></iframe></div>
   <div class="doc-acts">
     <a class="btn-p" id="dl" href="#" download>Pobierz PDF do podpisu</a>
     <button class="btn-s" type="button" id="noteBtn">Zgłoś uwagi</button>
     <button class="btn-s" type="button" id="fullBtn" hidden>Pełny ekran</button>
+    <button class="btn-s" type="button" id="acceptBtn" hidden>Akceptuję – przejdź do podpisu</button>
   </div>
   <p class="small" id="dlname"></p>
   <div class="notes" id="notes" hidden></div>
   <form class="note-form" id="noteForm" hidden>
-    <label for="noteTxt"><b>Twoje uwagi do dokumentu</b></label>
+    <label for="noteTxt"><b id="noteLbl">Twoje uwagi do dokumentu</b></label>
     <textarea id="noteTxt" rows="5" maxlength="4000" placeholder="Np. „W § 2 proszę dopisać…”, „Błędny adres – poprawny to…”"></textarea>
     <label for="noteWho" class="small">Imię i nazwisko (opcjonalnie)</label>
     <input id="noteWho" maxlength="120" autocomplete="name">
     <p class="err" id="noteErr" hidden></p>
     <div class="doc-acts"><button class="btn-p" type="submit" id="noteSend">Wyślij uwagi</button><button class="btn-s" type="button" id="noteCancel">Anuluj</button></div>
-    <p class="small">Uwagi trafią od razu do osoby z biura, która przygotowała dokument. Odpowiemy e-mailem lub telefonicznie, a w razie zmian prześlemy poprawioną wersję.</p>
+    <p class="small">Uwagi trafią od razu do biura. Odpowiedź zobaczysz na tej stronie i dostaniesz ją e-mailem; w razie zmian przygotujemy nową wersję dokumentu pod tym samym linkiem.</p>
   </form>
 </section>
 
@@ -105,6 +107,7 @@
 
 <footer><div class="in" id="foot">RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Beaty Artemskiej 11/44, 52-234 Wrocław<br>NIP 8992871126 · KRS 0000812185 · tel. 883 643 565 · kancelaria@rkdp.pl</div></footer>
 <script src="/config.js"></script>
+<script src="/podpis/diff.js"></script>
 <script src="/podpis/podpis.js"></script>
 </body>
 </html>
