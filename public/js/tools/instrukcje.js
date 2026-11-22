@@ -44,7 +44,7 @@ export const INSTRUKCJE = [
   { key: 'umow', title: 'Umów spotkanie z doradcą', path: '/umow/',
     desc: 'Rezerwacja konsultacji online – klient sam wybiera termin.',
     subject: 'Umówienie spotkania',
-    body: (link) => `Dzień dobry,\n\ntermin spotkania można wybrać samodzielnie pod linkiem: ${link}\n\nPozdrawiam` },
+    body: (link) => `Dzień dobry,\n\ntermin spotkania można wybrać samodzielnie pod linkiem: ${link}` },
 ];
 
 const PERSONAL = [['firma', 'Nazwa klienta (na górze strony)', {}, true], ['osoba', 'Opiekun'], ['email', 'E-mail opiekuna (tu klient wyśle potwierdzenia)', { type: 'email' }], ['tel', 'Telefon opiekuna', { type: 'tel' }]];
@@ -94,7 +94,8 @@ export function instrukcjaDialog(item) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.to.trim())) return toast('Wpisz poprawny e-mail klienta', true);
     btn.disabled = true; btn.textContent = 'Wysyłam…';
     try {
-      const { data: r, error } = await sb.functions.invoke('mail', { body: { action: 'send_file', client_id: client.id, to: f.to.trim(), subject: f.subject.trim(), body: f.body } });
+      const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'doc_mail', client_id: client.id, to: f.to.trim(), subject: f.subject.trim(), body: f.body,
+        doc: { kicker: item.key === 'umow' ? 'Spotkanie' : 'Instrukcja', title: item.title, button: { url: link(), label: item.key === 'umow' ? 'Wybierz termin' : 'Otwórz instrukcję' } } } });
       if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
       toast(`Wysłano do ${f.to.trim()}`); close();
     } catch (err) { toast('Nie udało się wysłać: ' + String(err.message || err).slice(0, 160), true); btn.disabled = false; btn.textContent = 'Wyślij z aplikacji'; }
@@ -104,7 +105,7 @@ export function instrukcjaDialog(item) {
     picker, custom,
     h('label', { class: 'field' }, h('span', {}, 'Do (e-mail klienta)'), toInput),
     h('label', { class: 'field' }, h('span', {}, 'Temat'), subjInput),
-    h('label', { class: 'field' }, h('span', {}, 'Treść (pod spodem dopisze się Twoja stopka)'), bodyTa),
+    h('label', { class: 'field' }, h('span', {}, 'Treść – e-mail wyjdzie z rdp.app z logo RKDP (bez osobistej stopki); odpowiedź klienta wróci do Ciebie'), bodyTa),
     h('label', { class: 'field' }, h('span', {}, 'Link dla klienta'), out),
     h('p', { class: 'hint', style: { marginTop: '6px' } }, 'E-mail wyjdzie z kancelaria@rkdp.pl i zapisze się w historii klienta.'));
   modal(item.title, body, close => [

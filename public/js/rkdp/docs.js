@@ -393,16 +393,16 @@ const UKO_TXT = {
   papier: 'Prosimy wydrukować wniosek, podpisać go (osoby uprawnione do reprezentacji zgodnie z KRS) i złożyć w urzędzie skarbowym właściwym w sprawach ewidencji – osobiście albo listem poleconym.',
 };
 const MAIL_DOCS = {
-  uko: { label: 'wniosek UKO', path: '/e-us-dostep/', ways: UKO_WAYS, txt: UKO_TXT,
+  uko: { label: 'wniosek UKO', title: 'Dostęp do konta organizacji w e-Urzędzie Skarbowym', path: '/e-us-dostep/', ways: UKO_WAYS, txt: UKO_TXT,
     intro: 'w załączniku przesyłamy wypełniony wniosek o przyznanie dostępu do konta organizacji w e-Urzędzie Skarbowym. Po jego rozpatrzeniu wskazana osoba będzie mogła załatwiać sprawy spółki w e-Urzędzie Skarbowym (a przy dostępie rozszerzonym – nadawać dostęp kolejnym osobom). Prosimy o sprawdzenie danych.',
     outro: 'W razie pytań jesteśmy do dyspozycji.' },
-  zawfa: { label: 'ZAW-FA', path: '/zaw-fa/', ways: ZAW_WAYS, txt: ZAW_TXT,
+  zawfa: { label: 'ZAW-FA', title: 'ZAW-FA – dostęp do KSeF', path: '/zaw-fa/', ways: ZAW_WAYS, txt: ZAW_TXT,
     intro: 'w załączniku przesyłamy wypełnione zawiadomienie ZAW-FA. Wskazuje ono osobę z Państwa firmy uprawnioną do korzystania z Krajowego Systemu e-Faktur (KSeF) w imieniu spółki – po jego przetworzeniu ta osoba zaloguje się do KSeF i wygeneruje certyfikat firmy. Prosimy o sprawdzenie danych.',
     outro: 'W razie pytań jesteśmy do dyspozycji.' },
-  upl1: { label: 'UPL-1', path: '/upl-1/', ways: UPL_WAYS, txt: UPL_TXT,
+  upl1: { label: 'UPL-1', title: 'Pełnomocnictwo UPL-1', path: '/upl-1/', ways: UPL_WAYS, txt: UPL_TXT,
     intro: 'w załączniku przesyłamy wypełnione pełnomocnictwo UPL-1. Dzięki niemu będziemy mogli podpisywać i wysyłać w Państwa imieniu deklaracje podatkowe i pliki JPK do urzędu skarbowego. Prosimy o sprawdzenie danych.',
     outro: 'Złożenie UPL-1 jest bezpłatne – nie podlega opłacie skarbowej. W razie pytań jesteśmy do dyspozycji.' },
-  pel: { label: 'PEL', path: '/zus-pel/', ways: PEL_WAYS, txt: PEL_TXT,
+  pel: { label: 'PEL', title: 'Pełnomocnictwo ZUS PEL', path: '/zus-pel/', ways: PEL_WAYS, txt: PEL_TXT,
     intro: 'w załączniku przesyłamy wypełnione pełnomocnictwo ZUS PEL. Dzięki niemu będziemy mogli wysyłać w Państwa imieniu deklaracje i dokumenty do ZUS oraz załatwiać sprawy przez eZUS. Prosimy o sprawdzenie danych.',
     outro: 'W razie pytań jesteśmy do dyspozycji.' },
 };
@@ -421,7 +421,7 @@ async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
   const draw = () => body.replaceChildren(
     h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, cl.name), ' · w załączniku: ', h('b', {}, filename)),
     grid([['way', 'Sposób złożenia (zmienia treść e-maila i instrukcji)', 'select', D.ways, true], ['to', 'Do (e-mail klienta)', 'email', null, true],
-      ['subject', 'Temat', 'text', null, true], ['body', 'Treść (pod spodem dopisze się Twoja stopka)', 'textarea']], s, k => { if (k === 'way') { s.body = text(); draw(); } }),
+      ['subject', 'Temat', 'text', null, true], ['body', 'Treść – e-mail wyjdzie z rdp.app z logo RKDP, odpowiedź klienta wróci do Ciebie', 'textarea']], s, k => { if (k === 'way') { s.body = text(); draw(); } }),
     h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Link do instrukcji: ', h('a', { href: link(), target: '_blank', rel: 'noopener' }, 'podgląd instrukcji'), ' · e-mail wyjdzie z kancelaria@rkdp.pl, a wiadomość zapisze się w historii klienta.'));
   draw();
   body.querySelector('textarea')?.setAttribute('rows', '12');
@@ -435,8 +435,9 @@ async function sendUpl1(cl, data, pelnomocnik, filename, kind = 'upl1') {
         const bytes = kind === 'uko' ? await overlayPdfBytes(UKO_PAGES, ukoItems(data)) : kind === 'zawfa' ? await overlayPdfBytes(ZAW_PAGES, zawItems(data)) : kind === 'pel' ? await overlayPdfBytes(PEL_PAGES, pelItems(data, pelnomocnik)) : await overlayPdfBytes(UPL1_PAGES, upl1Items(data, pelnomocnik));
         let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
         b.textContent = 'Wysyłam…';
-        const { data: r, error } = await sb.functions.invoke('mail', { body: { action: 'send_file', client_id: cl.id, to: s.to.trim(), subject: s.subject, body: s.body,
-          attachment: { name: filename.replace(/_/g, ' '), type: 'application/pdf', base64: btoa(bin) } } });
+        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'doc_mail', client_id: cl.id, to: s.to.trim(), subject: s.subject, body: s.body,
+          attachment: { name: filename.replace(/_/g, ' '), base64: btoa(bin) },
+          doc: { kicker: kind === 'uko' ? 'Wniosek do złożenia' : kind === 'zawfa' ? 'Zawiadomienie do złożenia' : 'Pełnomocnictwo do złożenia', title: D.title || D.label, button: { url: link(), label: `Instrukcja: jak złożyć ${D.label}` } } } });
         if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
         toast(`Wysłano ${D.label} do ${s.to.trim()}`); close();
       } catch (err) { fail(err, 'Nie udało się wysłać e-maila'); b.disabled = false; b.textContent = 'Wyślij e-mail'; }

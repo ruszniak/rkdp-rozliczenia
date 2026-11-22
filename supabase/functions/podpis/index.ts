@@ -11,8 +11,11 @@
 //  • reply  – zalogowany: { id, text, verdicts: [{ id, verdict }], to?, subject?, version?: { attachment: { base64 }, doc_html?, changes } }
 //             odpowiedź biura na uwagi klienta (strona podpisu + e-mail) i opcjonalnie nowa wersja dokumentu pod tym samym linkiem;
 //             RKDP – odpowiada tylko administrator, M2 TAX – administrator i Marcin
-//  • accept – publiczne { token, author }: klient akceptuje stanowisko biura → e-mail do zespołu (przygotować umowę do podpisu)
+//  • accept – publiczne { token, author }: klient akceptuje stanowisko kancelarii → e-mail do zespołu (przygotować umowę do podpisu)
 //  • final  – zalogowany: { id, attachment: { base64, name, type } } – egzemplarz podpisany przez obie strony → archiwum + e-mail do klienta z linkiem do pobrania
+//  • doc_mail – zalogowany: { client_id, to, subject, body, attachment?: { name, base64 }, doc?: { kicker, title, button: { url, label } } }
+//             e-mail z aplikacji (ZAW-FA, UPL-1, PEL, UKO, instrukcje) – szablon rdp.app z logo kancelarii, odpowiedź wraca do osoby wysyłającej
+//  E-maile do klientów (umowy, odpowiedzi, egzemplarze, dokumenty) wychodzą jako „rdp.app · RKDP” / „rdp.app · M2 TAX” (appMail).
 //  • offer_mail – zalogowany: { offer_id, to, subject, body } – e-mail do klienta z linkiem do oferty (podgląd bez logowania, #/wynik/<token>)
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -43,6 +46,66 @@ const clientName = (r: any) => r.clients?.name || r.m2_clients?.name || '';
 const M2_REPLY = ['c66817f8-61a2-4605-a503-07cbcf9d47d5'];   // Marcin – odpowiada na uwagi klientów M2 TAX (obok administratora)
 const VERDICT: Record<string, string> = { przyjete: 'przyjęte', czesciowo: 'częściowo przyjęte', odrzucone: 'nieprzyjęte' };
 const m2Sig = (me: any) => ({ sigHtml: '', text: ['', 'Pozdrawiam serdecznie,', me?.full_name || '', 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska', 'ul. Zwycięska 3, 53-033 Wrocław', 'kancelaria@m2tax.pl · tel. 883 643 565 · www.m2tax.pl'].filter(Boolean).join('\n') });
+
+// ---------- e-mail z aplikacji: logo kancelarii, treść, przycisk, stopka rdp.app (bez osobistej stopki) ----------
+const APP_FROM: Record<string, string> = { rkdp: 'rdp.app · RKDP', m2: 'rdp.app · M2 TAX' };
+const FIRM_FOOT: Record<string, string> = {
+  rkdp: 'RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Czereśniowa 28d, 55-010 Ozorzyce · kancelaria: ul. Beaty Artemskiej 11/44, 52-234 Wrocław · tel. 883 643 565 · kancelaria@rkdp.pl · rkdp.pl',
+  m2: 'M2 TAX Doradcy Podatkowi Otręba Ruszniak spółka partnerska · ul. Zwycięska 3, 53-033 Wrocław · tel. 883 643 565 · kancelaria@m2tax.pl · m2tax.pl',
+};
+const APP_LINE = 'Wiadomość wysłana z rdp.app by @RKDP (rkdp.pl)';
+type AppMail = { firm: string; kicker?: string; title: string; text: string; button?: { url: string; label: string } | null; attachment?: string | null };
+function appMail(app: string, m: AppMail) {
+  const firm = m.firm === 'm2' ? 'm2' : 'rkdp';
+  const F = 'font-family:Arial,Helvetica,sans-serif';
+  const lnk = (t: string) => escH(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#7A5A37;word-break:break-all">$1</a>');
+  const btnHtml = m.button ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 18px"><tr><td style="background:#2E2A25;border-radius:6px"><a href="${escH(m.button.url)}" style="display:inline-block;padding:14px 24px;${F};font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none">${escH(m.button.label)}</a></td></tr></table>` : '';
+  // treść: akapity; linia z adresem przycisku (albo {button}) staje się przyciskiem
+  let placed = false;
+  const paras = m.text.replace(/\r/g, '').split(/\n{2,}/).map(par => {
+    const lines = par.split('\n');
+    const out: string[] = []; let buf: string[] = [];
+    const flush = () => { if (buf.length) out.push(`<p style="margin:0 0 14px;${F};font-size:15px;line-height:1.6;color:#1D1A16">${buf.map(lnk).join('<br>')}</p>`); buf = []; };
+    for (const l of lines) {
+      if (m.button && !placed && (l.trim() === '{button}' || (m.button.url && l.includes(m.button.url)))) {
+        const before = l.replace('{button}', '').split(m.button.url)[0].replace(/[:\s]+$/, '').trim();
+        if (before) buf.push(before + ':');
+        flush(); out.push(btnHtml); placed = true;
+      } else buf.push(l);
+    }
+    flush(); return out.join('');
+  }).join('');
+  const logo = firm === 'm2'
+    ? `<img src="${app}/m2tax-logo.png" width="200" alt="M2 TAX Doradcy Podatkowi" style="display:block;width:200px;max-width:60%;height:auto;border:0">`
+    : `<img src="${app}/logo-rkdp.png" width="190" alt="RKDP spółka doradztwa podatkowego" style="display:block;width:190px;max-width:60%;height:auto;border:0">`;
+  const att = m.attachment ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:4px 0 18px;border:1px solid #E6DFD4"><tr><td style="padding:12px 14px;${F};font-size:14px;color:#1D1A16"><span style="display:inline-block;border:1px solid #CDBFAA;color:#7A5A37;font-size:10px;font-weight:bold;padding:6px 5px;margin-right:10px;vertical-align:middle">PDF</span><b style="vertical-align:middle">${escH(m.attachment)}</b> <span style="color:#5F584E;font-size:12px;vertical-align:middle">· w załączniku</span></td></tr></table>` : '';
+  const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escH(m.title)}</title></head>
+<body style="margin:0;padding:0;background:#F4F1EC">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F1EC"><tr><td align="center" style="padding:20px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #E6DFD4">
+<tr><td align="center" style="padding:28px 32px 22px;border-bottom:1px solid #E6DFD4">${logo}</td></tr>
+<tr><td style="padding:30px 36px 14px">
+${m.kicker ? `<p style="margin:0 0 10px;${F};font-size:12px;font-weight:bold;color:#7A5A37">${escH(m.kicker)}</p>` : ''}
+<h1 style="margin:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-weight:600;font-size:25px;line-height:1.25;color:#1D1A16">${escH(m.title)}</h1>
+${att}${paras}${m.button && !placed ? btnHtml : ''}
+<p style="margin:6px 0 0;${F};font-size:15px;line-height:1.6;color:#1D1A16">Pozdrawiamy,<br><b>Zespół ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}</b></p>
+</td></tr>
+<tr><td style="padding:22px 36px 26px;background:#FAF8F4;border-top:1px solid #E6DFD4">
+<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+<td valign="middle" style="padding-right:12px"><div style="width:34px;height:34px;line-height:34px;border-radius:8px;background:#1F2229;color:#ffffff;text-align:center;${F};font-size:13px;font-weight:bold">rdp.</div></td>
+<td valign="middle" style="${F};font-size:13px;line-height:1.5;color:#3B362F">Wiadomość wysłana z <b>rdp.app</b> by <a href="https://rkdp.pl" style="color:#7A5A37;font-weight:bold;text-decoration:none">@RKDP</a></td>
+</tr></table>
+<p style="margin:12px 0 0;${F};font-size:11.5px;line-height:1.55;color:#6B645A">${escH(FIRM_FOOT[firm])}</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
+  const textOut = `${m.text.replace('{button}', m.button ? m.button.url : '')}${m.button && !m.text.includes(m.button.url) ? `\n\n${m.button.label}: ${m.button.url}` : ''}\n\nPozdrawiamy,\nZespół ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}\n\n--\n${APP_LINE}\n${FIRM_FOOT[firm]}`;
+  return { html, text: textOut, from: APP_FROM[firm] };
+}
+async function sendApp(S: { from: string; app: string }, me: any, to: string, subject: string, m: AppMail, attachments: any[] = []) {
+  const x = appMail(S.app, m);
+  await transport().sendMail({ from: { name: x.from, address: S.from }, replyTo: me?.email && emailOk(me.email) ? { name: me.full_name || x.from, address: me.email } : S.from, to, subject, text: x.text, html: x.html, ...(attachments.length ? { attachments } : {}) });
+  return x.text;
+}
 
 async function settings() {
   const { data } = await admin.from('app_settings').select('key,value').in('key', ['mail_from', 'mail_sender', 'app_url']);
@@ -78,8 +141,8 @@ const bodyHtml = (t: string) => `<div style="font-family:Arial,Helvetica,sans-se
 async function byToken(token: string) {
   const { data } = await admin.from('sign_requests').select('*, clients(name, accountant_id), m2_clients(name)').eq('token', token).maybeSingle();
   if (!data) return { error: 'Link jest nieprawidłowy.' };
-  if (data.status === 'anulowano') return { error: 'Ta prośba o podpis została anulowana. W razie pytań skontaktuj się z biurem.' };
-  if (data.status !== 'podpisano' && new Date(data.expires_at) < new Date()) return { error: 'Link wygasł. Poproś biuro o nowy.' };
+  if (data.status === 'anulowano') return { error: 'Ta prośba o podpis została anulowana. W razie pytań skontaktuj się z kancelarią.' };
+  if (data.status !== 'podpisano' && new Date(data.expires_at) < new Date()) return { error: 'Link wygasł. Poproś kancelarię o nowy.' };
   return { r: data };
 }
 
@@ -174,7 +237,7 @@ Deno.serve(async (req: Request) => {
       const author = String(body.author || '').replace(/\s+/g, ' ').trim().slice(0, 120) || null;
       if (text.length < 2) return json({ error: 'Wpisz treść uwag.' }, 400);
       const { count } = await admin.from('sign_notes').select('id', { count: 'exact', head: true }).eq('request_id', r.id).eq('from_client', true);
-      if ((count || 0) >= 30) return json({ error: 'Osiągnięto limit uwag – skontaktuj się z biurem telefonicznie lub e-mailem.' }, 429);
+      if ((count || 0) >= 30) return json({ error: 'Osiągnięto limit uwag – skontaktuj się z kancelarią telefonicznie lub e-mailem.' }, 429);
       const { error: e1 } = await admin.from('sign_notes').insert({ request_id: r.id, body: text, author, version: r.version || 1 });
       if (e1) return json({ error: 'Nie udało się zapisać uwag – spróbuj ponownie.' }, 500);
       const who = author ? `${author} (${clientName(r) || 'klient'})` : (clientName(r) || 'Klient');
@@ -185,7 +248,7 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true });
     }
 
-    // ===== klient akceptuje stanowisko biura =====
+    // ===== klient akceptuje stanowisko kancelarii =====
     if (action === 'accept') {
       if (!validToken(body.token)) return json({ error: 'Link jest nieprawidłowy.' }, 400);
       const { r, error } = await byToken(body.token);
@@ -287,12 +350,10 @@ Deno.serve(async (req: Request) => {
       const mailText = final
         ? `Dzień dobry,\n\nzgodnie z uzgodnieniami ${newVer ? `wersja ${ver} dokumentu „${r.title}” (zmiany są zaznaczone w treści)` : `dokument „${r.title}”`} czeka na Państwa podpis. Pod linkiem poniżej można go przeczytać, pobrać i podpisać.`
         : `Dzień dobry,\n\nodnieśliśmy się do Państwa uwag do dokumentu „${r.title}”.${newVer ? ` Przygotowaliśmy też wersję ${ver} dokumentu – zmiany są zaznaczone w treści.` : ''}\n\nSzczegóły – nasze stanowisko do każdej uwagi – znajdą Państwo pod linkiem poniżej. Tam można też odpowiedzieć${newVer ? ' i podpisać nową wersję' : ' i podpisać dokument'}.`;
-      const textBody = `${mailText}\n${link}`;
-      const sig = r.firm === 'm2' ? m2Sig(me) : await signatureOf(me, S.from);
-      const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#2E2A25;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:6px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">${final ? 'Przeczytaj i podpisz' : newVer ? `Otwórz dokument – wersja ${ver}` : 'Otwórz dokument'}</a></p>`;
-      const html = bodyHtml(mailText) + btn + (sig.sigHtml ? '<br>' + sig.sigHtml : bodyHtml(sig.text));
+      let textBody = '';
       try {
-        await transport().sendMail({ from: { name: FROM_NAME[r.firm] || FROM_NAME.rkdp, address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
+        textBody = await sendApp(S, me, to, subject, { firm: r.firm, kicker: final ? 'Dokument do podpisu' : 'Odpowiedź na uwagi', title: newVer ? `${r.title} – wersja ${ver}` : r.title, text: mailText,
+          button: { url: link, label: final ? 'Przeczytaj i podpisz' : newVer ? `Otwórz dokument – wersja ${ver}` : 'Otwórz dokument' } });
       } catch (e) {
         return json({ ok: true, link, version: ver, mail_error: String((e as Error).message || e).slice(0, 300) });
       }
@@ -328,13 +389,10 @@ Deno.serve(async (req: Request) => {
       if (body.no_email === true || !emailOk(to) || !SMTP_USER || !SMTP_PASS) return json({ ok: true, link, mailed: false });
       const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
       const subject = `Umowa podpisana – Państwa egzemplarz – ${r.title}`.slice(0, 200);
-      const mailText = `Dzień dobry,\n\ndokument „${r.title}” został podpisany przez obie strony. Państwa egzemplarz można pobrać pod linkiem poniżej.\n\nDziękujemy za współpracę.`;
-      const textBody = `${mailText}\n${link}`;
-      const sig = r.firm === 'm2' ? m2Sig(me) : await signatureOf(me, S.from);
-      const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#2E2A25;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:6px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">Pobierz swój egzemplarz</a></p>`;
-      const html = bodyHtml(mailText) + btn + (sig.sigHtml ? '<br>' + sig.sigHtml : bodyHtml(sig.text));
+      const mailText = `Dzień dobry,\n\ndokument „${r.title}” został podpisany przez obie strony. Państwa egzemplarz można pobrać pod linkiem poniżej.\n\n{button}\n\nDziękujemy za współpracę.`;
+      let textBody = '';
       try {
-        await transport().sendMail({ from: { name: FROM_NAME[r.firm] || FROM_NAME.rkdp, address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
+        textBody = await sendApp(S, me, to, subject, { firm: r.firm, kicker: 'Umowa podpisana', title: r.title, text: mailText, button: { url: link, label: 'Pobierz swój egzemplarz' } });
       } catch (e) {
         return json({ ok: true, link, mailed: false, mail_error: String((e as Error).message || e).slice(0, 300) });
       }
@@ -342,6 +400,35 @@ Deno.serve(async (req: Request) => {
       if (!rk && r.m2_client_id) { const { data: m } = await admin.from('m2_clients').select('rkdp_client_id').eq('id', r.m2_client_id).maybeSingle(); rk = m?.rkdp_client_id || null; }
       if (rk) await admin.from('client_messages').insert({ client_id: rk, kind: 'informacja', period: null, email: to, subject, body: textBody, sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
       return json({ ok: true, link, mailed: true });
+    }
+
+    if (action === 'doc_mail') {
+      const to = String(body.to || '').trim().toLowerCase();
+      if (!emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail' }, 400);
+      const { data: c } = await sb.from('clients').select('id, name').eq('id', String(body.client_id || '')).maybeSingle();   // RLS
+      if (!c) return json({ error: 'Brak dostępu do klienta' }, 403);
+      const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').replace(/\r/g, '').slice(0, 8000);
+      if (!subject || !text0.trim()) return json({ error: 'Pusty temat lub treść' }, 400);
+      if (!SMTP_USER || !SMTP_PASS) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
+      const att = body.attachment || null;
+      const b64 = att ? String(att.base64 || '').replace(/\s+/g, '') : '';
+      if (att && (!b64 || b64.length > 10_000_000 || !/^[A-Za-z0-9+/=]+$/.test(b64))) return json({ error: 'Brak albo zbyt duży załącznik' }, 400);
+      const filename = att ? (String(att.name || 'dokument.pdf').replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 120) || 'dokument.pdf').replace(/(\.pdf)?$/i, '.pdf') : '';
+      const d = body.doc || {};
+      const bu = d.button && /^https:\/\/[^\s"<>]+$/.test(String(d.button.url || '')) ? { url: String(d.button.url).slice(0, 500), label: String(d.button.label || 'Otwórz').slice(0, 80) } : null;
+      const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
+      const S = await settings();
+      let textBody = text0;
+      try {
+        textBody = await sendApp(S, me, to, subject, { firm: 'rkdp', kicker: String(d.kicker || '').slice(0, 60) || undefined, title: String(d.title || subject).slice(0, 140), text: text0, button: bu, attachment: filename || null },
+          att ? [{ filename, content: b64, encoding: 'base64', contentType: 'application/pdf' }] : []);
+      } catch (e) {
+        const m = String((e as Error).message || e);
+        await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, status: 'blad', error: m.slice(0, 300), sent_by: memberId });
+        return json({ error: 'send_failed', detail: m.slice(0, 300) }, 200);
+      }
+      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + (filename ? `\n\n[załącznik: ${filename}]` : ''), sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
+      return json({ ok: true, sent: 1 });
     }
 
     if (action === 'offer_mail') {
@@ -425,13 +512,10 @@ Deno.serve(async (req: Request) => {
         if (order && order.status === 'projekt') await admin.from('m2_orders').update({ status: 'wyslane' }).eq('id', order.id);
         return json({ ok: true, id: rq.id, link });
       }
-      const textBody = text0.replaceAll('{link}', link);
       const { data: me } = await admin.from('team_members').select('full_name, email').eq('id', memberId).single();
-      const sig = firm === 'm2' ? m2Sig(me) : await signatureOf(me, S.from);
-      const btn = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:10px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:15px">Przeczytaj i podpisz online</a></p>`;
-      const html = bodyHtml(textBody) + btn + (sig.sigHtml ? '<br>' + sig.sigHtml : bodyHtml(sig.text));
+      let textBody = text0.replaceAll('{link}', link);
       try {
-        await transport().sendMail({ from: { name: FROM_NAME[firm], address: S.from }, replyTo: me?.email && emailOk(me.email) ? me.email : S.from, to, subject, text: textBody + '\n' + sig.text, html });
+        textBody = await sendApp(S, me, to, subject, { firm, kicker: kind === 'pel' ? 'Pełnomocnictwo do podpisu' : 'Dokument do podpisu', title, text: text0.replaceAll('{link}', '{button}'), button: { url: link, label: 'Przeczytaj i podpisz' } });
       } catch (e) {
         const m = String((e as Error).message || e);
         await admin.from('sign_requests').update({ status: 'anulowano' }).eq('id', rq.id);

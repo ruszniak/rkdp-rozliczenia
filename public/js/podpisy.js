@@ -39,7 +39,7 @@ export async function sendForSignature(opts) {
   s.body = `Dzień dobry,\n\nprzygotowaliśmy dla Państwa ${word} „${opts.title}”. Pod linkiem poniżej można ${word === 'pełnomocnictwo' ? 'je' : 'ją'} przeczytać, zgłosić ewentualne uwagi i podpisać:\n{link}\n\nPodpisać można:\n• bezpłatnie profilem zaufanym (podpis zaufany na gov.pl),\n• podpisem kwalifikowanym,\n• odręcznie – po wydrukowaniu i zeskanowaniu.\n\nNa stronie jest instrukcja krok po kroku i miejsce na odesłanie podpisanego pliku. Link jest ważny 7 dni.\n\nW razie pytań jesteśmy do dyspozycji.`;
   if (word === 'zlecenie') s.body = s.body.replace('można ją', 'można je');
   const grid = h('div', { class: 'form-grid' }, ...[['title', 'Nazwa dokumentu', 'text'], ['to', 'Do (e-mail klienta)', 'email'], ['subject', 'Temat', 'text'],
-    ['body', 'Treść – {link} zamieni się na link do strony podpisu (pod spodem dopisze się Twoja stopka)', 'textarea']].map(([k, label, type]) => {
+    ['body', 'Treść – {link} zamieni się na przycisk do strony podpisu; e-mail wyjdzie z rdp.app z logo kancelarii, odpowiedź klienta wróci do Ciebie', 'textarea']].map(([k, label, type]) => {
     const el = type === 'textarea' ? h('textarea', { class: 'input', rows: 13 }, s[k]) : h('input', { class: 'input', type, value: s[k] });
     el.addEventListener('input', () => { s[k] = el.value; });
     return h('label', { class: 'field wide' }, h('span', {}, label), el);
