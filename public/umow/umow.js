@@ -1,6 +1,7 @@
 // Publiczne umawianie spotkań z doradcą podatkowym (bez logowania). Dane i wolne terminy z funkcji „spotkania”.
 // ?embed=1 – w okienku na stronie (rkdp.pl / m2tax.pl); ?t=<token> – zmiana terminu / odwołanie z linku w e-mailu;
-// ?typ=<id|online|bezplatne|jagodno|zwycieska> i ?doradca=<id|michal|marcin> – wybór od razu.
+// ?typ=<id|online|bezplatne|jagodno|zwycieska> i ?doradca=<id|michal|marcin> – wybór od razu;
+// ?tylko=<id|michal|marcin> – link osobisty: tylko ten doradca i jego rodzaje spotkań (bez wyboru innego doradcy).
 (function () {
   'use strict';
   var SB = (window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl) || 'https://iuszfoyttqnkzjzjpzma.supabase.co';
@@ -342,6 +343,16 @@
     var ord = []; (cfg.types || []).forEach(function (t) { (t.advisors || []).forEach(function (id) { if (ord.indexOf(id) < 0) ord.push(id); }); });
     cfg.advisors = (cfg.advisors || []).slice().sort(function (a, b) { var x = ord.indexOf(a.id), y = ord.indexOf(b.id); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });
     if (!cfg.types || !cfg.types.length) return fail('Rezerwacja online jest chwilowo niedostępna.');
+    var only = norm(q.get('tylko'));
+    if (only) {
+      var me = cfg.advisors.filter(function (x) { return x.id === q.get('tylko') || norm(x.name).indexOf(only) >= 0; })[0];
+      if (me) {
+        cfg.advisors = [me];
+        cfg.types = cfg.types.filter(function (t) { return (t.advisors || []).indexOf(me.id) >= 0; });
+        st.adv = me.id;
+        if (!cfg.types.length) return fail('Rezerwacja online jest chwilowo niedostępna.');
+      }
+    }
     var wantT = norm(q.get('typ')), wantA = norm(q.get('doradca'));
     if (wantT) st.type = cfg.types.filter(function (t) { return t.id === q.get('typ') || norm(t.name).indexOf(wantT) >= 0; })[0] || null;
     if (wantA) { var a = cfg.advisors.filter(function (x) { return x.id === q.get('doradca') || norm(x.name).indexOf(wantA) >= 0; })[0]; if (a) st.adv = a.id; }

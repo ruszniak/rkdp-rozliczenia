@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Umawianie spotkań: link osobisty doradcy (np. app.ruszniak.io/umow/?tylko=michal) – klient widzi tylko tego doradcę i jego rodzaje spotkań.',
     'Pulpit: w „Dostosuj sekcje” można też ukryć sekcje u góry – „Moje kratki”, „Terminy w 7 dni”, „Braki dokumentów” i „Monitoring – zmiany u klientów”.',
     'Wspólne dane do pełnomocnictw: osoby z tą opcją (Zespół → karta osoby) widzą nawzajem PESEL z „Mój profil”, więc PEL i UPL-1 wygenerowane za kogoś z nich mają PESEL pełnomocnika od razu. Zmienić PESEL może tylko jego właściciel.',
     'PESEL zapisuje się na stałe: PESEL osób klienta w ZUS PEL, ZAW-FA i wniosku UKO – przy kliencie (wpisze się sam następnym razem dla tej samej osoby; widzą go tylko osoby z dostępem do klienta), a Twój PESEL pełnomocnika wpisany w PEL – w „Mój profil”.',
