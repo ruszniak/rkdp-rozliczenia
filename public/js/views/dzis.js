@@ -13,7 +13,7 @@ import { celebrate } from '../efekty.js';
 
 const TASK_KIND = { jpk: 'vat', vat: 'vat', pit_cit: null, zus_podany: 'zus', zus_wyslany: 'zus', pit4: 'pit4' };
 
-export async function renderDzis(box, D, { lite = false } = {}) {
+export async function renderDzis(box, D, { lite = false, hide = new Set() } = {}) {
   const me = state.me.id, today = todayIso(), period = defaultPeriod(), pdate = period + '-01';
   const in7 = addDays(today, 7);
   const [clients, entries, reqs, alerts, m2dl, yEnt] = await Promise.all([
@@ -136,25 +136,28 @@ export async function renderDzis(box, D, { lite = false } = {}) {
   drawStats(); drawItems();
 
   const sec = (title, link, ...els) => h('section', { class: 'card section' }, h('div', { class: 'section-head' }, h('h2', {}, title), link || null), ...els);
-  box.replaceChildren(lite ? '' : stats, h('div', { class: 'two dz' },
-    h('div', {}, sec(`Moje kratki – ${periodLabel(period).toLowerCase()}`, h('a', { class: 'small', href: `#/rozliczenia?okres=${period}` }, 'Rozliczenia →'),
-      h('p', { class: 'muted small dz-tip' }, 'Kliknij kratkę = zrobione · ⋯ = inne statusy · na telefonie przesuń wiersz w lewo'), listBox)),
-    h('div', {},
+  // sekcje ukryte przez osobę („Dostosuj sekcje” na pulpicie): kratki, terminy7, braki, monitoring
+  const kratki = hide.has('kratki') ? null : h('div', {}, sec(`Moje kratki – ${periodLabel(period).toLowerCase()}`, h('a', { class: 'small', href: `#/rozliczenia?okres=${period}` }, 'Rozliczenia →'),
+      h('p', { class: 'muted small dz-tip' }, 'Kliknij kratkę = zrobione · ⋯ = inne statusy · na telefonie przesuń wiersz w lewo'), listBox));
+  const side = [
       lite ? null : sec(`Moje zgłoszenia (${myTickets.length})`, h('a', { class: 'small', href: '#/rozmowy?f=moje' }, 'Wszystkie →'),
         ...(myTickets.length ? myTickets.slice(0, 8).map(t => h('a', { class: 'tk-mini', href: `#/zgloszenia/${t.id}` }, h('div', { style: { minWidth: 0 } }, h('b', {}, t.title), h('div', { class: 'small muted' }, `#${t.no}${t.client_id && cBy.get(t.client_id) ? ' · ' + cBy.get(t.client_id).name : ''}`)), h('div', { style: { textAlign: 'right', flex: 'none' } }, statusTag(t.status), h('div', {}, dueTag(t)))))
           : [h('p', { class: 'hint' }, 'Nie masz otwartych zgłoszeń.')])),
-      sec('Terminy w 7 dni', h('a', { class: 'small', href: '#/terminy?kto=moi' }, 'Kalendarz →'),
+      hide.has('terminy7') ? null : sec('Terminy w 7 dni', h('a', { class: 'small', href: '#/terminy?kto=moi' }, 'Kalendarz →'),
         ...(obl7.length ? groupObl(obl7) : [h('p', { class: 'hint' }, 'Brak niezrobionych terminów u Twoich klientów w najbliższym tygodniu.')])),
       myM2.length && !lite ? sec('Terminy spraw doradczych', h('a', { class: 'small', href: '#/doradztwo/sprawy' }, 'Sprawy →'),
         ...myM2.map(d => h('a', { class: 'tk-mini', href: `#/doradztwo/sprawa/${d.matter_id}` }, h('span', {}, d.title), h('b', { class: d.due_date < today ? 'late-t' : '' }, fmtShort(d.due_date))))) : null,
-      missing.length ? sec(`Braki dokumentów (${missing.length})`, null, ...missing.map(c => {
+      missing.length && !hide.has('braki') ? sec(`Braki dokumentów (${missing.length})`, null, ...missing.map(c => {
         const r = reqs.filter(x => x.client_id === c.id && !x.closed_at).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
         return h('div', { class: 'tk-mini' }, h('a', { href: `#/klient/${c.id}`, 'data-panel': c.id }, c.name),
           r ? h('span', { class: 'small ' + (r.files_count ? 'ok-t' : 'muted') }, r.files_count ? `klient wgrał ${r.files_count} plik.` : r.sent_at ? `poproszono ${fmtShort(r.sent_at.slice(0, 10))}` : 'prośba niewysłana')
             : h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openDocRequest(c, period, entries.filter(e => e.client_id === c.id && ['missing_docs', 'reminded'].includes(e.status)).map(e => e.task_code)) }, icon('mail'), 'Wiadomość'));
       })) : null,
-      myAlerts.length ? sec('Monitoring – zmiany u klientów', null, ...myAlerts.map(a => h('a', { class: 'tk-mini', href: `#/klient/${a.client_id}`, 'data-panel': a.client_id }, h('div', { style: { minWidth: 0 } }, h('b', {}, cBy.get(a.client_id)?.name || ''), h('div', { class: 'small muted' }, a.summary))))) : null
-    )));
+      myAlerts.length && !hide.has('monitoring') ? sec('Monitoring – zmiany u klientów', null, ...myAlerts.map(a => h('a', { class: 'tk-mini', href: `#/klient/${a.client_id}`, 'data-panel': a.client_id }, h('div', { style: { minWidth: 0 } }, h('b', {}, cBy.get(a.client_id)?.name || ''), h('div', { class: 'small muted' }, a.summary))))) : null,
+  ].filter(Boolean);
+  if (!kratki && !side.length) { box.replaceChildren(); box.hidden = true; return; }
+  box.hidden = false;
+  box.replaceChildren(lite ? '' : stats, kratki && side.length ? h('div', { class: 'two dz' }, kratki, h('div', {}, ...side)) : h('div', { class: 'dz' }, ...(kratki ? [kratki] : side)));
   function groupObl(list) {
     const g = new Map();
     list.sort((a, b) => a.date.localeCompare(b.date)).forEach(o => { const k = o.date + '|' + o.kind; if (!g.has(k)) g.set(k, []); g.get(k).push(o); });

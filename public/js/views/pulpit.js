@@ -273,11 +273,21 @@ export async function renderPulpit(main, params) {
   let editing = false;
   const editBtn = h('button', { class: 'btn btn-outline btn-sm dash-edit-btn', type: 'button', onclick: () => { editing = !editing; draw(); } });
   const key = admin ? 'pulpit_doradca' : 'pulpit_moj';
+  // sekcje u góry pulpitu pracownika (Moje kratki, Terminy w 7 dni, Braki dokumentów, Monitoring) – też do ukrycia
+  const DZIS = [['kratki', 'Moje kratki'], ['terminy7', 'Terminy w 7 dni'], ['braki', 'Braki dokumentów'], ['monitoring', 'Monitoring – zmiany u klientów']];
+  const dzisHidden = () => new Set(mp.pulpit_dzis?.hidden || []);
+  const dzisToggles = () => { const hid = dzisHidden();
+    return h('div', { class: 'dash-edit', style: { flexWrap: 'wrap', gap: '6px 16px' } }, h('b', {}, 'Sekcje u góry:'),
+      ...DZIS.map(([k, l]) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !hid.has(k), onchange: async e => {
+        e.target.checked ? hid.delete(k) : hid.add(k);
+        mp = await saveMemberPrefs({ pulpit_dzis: { hidden: [...hid] } }, state.me.id);
+        renderDzis(dzis, D, { lite: true, hide: dzisHidden() });
+      } }), l))); };
   const draw = () => {
     editBtn.replaceChildren(editing ? '✓ Gotowe' : 'Dostosuj sekcje');
     editBtn.classList.toggle('on', editing);
     const dash = admin ? adminDashboard(D, period, hist, alerts, signs) : myDashboard(D, period, hist, signs);
-    body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.')] : []),
+    body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.'), dzis ? dzisToggles() : null].filter(Boolean) : []),
       ...arrange(admin ? 'doradca' : 'moj', dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
     if (!editing) body.prepend(warningsCard());
   };
@@ -293,6 +303,6 @@ export async function renderPulpit(main, params) {
     dzis,
     h('div', { class: 'pl-head' }, h('h2', {}, admin ? 'Biuro' : 'Mój pulpit'), editBtn),
     body].filter(Boolean)))].filter(Boolean));
-  if (dzis) renderDzis(dzis, D, { lite: true });
+  if (dzis) renderDzis(dzis, D, { lite: true, hide: dzisHidden() });
   draw();
 }
