@@ -38,10 +38,23 @@
 .protokol .brk{page-break-before:always;break-before:page;margin-top:36px}
 .protokol .empty{color:#9a9a9a}
 @media (max-width:640px){.gen .g2{grid-template-columns:1fr}.gen .row{grid-template-columns:1fr 1fr}.gen .row label:first-child{grid-column:1/-1}.protokol{padding:26px 20px}.preview{padding:10px}}
+/* akapity w protokole: wcięcie pierwszego wiersza, odstępy między częściami */
+.protokol>p,.protokol .brk>p{text-indent:1.25em}
+.protokol .sub,.protokol .vote{text-indent:0}
+.protokol h4{margin-top:30px}
+.protokol ol li{margin:0 0 3px}
+@page{size:A4;margin:25mm 22mm 22mm}
 @media print{
   body>header,body>footer,main>*:not(.preview){display:none!important}
   main{max-width:none;padding:0}
   .preview{border:0;background:none;padding:0;margin:0}
-  .protokol{box-shadow:none;padding:0;max-width:none}
+  .protokol{box-shadow:none;padding:0;max-width:none;font-size:12pt;line-height:1.5}
+  .protokol h3{font-size:15pt;margin-bottom:4pt}
+  .protokol .sub{margin-bottom:20pt}
+  .protokol p{margin:0 0 8pt;orphans:3;widows:3}
+  .protokol h4{font-size:12pt;margin:22pt 0 8pt;break-after:avoid;page-break-after:avoid}
+  .protokol .vote{margin-bottom:12pt}
+  .protokol .sig{margin-top:48pt;break-inside:avoid}
+  .protokol table{break-inside:avoid}
   .protokol .empty{color:#111}
 }

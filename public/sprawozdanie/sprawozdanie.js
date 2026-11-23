@@ -180,8 +180,11 @@
   document.getElementById('word').addEventListener('click', function () {
     render();
     var d = data();
-    var css = 'body{font-family:"Times New Roman",serif;font-size:12pt;line-height:1.45}h3{text-align:center;font-size:14pt;margin:0}h4{text-align:center;font-size:12pt;margin:18pt 0 6pt}.sub{text-align:center}p{text-align:justify;margin:0 0 6pt}.vote{font-style:italic}table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4pt 6pt}.sig div{margin-top:36pt}.brk{page-break-before:always}.empty{color:#000}';
-    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Protokół</title><style>' + css + '</style></head><body>' + doc.innerHTML + '</body></html>';
+    var css = '@page WordSection1{size:595.3pt 841.9pt;margin:70.9pt 62.4pt 62.4pt 62.4pt}div.WordSection1{page:WordSection1}'
+      + 'body{font-family:"Times New Roman",serif;font-size:12pt;line-height:1.5}h3{text-align:center;font-size:15pt;margin:0 0 4pt}h4{text-align:center;font-size:12pt;margin:22pt 0 8pt;page-break-after:avoid}'
+      + '.sub{text-align:center;margin-bottom:20pt}p{text-align:justify;margin:0 0 8pt;text-indent:1.25em}p.sub,p.vote{text-indent:0}.vote{font-style:italic;margin-bottom:12pt}li{margin:0 0 3pt}'
+      + 'table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:4pt 6pt}.sig div{margin-top:48pt}.brk{page-break-before:always}.empty{color:#000}';
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Protokół</title><style>' + css + '</style></head><body><div class="WordSection1">' + doc.innerHTML + '</div></body></html>';
     var blob = new Blob(['﻿' + html], { type: 'application/msword' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
