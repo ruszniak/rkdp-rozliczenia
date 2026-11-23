@@ -13,7 +13,7 @@ import { fetchAll } from './rozliczenia.js';
 import { fileTile, dropZone, named, safeName } from './zgloszenia.js';
 import { pps1Defaults, pps1Scope, printPps1, BOX4_LABELS } from '../m2/pps1.js';
 import { poaBlocks, printableHtml, buildOrderDocx } from '../m2/order.js';
-import { sendForSignature, sendFileForSignature, signPanel, previewDoc, xmlPreview } from '../podpisy.js';
+import { sendForSignature, sendFileForSignature, signPanel, previewDoc, xmlPreview, signDashBox } from '../podpisy.js';
 import { nipLookupBar, mergeNipData, vatLine } from '../nip.js';
 import { printMatterReport } from '../m2/report.js';
 import { renderZgloszenia, clientTicketsBox } from './zgloszenia.js';
@@ -274,6 +274,7 @@ async function viewDashboard(main, params) {
       h('aside', { class: 'pl-side' }, meetingsCard(), obTodayWidget(), canSeeTeam() ? teamTodayCard() : null, amlDashCard('m2')),
       h('div', { class: 'pl-main' },
         ...teamBlocks({ zl: params?.get?.('zl') || null }),
+        signDashBox({ firm: 'm2', mineOnly: !isAdmin() && !['c66817f8-61a2-4605-a503-07cbcf9d47d5'].includes(state.me.id) }),
         h('div', { class: 'table-title' }, h('h2', {}, 'Najbliższe terminy'), h('span', { class: 'muted small' }, 'zaległe i 30 dni naprzód')), list,
         h('div', { class: 'table-title', style: { marginTop: '22px' } }, h('h2', {}, 'Moje sprawy'), h('span', { class: 'muted small' }, `${mine.length} otwartych`)),
         h('div', { class: 'card', style: { padding: '6px 0' } }, ...(mine.length ? mine.slice(0, 12).map(m => h('a', { class: 'mini-matter', href: `${BASE}/sprawa/${m.id}` },

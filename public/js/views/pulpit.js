@@ -14,6 +14,7 @@ import { renderDzis } from './dzis.js';
 import { obligationsCard } from './terminy.js';
 import { warningsCard } from '../limity.js';
 import { pushNudge } from '../pushnudge.js';
+import { SIGN_SEL, signDashCard } from '../podpisy.js';
 
 const PREF = 'rkdp-pulpit-widok';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -35,7 +36,8 @@ const HELP_ADMIN = `Pulpit doradcy – podsumowanie całego biura:
 • Kafelki: wszystkie otwarte zgłoszenia, po terminie, pilne i wysokie, czekające na klienta oraz stan rozliczeń (księgowość i kadry) za bieżący miesiąc.
 • Zespół: dla każdej osoby – otwarte i zaległe zgłoszenia, zamknięte w ostatnich 7 dniach, klienci rozliczeni / wszyscy i braki dokumentów.
 • Wymaga uwagi: zgłoszenia po terminie i pilne w całym biurze, nieprzypisane zgłoszenia, klienci bez księgowej, nieotwarty miesiąc.
-• Ostatnio zamknięte: co zespół zrobił w ostatnich 7 dniach (z opisem wykonania w zgłoszeniu).`;
+• Ostatnio zamknięte: co zespół zrobił w ostatnich 7 dniach (z opisem wykonania w zgłoszeniu).
+• Umowy do podpisu: uwagi klientów do odpowiedzi, akceptacje (wyślij do podpisu), wysłane i niepodpisane – ze statusem (nieotwarta, otwarta, czeka na klienta, link wygasł) oraz podpisane bez egzemplarza obu stron.`;
 
 async function loadData(period) {
   const pdate = period + '-01';
@@ -78,7 +80,7 @@ const empty = txt => h('p', { class: 'hint' }, txt);
 
 
 // ---------- pulpit pracownika ----------
-function myDashboard(D, period, hist) {
+function myDashboard(D, period, hist, signs) {
   const me = state.me.id;
   const mine = D.tickets.filter(t => TK_OPEN.includes(t.status) && t.assignee_id === me).sort(byDue);
   const late = mine.filter(isLate);
@@ -113,6 +115,7 @@ function myDashboard(D, period, hist) {
         ...(mine.length ? mine.slice(0, 12).map(t => ticketRow(t, D.cname)) : [empty('Nie masz otwartych zadań.')]),
         mine.length > 12 ? h('a', { class: 'small', href: '#/rozmowy?f=moje', style: { display: 'block', marginTop: '10px' } }, `Wszystkie (${mine.length}) →`) : null) },
       state.me.attendance ? { key: 'obecnosc', title: 'Obecność dziś', el: todayWidget() } : null,
+      (() => { const el = signDashCard(signs, { mineOnly: true }); return el ? { key: 'podpisy', title: 'Umowy do podpisu', el } : null; })(),
       { key: 'terminy', title: 'Obowiązki w miesiącu', el: obligationsCard({ mine: true }) },
       delegated.length ? { key: 'przekazane', title: 'Przekazane innym', el: card(`Przekazane innym (${delegated.length})`, null, ...delegated.slice(0, 8).map(t => ticketRow(t, D.cname, true))) } : null,
       ...settleCards.map((el, i) => ({ key: 'rozliczenia_' + (areas[i]?.area || i), title: `Rozliczenia – ${areas[i]?.label || ''}`, el })),
@@ -121,7 +124,7 @@ function myDashboard(D, period, hist) {
 }
 
 // ---------- pulpit doradcy (administrator) ----------
-function adminDashboard(D, period, hist, alerts) {
+function adminDashboard(D, period, hist, alerts, signs) {
   const open = D.tickets.filter(t => TK_OPEN.includes(t.status));
   const late = open.filter(isLate).sort(byDue);
   const hot = open.filter(t => ['pilny', 'wysoki'].includes(t.priority));
@@ -183,6 +186,7 @@ function adminDashboard(D, period, hist, alerts) {
       { key: 'zespol', title: 'Zespół', wide: true, el: card('Zespół', h('a', { class: 'btn btn-ghost btn-sm', href: '#/raport' }, 'Raport miesięczny →'), h('div', { class: 'list-wrap' }, h('table', { class: 'list pl-team' },
         h('thead', {}, h('tr', {}, ...['Osoba', 'Zadania otwarte', 'Po terminie', 'Zamknięte (7 dni)', 'Księgowość', 'Kadry', 'Brak dok.'].map(x => h('th', {}, x)))),
         h('tbody', {}, ...team.map(row))))) },
+      { key: 'podpisy', title: 'Umowy do podpisu', el: signDashCard(signs) },
       { key: 'uwaga', title: 'Wymaga uwagi', el: card('Wymaga uwagi', null, ...(info.length ? [h('div', { class: 'pl-infos' }, ...info)] : []),
         ...(attention.length ? attention : [empty('Brak zgłoszeń po terminie i pilnych. 👍')])) },
       openAlerts.length ? { key: 'monitoring', title: 'Monitoring klientów', el: card(`Monitoring klientów – zmiany (${openAlerts.length})`, null,
@@ -205,7 +209,9 @@ function adminDashboard(D, period, hist, alerts) {
 function arrange(view, dash, lay, editing, onChange) {
   const order = lay.order || [];
   const hidden = new Set(lay.hidden || []);
-  const blocks = [...dash.blocks].sort((a, b) => { const ia = order.indexOf(a.key), ib = order.indexOf(b.key); return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib); });
+  // nowe sekcje (np. „Umowy do podpisu”) – na początku, dopóki osoba sama ich nie przestawi
+  const pos = k => { const i = order.indexOf(k); return i >= 0 ? i : k === 'podpisy' ? -1 : 999; };
+  const blocks = [...dash.blocks].sort((a, b) => pos(a.key) - pos(b.key));
   const tilesHidden = hidden.has('kafelki');
   const out = [];
   if (dash.top) out.push(dash.top);
@@ -253,10 +259,11 @@ export async function renderPulpit(main, params) {
   main.replaceChildren(h('div', { class: 'spinner' }, 'Wczytywanie pulpitu…'));
   // zadania cykliczne, dane pulpitu, trend 6 miesięcy, monitoring i układ – równolegle
   const tasks = state.taskTypes.filter(t => t.active);
-  let [created, D, hist, alerts, mp] = await Promise.all([generateRecurring(), loadData(period),
+  let [created, D, hist, alerts, mp, signs] = await Promise.all([generateRecurring(), loadData(period),
     settledHistory(lastPeriods(period, 6), tasks).catch(() => null),
     fetchSoft(() => sb.from('monitor_alerts').select('id,client_id,summary,created_at,resolved_at').eq('module', 'rkdp').is('resolved_at', null).order('created_at', { ascending: false })),
-    loadMemberPrefs()]);
+    loadMemberPrefs(),
+    fetchSoft(() => sb.from('sign_requests').select(SIGN_SEL).in('status', ['wyslano', 'podpisano']).order('created_at', { ascending: false }))]);
   if (created > 0) D = await loadData(period);
   // Jeden pulpit bez zakładek: na górze „Sprawy” (to, co czeka na Ciebie), niżej –
   // pracownik: jego kratki, terminy i braki + jego sekcje; szef (administrator): zadania całego zespołu + podsumowanie biura.
@@ -269,7 +276,7 @@ export async function renderPulpit(main, params) {
   const draw = () => {
     editBtn.replaceChildren(editing ? '✓ Gotowe' : 'Dostosuj sekcje');
     editBtn.classList.toggle('on', editing);
-    const dash = admin ? adminDashboard(D, period, hist, alerts) : myDashboard(D, period, hist);
+    const dash = admin ? adminDashboard(D, period, hist, alerts, signs) : myDashboard(D, period, hist, signs);
     body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.')] : []),
       ...arrange(admin ? 'doradca' : 'moj', dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
     if (!editing) body.prepend(warningsCard());

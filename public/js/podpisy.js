@@ -9,6 +9,50 @@ const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const b64 = bytes => { let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(bin); };
 const firstEmail = v => String(v || '').split(/[;,\s]+/).find(x => x.includes('@')) || '';
 
+// ---------- pulpit: umowy do podpisu – uwagi klienta, akceptacje, wysłane i niepodpisane (ze statusem) ----------
+export const SIGN_SEL = 'id,title,status,created_at,opened_at,signed_at,expires_at,accepted_at,final_at,client_id,m2_client_id,order_id,created_by,firm,version,clients(name,accountant_id),m2_clients(name),sign_notes(from_client,kind,verdict,created_at)';
+const daysAgo = d => Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 86400000));
+const agoTxt = n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : `${n} dni temu`;
+export function signState(r) {
+  const notes = [...(r.sign_notes || [])].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const lastOffice = notes.map(n => !n.from_client).lastIndexOf(true);
+  const pending = notes.slice(lastOffice + 1).filter(n => n.from_client && n.kind !== 'akceptacja' && !n.verdict).length;
+  if (r.status === 'podpisano') return { o: 3, cls: 'ok', txt: 'Podpisana przez klienta – wgraj egzemplarz obu stron' };
+  if (pending) return { o: 0, cls: 'warn', txt: `Uwagi klienta – do odpowiedzi (${pending})` };
+  if (r.accepted_at) return { o: 1, cls: 'warn', txt: 'Klient zaakceptował – wyślij do podpisu' };
+  if (new Date(r.expires_at) < new Date()) return { o: 2, cls: 'dark', txt: 'Link wygasł' };
+  if (lastOffice >= 0) return { o: 4, cls: '', txt: 'Odpowiedź wysłana – czeka na klienta' };
+  if (r.opened_at) return { o: 5, cls: '', txt: `Otwarta ${agoTxt(daysAgo(r.opened_at))} – czeka na podpis` };
+  return { o: 6, cls: '', txt: 'Wysłana – klient jeszcze nie otworzył' };
+}
+// list – wiersze z SIGN_SEL; mineOnly – tylko wysłane przeze mnie albo moich klientów (księgowa); firm – 'm2' / 'rkdp'
+export function signDashCard(list, { mineOnly = false, firm = null } = {}) {
+  const me = state.me.id;
+  const rows = (list || []).filter(r => r.status === 'wyslano' || (r.status === 'podpisano' && !r.final_at && r.signed_at && daysAgo(r.signed_at) <= 45))
+    .filter(r => !firm || r.firm === firm)
+    .filter(r => !mineOnly || r.created_by === me || r.clients?.accountant_id === me)
+    .map(r => ({ r, st: signState(r) })).sort((a, b) => a.st.o - b.st.o || a.r.created_at.localeCompare(b.r.created_at));
+  if (!rows.length && mineOnly) return null;
+  const href = r => r.order_id ? `#/doradztwo/zlecenie/${r.order_id}` : r.client_id ? `#/klient/${r.client_id}` : `#/doradztwo/klient/${r.m2_client_id}`;
+  const who = id => state.members?.find(m => m.id === id)?.full_name || '';
+  const comments = rows.filter(x => x.st.o === 0).length;
+  return h('section', { class: 'card section' },
+    h('div', { class: 'section-head' }, h('h2', {}, `Umowy do podpisu (${rows.length})`), comments ? h('span', { class: 'badge warn' }, `uwagi: ${comments}`) : null),
+    ...(rows.length ? rows.slice(0, 14).map(({ r, st }) => h('a', { class: 'tk-mini', href: href(r), 'data-panel': r.client_id || null },
+      h('div', { style: { minWidth: 0 } }, h('b', {}, r.title + (r.version > 1 ? ` · wersja ${r.version}` : '')),
+        h('div', { class: 'small muted' }, [r.clients?.name || r.m2_clients?.name, !firm && r.firm === 'm2' ? 'M2 TAX' : null, `wysłana ${agoTxt(daysAgo(r.created_at))}`, !mineOnly && r.created_by ? who(r.created_by) : null].filter(Boolean).join(' · '))),
+      h('span', { class: 'badge' + (st.cls ? ' ' + st.cls : ''), style: { flex: 'none', whiteSpace: 'normal', textAlign: 'right', maxWidth: '46%' } }, st.txt)))
+      : [h('p', { class: 'hint' }, 'Nie ma umów czekających na podpis ani uwag klientów.')]),
+    rows.length > 14 ? h('p', { class: 'hint', style: { marginTop: '8px' } }, `… i ${rows.length - 14} więcej`) : null);
+}
+// karta ładująca dane sama (pulpit M2 TAX)
+export function signDashBox(opts = {}) {
+  const box = h('div');
+  sb.from('sign_requests').select(SIGN_SEL).in('status', ['wyslano', 'podpisano']).order('created_at', { ascending: false }).limit(300)
+    .then(({ data }) => { const el = signDashCard(data || [], opts); box.replaceChildren(...(el ? [el] : [])); });
+  return box;
+}
+
 // Podgląd na stronie podpisu: pełny dokument HTML (ramka bez skryptów). „paper” – kartka A4 na szarym tle.
 export function previewDoc(inner, { head = '', paper = true } = {}) {
   return `<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${head}<style>
