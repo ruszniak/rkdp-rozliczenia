@@ -104,6 +104,46 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
   let cl = client;
   const d = { type, who: 'doradca' };
   let v = {};
+  // PESEL-e osób klienta (PEL, ZAW-FA, UKO) – zapisane na stałe w client_person_pesel; PESEL pełnomocnika – w „Mój profil” (member_private)
+  let pesels = [];
+  const pKey = (f, l) => `${String(f || '').trim().toLowerCase()}|${String(l || '').trim().toLowerCase()}`;
+  const peselOf = (f, l) => (f || l) ? pesels.find(x => pKey(x.first_name, x.last_name) === pKey(f, l))?.pesel || '' : '';
+  const PERSONS = [['pel', 'g_first', 'g_last', 'g_pesel'], ['zawfa', 'u_first', 'u_last', 'u_id'], ['uko', 'u_first', 'u_last', 'u_pesel']];
+  const fillPesels = () => PERSONS.forEach(([k, f, l, pf]) => { const x = v[k]; if (x && !x[pf] && (k !== 'zawfa' || x.u_idtype === 'pesel')) x[pf] = peselOf(x[f], x[l]); });
+  const loadPesels = async () => {
+    pesels = [];
+    if (!cl?.id) return;
+    const { data } = await sb.from('client_person_pesel').select('id,first_name,last_name,pesel').eq('client_id', cl.id);
+    pesels = data || [];
+    fillPesels(); build();
+  };
+  const savePesels = async () => {
+    if (!cl?.id) return;
+    const t = d.type;
+    for (const [k, f, l, pf] of PERSONS) {
+      if (k !== t) continue;
+      const x = v[k], pesel = String(x[pf] || '').replace(/\D/g, '');
+      if (k === 'zawfa' && x.u_idtype !== 'pesel') continue;
+      const first = String(x[f] || '').trim(), last = String(x[l] || '').trim();
+      if (!/^\d{11}$/.test(pesel) || !first || !last) continue;
+      const cur = pesels.find(y => pKey(y.first_name, y.last_name) === pKey(first, last));
+      if (cur?.pesel === pesel) continue;
+      const row = { client_id: cl.id, first_name: first, last_name: last, pesel, updated_by: state.me.id, updated_at: new Date().toISOString() };
+      const { data, error } = cur ? await sb.from('client_person_pesel').update(row).eq('id', cur.id).select('id,first_name,last_name,pesel').single()
+        : await sb.from('client_person_pesel').insert(row).select('id,first_name,last_name,pesel').single();
+      if (error) { console.warn('pesel', error); continue; }
+      pesels = [...pesels.filter(y => y.id !== data.id), data];
+    }
+    // PEL: PESEL pełnomocnika – zapis tylko własny (Mój profil), cudzego nie widać ani nie zmieniamy
+    if (t === 'pel') {
+      const pp = String(v.pel.p_pesel || '').replace(/\D/g, '');
+      const meEmp = d.who === 'emp:' + state.me.id || (d.who === 'doradca' && advisor.full_name === state.me.full_name);
+      if (meEmp && /^\d{11}$/.test(pp)) {
+        const { data: cur } = await sb.from('member_private').select('pesel').eq('member_id', state.me.id).maybeSingle();
+        if (cur?.pesel !== pp) await sb.from('member_private').upsert({ member_id: state.me.id, pesel: pp }, { onConflict: 'member_id' });
+      }
+    }
+  };
   const reset = () => {
     const kind = isJdg(cl) ? 'osoba' : 'firma';
     const repsText = cl?.contact_person || '';
@@ -128,7 +168,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     const sel = h('select', { class: 'select', style: { flex: '1' } });
     const fill = () => { sel.replaceChildren(h('option', { value: '' }, '— wybierz klienta —'), ...clients.map(c => h('option', { value: c.id }, c.name + (c.nip ? ` (NIP ${c.nip})` : '')))); sel.value = cl?.id || ''; };
     fill();
-    sel.addEventListener('change', () => { cl = clients.find(c => c.id === sel.value) || null; reset(); build(); });
+    sel.addEventListener('change', () => { cl = clients.find(c => c.id === sel.value) || null; reset(); build(); loadPesels(); });
     const add = canEditClients() ? h('button', { class: 'btn btn-outline btn-sm', type: 'button', onclick: async () => {
       const val = prompt('Nowy klient – podaj NIP (dane pobiorę z Białej listy VAT) albo nazwę:');
       if (!val?.trim()) return;
@@ -139,7 +179,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       }
       const { data, error } = await sb.from('clients').insert(row).select('*').single();
       if (error) return fail(error);
-      clients.push(data); clients.sort((a, b) => a.name.localeCompare(b.name, 'pl')); cl = data; fill(); reset(); build();
+      clients.push(data); clients.sort((a, b) => a.name.localeCompare(b.name, 'pl')); cl = data; fill(); reset(); build(); loadPesels();
       toast('Dodano klienta – uzupełnij jego profil na karcie klienta');
     } }, icon('plus'), 'Nowy klient') : null;
     return h('label', { class: 'field wide', style: { marginBottom: '12px' } }, h('span', {}, 'Klient'), h('div', { style: { display: 'flex', gap: '8px' } }, sel, add));
@@ -208,9 +248,9 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       if (t === 'pel') parts.push(grid([
         ['acting', 'Działam w imieniu', 'select', { wlasne: 'własnym', firma: 'mojej firmy (JDG) – NIP', podmiot: 'innego podmiotu (spółka) – NIP i dane' }],
         ['client_nip', 'NIP firmy / podmiotu', 'text'], ['entity', 'Podmiot: nazwa, adres siedziby, REGON', 'text', null, true],
-        ['g_first', 'Osoba udzielająca – imię', 'text'], ['g_last', 'Nazwisko', 'text'], ['g_pesel', 'PESEL (opcjonalnie – nie zapisuje się)', 'text'],
+        ['g_first', 'Osoba udzielająca – imię', 'text'], ['g_last', 'Nazwisko', 'text'], ['g_pesel', 'PESEL (zapisze się przy kliencie)', 'text'],
         ['g_street', 'Ulica', 'text'], ['g_house', 'Nr domu', 'text'], ['g_flat', 'Nr lokalu', 'text'], ['g_zip', 'Kod pocztowy', 'text'], ['g_city', 'Miejscowość', 'text'], ['g_phone', 'Telefon', 'text'],
-        ['p_pesel', 'PESEL pełnomocnika (opcjonalnie – nie zapisuje się)', 'text'],
+        ['p_pesel', 'PESEL pełnomocnika (puste = z „Mój profil”; Twój zapisze się w profilu)', 'text'],
         ['scope_all', 'do załatwiania wszystkich spraw w ZUS', 'check'], ['scope_pit', 'do otrzymywania deklaracji PIT', 'check'],
         ['scope_task', 'do konkretnej czynności (opis)', 'text', null, true],
         ['ezus', 'dostęp przez eZUS', 'check'], ['ezus_role', 'Rola eZUS', 'select', { platnik: 'Płatnik składek (w swoim imieniu)', platnik_inny: 'Płatnik składek (inny podmiot)', ubezpieczony: 'Ubezpieczony', swiadczeniobiorca: 'Świadczeniobiorca', komornik: 'Komornik' }],
@@ -245,7 +285,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
           ['client_nip', 'Poz. 1 – NIP klienta', 'text'], ['client_name', 'Poz. 8 – nazwa pełna', 'text', null, true],
           ['client_phone', 'Poz. 9 – telefon firmy', 'text'], ['client_email', 'Poz. 10 – e-mail firmy (obowiązkowy)', 'text'],
           ['u_first', 'Poz. 14 – osoba uprawniona: imię', 'text'], ['u_last', 'Poz. 13 – nazwisko', 'text'],
-          ['u_idtype', 'Poz. 11 – identyfikator', 'select', { pesel: 'PESEL', nip: 'NIP' }], ['u_id', 'Poz. 12 – PESEL / NIP (nie zapisuje się – można zostawić puste do wpisania ręcznie)', 'text'],
+          ['u_idtype', 'Poz. 11 – identyfikator', 'select', { pesel: 'PESEL', nip: 'NIP' }], ['u_id', 'Poz. 12 – PESEL / NIP (PESEL zapisze się przy kliencie)', 'text'],
           ['u_phone', 'Poz. 19 – telefon osoby', 'text'], ['u_email', 'Poz. 20 – e-mail osoby (obowiązkowy)', 'text'],
           ['reps', 'Część E – podpisujący (max 3) – „Jan Kowalski – prezes zarządu”, każda osoba w osobnej linii', 'textarea'],
         ], v.zawfa));
@@ -258,7 +298,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
           ['client_nip', 'Poz. 2 – NIP', 'text'], ['client_name', 'Poz. 3 – nazwa pełna', 'text', null, true],
           ['c_street', '4. Ulica', 'text'], ['c_house', '5. Nr domu', 'text'], ['c_flat', '6. Nr lokalu', 'text'],
           ['c_zip', '7. Kod pocztowy', 'text'], ['c_city', '8. Miejscowość', 'text'], ['client_phone', '9. Telefon', 'text'],
-          ['u_first', '12. Użytkownik – imię', 'text'], ['u_last', '11. Nazwisko', 'text'], ['u_pesel', '10. PESEL (nie zapisuje się – można zostawić do wpisania ręcznie)', 'text'],
+          ['u_first', '12. Użytkownik – imię', 'text'], ['u_last', '11. Nazwisko', 'text'], ['u_pesel', '10. PESEL (zapisze się przy kliencie)', 'text'],
           ['reps', 'Część E – reprezentanci (max 3) – „Jan Kowalski – prezes zarządu”, każda osoba w osobnej linii', 'textarea'],
         ], v.uko));
     } else if (t === 'procesowe') {
@@ -269,11 +309,13 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     box.replaceChildren(...parts.filter(Boolean));
   };
   build();
+  loadPesels();
 
   const fname = (prefix, ext) => `${prefix}_${(cl?.name || 'klient').replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 40)}.${ext}`;
   async function generate(format) {
     if (!cl) return toast('Wybierz klienta', true);
     const t = d.type;
+    fillPesels(); savePesels().catch(e => console.warn(e));
     try {
       if (t === 'umowa') {
         const c = v.contract, T = TEMPLATES[c.tpl];
@@ -310,12 +352,13 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
   }
 
   // UPL-1: e-mail do klienta z wypełnionym formularzem (PDF do pobrania linkiem ważnym 30 dni) i linkiem do instrukcji złożenia
-  const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => !cl ? toast('Wybierz klienta', true)
-    : d.type === 'pel' ? sendUpl1(cl, v.pel, pelnomocnik(), fname('PEL', 'pdf'), 'pel') : d.type === 'zawfa' ? sendUpl1(cl, v.zawfa, null, fname('ZAW-FA', 'pdf'), 'zawfa') : d.type === 'uko' ? sendUpl1(cl, v.uko, null, fname('Wniosek_UKO', 'pdf'), 'uko') : sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')) }, icon('mail'), 'Wyślij klientowi');
+  const sendBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: () => { if (!cl) return toast('Wybierz klienta', true); fillPesels(); savePesels().catch(e => console.warn(e));
+    return d.type === 'pel' ? sendUpl1(cl, v.pel, pelnomocnik(), fname('PEL', 'pdf'), 'pel') : d.type === 'zawfa' ? sendUpl1(cl, v.zawfa, null, fname('ZAW-FA', 'pdf'), 'zawfa') : d.type === 'uko' ? sendUpl1(cl, v.uko, null, fname('Wniosek_UKO', 'pdf'), 'uko') : sendUpl1(cl, v.upl1, pelnomocnik(), fname('UPL-1', 'pdf')); } }, icon('mail'), 'Wyślij klientowi');
   // umowa: e-mail z linkiem do strony podpisu (podgląd, uwagi, profil zaufany / kwalifikowany / odręcznie); podpisany plik wraca do archiwum klienta
   const signBtn = h('button', { class: 'btn btn-outline btn-sm', onclick: async () => {
     if (!cl) return toast('Wybierz klienta', true);
     if (d.type === 'pel') {   // ZUS PEL: formularz urzędowy – PDF z wzoru ZUS, podgląd stron formularza
+      fillPesels(); savePesels().catch(e => console.warn(e));
       const title = `Pełnomocnictwo ZUS PEL – ${cl.name}`.slice(0, 150);
       const html = overlayHtml(PEL_PAGES, pelItems(v.pel, pelnomocnik()), title);
       const preview = html.replace('</style>', '@media(max-width:820px){.pg{zoom:.75}}@media(max-width:640px){.pg{zoom:.55}}@media(max-width:460px){.pg{zoom:.42}}html,body{background:#E9EAEE}.pg{margin:14px auto;box-shadow:0 2px 10px rgba(0,0,0,.08)}</style>');

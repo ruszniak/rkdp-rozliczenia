@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'PESEL zapisuje się na stałe: PESEL osób klienta w ZUS PEL, ZAW-FA i wniosku UKO – przy kliencie (wpisze się sam następnym razem dla tej samej osoby; widzą go tylko osoby z dostępem do klienta), a Twój PESEL pełnomocnika wpisany w PEL – w „Mój profil”.',
     'Pulpit: nowa sekcja „Umowy do podpisu” – uwagi klientów do odpowiedzi, akceptacje (wyślij do podpisu), wysłane i niepodpisane umowy ze statusem (nieotwarta, otwarta, czeka na klienta, link wygasł) oraz podpisane bez egzemplarza obu stron. Także na pulpicie M2 TAX.',
     'Generator protokołu zgromadzenia: przycisk „Pobierz z KRS” (numer KRS albo NIP) uzupełnia nazwę, siedzibę, adres, udziały wspólników i funkcje w zarządzie. Link wysłany z aplikacji ma już numer KRS klienta, więc dane wczytują się same. Imiona i nazwiska trzeba dopisać – publiczny odpis KRS ich nie podaje.',
     'Nowa instrukcja dla klientów „Sprawozdanie finansowe – zatwierdzenie i KRS” (Dokumenty i narzędzia → Instrukcje dla klientów): terminy, podpisanie sprawozdania, zgromadzenie wspólników i złożenie w Repozytorium Dokumentów Finansowych. Klient sam generuje na stronie protokół zwyczajnego zgromadzenia wspólników (uchwały, podział zysku albo pokrycie straty, absolutorium, lista obecności) – do druku, PDF albo Worda.',
