@@ -42,6 +42,7 @@ export const INSTRUKCJE = [
     subject: 'Dostęp do konta organizacji w e-Urzędzie Skarbowym – instrukcja',
     body: (link) => `Dzień dobry,\n\nprzesyłamy instrukcję złożenia wniosku o przyznanie dostępu do konta organizacji w e-Urzędzie Skarbowym.\n\nInstrukcja krok po kroku: ${link}\n\nW razie pytań jesteśmy do dyspozycji.` },
   { key: 'sprawozdanie', title: 'Sprawozdanie finansowe – zatwierdzenie i KRS', path: '/sprawozdanie/',
+    query: c => { const k = String(c.krs || '').replace(/\D/g, ''), n = String(c.nip || '').replace(/\D/g, ''); return k ? `?krs=${k}` : n.length === 10 ? `?nip=${n}` : ''; },
     desc: 'Terminy, podpisanie sprawozdania (XML), zwyczajne zgromadzenie wspólników i złożenie w Repozytorium Dokumentów Finansowych KRS. Z generatorem protokołu zgromadzenia (uchwały, podział zysku, absolutorium, lista obecności).',
     subject: 'Sprawozdanie finansowe – zatwierdzenie i złożenie w KRS',
     body: (link) => `Dzień dobry,\n\nprzesyłamy instrukcję dotyczącą sprawozdania finansowego spółki: podpisanie sprawozdania przez zarząd, zwyczajne zgromadzenie wspólników (zatwierdzenie sprawozdania, podział zysku lub pokrycie straty, absolutorium) oraz złożenie dokumentów w Repozytorium Dokumentów Finansowych KRS.\n\nNa stronie jest też generator protokołu zgromadzenia wspólników – po wpisaniu danych spółki protokół z uchwałami tworzy się automatycznie i można go wydrukować, zapisać jako PDF albo pobrać do Worda.\n\nPrzypominamy terminy: zatwierdzenie sprawozdania do 30 czerwca, złożenie w KRS w ciągu 15 dni od zatwierdzenia.\n\nInstrukcja i generator: ${link}\n\nW razie pytań jesteśmy do dyspozycji.` },
@@ -62,7 +63,7 @@ export function instrukcjaDialog(item) {
   fields.forEach(([k]) => { f[k] ??= ''; });
   let client = null, bodyEdited = false;
   const link = () => {
-    return `${location.origin}${item.path}`;   // zwykły link do instrukcji – dane osób są w treści e-maila
+    return `${location.origin}${item.path}${item.query && client ? item.query(client) : ''}`;   // zwykły link do instrukcji – dane osób są w treści e-maila (sprawozdanie: ?krs= – dane spółki z KRS w generatorze)
   };
   const out = h('input', { class: 'input', readonly: true, onfocus: e => e.target.select() });
   const bodyTa = h('textarea', { class: 'input', rows: 10, maxlength: 7000, oninput: e => { f.body = e.target.value; bodyEdited = true; } });
@@ -81,7 +82,7 @@ export function instrukcjaDialog(item) {
   const dl = h('datalist', { id: 'inst-clients' });
   const fillList = list => dl.replaceChildren(...list.map(c => h('option', { value: c.name })));
   if (CLIENTS) fillList(CLIENTS);
-  else sb.from('clients').select('id,name,email,accountant_id,hr_id,status').order('name').limit(3000).then(({ data }) => { CLIENTS = data || []; fillList(CLIENTS); });
+  else sb.from('clients').select('id,name,email,accountant_id,hr_id,status,krs,nip').order('name').limit(3000).then(({ data }) => { CLIENTS = data || []; fillList(CLIENTS); });
   const toInput = h('input', { class: 'input', type: 'email', value: f.to, placeholder: 'klient@firma.pl', maxlength: 160, oninput: e => { f.to = e.target.value; } });
   const subjInput = h('input', { class: 'input', value: f.subject, maxlength: 200, oninput: e => { f.subject = e.target.value; } });
   const picker = h('label', { class: 'field' }, h('span', {}, item.prefill ? 'Klient (uzupełni dane z karty klienta)' : 'Klient'),

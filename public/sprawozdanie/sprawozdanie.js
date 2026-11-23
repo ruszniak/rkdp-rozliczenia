@@ -10,7 +10,9 @@
   var dLong = function (s) { if (!/^\d{4}-\d{2}-\d{2}$/.test(s || '')) return ''; var p = s.split('-'); return (+p[2]) + ' ' + MON[+p[1] - 1] + ' ' + p[0] + ' r.'; };
   var num = function (s) { var v = parseFloat(String(s || '').replace(/\s/g, '').replace(',', '.')); return isFinite(v) ? Math.round(v * 100) / 100 : 0; };
   var zl = function (v) { var p = Math.abs(v).toFixed(2).split('.'); return (v < 0 ? '-' : '') + p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + p[1] + ' zł'; };
-  var siedz = function (v) { v = (v || '').trim(); return v ? (/^(w|we)\s/i.test(v) ? esc(v) : 'w ' + esc(v)) : '<span class="empty">w ……………</span>'; };
+  var LOC = { 'wrocław': 'we Wrocławiu', 'warszawa': 'w Warszawie', 'kraków': 'w Krakowie', 'poznań': 'w Poznaniu', 'gdańsk': 'w Gdańsku', 'gdynia': 'w Gdyni', 'łódź': 'w Łodzi', 'katowice': 'w Katowicach', 'szczecin': 'w Szczecinie', 'lublin': 'w Lublinie', 'bydgoszcz': 'w Bydgoszczy', 'toruń': 'w Toruniu', 'opole': 'w Opolu', 'kalisz': 'w Kaliszu', 'rzeszów': 'w Rzeszowie', 'białystok': 'w Białymstoku', 'kielce': 'w Kielcach', 'olsztyn': 'w Olsztynie', 'zielona góra': 'w Zielonej Górze', 'gorzów wielkopolski': 'w Gorzowie Wielkopolskim', 'częstochowa': 'w Częstochowie', 'radom': 'w Radomiu', 'gliwice': 'w Gliwicach', 'legnica': 'w Legnicy', 'wałbrzych': 'w Wałbrzychu', 'jelenia góra': 'w Jeleniej Górze', 'świdnica': 'w Świdnicy', 'głogów': 'w Głogowie', 'lubin': 'w Lubinie', 'bolesławiec': 'w Bolesławcu', 'żagań': 'w Żaganiu', 'siechnice': 'w Siechnicach', 'ozorzyce': 'w Ozorzycach', 'kobierzyce': 'w Kobierzycach', 'bielany wrocławskie': 'w Bielanach Wrocławskich', 'smolec': 'w Smolcu', 'oława': 'w Oławie', 'oleśnica': 'w Oleśnicy', 'trzebnica': 'w Trzebnicy', 'strzelin': 'w Strzelinie', 'brzeg': 'w Brzegu', 'kępno': 'w Kępnie', 'długołęka': 'w Długołęce', 'żórawina': 'w Żórawinie', 'środa śląska': 'w Środzie Śląskiej', 'kąty wrocławskie': 'w Kątach Wrocławskich', 'jelcz-laskowice': 'w Jelczu-Laskowicach', 'oborniki śląskie': 'w Obornikach Śląskich', 'czernica': 'w Czernicy', 'wisznia mała': 'w Wiszni Małej', 'mietków': 'w Mietkowie', 'sobótka': 'w Sobótce', 'miękinia': 'w Miękini', 'św. katarzyna': 'w Świętej Katarzynie', 'święta katarzyna': 'w Świętej Katarzynie', 'radwanice': 'w Radwanicach', 'wysoka': 'w Wysokiej', 'domasław': 'w Domasławiu', 'tyniec mały': 'w Tyńcu Małym', 'żerniki wrocławskie': 'w Żernikach Wrocławskich' };
+  var siedz = function (v) { v = (v || '').trim(); if (!v) return '<span class="empty">w ……………</span>'; if (/^(w|we)\s/i.test(v)) return esc(v); var l = LOC[v.toLowerCase()]; return l ? esc(l) : 'w miejscowości ' + esc(v); };
+  var title = function (t) { return String(t || '').toLowerCase().replace(/(^|[\s\-(])(\S)/g, function (m, a, b) { return a + b.toUpperCase(); }); };
   var DAT = { 'Prezes Zarządu': 'Prezesowi Zarządu', 'Wiceprezes Zarządu': 'Wiceprezesowi Zarządu', 'Członek Zarządu': 'Członkowi Zarządu', 'Przewodniczący Rady Nadzorczej': 'Przewodniczącemu Rady Nadzorczej', 'Członek Rady Nadzorczej': 'Członkowi Rady Nadzorczej' };
   var pct = function (a, b) { return b ? (a / b * 100).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' : '0%'; };
   var votes = function (n) { var m10 = n % 10, m100 = n % 100; return n === 1 ? 'głos' : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? 'głosy' : 'głosów'; };
@@ -31,7 +33,7 @@
       var second = d.type === 'num'
         ? '<input data-k="' + k + '" data-i="' + i + '" data-f="u" inputmode="numeric" value="' + esc(r.u) + '" placeholder="np. 100">'
         : '<select data-k="' + k + '" data-i="' + i + '" data-f="u">' + d.opts.map(function (o) { return '<option' + (o === r.u ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>';
-      return '<div class="row"><label>' + d.label + '<input data-k="' + k + '" data-i="' + i + '" data-f="n" value="' + esc(r.n) + '"></label><label>' + d.second + second + '</label>'
+      return '<div class="row"><label>' + d.label + '<input data-k="' + k + '" data-i="' + i + '" data-f="n" value="' + esc(r.n) + '"' + (r.ph ? ' placeholder="w KRS: ' + esc(r.ph) + '"' : '') + '></label><label>' + d.second + second + '</label>'
         + ((k === 'wsp' || k === 'zarz') && S[k].length === 1 ? '<span></span>' : '<button type="button" class="x" data-del="' + k + '" data-i="' + i + '" aria-label="Usuń">Usuń</button>') + '</div>';
     }).join('');
   }
@@ -192,6 +194,60 @@
     location.reload();
   });
 
+
+  // ---------- dane z KRS (publiczny odpis aktualny; imiona i nazwiska osób są w nim ukryte) ----------
+  var KRS_API = (window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl || '') + '/functions/v1/nip-lookup';
+  var krsMsg = document.getElementById('krs-msg'), krsQ = document.getElementById('krs-q'), krsBtn = document.getElementById('krs-go');
+  var firmName = function (n) {
+    var legal = /(SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ|SPÓŁKA AKCYJNA|PROSTA SPÓŁKA AKCYJNA|SPÓŁKA KOMANDYTOWA|SPÓŁKA JAWNA|SPÓŁKA PARTNERSKA)/;
+    var m = String(n || '').split(legal);
+    return (m[0] || '').split(/\s+/).filter(Boolean).map(function (w) { return w.length > 4 && /[AĄEĘIOÓUY]/.test(w) && !/\d/.test(w) ? title(w) : w; }).join(' ') + (m[1] ? ' ' + m[1].toLowerCase() + (m[2] || '').toLowerCase() : '');
+  };
+  var ROLE = function (r, rn) { r = String(r || '').toUpperCase(); if (rn) return /PRZEWODNICZ/.test(r) ? RF[0] : RF[1]; return /WICEPREZES/.test(r) ? ZF[1] : /PREZES/.test(r) ? ZF[0] : ZF[2]; };
+  var masked = function (p) { return p.entity ? '' : [p.first, p.last].filter(Boolean).join(' '); };
+  var setVal = function (name, v) { var el = form.elements[name]; if (el && v) el.value = v; };
+  function fromKrs(q) {
+    var digits = String(q || '').replace(/\D/g, '');
+    if (!digits) { krsMsg.hidden = false; krsMsg.className = 'hint err'; krsMsg.textContent = 'Wpisz numer KRS albo NIP spółki.'; return; }
+    var body = digits.length === 10 && !/^0{3}/.test(digits) && digits.length === 10 && digits[0] !== '0' ? { public: true, nip: digits } : { public: true, krs: digits };
+    krsBtn.disabled = true; krsBtn.textContent = 'Pobieram…'; krsMsg.hidden = false; krsMsg.className = 'hint'; krsMsg.textContent = 'Łączę się z KRS…';
+    fetch(KRS_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        krsBtn.disabled = false; krsBtn.textContent = 'Pobierz z KRS';
+        if (!d || d.error || !d.found) { krsMsg.className = 'hint err'; krsMsg.textContent = (d && d.error) || 'Nie znaleziono spółki w KRS. Sprawdź numer.'; return; }
+        setVal('firma', firmName(d.name)); setVal('krs', d.krs);
+        var city = title(d.seat && d.seat.miejscowosc || '');
+        if (city) setVal('miasto', LOC[city.toLowerCase()] || city);
+        var a = d.address || {};
+        var street = [a.ulica ? 'ul. ' + title(a.ulica) : '', [a.nrDomu, a.nrLokalu].filter(Boolean).join('/')].filter(Boolean).join(' ');
+        if (street || a.miejscowosc) setVal('miejsce', 'w siedzibie Spółki, ' + [street, [a.kodPocztowy, title(a.miejscowosc)].filter(Boolean).join(' ')].filter(Boolean).join(', '));
+        // wspólnicy: liczba udziałów z KRS; łączna liczba udziałów z kapitału i wartości nominalnej
+        var nominal = 0;
+        var sh = (d.shareholders || []).map(function (w) {
+          var txt = String(w.shares || ''), n = parseInt((txt.match(/^\s*(\d[\d\s]*)/) || ['', ''])[1].replace(/\s/g, ''), 10) || 0;
+          var val = (txt.match(/WYSOKO[ŚS]CI\s+([\d.\s]+,\d{2})/i) || [])[1];
+          if (n && val && !nominal) nominal = parseFloat(val.replace(/[.\s]/g, '').replace(',', '.')) / n;
+          return { n: w.entity ? firmName(w.entity) : '', u: n ? String(n) : '', ph: masked(w) };
+        });
+        if (sh.length) S.wsp = sh;
+        var board = (d.board || []).map(function (p) { return { n: p.entity ? p.entity : '', u: ROLE(p.role), ph: masked(p) }; });
+        if (board.length) S.zarz = board;
+        S.rn = (d.supervisory || []).map(function (p) { return { n: '', u: ROLE(p.role, true), ph: masked(p) }; });
+        ['wsp', 'zarz', 'rn'].forEach(drawRows); people(); render();
+        var cap = parseFloat(String(d.capital || '').replace(/\s/g, '').replace(',', '.')) || 0;
+        var all = nominal ? Math.round(cap / nominal) : 0, listed = sh.reduce(function (t, w) { return t + (parseInt(w.u, 10) || 0); }, 0);
+        var last = (d.filings || []).slice(-1)[0];
+        var info = ['<span class="ok">Pobrano dane z KRS' + (d.stanZDnia ? ' (stan z dnia ' + esc(d.stanZDnia) + ')' : '') + '.</span> Wpisz imiona i nazwiska – KRS pokazuje je publicznie tylko w skrócie (podpowiedź jest w polach).'];
+        if (all && listed < all) info.push('KRS wykazuje tylko wspólników mających co najmniej 10% kapitału: na liście jest ' + listed + ' z ' + all + ' udziałów – dopisz pozostałych wspólników.');
+        if (last) info.push('Ostatnie sprawozdanie złożone w KRS: za okres ' + esc(String(last.period || '').toLowerCase()) + (last.filed ? ' (złożone ' + esc(last.filed) + ')' : '') + '.');
+        krsMsg.className = 'hint'; krsMsg.innerHTML = info.join(' ');
+      })
+      .catch(function () { krsBtn.disabled = false; krsBtn.textContent = 'Pobierz z KRS'; krsMsg.className = 'hint err'; krsMsg.textContent = 'Brak połączenia z KRS – spróbuj ponownie albo wpisz dane ręcznie.'; });
+  }
+  krsBtn.addEventListener('click', function () { fromKrs(krsQ.value); });
+  krsQ.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); fromKrs(krsQ.value); } });
+
   // ---------- start ----------
   var saved = load();
   var y = new Date().getFullYear() - 1;
@@ -204,4 +260,6 @@
   });
   people();
   render();
+  var qp = new URLSearchParams(location.search), qk = (qp.get('krs') || qp.get('nip') || '').replace(/\D/g, '');
+  if (qk) { krsQ.value = qk; if (!saved.firma) fromKrs(qk); }
 })();

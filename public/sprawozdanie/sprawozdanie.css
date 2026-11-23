@@ -1,4 +1,10 @@
 /* Sprawozdanie finansowe – generator protokołu (styl stron dla klientów: /umow/doc.css) */
+.krs-box{background:var(--paper-2);border:1px solid var(--line);padding:14px 18px;margin:16px 0 6px}
+.krs-box label{display:block;margin:0 0 6px;color:var(--ink)}
+.krs-row{display:flex;gap:8px;flex-wrap:wrap}
+.krs-row input{flex:1 1 220px;font:inherit;font-size:16px;border:1px solid var(--line-2);border-radius:6px;padding:9px 11px;background:#fff;color:var(--ink);min-height:46px;box-sizing:border-box}
+.krs-box .hint{font-size:14.5px;color:var(--muted);margin:8px 0 0}
+.krs-box .ok{color:#3E6B47}
 .gen{margin:18px 0 10px}
 .gen fieldset{border:1px solid var(--line);padding:14px 18px 16px;margin:0 0 14px}
 .gen legend{font-family:var(--serif);font-weight:600;font-size:18px;color:var(--ink);padding:0 6px}

@@ -37,23 +37,8 @@ const wlErr = (w: { j: any; status: number }) => /aktualizacj/i.test(w.j?.messag
   ? 'Biała lista VAT (Ministerstwo Finansów) chwilowo aktualizuje bazę i nie odpowiada. Spróbuj ponownie za kilka–kilkanaście minut albo uzupełnij dane ręcznie.'
   : (w.j?.message || `Biała lista VAT odpowiedziała błędem (${w.status || 'brak połączenia'}).`);
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
-  try {
-    const auth = req.headers.get('Authorization') || '';
-    if (!auth.startsWith('Bearer ')) return json({ error: 'Brak dostępu' }, 401);
-    const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: auth } },
-    });
-    const { data: memberId, error: authErr } = await sb.rpc('current_member_id');
-    if (authErr || !memberId) return json({ error: 'Brak dostępu' }, 403);
-
-    const body = await req.json().catch(() => ({}));
-    const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
-
-    // Odpis aktualny z KRS (API Ministerstwa Sprawiedliwości): { krs: '0000812185' }
-    if (body.krs !== undefined) {
-      const krs = String(body.krs || '').replace(/\D/g, '').padStart(10, '0');
+async function krsOdpis(raw: string, date: string) {
+      const krs = String(raw || '').replace(/\D/g, '').padStart(10, '0');
       if (!/^\d{10}$/.test(krs) || krs === '0000000000') return json({ error: 'Nieprawidłowy numer KRS.' }, 400);
       let r = await fetch(`https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/${krs}?rejestr=P&format=json`, { headers: { Accept: 'application/json' } });
       if (r.status === 404) r = await fetch(`https://api-krs.ms.gov.pl/api/krs/OdpisAktualny/${krs}?rejestr=S&format=json`, { headers: { Accept: 'application/json' } });
@@ -83,6 +68,39 @@ Deno.serve(async (req: Request) => {
         filings: filings.map((f: any) => ({ filed: f.dataZlozenia || null, period: f.zaOkresOdDo || null })),
       });
     }
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  try {
+    // Tryb publiczny (strony dla klientów, np. generator protokołu zgromadzenia): tylko odpis aktualny z KRS – dane jawne.
+    // { public: true, krs } albo { public: true, nip } (NIP → numer KRS z Białej listy VAT)
+    const pre = await req.clone().json().catch(() => ({}));
+    if (pre?.public === true) {
+      const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
+      let krs = String(pre.krs || '').replace(/\D/g, '');
+      if (!krs) {
+        const nip = String(pre.nip || '').replace(/\D/g, '');
+        if (!validNip(nip)) return json({ error: 'Wpisz numer KRS (10 cyfr) albo poprawny NIP spółki.' }, 400);
+        const w = await wl(`nip/${nip}`, date);
+        if (!w.ok) return json({ error: wlErr(w) }, 502);
+        krs = String(w.j?.result?.subject?.krs || '').replace(/\D/g, '');
+        if (!krs) return json({ found: false, error: 'Dla tego NIP nie znaleziono numeru KRS – wpisz numer KRS.' }, 404);
+      }
+      return await krsOdpis(krs, date);
+    }
+    const auth = req.headers.get('Authorization') || '';
+    if (!auth.startsWith('Bearer ')) return json({ error: 'Brak dostępu' }, 401);
+    const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: auth } },
+    });
+    const { data: memberId, error: authErr } = await sb.rpc('current_member_id');
+    if (authErr || !memberId) return json({ error: 'Brak dostępu' }, 403);
+
+    const body = await req.json().catch(() => ({}));
+    const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' });
+
+    // Odpis aktualny z KRS (API Ministerstwa Sprawiedliwości): { krs: '0000812185' }
+    if (body.krs !== undefined) return await krsOdpis(String(body.krs || ''), date);
 
     // Tryb zbiorczy: { nips: [...] } – po 30 NIP-ów w jednym zapytaniu do Białej listy
     if (Array.isArray(body.nips)) {

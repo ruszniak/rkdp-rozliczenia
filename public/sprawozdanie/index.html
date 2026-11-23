@@ -68,7 +68,13 @@ Uchwały (np. cały protokół z generatora) można dołączyć jako <strong>PDF
 <p class="small">Jeśli sprawozdanie nie zostanie zatwierdzone w terminie, składa się je w ciągu 15 dni od upływu terminu na zatwierdzenie (z informacją o braku zatwierdzenia). Uchwałę zatwierdzającą dosyła się w ciągu 15 dni od jej podjęcia. Za niezłożenie sprawozdania grozi odpowiedzialność karna członków zarządu, a sąd rejestrowy może wszcząć postępowanie przymuszające.</p>
 
 <h2 id="generator">Generator protokołu zgromadzenia wspólników</h2>
-<p>Uzupełnij dane, a protokół z uchwałami pojawi się poniżej. Możesz go <strong>wydrukować lub zapisać jako PDF</strong> albo pobrać do edycji w <strong>Wordzie</strong>. Dane zostają tylko w tej przeglądarce i nie są nigdzie wysyłane.</p>
+<p>Uzupełnij dane, a protokół z uchwałami pojawi się poniżej. Możesz go <strong>wydrukować lub zapisać jako PDF</strong> albo pobrać do edycji w <strong>Wordzie</strong>. Wpisane dane zostają tylko w tej przeglądarce.</p>
+<div class="krs-box">
+<label for="krs-q"><b>Pobierz dane spółki z KRS</b></label>
+<div class="krs-row"><input id="krs-q" inputmode="numeric" placeholder="numer KRS albo NIP spółki"><button type="button" class="btn-p" id="krs-go">Pobierz z KRS</button></div>
+<p class="hint">Uzupełnimy nazwę, siedzibę, numer KRS, adres, liczbę udziałów wspólników oraz funkcje w zarządzie i radzie nadzorczej. Imion i nazwisk publiczny odpis KRS nie podaje – trzeba je dopisać.</p>
+<p id="krs-msg" class="hint" hidden></p>
+</div>
 
 <form id="gen" class="gen" autocomplete="off" novalidate>
 <fieldset><legend>Spółka</legend>
@@ -148,6 +154,7 @@ Uchwały (np. cały protokół z generatora) można dołączyć jako <strong>PDF
 <p>Odpowiedz na naszego e-maila albo zadzwoń: <a href="tel:+48883643565">883 643 565</a> · <a href="mailto:kancelaria@rkdp.pl">kancelaria@rkdp.pl</a>. Protokół z generatora to wzór na typową sytuację. Jeśli spółka ma umowę z innymi zasadami (np. uprzywilejowane udziały, inne kworum), daj nam znać przed zgromadzeniem.</p>
 </main>
 <footer><div class="in">RKDP spółka doradztwa podatkowego sp. z o.o. · ul. Beaty Artemskiej 11/44, 52-234 Wrocław<br>NIP 8992871126 · KRS 0000812185 · tel. 883 643 565 · kancelaria@rkdp.pl</div></footer>
+<script src="/config.js"></script>
 <script src="/sprawozdanie/sprawozdanie.js"></script>
 </body>
 </html>
