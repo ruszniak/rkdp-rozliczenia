@@ -1,7 +1,7 @@
 // Publiczne umawianie spotkań z doradcą podatkowym (bez logowania). Dane i wolne terminy z funkcji „spotkania”.
 // ?embed=1 – w okienku na stronie (rkdp.pl / m2tax.pl); ?t=<token> – zmiana terminu / odwołanie z linku w e-mailu;
 // ?typ=<id|online|bezplatne|jagodno|zwycieska> i ?doradca=<id|michal|marcin> – wybór od razu;
-// ?tylko=<id|michal|marcin> – link osobisty: tylko ten doradca i jego rodzaje spotkań (bez wyboru innego doradcy).
+// ?tylko=<id|michal|marcin> – link osobisty: tylko ten doradca i jego rodzaje spotkań, także „tylko z linku” (np. u klienta).
 (function () {
   'use strict';
   var SB = (window.RKDP_CONFIG && window.RKDP_CONFIG.supabaseUrl) || 'https://iuszfoyttqnkzjzjpzma.supabase.co';
@@ -109,7 +109,7 @@
       h('div', { class: 'typs' }, types.map(function (t) {
         return h('button', { type: 'button', class: 'typ' + (st.type && st.type.id === t.id ? ' on' : ''), onclick: function () { st.type = t; st.day = null; st.slot = null; loadSlots(); } },
           h('span', { class: 'ic', html: ICON[t.mode] || ICON.meet }),
-          h('span', null, h('b', null, t.name), h('small', null, (t.duration_min >= 60 ? (t.duration_min / 60 + ' godz.').replace('.5', ',5') : t.duration_min + ' min') + ' · ' + (t.mode === 'office' ? (t.place || 'stacjonarnie').replace(/^RKDP Doradztwo Podatkowe, /, '') : t.mode === 'phone' ? 'telefonicznie' : 'online (Google Meet)'))),
+          h('span', null, h('b', null, t.name), h('small', null, (t.duration_min >= 60 ? (t.duration_min / 60 + ' godz.').replace('.5', ',5') : t.duration_min + ' min') + ' · ' + (t.ask_address ? 'u Ciebie w firmie' : t.mode === 'office' ? (t.place || 'stacjonarnie').replace(/^RKDP Doradztwo Podatkowe, /, '') : t.mode === 'phone' ? 'telefonicznie' : 'online (Google Meet)'))),
           priceOf(t) > 0 ? h('span', { class: 'free price' }, zl(priceOf(t))) : /bezpłatn/i.test(t.name) ? h('span', { class: 'free' }, '0 zł') : null);
       })),
       cfg.advisors.length > 1 ? [h('p', { class: 'lbl', style: 'margin-top:14px' }, 'Doradca'),
@@ -161,7 +161,7 @@
     if (c && Date.now() - c.at < 120000) return c.p;
     var t0 = isoDay(new Date());
     var to = new Date(); to.setDate(to.getDate() + (cfg.max_days || 28));
-    var p = api('slots', { type_id: typeId, advisor: adv, from: t0, to: isoDay(to) });
+    var p = api('slots', { type_id: typeId, advisor: adv, from: t0, to: isoDay(to), only: ONLY || undefined });
     slotCache[k] = { at: Date.now(), p: p };
     p.catch(function () { delete slotCache[k]; });
     return p;
@@ -178,7 +178,7 @@
   function card(step, body) { return h('div', { class: 'um-card' }, top(step), body); }
 
   // ---------- krok 2: dane ----------
-  var form = { name: '', email: '', phone: '', nip: '', topic: '', consent: false, terms: false };
+  var form = { name: '', email: '', phone: '', nip: '', address: '', topic: '', consent: false, terms: false };
   function summary() {
     var d = new Date(st.slot.start), end = new Date(d.getTime() + st.type.duration_min * 60000);
     var advId = st.adv !== 'any' ? st.adv : (st.slot.advisors.length === 1 ? st.slot.advisors[0] : null);
@@ -186,7 +186,7 @@
     return h('div', { class: 'sum' },
       h('div', { class: 'd' }, h('div', { class: 'dd' }, h('small', null, d.toLocaleDateString('pl-PL', { weekday: 'short' })), h('b', null, String(d.getDate()))),
         h('div', null, h('b', null, st.type.name), h('div', { style: 'font-size:13px;color:#C9CCD1' }, d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) + '–' + end.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) + ', ' + longDay(isoDay(d))))),
-      h('p', null, (st.type.mode === 'office' ? 'Miejsce: ' + (st.type.place || '') : st.type.mode === 'phone' ? 'Zadzwonimy na podany numer.' : 'Spotkanie online – link do Google Meet przyjdzie w e-mailu.'),
+      h('p', null, (st.type.ask_address ? 'Miejsce: u Ciebie w firmie (adres podaj poniżej)' : st.type.mode === 'office' ? 'Miejsce: ' + (st.type.place || '') : st.type.mode === 'phone' ? 'Zadzwonimy na podany numer.' : 'Spotkanie online – link do Google Meet przyjdzie w e-mailu.'),
         h('br'), 'Doradca: ' + (a ? a.name : 'pierwszy wolny doradca podatkowy')),
       h('p', null, h('a', { href: '#', onclick: function (e) { e.preventDefault(); render(card(1, step1())); } }, 'Zmień termin')));
   }
@@ -200,10 +200,11 @@
     var btn = h('button', { class: 'btn', type: 'submit', style: 'width:100%' }, 'Potwierdź rezerwację');
     var f = h('form', { onsubmit: function (e) {
       e.preventDefault();
+      if (st.type.ask_address && form.address.trim().length < 6) return render(card(2, step2('Podaj adres, pod którym ma się odbyć spotkanie.')));
       if (!form.consent) return render(card(2, step2('Zaznacz zgodę na przetwarzanie danych.')));
       if (priceOf(st.type) > 0 && !form.terms) return render(card(2, step2('Zaakceptuj regulamin konsultacji.')));
       btn.disabled = true; btn.textContent = 'Rezerwuję…';
-      api('book', { type_id: st.type.id, advisor: st.adv, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, platnosc: PAYMODE, terms: priceOf(st.type) > 0 && form.terms, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
+      api('book', { type_id: st.type.id, advisor: st.adv, only: ONLY || undefined, address: st.type.ask_address ? form.address : undefined, start: st.slot.start, name: form.name, email: form.email, phone: form.phone, nip: form.nip, topic: form.topic, consent: true, platnosc: PAYMODE, terms: priceOf(st.type) > 0 && form.terms, hp: hp.value, ms: Date.now() - openedAt, channel: CHANNEL })
         .then(function (r) { if (r.meeting) r.meeting._terms = form.terms; render(card(3, done(r.meeting, r.mailed))); toTop(); })
         .catch(function (e) {
           if (/zajęt/i.test(e.message)) { st.slot = null; loadSlots(); setTimeout(function () { alertBox(e.message); }, 50); return; }
@@ -215,6 +216,7 @@
       inp('email', 'E-mail', 'email', 'email'),
       inp('phone', 'Telefon (opcjonalnie)', 'tel', 'tel'),
       inp('nip', 'NIP firmy (opcjonalnie)', 'text', 'off', 'jeśli spotkanie dotyczy firmy'),
+      st.type.ask_address ? inp('address', 'Adres spotkania (siedziba firmy)', 'text', 'street-address', 'ulica, numer, kod pocztowy, miejscowość') : null,
       inp('topic', 'W jakiej sprawie? (krótko – pomoże nam się przygotować)', null, null, 'np. sprzedaż mieszkania, kontrola z urzędu skarbowego, wybór formy opodatkowania'),
       hp,
       h('label', { class: 'consent' }, h('input', { type: 'checkbox', checked: form.consent, onchange: function (e) { form.consent = e.target.checked; } }), h('span', null,
@@ -337,22 +339,15 @@
 
   // ---------- start ----------
   if (TOKEN) { manage(); return; }
-  api('config').then(function (r) {
+  var ONLY = q.get('tylko') || '';
+  api('config', ONLY ? { only: ONLY } : null).then(function (r) {
     cfg = r;
     // doradcy w kolejności z rodzajów spotkań (najpierw Michał Ruszniak, potem Marcin Otręba)
     var ord = []; (cfg.types || []).forEach(function (t) { (t.advisors || []).forEach(function (id) { if (ord.indexOf(id) < 0) ord.push(id); }); });
     cfg.advisors = (cfg.advisors || []).slice().sort(function (a, b) { var x = ord.indexOf(a.id), y = ord.indexOf(b.id); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });
     if (!cfg.types || !cfg.types.length) return fail('Rezerwacja online jest chwilowo niedostępna.');
-    var only = norm(q.get('tylko'));
-    if (only) {
-      var me = cfg.advisors.filter(function (x) { return x.id === q.get('tylko') || norm(x.name).indexOf(only) >= 0; })[0];
-      if (me) {
-        cfg.advisors = [me];
-        cfg.types = cfg.types.filter(function (t) { return (t.advisors || []).indexOf(me.id) >= 0; });
-        st.adv = me.id;
-        if (!cfg.types.length) return fail('Rezerwacja online jest chwilowo niedostępna.');
-      }
-    }
+    // osobisty link doradcy – serwer zwraca tylko jego rodzaje spotkań (także te „tylko z linku”, np. u klienta)
+    if (cfg.only) { ONLY = cfg.only; cfg.advisors = cfg.advisors.filter(function (x) { return x.id === cfg.only; }); st.adv = cfg.only; } else ONLY = '';
     var wantT = norm(q.get('typ')), wantA = norm(q.get('doradca'));
     if (wantT) st.type = cfg.types.filter(function (t) { return t.id === q.get('typ') || norm(t.name).indexOf(wantT) >= 0; })[0] || null;
     if (wantA) { var a = cfg.advisors.filter(function (x) { return x.id === q.get('doradca') || norm(x.name).indexOf(wantA) >= 0; })[0]; if (a) st.adv = a.id; }

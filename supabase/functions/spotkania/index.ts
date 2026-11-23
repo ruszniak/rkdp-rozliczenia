@@ -525,6 +525,19 @@ async function setMembers(m: any, want: string[], actor: string, notifyClient: b
 
 const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(e);
 const clean = (s: unknown, n: number) => String(s ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
+const normName = (s: unknown) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ł/g, 'l').trim();
+// osobisty link doradcy: ?tylko=<id|imię> → id doradcy przyjmującego spotkania (albo null)
+async function resolveOnly(v: unknown): Promise<string | null> {
+  const q = normName(clean(v, 60));
+  if (!q) return null;
+  const { data: types } = await admin.from('meeting_types').select('advisors').eq('active', true);
+  const ids = [...new Set((types || []).flatMap((t: any) => t.advisors || []))];
+  if (ids.includes(String(v))) return String(v);
+  if (!ids.length) return null;
+  const { data: m } = await admin.from('team_members').select('id,full_name,active').in('id', ids);
+  const hit = (m || []).find((x: any) => x.active && normName(x.full_name).includes(q));
+  return hit?.id || null;
+}
 const publicMeeting = async (m: any) => {
   const c = await ctxOf(m);
   return { id: m.id, status: m.status, start: m.start_at, end: m.end_at, type_id: m.type_id, type: c.type?.name || m.title, mode: m.mode, place: m.place, meet_url: m.status === 'confirmed' ? m.meet_url : null,
@@ -541,11 +554,15 @@ Deno.serve(async (req: Request) => {
 
     // ===== publiczne =====
     if (action === 'config') {
-      const { data: types } = await admin.from('meeting_types').select('id,name,duration_min,mode,place,map_url,advisors,description,sort,price_rkdp,price_m2tax').eq('active', true).eq('public', true).order('sort');
-      const ids = [...new Set((types || []).flatMap((t: any) => t.advisors || []))];
+      // rodzaje „tylko z linku” (link_only) – wyłącznie w osobistym linku doradcy /umow/?tylko=<id|imię>
+      const { data: all } = await admin.from('meeting_types').select('id,name,duration_min,mode,place,map_url,advisors,description,sort,price_rkdp,price_m2tax,public,link_only,ask_address').eq('active', true).or('public.eq.true,link_only.eq.true').order('sort');
+      const only = await resolveOnly(body.only);
+      const types = (all || []).filter((t: any) => only ? (t.advisors || []).includes(only) : t.public && !t.link_only)
+        .map(({ public: _p, link_only: _l, ...t }: any) => t);
+      const ids = [...new Set(types.flatMap((t: any) => t.advisors || []))];
       const { data: adv } = ids.length ? await admin.from('team_members').select('id,full_name,job_title,active,avatar').in('id', ids) : { data: [] };
       return json({
-        types, max_days: S.max_days, min_notice_h: S.min_notice_h,
+        types, only, max_days: S.max_days, min_notice_h: S.min_notice_h,
         advisors: (adv || []).filter((a: any) => a.active).map((a: any) => ({ id: a.id, name: a.full_name, title: a.job_title || 'Doradca podatkowy', initials: a.full_name.split(/\s+/).map((x: string) => x[0]).join('').slice(0, 2), photo: /^data:image\/(jpeg|png|webp);base64,/.test(a.avatar || '') ? a.avatar : null })),
       });
     }
@@ -559,10 +576,12 @@ Deno.serve(async (req: Request) => {
         const c = await ctxOf(data, S); type = c.type || { duration_min: (Date.parse(data.end_at) - Date.parse(data.start_at)) / 60000, advisors: c.advisors.map(a => a.id) };
         members = c.advisors.map(a => a.id);
       } else {
-        const { data } = await admin.from('meeting_types').select('*').eq('id', clean(body.type_id, 40)).eq('active', true).eq('public', true).maybeSingle();
-        if (!data) throw new Http(400, 'Wybierz rodzaj spotkania.');
+        const { data } = await admin.from('meeting_types').select('*').eq('id', clean(body.type_id, 40)).eq('active', true).maybeSingle();
+        const only = await resolveOnly(body.only);
+        const okType = data && (only ? (data.advisors || []).includes(only) && (data.public || data.link_only) : data.public && !data.link_only);
+        if (!okType) throw new Http(400, 'Wybierz rodzaj spotkania.');
         type = data;
-        const adv = clean(body.advisor, 40);
+        const adv = only || clean(body.advisor, 40);
         members = adv && adv !== 'any' ? (type.advisors || []).filter((x: string) => x === adv) : (type.advisors || []);
         if (!members.length) throw new Http(400, 'Wybierz doradcę.');
       }
@@ -591,6 +610,8 @@ Deno.serve(async (req: Request) => {
       if (name.length < 3) throw new Http(400, 'Podaj imię i nazwisko.');
       if (!emailOk(email)) throw new Http(400, 'Podaj poprawny adres e-mail.');
       if (phone && phone.replace(/\D/g, '').length < 9) throw new Http(400, 'Numer telefonu wygląda na niepełny – popraw go albo zostaw puste.');
+      const address = type.ask_address ? clean(body.address, 300) : '';
+      if (type.ask_address && address.length < 6) throw new Http(400, 'Podaj adres, pod którym ma się odbyć spotkanie.');
       if (body.consent !== true) throw new Http(400, 'Zaznacz zgodę na przetwarzanie danych.');
       const channel = ['rkdp', 'm2tax', 'link'].includes(String(body.channel)) ? String(body.channel) : 'link';
       // cena tylko przy rezerwacji z płatnością (strona /umow2/); /umow/ (okienka na m2tax.pl i rkdp.pl) – bez płatności
@@ -609,7 +630,7 @@ Deno.serve(async (req: Request) => {
       const match = await matchClient(email);
       const r = await createMeeting(S, {
         type_id: type.id, title: type.name, start_at: new Date(startMs).toISOString(), end_at: new Date(startMs + type.duration_min * 60000).toISOString(),
-        source: 'www', channel, price, terms_accepted_at: price > 0 ? new Date().toISOString() : null, mode: type.mode, place: type.place, client_name: name, client_email: email, client_phone: phone || null, client_nip: nip || null, topic, ...match, notify_client: true,
+        source: 'www', channel, price, terms_accepted_at: price > 0 ? new Date().toISOString() : null, mode: type.mode, place: address || type.place, client_name: name, client_email: email, client_phone: phone || null, client_nip: nip || null, topic, ...match, notify_client: true,
       }, [who], null);
       return json({ ok: true, mailed: r.mailed, meeting: await publicMeeting(r.meeting) });
     }

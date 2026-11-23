@@ -724,7 +724,7 @@ async function rodzaje(box) {
   const admin = isAdmin();
   put(box, h('section', { class: 'card sp-types' },
     ...types.map(t => h('div', { class: 'sp-type' + (t.active ? '' : ' off') },
-      h('div', { style: { flex: 1, minWidth: 0 } }, h('b', {}, t.name), h('small', {}, [`${t.duration_min} min`, MODE[t.mode], t.place, t.public ? 'na stronie' : 'tylko w aplikacji', t.active ? '' : 'wyłączony'].filter(Boolean).join(' · '))),
+      h('div', { style: { flex: 1, minWidth: 0 } }, h('b', {}, t.name), h('small', {}, [`${t.duration_min} min`, MODE[t.mode], t.ask_address ? 'u klienta' : t.place, t.link_only ? 'tylko z osobistego linku' : t.public ? 'na stronie' : 'tylko w aplikacji', t.active ? '' : 'wyłączony'].filter(Boolean).join(' · '))),
       h('span', { class: 'sp-avs' }, ...(t.advisors || []).map(memberById).filter(Boolean).map(avaChip)),
       admin ? h('button', { class: 'btn btn-outline btn-sm', onclick: () => editType(t, ids, () => rodzaje(box)) }, 'Edytuj') : null)),
     admin ? h('div', { style: { padding: '12px 16px' } }, h('button', { class: 'btn btn-primary btn-sm', onclick: () => editType(null, ids, () => rodzaje(box)) }, icon('plus'), 'Nowy rodzaj spotkania')) : h('p', { class: 'hint', style: { padding: '12px 16px' } }, 'Rodzaje spotkań zmienia administrator.')));
@@ -738,6 +738,7 @@ function editType(t, adv, onSave) {
   const map = h('input', { class: 'input', value: v.map_url || '', placeholder: 'link do Map Google (wizytówka)' });
   const desc = h('textarea', { class: 'input', rows: 2 }); desc.value = v.description || '';
   const pub = h('input', { type: 'checkbox', checked: v.public }), act = h('input', { type: 'checkbox', checked: v.active });
+  const lnk = h('input', { type: 'checkbox', checked: !!v.link_only }), addr = h('input', { type: 'checkbox', checked: !!v.ask_address });
   const pr1 = h('input', { class: 'input', type: 'number', min: 0, step: '1', value: Number(v.price_rkdp) || 0 }), pr2 = h('input', { class: 'input', type: 'number', min: 0, step: '1', value: Number(v.price_m2tax) || 0 });
   const sel = new Set(v.advisors || []);
   const people = state.members.filter(m => m.active !== false && (adv.includes(m.id) || (m.modules || []).includes('doradztwo')));
@@ -754,9 +755,11 @@ function editType(t, adv, onSave) {
       return b;
     }))),
     h('label', { class: 'sp-check wide' }, pub, 'Można zarezerwować na stronie internetowej'),
+    h('label', { class: 'sp-check wide' }, lnk, 'Tylko z osobistego linku doradcy (app.ruszniak.io/umow/?tylko=imię) – nie na stronach'),
+    h('label', { class: 'sp-check wide' }, addr, 'U klienta – klient podaje adres spotkania'),
     h('label', { class: 'sp-check wide' }, act, 'Aktywny')),
   close => [h('button', { class: 'btn btn-ghost', onclick: close }, 'Anuluj'), h('button', { class: 'btn btn-primary', onclick: async () => {
-    const row = { name: name.value.trim(), duration_min: +dur.value, mode: mode.value, place: place.value.trim() || null, map_url: map.value.trim() || null, description: desc.value.trim() || null, advisors: [...sel], public: pub.checked, active: act.checked, ...(PAYMENTS ? { price_rkdp: Math.max(0, Number(pr1.value) || 0), price_m2tax: Math.max(0, Number(pr2.value) || 0) } : {}) };
+    const row = { name: name.value.trim(), duration_min: +dur.value, mode: mode.value, place: place.value.trim() || null, map_url: map.value.trim() || null, description: desc.value.trim() || null, advisors: [...sel], public: pub.checked && !lnk.checked, link_only: lnk.checked, ask_address: addr.checked, active: act.checked, ...(PAYMENTS ? { price_rkdp: Math.max(0, Number(pr1.value) || 0), price_m2tax: Math.max(0, Number(pr2.value) || 0) } : {}) };
     if (!row.name) return toast('Wpisz nazwę', true);
     const { error } = t ? await sb.from('meeting_types').update(row).eq('id', t.id) : await sb.from('meeting_types').insert({ ...row, sort: 10 });
     if (error) return fail(error);
