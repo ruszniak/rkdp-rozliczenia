@@ -19,4 +19,4 @@ Strony z linków (podpis, UPL-1, wgrywanie, instrukcje, regulamin) mają wspóln
 ## Inne zasady
 - Komunikacja z właścicielem po polsku; nazwa aplikacji: rdp.app.
 - Przed push: `git pull --rebase` (repo zmienia też inna sesja). Przy zmianie frontendu podbij `CACHE` w `public/sw.js`.
-- Klucz service_role i sekrety nigdy we frontendzie ani w czacie. PESEL tylko w `member_private`.
+- Klucz service_role i sekrety nigdy we frontendzie ani w czacie. PESEL zespołu tylko w `member_private`, PESEL osób klienta tylko w `client_person_pesel` (nigdzie indziej).
