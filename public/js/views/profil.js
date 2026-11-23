@@ -9,7 +9,7 @@ import { isIOS, isStandalone, pushSupported, canInstall, onInstallChange, prompt
 const HELP = `Te dane wpisują się automatycznie w pełnomocnictwa UPL-1, PEL (ZUS) i PPS-1, gdy w „Umowy i pełnomocnictwa” wybierzesz siebie jako pełnomocnika.
 
 • NIP – tylko jeśli prowadzisz działalność; bez niej na formularzu wpisze się PESEL.
-• PESEL widzisz i zmieniasz tylko Ty – nie widzi go nikt z zespołu ani administrator. Wpisuje się wyłącznie do pełnomocnictw, które generujesz sam(a). Gdy dokument z Tobą wygeneruje ktoś inny, pole PESEL zostanie puste do wpisania ręcznie.
+• PESEL zmieniasz tylko Ty. Jeśli masz włączone „Wspólne dane do pełnomocnictw” (Zespół), widzą go też osoby z tą opcją – wpisuje się wtedy do PEL / UPL-1, które ktoś z nich wygeneruje z Tobą jako pełnomocnikiem (i odwrotnie). Bez tej opcji nie widzi go nikt poza Tobą.
 • Adres do doręczeń: domyślnie biuro RKDP (ul. Beaty Artemskiej 11/44, Wrocław). Własny adres wpisz tylko, jeśli pisma mają trafiać do Ciebie.
 • Adres do doręczeń elektronicznych (e-Doręczenia) – jeśli go masz, np. AE:PL-12345-67890-ABCDE-12.`;
 
@@ -199,8 +199,8 @@ export async function renderProfil(main) {
       h('div', { class: 'section-head' }, h('h2', {}, 'Dane do pełnomocnictw (UPL-1, PEL, PPS-1)')),
       h('div', { class: 'form-grid' },
         inp('nip', 'NIP', { num: true, hint: 'Tylko jeśli prowadzisz działalność – inaczej zostaw puste' }),
-        inp('pesel', 'PESEL', { num: true, hint: 'Widzisz go tylko Ty' }),
-        inp('id_doc', 'Seria i numer dowodu (opcjonalnie)', { hint: 'Widzisz go tylko Ty' }),
+        inp('pesel', 'PESEL', { num: true, hint: 'Zmieniasz go tylko Ty; widzą go osoby ze wspólnymi danymi do pełnomocnictw' }),
+        inp('id_doc', 'Seria i numer dowodu (opcjonalnie)', { hint: 'Jak PESEL' }),
         inp('ae_address', 'Adres do doręczeń elektronicznych (opcjonalnie)', { ph: 'AE:PL-…' }),
         inp('phone', 'Telefon', { ph: 'np. 600 000 000' }),
         inp('email', 'E-mail na pełnomocnictwa'))),
@@ -215,7 +215,7 @@ export async function renderProfil(main) {
   return () => { window.removeEventListener('beforeunload', beforeUnload); offInstall?.(); };
 }
 
-// Dane pełnomocników-pracowników do formularzy (PESEL tylko własny – RLS nie pokaże cudzego)
+// Dane pełnomocników-pracowników do formularzy (PESEL własny albo osób ze wspólnymi danymi – pesel_share, RLS)
 export function memberPoa(member, prof, priv) {
   const p = prof || {};
   const own = p.delivery === 'wlasny' && (p.street || p.city);

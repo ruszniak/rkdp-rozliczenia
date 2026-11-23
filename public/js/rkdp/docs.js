@@ -134,7 +134,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
       if (error) { console.warn('pesel', error); continue; }
       pesels = [...pesels.filter(y => y.id !== data.id), data];
     }
-    // PEL: PESEL pełnomocnika – zapis tylko własny (Mój profil), cudzego nie widać ani nie zmieniamy
+    // PEL: PESEL pełnomocnika – zapis tylko własny (Mój profil); cudzy widać przy pesel_share, ale go nie zmieniamy
     if (t === 'pel') {
       const pp = String(v.pel.p_pesel || '').replace(/\D/g, '');
       const meEmp = d.who === 'emp:' + state.me.id || (d.who === 'doradca' && advisor.full_name === state.me.full_name);
@@ -199,7 +199,7 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     const x = pelnomocnik();
     const me = employees.find(m => 'emp:' + m.id === d.who)?.id === state.me?.id;
     if (!x.filled) return h('p', { class: 'hint', style: { margin: '-4px 0 10px', color: '#a0522d' } }, me ? 'Nie masz jeszcze uzupełnionych danych – wpisz je w „Mój profil” (kliknij swoje nazwisko w prawym górnym rogu).' : 'Ta osoba nie uzupełniła jeszcze danych w „Mój profil” – wpisze się tylko imię i nazwisko.');
-    return h('p', { class: 'hint', style: { margin: '-4px 0 10px' } }, `Dane z „Mój profil”: ${[x.nip ? 'NIP' : x.pesel ? 'PESEL' : null, x.ae_address ? 'adres elektroniczny' : null, x.delivery === 'biuro' ? 'doręczenia na biuro' : 'własny adres', x.phone ? 'telefon' : null].filter(Boolean).join(', ')}.${!x.nip && !x.pesel && !me ? ' PESEL wpisze się tylko, gdy ta osoba wygeneruje dokument sama.' : ''}`);
+    return h('p', { class: 'hint', style: { margin: '-4px 0 10px' } }, `Dane z „Mój profil”: ${[x.nip ? 'NIP' : x.pesel ? 'PESEL' : null, x.ae_address ? 'adres elektroniczny' : null, x.delivery === 'biuro' ? 'doręczenia na biuro' : 'własny adres', x.phone ? 'telefon' : null].filter(Boolean).join(', ')}.${!x.nip && !x.pesel && !me ? ' Brak PESEL – ta osoba nie ma wspólnych danych do pełnomocnictw albo nie wpisała PESEL w „Mój profil”.' : ''}`);
   };
 
   let build = function () {
