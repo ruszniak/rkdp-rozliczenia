@@ -3,8 +3,8 @@ import { h } from '../ui.js';
 import { state } from '../store.js';
 import { TERMS_VERSION } from '../regulamin.js';
 
-export const APP_VERSION = '2.7';
-export const APP_DATE = '2026-11-22';
+export const APP_VERSION = '2.8';
+export const APP_DATE = '2026-11-23';
 const DOCS_DATE = '2 listopada 2026 r.';
 
 const OWNER = 'RKDP spółka doradztwa podatkowego sp. z o.o. z siedzibą w Ozorzycach (ul. Czereśniowa 28d, 55-010 Ozorzyce), KRS 0000812185, NIP 8992871126, REGON 384812329';
@@ -95,6 +95,9 @@ export const RODO = [
 
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
+  ['2.8', '23 listopada 2026', [
+    'Nowa instrukcja dla klientów „Sprawozdanie finansowe – zatwierdzenie i KRS” (Dokumenty i narzędzia → Instrukcje dla klientów): terminy, podpisanie sprawozdania, zgromadzenie wspólników i złożenie w Repozytorium Dokumentów Finansowych. Klient sam generuje na stronie protokół zwyczajnego zgromadzenia wspólników (uchwały, podział zysku albo pokrycie straty, absolutorium, lista obecności) – do druku, PDF albo Worda.',
+  ]],
   ['2.7', '22 listopada 2026', [
     'Zespół i ustawienia: przy osobie z M2 TAX wybór „Sprawy M2 TAX – wszystkie / tylko przypisane”. Przy „tylko przypisane” osoba widzi tylko sprawy, do których jest dopisana (prowadzący, drugi doradca, asystent), ich klientów i zlecenia.',
     'UPL-1, ZUS PEL, ZAW-FA i wniosek UKO nie idą już jako załącznik: klient dostaje w e-mailu przycisk „Pobierz PDF”, link działa 30 dni (mniej danych w skrzynkach, RODO).',

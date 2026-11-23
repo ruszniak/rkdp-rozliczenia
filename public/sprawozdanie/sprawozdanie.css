@@ -1,0 +1,41 @@
+/* Sprawozdanie finansowe – generator protokołu (styl stron dla klientów: /umow/doc.css) */
+.gen{margin:18px 0 10px}
+.gen fieldset{border:1px solid var(--line);padding:14px 18px 16px;margin:0 0 14px}
+.gen legend{font-family:var(--serif);font-weight:600;font-size:18px;color:var(--ink);padding:0 6px}
+.gen label{display:flex;flex-direction:column;gap:4px;font-size:14.5px;font-weight:600;color:var(--ink);margin:0 0 10px}
+.gen input,.gen select{font:inherit;font-size:16px;font-weight:400;border:1px solid var(--line-2);border-radius:6px;padding:9px 11px;background:#fff;color:var(--ink);width:100%;box-sizing:border-box;min-height:44px}
+.gen input:focus,.gen select:focus{outline:2px solid color-mix(in srgb,var(--accent) 35%,transparent);border-color:var(--accent)}
+.gen .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.gen .g2 .wide{grid-column:1/-1}
+.gen .chk{flex-direction:row;align-items:center;gap:10px;font-weight:400}
+.gen .chk input{width:20px;height:20px;min-height:0;margin:0;flex:none}
+.gen .hint{font-size:14.5px;color:var(--muted);margin:0 0 10px}
+.gen .rows{display:flex;flex-direction:column;gap:8px;margin:0 0 10px}
+.gen .row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:8px;align-items:end}
+.gen .row label{margin:0}
+.gen .row .x{min-height:44px;border:1px solid var(--line-2);background:#fff;border-radius:6px;padding:0 12px;cursor:pointer;font:inherit;color:var(--muted)}
+.gen .row .x:hover{border-color:var(--ink);color:var(--ink)}
+.gen .btn-s.sm{min-height:40px;padding:8px 14px;font-size:15px;margin:0 8px 10px 0}
+.gen .ok{color:#3E6B47}
+.preview{background:var(--paper-2);border:1px solid var(--line);padding:22px;margin:16px 0 10px;overflow-x:auto}
+.protokol{background:#fff;max-width:760px;margin:0 auto;padding:44px 52px;box-shadow:0 1px 3px rgba(0,0,0,.08);font-family:Georgia,"Times New Roman",serif;font-size:15.5px;line-height:1.55;color:#111}
+.protokol h3{text-align:center;font-size:18px;margin:0 0 2px;font-family:inherit}
+.protokol .sub{text-align:center;margin:0 0 22px}
+.protokol h4{font-size:15.5px;margin:22px 0 6px;text-align:center;font-family:inherit}
+.protokol p{margin:0 0 9px;text-align:justify}
+.protokol ol{margin:0 0 10px;padding-left:22px}
+.protokol .vote{font-style:italic}
+.protokol .sig{display:flex;justify-content:space-between;gap:30px;margin-top:46px}
+.protokol .sig div{flex:1;text-align:center;border-top:1px dotted #555;padding-top:4px;font-size:13.5px}
+.protokol table{width:100%;border-collapse:collapse;margin:10px 0}
+.protokol th,.protokol td{border:1px solid #555;padding:7px 9px;font-size:14px;background:none;color:#111}
+.protokol .brk{page-break-before:always;break-before:page;margin-top:36px}
+.protokol .empty{color:#9a9a9a}
+@media (max-width:640px){.gen .g2{grid-template-columns:1fr}.gen .row{grid-template-columns:1fr 1fr}.gen .row label:first-child{grid-column:1/-1}.protokol{padding:26px 20px}.preview{padding:10px}}
+@media print{
+  body>header,body>footer,main>*:not(.preview){display:none!important}
+  main{max-width:none;padding:0}
+  .preview{border:0;background:none;padding:0;margin:0}
+  .protokol{box-shadow:none;padding:0;max-width:none}
+  .protokol .empty{color:#111}
+}
