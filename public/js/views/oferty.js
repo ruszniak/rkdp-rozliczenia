@@ -1,6 +1,6 @@
 // Oferty na usługi – lista i edytor (RKDP: zakładka Klienci → Oferty, M2 TAX: Zlecenia → Oferty).
 import { h, toast, fail, icon, infoTip, printHtml, modal } from '../ui.js';
-import { sb, state, isAdmin } from '../store.js';
+import { sb, state, isAdmin, hasModule } from '../store.js';
 import { fetchAll } from './rozliczenia.js';
 import { lookupNip, validNip } from '../nip.js';
 import { OFFER_BRANDS, PEOPLE, BOOK_FORMS, PARTNER_FEATURES, offerDefaults, serviceDefaults, offerHtml, autoTitle, autoIntro, monthlyEstimate, money, activeServices } from '../offers/offer.js';
@@ -22,6 +22,17 @@ const HELP = `Oferta na usługi w PDF – z okładką, zakresem usług, cennikie
 • „Wyślij e-mailem” – klient dostaje e-mail z Twoją stopką i linkiem do oferty (bez logowania, z pobraniem PDF); status zmienia się na „wysłana”, widać, czy klient ją otworzył.
 • Oferty zapisują się z numerem OF/rok/numer; status (wysłana, zaakceptowana…) pomaga śledzić, co się dzieje z ofertą.`;
 
+const bothFirms = () => isAdmin() || (hasModule('rozliczenia') && hasModule('doradztwo'));
+// „Nowa oferta” – najpierw wybór firmy (papier, dane i cennik RKDP albo M2 TAX)
+function pickFirm(cur) {
+  let close = () => {};
+  modal('Nowa oferta – która firma?', h('div', { style: { display: 'grid', gap: '10px' } },
+    ...[['rkdp', 'RKDP', 'RKDP spółka doradztwa podatkowego – księgowość, kadry i doradztwo'], ['m2', 'M2 TAX', 'M2 TAX Doradcy Podatkowi – doradztwo podatkowe']].map(([k, t, d]) =>
+      h('button', { type: 'button', class: 'btn ' + (k === cur ? 'btn-primary' : 'btn-outline'), style: { justifyContent: 'flex-start', textAlign: 'left', padding: '12px 14px', height: 'auto' },
+        onclick: () => { close(); location.hash = `${CFG[k].base}/nowa`; } }, h('span', {}, h('b', {}, t), h('br'), h('span', { class: 'small', style: { opacity: .85 } }, d))))),
+    c => { close = c; return [h('button', { class: 'btn btn-outline', onclick: c }, 'Anuluj')]; });
+}
+
 export async function renderOferty(main, id, brand = 'rkdp') {
   const C = CFG[brand];
   if (id) return renderEditor(main, id === 'nowa' ? null : id, brand);
@@ -32,10 +43,14 @@ export async function renderOferty(main, id, brand = 'rkdp') {
     h('div', { class: 'page-head', style: { marginTop: '10px' } },
       h('div', {}, C.eyebrow ? h('p', { class: 'eyebrow' }, C.eyebrow) : null,
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Oferty', infoTip(HELP, 'Oferty – instrukcja')),
-        h('p', { class: 'sub' }, 'Profesjonalne oferty na doradztwo podatkowe, księgowość i kadry – w PDF, z cennikiem z naszych umów.')),
+        h('p', { class: 'sub' }, 'Profesjonalne oferty na doradztwo podatkowe, księgowość i kadry – w PDF, z cennikiem z naszych umów.'),
+        // wybór firmy: oferty RKDP i M2 TAX (osoby z dostępem do obu modułów)
+        bothFirms() ? h('div', { class: 'seg', style: { display: 'flex', gap: '6px', marginTop: '12px', flexWrap: 'wrap', alignItems: 'center' } },
+          h('span', { class: 'small muted', style: { marginRight: '4px' } }, 'Firma:'),
+          ...[['rkdp', 'RKDP'], ['m2', 'M2 TAX']].map(([k, t]) => h('a', { class: 'btn btn-sm ' + (k === brand ? 'btn-primary' : 'btn-outline'), href: CFG[k].base, 'aria-current': k === brand ? 'page' : null }, t))) : null),
       h('div', { class: 'row-btns' },
         brand === 'm2' ? h('a', { class: 'btn btn-outline', href: `${C.base}/nowa?typ=partner` }, icon('plus'), 'Oferta dla biura rachunkowego') : null,
-        h('a', { class: 'btn btn-primary', href: `${C.base}/nowa` }, icon('plus'), 'Nowa oferta'))),
+        h('a', { class: 'btn btn-primary', href: `${C.base}/nowa`, onclick: e => { if (!bothFirms()) return; e.preventDefault(); pickFirm(brand); } }, icon('plus'), 'Nowa oferta'))),
     h('div', { class: 'list-wrap' }, h('table', { class: 'list' },
       h('thead', {}, h('tr', {}, ...['Numer', 'Klient', 'Usługi', 'Data', 'Koszt mies.', 'Status'].map(x => h('th', {}, x)))),
       h('tbody', {}, ...((rows || []).length ? rows.map(r => {
