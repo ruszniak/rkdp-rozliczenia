@@ -303,3 +303,69 @@ export function signPanel(filter, { title = 'Do podpisu', emptyHidden = true } =
   return box;
 }
 export { esc as escHtml };
+
+// ---------- wzór (projekt) umowy e-mailem – do zapoznania się, bez podpisu ----------
+// PDF trafia do archiwum wysyłek; klient dostaje e-mail z przyciskiem „Pobierz PDF” (link ważny 30 dni, bez załącznika).
+// opts: { client, target: { client_id } | { m2_client_id }, firm: 'rkdp'|'m2', title, buildPdf, word?: 'umowę'|'zlecenie' }
+export function mailDraft(opts) {
+  const { client, target, firm = 'rkdp', title } = opts;
+  const word = opts.word || 'umowę';
+  const s = { to: firstEmail(opts.email || client.email), subject: `Projekt: ${title}` };
+  s.body = `Dzień dobry,\n\nprzesyłamy projekt ${word === 'zlecenie' ? 'zlecenia' : 'umowy'} „${title}” do zapoznania się. Plik PDF pobiorą Państwo przyciskiem „Pobierz PDF” poniżej.\n\nJeśli mają Państwo uwagi albo pytania, prosimy o odpowiedź na tę wiadomość. Gdy treść będzie uzgodniona, prześlemy ${word === 'zlecenie' ? 'zlecenie' : 'umowę'} do podpisu.`;
+  const grid = h('div', { class: 'form-grid' }, ...[['to', 'Do (e-mail klienta)', 'email'], ['subject', 'Temat', 'text'],
+    ['body', `Treść – e-mail wyjdzie z rdp.app z logo ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}, odpowiedź klienta wróci do Ciebie`, 'textarea']].map(([k, label, type]) => {
+    const el = type === 'textarea' ? h('textarea', { class: 'input', rows: 11 }, s[k]) : h('input', { class: 'input', type, value: s[k] });
+    el.addEventListener('input', () => { s[k] = el.value; });
+    return h('label', { class: 'field wide' }, h('span', {}, label), el);
+  }));
+  let pdfP = null;
+  const pdf = () => pdfP ||= opts.buildPdf().catch(e => { pdfP = null; throw e; });
+  const fname = `Projekt – ${title}`.replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 110) + '.pdf';
+  const body = h('div', {},
+    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, client.name || '—'),
+      ' · wzór do zapoznania się (bez podpisu). PDF do pobrania linkiem ważnym 30 dni – bez załącznika w e-mailu.'),
+    grid,
+    h('div', { class: 'row-btns', style: { marginTop: '8px' } },
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async e => {
+        const b = e.currentTarget; b.disabled = true;
+        try {
+          const url = URL.createObjectURL(new Blob([await pdf()], { type: 'application/pdf' }));
+          const a = h('a', { href: url, download: fname }); document.body.append(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (err) { fail(err, 'Nie udało się przygotować PDF'); } finally { b.disabled = false; }
+      } }, icon('download'), 'Podgląd PDF')),
+    h('p', { class: 'hint', style: { marginTop: '8px' } }, 'Gdy klient zaakceptuje treść, użyj „Wyślij do podpisu”.'));
+  modal('Wyślij wzór umowy', body, close => [
+    h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Anuluj'),
+    // sam link do pobrania PDF (30 dni) – do wysłania klientowi samodzielnie (SMS, WhatsApp, własny e-mail)
+    h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Utwórz link do pobrania PDF (ważny 30 dni) i skopiuj go – bez wysyłania e-maila z aplikacji', onclick: async e => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję…';
+      try {
+        const bytes = await pdf();
+        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'doc_mail', ...target, firm, no_email: true,
+          attachment: { name: fname, base64: b64(bytes) }, doc: { title } } });
+        if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
+        let copied = false; try { await navigator.clipboard.writeText(r.link); copied = true; } catch { /* */ }
+        close();
+        modal('Link do wzoru umowy', h('div', {},
+          h('p', { class: 'small', style: { margin: '0 0 10px' } }, copied ? 'Link skopiowany – wklej go klientowi. ' : 'Skopiuj link i wyślij go klientowi. ', `Klient pobierze PDF bez logowania; link działa do ${r.until}.`),
+          h('input', { class: 'input', readonly: true, value: r.link, onfocus: ev => ev.target.select() })),
+          c => [h('button', { class: 'btn btn-primary btn-sm', onclick: async () => { try { await navigator.clipboard.writeText(r.link); toast('Skopiowano link'); } catch { toast('Zaznacz i skopiuj link ręcznie', true); } } }, 'Kopiuj link'),
+            h('button', { class: 'btn btn-ghost btn-sm', onclick: c }, 'Zamknij')]);
+      } catch (err) { fail(err, 'Nie udało się utworzyć linku'); b.disabled = false; b.textContent = 'Tylko link'; }
+    } }, icon('paperclip'), 'Tylko link'),
+    h('button', { class: 'btn btn-primary btn-sm', onclick: async e => {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s.to).trim())) return toast('Wpisz poprawny e-mail klienta', true);
+      if (!s.subject.trim() || !s.body.trim()) return toast('Uzupełnij temat i treść', true);
+      const b = e.currentTarget; b.disabled = true; b.textContent = 'Przygotowuję PDF…';
+      try {
+        const bytes = await pdf();
+        b.textContent = 'Wysyłam…';
+        const { data: r, error } = await sb.functions.invoke('podpis', { body: { action: 'doc_mail', ...target, firm, to: s.to.trim(), subject: s.subject.trim(), body: s.body,
+          attachment: { name: fname, base64: b64(bytes) }, doc: { kicker: 'Projekt do zapoznania się', title } } });
+        if (error || r?.error) throw new Error(r?.detail || r?.error || error.message);
+        toast(`Wysłano wzór do ${s.to.trim()}`); close(); opts.onSent?.();
+      } catch (err) { fail(err, 'Nie udało się wysłać e-maila'); b.disabled = false; b.textContent = 'Wyślij e-mail'; }
+    } }, icon('mail'), 'Wyślij e-mail'),
+  ]);
+}

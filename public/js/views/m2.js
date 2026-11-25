@@ -1315,6 +1315,20 @@ async function viewOrder(main, id, params) {
       editable: { xml, key: `m2:order:${draft.id}`, ids: { m2_client_id: cl.id, order_id: draft.id }, pdf: async x => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(x, brand, title); }, preview: x => xmlPreview(x, brand) },
       onSent: () => { signBox.reload(); draft.status = draft.status === 'projekt' ? 'wyslane' : draft.status; } });
   } }, icon('mail'), 'Wyślij do podpisu');
+  // wzór (projekt) do zapoznania się – e-mail z PDF do pobrania (30 dni), bez podpisu
+  const draftBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wyślij klientowi projekt do zapoznania się (PDF do pobrania) – bez podpisu', onclick: async () => {
+    if (!draft.id) return toast('Najpierw zapisz dokument', true);
+    if (!(await save(true))) return;
+    const cl = client();
+    if (!cl) return toast('Wybierz klienta', true);
+    const { loadEdit } = await import('../docedit.js');
+    const sv = await loadEdit(`m2:order:${draft.id}`).catch(() => null);
+    const xml = sv?.xml || orderDocumentXml(docBlocks(draft, cl, chosenSigners()));
+    const title = `${isUmowa() ? 'Umowa' : 'Zlecenie'} ${draft.number || ''} – ${cl.name}`.replace(/\s+/g, ' ').slice(0, 150);
+    const { mailDraft } = await import('../podpisy.js');
+    mailDraft({ client: cl, email: P.client_email || cl.email, target: { m2_client_id: cl.id }, firm, title, word: isUmowa() ? 'umowę' : 'zlecenie',
+      buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, brand, title); } });
+  } }, icon('mail'), 'Wyślij wzór');
   const signBox = draft.id ? signPanel({ order_id: draft.id }) : null;
   const delBtn = draft.id && isAdmin() ? h('button', { class: 'btn btn-danger btn-sm', onclick: async () => {
     const { data: ms } = await sb.from('m2_matters').select('id').eq('order_id', draft.id);
@@ -1339,7 +1353,7 @@ async function viewOrder(main, id, params) {
   const title = draft.id ? docLabel(draft) : (isUmowa() ? 'Nowa umowa' : 'Nowe zlecenie');
   const subTitle = (bothFirms() ? `${FIRM_LABEL[firm]} · ` : '') + (draft.id ? `Klient: ${client()?.name || '—'}` : 'Wybierz rodzaj dokumentu. Po zapisaniu automatycznie założy się sprawa – możesz ją potem edytować.');
   main.replaceChildren(...header('zlecenia', title, subTitle,
-    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : params.get('sprawa') ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn, signBtn,
+    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : params.get('sprawa') ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn, draftBtn, signBtn,
       h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ firm, client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id, kind: isUmowa() && /procesow|p\.p\.s\.a/i.test(P.poa_type || matterTemplate(P.matter_type).poa) ? 'procesowe' : 'pps1' }) }, 'Pełnomocnictwo'),
       delBtn].filter(Boolean)),
   typeSwitch || '',

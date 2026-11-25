@@ -15,7 +15,8 @@
 //             (wszystkie „ok” = akceptacja stanowiska); punkty uwag zapisane w sign_notes.points
 //  • accept – publiczne { token, author }: klient akceptuje stanowisko kancelarii → e-mail do zespołu (przygotować umowę do podpisu)
 //  • final  – zalogowany: { id, attachment: { base64, name, type } } – egzemplarz podpisany przez obie strony → archiwum + e-mail do klienta z linkiem do pobrania
-//  • doc_mail – zalogowany: { client_id, to, subject, body, attachment?: { name, base64 }, doc?: { kicker, title, button: { url, label } } }
+//  • doc_mail – zalogowany: { client_id | m2_client_id, firm?, to, subject, body, attachment?: { name, base64 }, doc?: { kicker, title, button: { url, label } }, no_email? }
+//             no_email: true – bez e-maila, zwraca sam link do pobrania (do skopiowania)
 //             e-mail z aplikacji (ZAW-FA, UPL-1, PEL, UKO, instrukcje) – szablon rdp.app z logo kancelarii, odpowiedź wraca do osoby wysyłającej
 //             PDF nie jest załącznikiem: zapis w <klient>/wysylka/ + link /pobierz/?t=… ważny 30 dni (tabela doc_links)
 //  • file_link – publiczne { token, count? }: dane pliku i krótki link do pobrania (po 30 dniach – wygasł)
@@ -487,14 +488,22 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'doc_mail') {
+      // no_email: sam link do pobrania PDF (30 dni) – do skopiowania i wysłania klientowi samodzielnie
+      const noMail = body.no_email === true;
       const to = String(body.to || '').trim().toLowerCase();
-      if (!emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail' }, 400);
-      const { data: c } = await sb.from('clients').select('id, name').eq('id', String(body.client_id || '')).maybeSingle();   // RLS
+      if ((!noMail || to) && !emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail' }, 400);
+      // klient RKDP (clients) albo klient modułu doradztwa (m2_clients: M2 TAX i umowy doradcze RKDP) – RLS
+      const isM2 = !!body.m2_client_id && !body.client_id;
+      const { data: c } = isM2 ? await sb.from('m2_clients').select('id, name, rkdp_client_id').eq('id', String(body.m2_client_id)).maybeSingle()
+        : await sb.from('clients').select('id, name').eq('id', String(body.client_id || '')).maybeSingle();
       if (!c) return json({ error: 'Brak dostępu do klienta' }, 403);
+      const firm = body.firm === 'm2' ? 'm2' : 'rkdp';
+      const rkId: string | null = isM2 ? (c as any).rkdp_client_id || null : c.id;   // historia wiadomości – karta klienta RKDP
       const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').replace(/\r/g, '').slice(0, 8000);
-      if (!subject || !text0.trim()) return json({ error: 'Pusty temat lub treść' }, 400);
-      if (!SMTP_USER || !SMTP_PASS) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
+      if (!noMail && (!subject || !text0.trim())) return json({ error: 'Pusty temat lub treść' }, 400);
+      if (!noMail && (!SMTP_USER || !SMTP_PASS)) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
       const att = body.attachment || null;
+      if (noMail && !att) return json({ error: 'Brak pliku' }, 400);
       const b64 = att ? String(att.base64 || '').replace(/\s+/g, '') : '';
       if (att && (!b64 || b64.length > 10_000_000 || !/^[A-Za-z0-9+/=]+$/.test(b64))) return json({ error: 'Brak albo zbyt duży załącznik' }, 400);
       const filename = att ? (String(att.name || 'dokument.pdf').replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim().slice(0, 120) || 'dokument.pdf').replace(/(\.pdf)?$/i, '.pdf') : '';
@@ -506,26 +515,27 @@ Deno.serve(async (req: Request) => {
       let download: { name: string; url: string; until: string } | null = null, linkId: string | null = null;
       if (att) {
         const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
-        const path = `${c.id}/wysylka/${crypto.randomUUID().slice(0, 8)}-${safeName(filename)}`;
+        const path = `${isM2 ? 'm2/' : ''}${c.id}/wysylka/${crypto.randomUUID().slice(0, 8)}-${safeName(filename)}`;
         const { error: eu } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: false });
         if (eu) return json({ error: 'Nie udało się zapisać pliku do wysłania' }, 500);
         const token = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
         const exp = new Date(Date.now() + 30 * 86400000);
-        const { data: dlr, error: ed } = await admin.from('doc_links').insert({ token, client_id: c.id, path, name: filename, title: String(d.title || subject).slice(0, 140), firm: 'rkdp', email: to, created_by: memberId, expires_at: exp.toISOString() }).select('id').single();
+        const { data: dlr, error: ed } = await admin.from('doc_links').insert({ token, client_id: isM2 ? null : c.id, m2_client_id: isM2 ? c.id : null, path, name: filename, title: String(d.title || subject || 'Dokument').slice(0, 140), firm, email: to || null, created_by: memberId, expires_at: exp.toISOString() }).select('id').single();
         if (ed) { console.error(ed); await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się przygotować linku do pobrania' }, 500); }
         linkId = dlr.id;
         download = { name: filename, url: `${S.app}/pobierz/?t=${token}`, until: exp.toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' }) };
       }
+      if (noMail) return json({ ok: true, link: download!.url, until: download!.until });
       let textBody = text0;
       try {
-        textBody = await sendApp(S, me, to, subject, { firm: 'rkdp', kicker: String(d.kicker || '').slice(0, 60) || undefined, title: String(d.title || subject).slice(0, 140), text: text0, button: bu, download });
+        textBody = await sendApp(S, me, to, subject, { firm, kicker: String(d.kicker || '').slice(0, 60) || undefined, title: String(d.title || subject).slice(0, 140), text: text0, button: bu, download });
       } catch (e) {
         if (linkId) await admin.from('doc_links').update({ expires_at: new Date().toISOString() }).eq('id', linkId);
         const m = String((e as Error).message || e);
-        await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, status: 'blad', error: m.slice(0, 300), sent_by: memberId });
+        if (rkId) await admin.from('client_messages').insert({ client_id: rkId, kind: 'informacja', period: null, email: to, subject, status: 'blad', error: m.slice(0, 300), sent_by: memberId });
         return json({ error: 'send_failed', detail: m.slice(0, 300) }, 200);
       }
-      await admin.from('client_messages').insert({ client_id: c.id, kind: 'informacja', period: null, email: to, subject, body: textBody + (filename ? `\n\n[plik do pobrania przez 30 dni: ${filename}]` : ''), sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
+      if (rkId) await admin.from('client_messages').insert({ client_id: rkId, kind: 'informacja', period: null, email: to, subject, body: textBody + (filename ? `\n\n[plik do pobrania przez 30 dni: ${filename}]` : ''), sender_name: me?.full_name || null, status: 'wyslano', sent_by: memberId });
       return json({ ok: true, sent: 1 });
     }
 

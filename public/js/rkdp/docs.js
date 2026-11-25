@@ -377,11 +377,25 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
         editable: { xml: documentXml, key: `rkdp:umowa:${cl.id}:${c.tpl}`, ids: { client_id: cl.id }, pdf: x => contractPdf(x, title), preview: x => rkdpContractPreview(docxToHtml(x)) } });
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
-  const syncSend = () => { sendBtn.hidden = !['upl1', 'pel', 'zawfa', 'uko'].includes(d.type); signBtn.hidden = d.type !== 'umowa'; };
+  // umowa księgowa: wzór do zapoznania się – e-mail z PDF do pobrania (30 dni), bez podpisu
+  const draftBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wyślij klientowi projekt umowy do zapoznania się (PDF do pobrania) – bez podpisu', onclick: async () => {
+    if (!cl) return toast('Wybierz klienta', true);
+    const c = v.contract, T = TEMPLATES[c.tpl];
+    try {
+      const { documentXml } = await fillDocx(T.url, contractReplacements(c));
+      const { loadEdit } = await import('../docedit.js');
+      const sv = await loadEdit(`rkdp:umowa:${cl.id}:${c.tpl}`).catch(() => null);
+      const { contractPdf } = await import('../umowapdf.js');
+      const { mailDraft } = await import('../podpisy.js');
+      const title = `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150);
+      mailDraft({ client: cl, target: { client_id: cl.id }, firm: 'rkdp', title, buildPdf: () => contractPdf(sv?.xml || documentXml, title) });
+    } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
+  } }, icon('mail'), 'Wyślij wzór');
+  const syncSend = () => { sendBtn.hidden = !['upl1', 'pel', 'zawfa', 'uko'].includes(d.type); signBtn.hidden = d.type !== 'umowa'; draftBtn.hidden = d.type !== 'umowa'; };
   const build0 = build; build = () => { build0(); syncSend(); }; syncSend();
   modal('Dokumenty klienta', box, (close) => [
     h('button', { class: 'btn btn-ghost btn-sm', onclick: close }, 'Zamknij'),
-    sendBtn, signBtn,
+    sendBtn, draftBtn, signBtn,
     h('button', { class: 'btn btn-outline btn-sm', onclick: () => generate('docx') }, icon('download'), 'Word'),
     h('button', { class: 'btn btn-primary btn-sm', onclick: () => generate('pdf') }, icon('download'), 'PDF'),
   ]);
