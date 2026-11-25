@@ -17,6 +17,7 @@
 //  • final  – zalogowany: { id, attachment: { base64, name, type } } – egzemplarz podpisany przez obie strony → archiwum + e-mail do klienta z linkiem do pobrania
 //  • doc_mail – zalogowany: { client_id | m2_client_id, firm?, to, subject, body, attachment?: { name, base64 }, doc?: { kicker, title, button: { url, label } }, no_email? }
 //             no_email: true – bez e-maila, zwraca sam link do pobrania (do skopiowania)
+//             bez client_id / m2_client_id – wzór umowy dla przyszłego klienta (tylko z plikiem; zapis w wzory/<osoba>/)
 //             e-mail z aplikacji (ZAW-FA, UPL-1, PEL, UKO, instrukcje) – szablon rdp.app z logo kancelarii, odpowiedź wraca do osoby wysyłającej
 //             PDF nie jest załącznikiem: zapis w <klient>/wysylka/ + link /pobierz/?t=… ważny 30 dni (tabela doc_links)
 //  • file_link – publiczne { token, count? }: dane pliku i krótki link do pobrania (po 30 dniach – wygasł)
@@ -493,12 +494,15 @@ Deno.serve(async (req: Request) => {
       const to = String(body.to || '').trim().toLowerCase();
       if ((!noMail || to) && !emailOk(to)) return json({ error: 'Nieprawidłowy adres e-mail' }, 400);
       // klient RKDP (clients) albo klient modułu doradztwa (m2_clients: M2 TAX i umowy doradcze RKDP) – RLS
+      // bez klienta (wzór umowy dla przyszłego klienta): tylko z plikiem, zapis w wzory/<osoba>/
+      const noClient = !body.client_id && !body.m2_client_id;
       const isM2 = !!body.m2_client_id && !body.client_id;
-      const { data: c } = isM2 ? await sb.from('m2_clients').select('id, name, rkdp_client_id').eq('id', String(body.m2_client_id)).maybeSingle()
+      const { data: c } = noClient ? { data: null } : isM2 ? await sb.from('m2_clients').select('id, name, rkdp_client_id').eq('id', String(body.m2_client_id)).maybeSingle()
         : await sb.from('clients').select('id, name').eq('id', String(body.client_id || '')).maybeSingle();
-      if (!c) return json({ error: 'Brak dostępu do klienta' }, 403);
+      if (!noClient && !c) return json({ error: 'Brak dostępu do klienta' }, 403);
+      if (noClient && !body.attachment) return json({ error: 'Brak pliku' }, 400);
       const firm = body.firm === 'm2' ? 'm2' : 'rkdp';
-      const rkId: string | null = isM2 ? (c as any).rkdp_client_id || null : c.id;   // historia wiadomości – karta klienta RKDP
+      const rkId: string | null = noClient ? null : isM2 ? (c as any).rkdp_client_id || null : c.id;   // historia wiadomości – karta klienta RKDP
       const subject = String(body.subject || '').trim().slice(0, 200), text0 = String(body.body || '').replace(/\r/g, '').slice(0, 8000);
       if (!noMail && (!subject || !text0.trim())) return json({ error: 'Pusty temat lub treść' }, 400);
       if (!noMail && (!SMTP_USER || !SMTP_PASS)) return json({ error: 'not_configured', detail: 'Brak konfiguracji wysyłki e-mail (SMTP).' }, 200);
@@ -515,12 +519,12 @@ Deno.serve(async (req: Request) => {
       let download: { name: string; url: string; until: string } | null = null, linkId: string | null = null;
       if (att) {
         const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
-        const path = `${isM2 ? 'm2/' : ''}${c.id}/wysylka/${crypto.randomUUID().slice(0, 8)}-${safeName(filename)}`;
+        const path = noClient ? `wzory/${memberId}/${crypto.randomUUID().slice(0, 8)}-${safeName(filename)}` : `${isM2 ? 'm2/' : ''}${c.id}/wysylka/${crypto.randomUUID().slice(0, 8)}-${safeName(filename)}`;
         const { error: eu } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: 'application/pdf', upsert: false });
         if (eu) return json({ error: 'Nie udało się zapisać pliku do wysłania' }, 500);
         const token = [...crypto.getRandomValues(new Uint8Array(24))].map(b => b.toString(16).padStart(2, '0')).join('');
         const exp = new Date(Date.now() + 30 * 86400000);
-        const { data: dlr, error: ed } = await admin.from('doc_links').insert({ token, client_id: isM2 ? null : c.id, m2_client_id: isM2 ? c.id : null, path, name: filename, title: String(d.title || subject || 'Dokument').slice(0, 140), firm, email: to || null, created_by: memberId, expires_at: exp.toISOString() }).select('id').single();
+        const { data: dlr, error: ed } = await admin.from('doc_links').insert({ token, client_id: noClient || isM2 ? null : c.id, m2_client_id: !noClient && isM2 ? c.id : null, path, name: filename, title: String(d.title || subject || 'Dokument').slice(0, 140), firm, email: to || null, created_by: memberId, expires_at: exp.toISOString() }).select('id').single();
         if (ed) { console.error(ed); await admin.storage.from(BUCKET).remove([path]); return json({ error: 'Nie udało się przygotować linku do pobrania' }, 500); }
         linkId = dlr.id;
         download = { name: filename, url: `${S.app}/pobierz/?t=${token}`, until: exp.toLocaleDateString('pl-PL', { timeZone: 'Europe/Warsaw' }) };

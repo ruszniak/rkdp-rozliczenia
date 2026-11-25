@@ -1316,17 +1316,16 @@ async function viewOrder(main, id, params) {
       onSent: () => { signBox.reload(); draft.status = draft.status === 'projekt' ? 'wyslane' : draft.status; } });
   } }, icon('mail'), 'Wyślij do podpisu');
   // wzór (projekt) do zapoznania się – e-mail z PDF do pobrania (30 dni), bez podpisu
-  const draftBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wyślij klientowi projekt do zapoznania się (PDF do pobrania) – bez podpisu', onclick: async () => {
-    if (!draft.id) return toast('Najpierw zapisz dokument', true);
-    if (!(await save(true))) return;
+  const draftBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wyślij projekt do zapoznania się (PDF do pobrania) – bez podpisu; działa też bez klienta w bazie', onclick: async () => {
+    // bez klienta w bazie (przyszły klient) – wzór z pustymi danymi klienta, bez zapisywania; e-mail wpisujesz ręcznie
     const cl = client();
-    if (!cl) return toast('Wybierz klienta', true);
+    if (cl && draft.id && !(await save(true))) return;
     const { loadEdit } = await import('../docedit.js');
-    const sv = await loadEdit(`m2:order:${draft.id}`).catch(() => null);
+    const sv = cl && draft.id ? await loadEdit(`m2:order:${draft.id}`).catch(() => null) : null;
     const xml = sv?.xml || orderDocumentXml(docBlocks(draft, cl, chosenSigners()));
-    const title = `${isUmowa() ? 'Umowa' : 'Zlecenie'} ${draft.number || ''} – ${cl.name}`.replace(/\s+/g, ' ').slice(0, 150);
+    const title = (cl ? `${isUmowa() ? 'Umowa' : 'Zlecenie'} ${draft.number || ''} – ${cl.name}` : `${isUmowa() ? 'Umowa o świadczenie usług doradztwa podatkowego' : 'Zlecenie'} – ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}`).replace(/\s+/g, ' ').slice(0, 150);
     const { mailDraft } = await import('../podpisy.js');
-    mailDraft({ client: cl, email: P.client_email || cl.email, target: { m2_client_id: cl.id }, firm, title, word: isUmowa() ? 'umowę' : 'zlecenie',
+    mailDraft({ client: cl, email: P.client_email || cl?.email, target: cl ? { m2_client_id: cl.id } : {}, firm, title, word: isUmowa() ? 'umowę' : 'zlecenie',
       buildPdf: async () => { const { orderPdf } = await import('../umowapdf.js'); return orderPdf(xml, brand, title); } });
   } }, icon('mail'), 'Wyślij wzór');
   const signBox = draft.id ? signPanel({ order_id: draft.id }) : null;

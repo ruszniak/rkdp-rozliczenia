@@ -378,17 +378,17 @@ export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij do podpisu');
   // umowa księgowa: wzór do zapoznania się – e-mail z PDF do pobrania (30 dni), bez podpisu
-  const draftBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wyślij klientowi projekt umowy do zapoznania się (PDF do pobrania) – bez podpisu', onclick: async () => {
-    if (!cl) return toast('Wybierz klienta', true);
+  // bez wybranego klienta (np. przyszły klient) – wzór z pustymi polami albo z tym, co wpisano w formularzu; e-mail wpisujesz ręcznie
+  const draftBtn = h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Wyślij projekt umowy do zapoznania się (PDF do pobrania) – bez podpisu; działa też bez klienta w bazie', onclick: async () => {
     const c = v.contract, T = TEMPLATES[c.tpl];
     try {
       const { documentXml } = await fillDocx(T.url, contractReplacements(c));
       const { loadEdit } = await import('../docedit.js');
-      const sv = await loadEdit(`rkdp:umowa:${cl.id}:${c.tpl}`).catch(() => null);
+      const sv = cl ? await loadEdit(`rkdp:umowa:${cl.id}:${c.tpl}`).catch(() => null) : null;
       const { contractPdf } = await import('../umowapdf.js');
       const { mailDraft } = await import('../podpisy.js');
-      const title = `Umowa o usługi księgowe – ${cl.name}`.slice(0, 150);
-      mailDraft({ client: cl, target: { client_id: cl.id }, firm: 'rkdp', title, buildPdf: () => contractPdf(sv?.xml || documentXml, title) });
+      const title = (cl ? `Umowa o usługi księgowe – ${cl.name}` : 'Umowa o usługi księgowe – wzór').slice(0, 150);
+      mailDraft({ client: cl, email: c.email || cl?.email, target: cl ? { client_id: cl.id } : {}, firm: 'rkdp', title, buildPdf: () => contractPdf(sv?.xml || documentXml, title) });
     } catch (e) { fail(e, 'Nie udało się przygotować umowy'); }
   } }, icon('mail'), 'Wyślij wzór');
   const syncSend = () => { sendBtn.hidden = !['upl1', 'pel', 'zawfa', 'uko'].includes(d.type); signBtn.hidden = d.type !== 'umowa'; draftBtn.hidden = d.type !== 'umowa'; };

@@ -310,7 +310,7 @@ export { esc as escHtml };
 export function mailDraft(opts) {
   const { client, target, firm = 'rkdp', title } = opts;
   const word = opts.word || 'umowę';
-  const s = { to: firstEmail(opts.email || client.email), subject: `Projekt: ${title}` };
+  const s = { to: firstEmail(opts.email || client?.email), subject: `Projekt: ${title}` };
   s.body = `Dzień dobry,\n\nprzesyłamy projekt ${word === 'zlecenie' ? 'zlecenia' : 'umowy'} „${title}” do zapoznania się. Plik PDF pobiorą Państwo przyciskiem „Pobierz PDF” poniżej.\n\nJeśli mają Państwo uwagi albo pytania, prosimy o odpowiedź na tę wiadomość. Gdy treść będzie uzgodniona, prześlemy ${word === 'zlecenie' ? 'zlecenie' : 'umowę'} do podpisu.`;
   const grid = h('div', { class: 'form-grid' }, ...[['to', 'Do (e-mail klienta)', 'email'], ['subject', 'Temat', 'text'],
     ['body', `Treść – e-mail wyjdzie z rdp.app z logo ${firm === 'm2' ? 'M2 TAX' : 'RKDP'}, odpowiedź klienta wróci do Ciebie`, 'textarea']].map(([k, label, type]) => {
@@ -322,7 +322,7 @@ export function mailDraft(opts) {
   const pdf = () => pdfP ||= opts.buildPdf().catch(e => { pdfP = null; throw e; });
   const fname = `Projekt – ${title}`.replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 110) + '.pdf';
   const body = h('div', {},
-    h('p', { class: 'small', style: { margin: '0 0 12px' } }, 'Klient: ', h('b', {}, client.name || '—'),
+    h('p', { class: 'small', style: { margin: '0 0 12px' } }, ...(client ? ['Klient: ', h('b', {}, client.name || '—')] : [h('b', {}, 'Bez klienta w bazie'), ' – wpisz e-mail odbiorcy']),
       ' · wzór do zapoznania się (bez podpisu). PDF do pobrania linkiem ważnym 30 dni – bez załącznika w e-mailu.'),
     grid,
     h('div', { class: 'row-btns', style: { marginTop: '8px' } },
