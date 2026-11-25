@@ -1,5 +1,5 @@
 // Generowanie dokumentów – jedno miejsce na wszystkie pliki, które aplikacja tworzy (umowy, pełnomocnictwa, protokoły, oferty, raporty).
-import { h, fail, infoTip, modal } from '../ui.js';
+import { h, fail, infoTip } from '../ui.js';
 import { sb, hasModule } from '../store.js';
 import { dokumentyDialog } from '../rkdp/docs.js';
 import { WZORY } from '../tools/wzory.js';
@@ -21,20 +21,6 @@ export async function renderDokumenty(main) {
     tags.length ? h('span', { class: 'dk-tags' }, ...tags.map(t => h('span', { class: 'badge' }, t))) : null);
   const group = (title, ...tiles) => h('section', { class: 'dk-group' }, h('h2', {}, title), h('div', { class: 'dk-grid' }, ...tiles.filter(Boolean)));
 
-  // wzór umowy do wysłania (też bez klienta w bazie): wybór rodzaju umowy, potem „Wyślij wzór” w otwartym oknie
-  const draftPick = () => {
-    let close = () => {};
-    const go = fn => () => { close(); fn(); };
-    const opt = (t, d, fn) => h('button', { type: 'button', class: 'btn btn-outline', style: { justifyContent: 'flex-start', textAlign: 'left', padding: '12px 14px', height: 'auto' }, onclick: go(fn) },
-      h('span', {}, h('b', {}, t), h('br'), h('span', { class: 'small', style: { opacity: .85 } }, d)));
-    modal('Wzór umowy dla klienta', h('div', { style: { display: 'grid', gap: '10px' } },
-      h('p', { class: 'small', style: { margin: '0 0 4px' } }, 'Wybierz umowę. Klienta możesz nie wybierać – wpisz tylko e-mail odbiorcy, a potem kliknij „Wyślij wzór”.'),
-      opt('Umowa o usługi księgowe – RKDP', 'ryczałt, KPiR albo księgi rachunkowe', () => dokumentyDialog({ type: 'umowa' }).catch(e => fail(e))),
-      opt('Umowa o doradztwo podatkowe – RKDP', 'na papierze RKDP', () => { location.hash = '#/doradztwo/zlecenie/nowe?typ=umowa&firma=rkdp'; }),
-      hasModule('doradztwo') ? opt('Umowa o doradztwo podatkowe – M2 TAX', 'na papierze M2 TAX', () => { location.hash = '#/doradztwo/zlecenie/nowe?typ=umowa&firma=m2'; }) : null),
-      c => { close = c; return [h('button', { class: 'btn btn-ghost btn-sm', onclick: c }, 'Anuluj')]; });
-  };
-
   const recent = h('div', {}, h('p', { class: 'hint' }, 'Wczytywanie…'));
   sb.from('rkdp_protocols').select('id, client_id, period_to, meeting_date, params, updated_at, clients(name)').order('updated_at', { ascending: false }).limit(5)
     .then(({ data, error }) => {
@@ -50,13 +36,13 @@ export async function renderDokumenty(main) {
       h('div', {},
         h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Generowanie dokumentów', infoTip(HELP, 'Generowanie dokumentów – instrukcja')),
         h('p', { class: 'sub' }, 'Umowy, pełnomocnictwa, protokoły, oferty i raporty – wszystko w jednym miejscu.'))),
-    group('Instrukcje dla klientów',
-      ...INSTRUKCJE.map(it => tile(it.title, it.desc, () => instrukcjaDialog(it), ['Link']))),
     group('Umowy i oferty',
-      tile('Wzór umowy dla klienta', 'Projekt umowy do zapoznania się – e-mailem (PDF do pobrania, 30 dni) albo sam link. Także dla osoby, której nie ma jeszcze w bazie klientów.', draftPick, ['E-mail', 'Link']),
+      tile('Generator wzorów umów', 'Wybierz wzór umowy (księgowa RKDP, doradztwo RKDP albo M2 TAX) i wyślij go klientowi – e-mailem albo linkiem. Klient nie musi być w bazie.', () => import('../tools/wzoryumow.js').then(m => m.wzorUmowyDialog()).catch(e => fail(e)), ['E-mail', 'Link']),
       tile('Umowa o usługi księgowe', 'Wzór RKDP – ryczałt, KPiR albo księgi rachunkowe. Dane klienta i wynagrodzenie wypełniają się same.', doc('umowa'), ['PDF', 'Word']),
       tile('Oferta na usługi', 'Profesjonalna oferta RKDP: księgowość, kadry, doradztwo podatkowe – z wyceną z umów.', '#/oferty/nowa', ['PDF']),
       tile('Zapisane oferty', 'Lista ofert RKDP ze statusem: projekt, wysłana, zaakceptowana.', '#/oferty')),
+    group('Instrukcje dla klientów',
+      ...INSTRUKCJE.map(it => tile(it.title, it.desc, () => instrukcjaDialog(it), ['Link']))),
     group('Pełnomocnictwa',
       tile('UPL-1', 'Pełnomocnictwo do podpisywania deklaracji składanych elektronicznie (urząd skarbowy).', doc('upl1'), ['PDF']),
       tile('PEL', 'Pełnomocnictwo do ZUS (PUE ZUS / e-ZUS).', doc('pel'), ['PDF']),

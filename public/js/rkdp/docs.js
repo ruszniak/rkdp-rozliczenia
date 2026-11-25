@@ -94,6 +94,12 @@ function contractReplacements(v) {
     ['[NAZWA FIRMY]', v.firm || '[NAZWA FIRMY]'], ['[ADRES: ULICA, NR, KOD POCZTOWY, MIEJSCOWOŚĆ]', v.address || '[ADRES]'], ['[NIP]', v.nip || '[NIP]'],
     ['zwanym/ą', f ? 'zwaną' : 'zwanym'], ...common];
 }
+// ---------- generator wzorów: umowa księgowa bez danych klienta (pola [DO UZUPEŁNIENIA]) ----------
+export const ACCOUNTING_TEMPLATES = Object.fromEntries(Object.entries(TEMPLATES).map(([k, t]) => [k, t.label]));
+export async function blankAccountingXml(tpl) {
+  const { documentXml } = await fillDocx(TEMPLATES[tpl].url, contractReplacements({ tpl }));
+  return documentXml;
+}
 // ---------- okno dokumentów ----------
 export async function dokumentyDialog({ client = null, type = 'umowa' } = {}) {
   const [advisor, clients] = await Promise.all([
