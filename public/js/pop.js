@@ -20,3 +20,13 @@ export function openPop(anchor, content) {
   (pop.querySelector('textarea, input, .opt.cur, .opt') || pop).focus?.();
   return pop;
 }
+// przycisk z rozwijanym menu (np. „Wyślij ▾”): items – [etykieta, opis | null, akcja] albo null (pominięty)
+export function menuButton(label, iconEl, items, cls = 'btn btn-outline btn-sm') {
+  const list = items.filter(Boolean);
+  const btn = h('button', { type: 'button', class: cls, 'aria-haspopup': 'menu', onclick: e => {
+    const a = e.currentTarget;
+    openPop(a, list.map(([t, d, fn]) => h('button', { type: 'button', class: 'opt', style: { flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }, onclick: () => { closePop(); fn(); } },
+      h('b', { style: { fontSize: '13.5px' } }, t), d ? h('span', { class: 'small muted' }, d) : null)));
+  } }, iconEl || null, label, h('span', { 'aria-hidden': 'true', style: { marginLeft: '2px', opacity: .7 } }, '▾'));
+  return btn;
+}

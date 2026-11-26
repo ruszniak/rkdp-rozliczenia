@@ -22,6 +22,7 @@ import { renderM2Dokumenty } from './m2pisma.js';
 import { OFFICE_NAMES } from '../urzedy.js';
 import { amlCard, renderAml, amlDashCard } from '../aml/aml.js';
 import { modal as uiModal } from '../ui.js';
+import { menuButton } from '../pop.js';
 import { renderOferty } from './oferty.js';
 import { clientMeetingsCard, openMeetingDialog } from '../spotkania.js';
 import { gcalAgendaCard } from '../gcal.js';
@@ -1352,8 +1353,14 @@ async function viewOrder(main, id, params) {
   const title = draft.id ? docLabel(draft) : (isUmowa() ? 'Nowa umowa' : 'Nowe zlecenie');
   const subTitle = (bothFirms() ? `${FIRM_LABEL[firm]} · ` : '') + (draft.id ? `Klient: ${client()?.name || '—'}` : 'Wybierz rodzaj dokumentu. Po zapisaniu automatycznie założy się sprawa – możesz ją potem edytować.');
   main.replaceChildren(...header('zlecenia', title, subTitle,
-    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : params.get('sprawa') ? 'Zapisz' : 'Zapisz i załóż sprawę'), pdfBtn, docxBtn, draftBtn, signBtn,
-      h('button', { class: 'btn btn-outline btn-sm', onclick: () => pelnomocnictwoDialog({ firm, client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id, kind: isUmowa() && /procesow|p\.p\.s\.a/i.test(P.poa_type || matterTemplate(P.matter_type).poa) ? 'procesowe' : 'pps1' }) }, 'Pełnomocnictwo'),
+    // prościej: Zapisz + dwa menu (Pobierz, Wyślij); pełnomocnictwo w menu „Wyślij”
+    [h('button', { class: 'btn btn-primary btn-sm', onclick: () => save(false) }, draft.id ? 'Zapisz' : params.get('sprawa') ? 'Zapisz' : 'Zapisz i załóż sprawę'),
+      menuButton('Pobierz', icon('download'), [['PDF', 'do druku albo wysłania', () => pdfBtn.click()], ['Word (.docx)', 'do własnych poprawek', () => docxBtn.click()]]),
+      menuButton('Wyślij', icon('mail'), [
+        ['Wzór do zapoznania się', 'e-mail z PDF albo sam link – bez podpisu', () => draftBtn.click()],
+        ['Do podpisu', 'klient czyta, zgłasza uwagi i podpisuje online', () => signBtn.click()],
+        ['Pełnomocnictwo', isUmowa() ? 'PPS-1 albo procesowe do tej sprawy' : 'PPS-1 do tej sprawy', () => pelnomocnictwoDialog({ firm, client: client(), params: isUmowa() ? P : {}, defaultSignerId: chosenSigners()[0]?.id, kind: isUmowa() && /procesow|p\.p\.s\.a/i.test(P.poa_type || matterTemplate(P.matter_type).poa) ? 'procesowe' : 'pps1' })],
+      ], 'btn btn-outline btn-sm'),
       delBtn].filter(Boolean)),
   typeSwitch || '',
   h('div', { class: 'order-layout' }, h('div', {}, h('section', { class: 'card section' }, formBox), signBox ? h('div', { style: { marginTop: '16px' } }, signBox) : '', mattersCard || ''), h('div', { class: 'paper-wrap' }, preview)));

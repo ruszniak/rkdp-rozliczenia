@@ -275,7 +275,12 @@ export async function renderPulpit(main, params) {
   const key = admin ? 'pulpit_doradca' : 'pulpit_moj';
   // sekcje u góry pulpitu pracownika (Moje kratki, Terminy w 7 dni, Braki dokumentów, Monitoring) – też do ukrycia
   const DZIS = [['kratki', 'Moje kratki'], ['terminy7', 'Terminy w 7 dni'], ['braki', 'Braki dokumentów'], ['monitoring', 'Monitoring – zmiany u klientów']];
-  const dzisHidden = () => new Set(mp.pulpit_dzis?.hidden || []);
+  // domyślny układ wg stanowiska (dopóki osoba sama nie ustawi pulpitu): kadry nie widzą księgowości i odwrotnie,
+  // asystentka – bez tabel rozliczeń i kratek
+  const job = String(state.me.job_title || '').toLowerCase();
+  const roleDef = /kadr|płac|plac/.test(job) ? { hidden: ['rozliczenia_ksiegowosc'] } : /asyst/.test(job) ? { hidden: ['rozliczenia_ksiegowosc', 'rozliczenia_kadry'], dzis: ['kratki'] }
+    : /księg|ksieg/.test(job) ? { hidden: ['rozliczenia_kadry'] } : {};
+  const dzisHidden = () => new Set(mp.pulpit_dzis ? mp.pulpit_dzis.hidden || [] : roleDef.dzis || []);
   const dzisToggles = () => { const hid = dzisHidden();
     return h('div', { class: 'dash-edit', style: { flexWrap: 'wrap', gap: '6px 16px' } }, h('b', {}, 'Sekcje u góry:'),
       ...DZIS.map(([k, l]) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !hid.has(k), onchange: async e => {
@@ -288,7 +293,7 @@ export async function renderPulpit(main, params) {
     editBtn.classList.toggle('on', editing);
     const dash = admin ? adminDashboard(D, period, hist, alerts, signs) : myDashboard(D, period, hist, signs);
     body.replaceChildren(...(editing ? [h('p', { class: 'dash-hint' }, 'Przeciągnij sekcje, aby zmienić kolejność (albo użyj strzałek), i ukryj te, których nie potrzebujesz. Układ zapisze się dla Ciebie na wszystkich urządzeniach.'), dzis ? dzisToggles() : null].filter(Boolean) : []),
-      ...arrange(admin ? 'doradca' : 'moj', dash, mp[key] || {}, editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
+      ...arrange(admin ? 'doradca' : 'moj', dash, mp[key] || (admin ? {} : { hidden: roleDef.hidden || [] }), editing, async (lay) => { mp = await saveMemberPrefs({ [key]: lay }, state.me.id); draw(); }));
     if (!editing) body.prepend(warningsCard());
   };
   const title = h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, `Dzień dobry, ${first(state.me.full_name)}`, infoTip(admin ? HELP_SPRAWY + '\n\n' + HELP_ADMIN : HELP_SPRAWY + '\n\n' + HELP_DZIS, 'Pulpit – instrukcja'));

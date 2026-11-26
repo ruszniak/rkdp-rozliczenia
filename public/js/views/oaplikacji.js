@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Prościej: „+ Nowy dokument” (Dokumenty i narzędzia oraz karta klienta) – jedno miejsce startu dla umów, zleceń, pełnomocnictw, ofert i protokołów, z wyszukiwarką. W edytorze umowy zamiast sześciu przycisków: „Zapisz”, „Pobierz ▾” i „Wyślij ▾”. Nowe osoby dostają pulpit dopasowany do stanowiska (kadry, księgowość, asystentka).',
     'Spotkania: zapis, zmiana terminu i odwołanie nie czekają już na Kalendarz Google – wpis w kalendarzu i e-mail do klienta robią się w tle (kilka sekund). Wolny Google nie blokuje wyszukiwania wolnych godzin.',
     'Stabilność: każde zapytanie do serwera ma limit czasu (zamiast niekończącego się „Wczytywanie…” – komunikat, że serwer nie odpowiada), stała wersja biblioteki bazy danych, a błędy i zawieszenia zapisują się same w dzienniku (administrator: Więcej → Dziennik błędów aplikacji).',
     'Wzór umowy dla klienta: „Wyślij wzór” w edytorze umowy / zlecenia (RKDP i M2 TAX) i przy umowie księgowej – e-mail z projektem w PDF do pobrania (link 30 dni) albo „Tylko link” do skopiowania. Bez podpisu – do zapoznania się; działa też bez klienta w bazie (dla przyszłego klienta). Najprościej: Dokumenty i narzędzia → „Generator wzorów umów” – wybierz wzór i „Wyślij klientowi”.',

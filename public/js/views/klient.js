@@ -408,7 +408,7 @@ export async function renderKlient(main, id) {
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../watek.js').then(m => m.openThread({ client: c })) }, 'Rozmowa i zadania'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, defaultPeriod(), []) }, icon('mail'), 'Wyślij wiadomość'),
         h('a', { class: 'btn btn-outline btn-sm', href: `#/oferty/nowa?klient=${c.id}` }, 'Oferta'),
-        h('button', { class: 'btn btn-outline btn-sm', onclick: () => dokumentyDialog({ client: { ...c, ...draft } }).catch(e => fail(e)) }, 'Umowy i pełnomocnictwa'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../tools/nowydok.js').then(m => m.nowyDokument({ client: { ...c, ...draft } })).catch(e => fail(e)) }, icon('plus'), 'Nowy dokument'),
         draft.phone ? h('a', { class: 'btn btn-outline btn-sm', href: 'tel:' + String(draft.phone).replace(/\s/g, '') }, 'Zadzwoń') : null)),
     h('div', { class: 'two' },
       h('div', {}, editHint, form, savebar),
