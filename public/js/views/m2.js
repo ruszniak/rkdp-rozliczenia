@@ -1052,6 +1052,21 @@ async function viewOrder(main, id, params) {
       else if (cl.billing_type === 'abonament') Object.assign(o, { fee_type: 'abonament', fee_amount: cl.monthly_fee });
     }
     if (cl && type === 'umowa') Object.assign(o.params, { client_party: defaultClientParty(cl), contact_person: cl.contact_person, client_email: cl.email, client_phone: cl.phone, ...(cl.hourly_rate ? { hourly_rate: cl.hourly_rate } : {}) });
+    // umowa z zaakceptowanej oferty (?oferta=<id>): ceny doradztwa z cennika oferty
+    if (params.get('oferta')) {
+      const { data: of } = await sb.from('offers').select('id, number, params').eq('id', params.get('oferta')).maybeSingle();
+      const rows = of?.params?.services?.doradztwo?.on ? of.params.services.doradztwo.rows || [] : [];
+      const num = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return n > 0 ? n : null; };
+      const monthly = rows.find(r => /mies/.test(r.unit || '') && num(r.price) && r.sum) || rows.find(r => /mies/.test(r.unit || '') && num(r.price));
+      const hourly = rows.find(r => /\/ ?h\b|godz/.test(r.unit || '') && num(r.price));
+      if (type === 'umowa') {
+        if (monthly) Object.assign(o.params, { matter_type: 'abonament', variant: 'C', monthly_fee: num(monthly.price) });
+        else if (hourly) Object.assign(o.params, { variant: 'B' });
+        if (hourly) Object.assign(o.params, { hourly_rate: num(hourly.price), rate_partner: num(hourly.price), rate_consultant: num(hourly.price) });
+      } else if (monthly) Object.assign(o, { fee_type: 'abonament', fee_amount: num(monthly.price) });
+      else if (hourly) Object.assign(o, { fee_type: 'godzinowa', fee_amount: num(hourly.price) });
+      if (of) o.params.from_offer = of.number || of.id;
+    }
   } else {
     o = existing;
   }

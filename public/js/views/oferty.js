@@ -259,6 +259,53 @@ async function renderEditor(main, id, brand) {
       } }, icon('mail'), 'Wyślij'),
     ], { wide: true });
   }
+  // ---- z oferty: klient w bazie + umowa z cenami z oferty ----
+  async function fromOffer() {
+    if (!o.client.name.trim()) return toast('Wpisz nazwę klienta', true);
+    if (!(await save())) return;
+    const num = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return n > 0 ? n : null; };
+    const S = o.services || {};
+    const book = brand === 'rkdp' && S.ksiegowosc?.on ? S.ksiegowosc : null, hr = brand === 'rkdp' && S.kadry?.on ? S.kadry : null, tax = S.doradztwo?.on ? S.doradztwo : null;
+    if (!book && !tax) return toast('Umowę z oferty przygotuję dla księgowości albo doradztwa – zaznacz jedną z tych usług', true);
+    // 1) klient: istniejący z listy albo nowy (z danymi i cenami z oferty)
+    let cl = null, created = false;
+    if (clientId) {
+      const { data, error } = await sb.from(C.clientTable).select('*').eq('id', clientId).maybeSingle();
+      if (error) return fail(error); cl = data;
+    }
+    const fees = brand === 'rkdp' && book ? {
+      bookkeeping: book.form === 'ksiegi' ? null : book.form, monthly_fee: num(book.rows?.[0]?.price), fee_extra_doc: num(book.rows?.[1]?.price),
+      ...(hr ? { fee_employee: num(hr.rows?.[0]?.price) } : {}),
+    } : {};
+    if (!cl) {
+      const nip = String(o.client.nip || '').replace(/\D/g, '') || null;
+      const base = { name: o.client.name.trim(), nip, address: o.client.address || null, email: o.client.email || null, contact_person: o.client.person || null };
+      const row = brand === 'rkdp' ? { ...base, ...fees } : { ...base, firm: 'm2', status: 'aktywny', kind: nip ? 'firma' : 'osoba' };
+      const { data, error } = await sb.from(C.clientTable).insert(row).select('*').single();
+      if (error) return fail(error, 'Nie udało się założyć klienta');
+      cl = data; created = true; clientId = cl.id; clients.push(cl);
+    } else if (brand === 'rkdp') {
+      // istniejący klient: uzupełnij tylko puste stawki
+      const upd = Object.fromEntries(Object.entries(fees).filter(([k, v]) => v != null && (cl[k] == null || cl[k] === '')));
+      if (Object.keys(upd).length) { const { data } = await sb.from('clients').update(upd).eq('id', cl.id).select('*').single(); if (data) cl = data; }
+    }
+    status = 'zaakceptowana'; statusSel.value = status;
+    const { error: e2 } = await sb.from('offers').update({ status, [C.clientField]: cl.id }).eq('id', row.id);
+    if (e2) return fail(e2);
+    drawClient();
+    toast(created ? `Założono klienta: ${cl.name}` : `Oferta przypięta do klienta: ${cl.name}`);
+    // 2) umowa
+    const openBook = () => import('../rkdp/docs.js').then(m => m.dokumentyDialog({ type: 'umowa', client: cl })).catch(e => fail(e));
+    const openTax = () => { location.hash = brand === 'rkdp' ? `#/doradztwo/zlecenie/nowe?typ=umowa&firma=rkdp&rkdp=${cl.id}&oferta=${row.id}` : `#/doradztwo/zlecenie/nowe?typ=umowa&firma=m2&klient=${cl.id}&oferta=${row.id}`; };
+    if (book && tax) {
+      let close = () => {};
+      modal('Która umowa?', h('div', { style: { display: 'grid', gap: '8px' } },
+        h('p', { class: 'small', style: { margin: '0 0 4px' } }, 'Oferta obejmuje księgowość i doradztwo – przygotuj najpierw jedną umowę, drugą otworzysz z karty klienta („Nowy dokument”).'),
+        h('button', { class: 'btn btn-outline', onclick: () => { close(); openBook(); } }, 'Umowa o usługi księgowe'),
+        h('button', { class: 'btn btn-outline', onclick: () => { close(); openTax(); } }, 'Umowa o doradztwo podatkowe')),
+        c => { close = c; return [h('button', { class: 'btn btn-ghost btn-sm', onclick: c }, 'Później')]; });
+    } else if (book) openBook(); else openTax();
+  }
   async function pdf() {
     if (dirty || !row) { if (!(await save())) return; }
     const html = offerHtml(o, brand, { number: row.number });
@@ -300,6 +347,8 @@ async function renderEditor(main, id, brand) {
           partnerContractDialog({ client: cl, pkg: pk || null, pkgKey: P.chosen });
         }, 'data-tip': 'Umowa o stałą obsługę doradczą biura z pakietem wybranym w ofercie – PDF, Word albo wysyłka do podpisu' }, icon('mail'), 'Umowa z biurem') : null,
         h('button', { class: 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => save().then(ok => ok && toast('Zapisano ofertę')) }, 'Zapisz'),
+        brand === 'rkdp' || !o.services?.partner?.on ? h('button', { class: status === 'zaakceptowana' ? 'btn btn-primary' : 'btn btn-outline', style: { width: '100%', marginTop: '8px' }, onclick: () => fromOffer().catch(e => fail(e)),
+          'data-tip': 'Klient zaakceptował ofertę? Jednym kliknięciem: klient w bazie (jeśli go nie ma) i umowa z cenami z tej oferty' }, icon('file'), 'Klient zaakceptował – klient i umowa') : null,
         h('p', { class: 'hint', style: { marginTop: '10px' } }, 'W oknie drukowania wybierz „Zapisz jako PDF”. Okładka i tło drukują się w kolorze.')))),
     h('div', { class: 'savebar' }, info,
       h('button', { class: 'btn btn-outline', onclick: () => mailOffer().catch(e => fail(e)) }, icon('mail'), 'Wyślij'),
