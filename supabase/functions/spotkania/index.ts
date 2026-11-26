@@ -10,6 +10,7 @@
 //  Rezerwacja ze strony /umow/ – bez płatności; ze strony /umow2/ (platnosc: true) – z ceną rodzaju spotkania i płatnością online.
 //  pay_link {id, amount?} – e-mail do klienta z linkiem do płatności (Przelewy24, funkcja „platnosci”) – np. po spotkaniu.
 // Cena spotkania (brutto) z rodzaju: price_rkdp (strona RKDP / link) albo price_m2tax (strona M2 TAX); płatność zawsze dobrowolna.
+// Kalendarz Google, e-maile i powiadomienia po utworzeniu / zmianie / odwołaniu spotkania robią się w tle (bg) – odpowiedź od razu.
 // Wydarzenia trafiają do głównych Kalendarzy Google doradców (połączenie z profilu, funkcja „gcal”); e-maile do klientów
 // wychodzą z adresu z ustawień (domyślnie app@ruszniak.io, alias konta SMTP_USER) z plikiem .ics.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -94,8 +95,12 @@ async function gToken(memberId: string): Promise<string | null> {
   tokenCache.set(memberId, { token: j.access_token, exp: Date.now() + (j.expires_in || 3600) * 1000 });
   return j.access_token;
 }
+// zadania po odpowiedzi: Kalendarz Google i e-maile nie wstrzymują ekranu (EdgeRuntime.waitUntil – funkcja kończy je w tle)
+const bg = (p: Promise<unknown>) => { const q = p.catch(e => console.error('w tle', e)); try { (globalThis as any).EdgeRuntime?.waitUntil(q); } catch { /* */ } return q; };
 async function gapi(token: string, method: string, path: string, body?: unknown) {
-  const r = await fetch(API + path, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  // limit 10 s na jedno wywołanie Google – wolny Google nie blokuje wyszukiwania terminów
+  const r = await fetch(API + path, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(10000) })
+    .catch(e => { console.error('google timeout', path.slice(0, 60), String(e)); return new Response(JSON.stringify({ error: { message: 'timeout' } }), { status: 504 }); });
   if (r.status === 204) return { ok: true, status: 204, data: null as any };
   const data = await r.json().catch(() => null);
   return { ok: r.ok, status: r.status, data };
@@ -457,26 +462,30 @@ async function createMeeting(S: any, row: any, memberIds: string[], actor: strin
     if ((e2 as any).code === '23P01') throw new Http(409, 'Ten termin został właśnie zajęty – wybierz inną godzinę.');
     throw e2;
   }
-  const c = await ctxOf(m, S);
-  const { gcal, meet } = await pushEvents(c, memberIds);
-  const { data: m2 } = await admin.from('meetings').update({ gcal, meet_url: meet, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
-  c.m = m2;
-  let mailed = false;
-  try { mailed = await mailClient(c, 'potwierdzenie'); } catch (e) { console.error('mail', e); }
-  await notifyTeam(m.id, 'nowe', actor);
-  // umówione w aplikacji dla kogoś innego – e-mail do tej osoby (nie każdy ma włączone powiadomienia w aplikacji)
-  // rezerwacja klienta ze strony (m2tax.pl, rkdp.pl, link) – e-mail do doradcy
-  if (actor || m.source === 'www') { try { await mailTeam(c, memberIds, actor, actor ? 'nowe' : 'www'); } catch (e) { console.error('mail zespół', e); } }
-  return { meeting: m2, mailed, google: Object.keys(gcal).length };
+  // Kalendarz Google (z linkiem Meet), potwierdzenie dla klienta i powiadomienia zespołu – w tle, ekran nie czeka
+  bg((async () => {
+    const c = await ctxOf(m, S);
+    const { gcal, meet } = await pushEvents(c, memberIds);
+    const { data: m2 } = await admin.from('meetings').update({ gcal, meet_url: meet, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
+    c.m = m2 || m;
+    try { await mailClient(c, 'potwierdzenie'); } catch (e) { console.error('mail', e); }
+    await notifyTeam(m.id, 'nowe', actor);
+    // umówione w aplikacji dla kogoś innego – e-mail do tej osoby (nie każdy ma włączone powiadomienia w aplikacji)
+    // rezerwacja klienta ze strony (m2tax.pl, rkdp.pl, link) – e-mail do doradcy
+    if (actor || m.source === 'www') { try { await mailTeam(c, memberIds, actor, actor ? 'nowe' : 'www'); } catch (e) { console.error('mail zespół', e); } }
+  })());
+  return { meeting: m, mailed: !!(m.client_email && m.notify_client && SMTP_USER && SMTP_PASS), google: 'tlo' };
 }
 async function cancelMeeting(m: any, reason: string | null, actor: string | null, notifyClient: boolean) {
   if (m.status === 'cancelled') return m;
   await admin.from('meeting_members').update({ active: false }).eq('meeting_id', m.id);
   const { data: m2 } = await admin.from('meetings').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancel_reason: reason, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
-  await dropEvents(m);
-  const c = await ctxOf(m2);
-  if (notifyClient) { try { await mailClient(c, 'odwolanie'); } catch (e) { console.error('mail', e); } }
-  await notifyTeam(m.id, actor ? 'odwolane_zespol' : 'odwolane', actor);
+  bg((async () => {
+    await dropEvents(m);
+    const c = await ctxOf(m2);
+    if (notifyClient) { try { await mailClient(c, 'odwolanie'); } catch (e) { console.error('mail', e); } }
+    await notifyTeam(m.id, actor ? 'odwolane_zespol' : 'odwolane', actor);
+  })());
   return m2;
 }
 async function moveMeeting(m: any, startMs: number, actor: string | null) {
@@ -485,13 +494,15 @@ async function moveMeeting(m: any, startMs: number, actor: string | null) {
   const { error } = await admin.from('meeting_members').update({ during }).eq('meeting_id', m.id).eq('active', true);
   if (error) { if ((error as any).code === '23P01') throw new Http(409, 'Ten termin został właśnie zajęty – wybierz inną godzinę.'); throw error; }
   const { data: m2 } = await admin.from('meetings').update({ start_at: new Date(startMs).toISOString(), end_at: new Date(endMs).toISOString(), reminder_sent_at: null, team_reminder_sent_at: null, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
-  const c = await ctxOf(m2);
-  const { gcal, meet } = await pushEvents(c, c.advisors.map(a => a.id));
-  const { data: m3 } = await admin.from('meetings').update({ gcal, meet_url: meet }).eq('id', m.id).select('*').single();
-  c.m = m3;
-  try { await mailClient(c, 'zmiana'); } catch (e) { console.error('mail', e); }
-  await notifyTeam(m.id, 'zmiana', actor);
-  return m3;
+  bg((async () => {
+    const c = await ctxOf(m2);
+    const { gcal, meet } = await pushEvents(c, c.advisors.map(a => a.id));
+    const { data: m3 } = await admin.from('meetings').update({ gcal, meet_url: meet }).eq('id', m.id).select('*').single();
+    c.m = m3 || m2;
+    try { await mailClient(c, 'zmiana'); } catch (e) { console.error('mail', e); }
+    await notifyTeam(m.id, 'zmiana', actor);
+  })());
+  return m2;
 }
 
 // zmiana osób na spotkaniu: podmiana doradcy albo dodanie drugiej osoby (oboje uczestniczą)
@@ -511,16 +522,18 @@ async function setMembers(m: any, want: string[], actor: string, notifyClient: b
     }
   }
   if (removed.length) await admin.from('meeting_members').update({ active: false }).eq('meeting_id', m.id).in('member_id', removed);
-  await dropEvents(m, removed);
-  const gcal0 = { ...(m.gcal || {}) }; removed.forEach((r: string) => { delete gcal0[r]; });
-  const c = await ctxOf({ ...m, gcal: gcal0 });
-  const { gcal, meet } = await pushEvents(c, added);
-  const { data: m2 } = await admin.from('meetings').update({ gcal, meet_url: meet, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
-  c.m = m2;
-  if (notifyClient && !m2.private) { try { await mailClient(c, 'doradca'); } catch (e) { console.error('mail', e); } }
-  await notifyTeam(m.id, 'osoby', actor, { added, removed });
-  if (added.length) { try { await mailTeam(c, added, actor, 'dodany'); } catch (e) { console.error('mail zespół', e); } }
-  return { meeting: m2, added, removed };
+  bg((async () => {
+    await dropEvents(m, removed);
+    const gcal0 = { ...(m.gcal || {}) }; removed.forEach((r: string) => { delete gcal0[r]; });
+    const c = await ctxOf({ ...m, gcal: gcal0 });
+    const { gcal, meet } = await pushEvents(c, added);
+    const { data: m2 } = await admin.from('meetings').update({ gcal, meet_url: meet, updated_at: new Date().toISOString() }).eq('id', m.id).select('*').single();
+    c.m = m2 || m;
+    if (notifyClient && !m.private) { try { await mailClient(c, 'doradca'); } catch (e) { console.error('mail', e); } }
+    await notifyTeam(m.id, 'osoby', actor, { added, removed });
+    if (added.length) { try { await mailTeam(c, added, actor, 'dodany'); } catch (e) { console.error('mail zespół', e); } }
+  })());
+  return { meeting: m, added, removed };
 }
 
 const emailOk = (e: string) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]{2,}$/.test(e);

@@ -263,7 +263,7 @@ export async function openMeetingDialog(opts = {}) {
         client_id: st.client.id, m2_client_id: st.client.m2, matter_id: st.matter, notify_client: st.notify,
       });
       closeFn();
-      toast(`Umówiono${r.google ? ' – jest w Kalendarzu Google' : ''}${r.mailed ? ', klient dostał potwierdzenie' : ''}`);
+      toast(`Umówiono${r.mailed ? ' – klient za chwilę dostanie potwierdzenie' : ''}. Wpis w Kalendarzu Google pojawi się w ciągu kilku sekund.`);
       import('./gcal.js').then(m => m.gcalStatus(true)).catch(() => {});
       opts.onDone?.(r.meeting);
     } catch (e) { fail(e); saveBtn.disabled = false; saveBtn.textContent = 'Umów spotkanie'; }
