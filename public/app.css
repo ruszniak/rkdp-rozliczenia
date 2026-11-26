@@ -3563,3 +3563,14 @@ fieldset.kl-form:disabled .partner{border-color:var(--line)}
 :root[data-theme="dark"] .sign-note.acc{background:rgba(22,163,74,.12)}
 
 .sign-pt{margin:6px 0 0;padding:6px 0 0;border-top:1px dashed var(--line,#E5E7EB)}.sign-pt b{display:block;font-size:13px}.sign-pt div{white-space:pre-wrap}
+/* historia klienta – oś czasu */
+.tl-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.tl-chip{border:1px solid var(--line-2);background:var(--card);border-radius:8px;padding:4px 10px;font-size:12.5px;cursor:pointer;color:var(--ink)}
+.tl-chip.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.tl-list{display:flex;flex-direction:column}
+.tl-row{display:flex;gap:12px;padding:9px 4px;border-top:1px solid var(--line);text-decoration:none;color:inherit;align-items:flex-start}
+.tl-row:first-child{border-top:0}
+a.tl-row:hover{background:var(--panel);border-radius:8px}
+.tl-dot{width:9px;height:9px;border-radius:99px;margin-top:6px;flex:none}
+.tl-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tl-body b{font-size:13.5px;font-weight:600;overflow-wrap:anywhere}

@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Historia klienta: na karcie klienta (RKDP i M2 TAX) jedna oś czasu – e-maile, podpisy, pliki, spotkania, oferty, umowy i sprawy, z filtrem rodzaju.',
     'Z oferty od razu umowa: przycisk „Klient zaakceptował – klient i umowa” zakłada klienta w bazie (jeśli go nie ma) i otwiera umowę z cenami z oferty.',
     'Prościej: „+ Nowy dokument” (Dokumenty i narzędzia oraz karta klienta) – jedno miejsce startu dla umów, zleceń, pełnomocnictw, ofert i protokołów, z wyszukiwarką. W edytorze umowy zamiast sześciu przycisków: „Zapisz”, „Pobierz ▾” i „Wyślij ▾”. Nowe osoby dostają pulpit dopasowany do stanowiska (kadry, księgowość, asystentka).',
     'Spotkania: zapis, zmiana terminu i odwołanie nie czekają już na Kalendarz Google – wpis w kalendarzu i e-mail do klienta robią się w tle (kilka sekund). Wolny Google nie blokuje wyszukiwania wolnych godzin.',

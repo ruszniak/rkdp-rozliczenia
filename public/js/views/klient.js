@@ -16,6 +16,7 @@ import { clientMeetingsCard } from '../spotkania.js';
 import { poaCard } from '../pelnomocnictwa.js';
 import { amlCard } from '../aml/aml.js';
 import { archiveCard } from '../archiwum.js';
+import { timelineCard } from '../historia.js';
 
 const YESNO = { true: 'Tak', false: 'Nie' };
 const isJdg = c => c.legal_form === 'jdg';
@@ -412,7 +413,7 @@ export async function renderKlient(main, id) {
         draft.phone ? h('a', { class: 'btn btn-outline btn-sm', href: 'tel:' + String(draft.phone).replace(/\s/g, '') }, 'Zadzwoń') : null)),
     h('div', { class: 'two' },
       h('div', {}, editHint, form, savebar),
-      h('div', {}, threadCard(c), clientMeetingsCard({ client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }), doradztwoCard(c), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
+      h('div', {}, threadCard(c), timelineCard({ rk: c.id }), clientMeetingsCard({ client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }), doradztwoCard(c), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));
 
   const beforeUnload = e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
   window.addEventListener('beforeunload', beforeUnload);

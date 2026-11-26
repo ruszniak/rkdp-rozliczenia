@@ -23,6 +23,7 @@ import { OFFICE_NAMES } from '../urzedy.js';
 import { amlCard, renderAml, amlDashCard } from '../aml/aml.js';
 import { modal as uiModal } from '../ui.js';
 import { menuButton } from '../pop.js';
+import { timelineCard } from '../historia.js';
 import { renderOferty } from './oferty.js';
 import { clientMeetingsCard, openMeetingDialog } from '../spotkania.js';
 import { gcalAgendaCard } from '../gcal.js';
@@ -771,7 +772,7 @@ async function viewClient(main, id) {
   m2SignBox,
   ...(orders.length ? orders.map(o => h('a', { class: 'mini-matter', href: `${BASE}/zlecenie/${o.id}` }, h('div', {}, h('b', {}, docLabel(o)), ' ', o.subject), orderPill(o.status))) : [h('p', { class: 'hint' }, 'Brak zleceń i umów.')]));
   main.replaceChildren(...header('klienci', c.name, [c.client_type === 'partner' ? `Partner – biuro rachunkowe${PARTNER_PKG[c.partner_package] ? ` (pakiet ${PARTNER_PKG[c.partner_package]})` : ''}` : null, c.kind === 'osoba' ? 'Osoba fizyczna' : 'Firma', c.nip ? `NIP ${c.nip}` : null].filter(Boolean).join(' · '), [timerButton({ module: 'm2', clientId: c.id, name: c.name })]),
-    h('div', { class: 'two' }, form, h('div', {}, c.client_type === 'partner' ? partnerTasksCard(c) : null, mattersCard, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
+    h('div', { class: 'two' }, form, h('div', {}, c.client_type === 'partner' ? partnerTasksCard(c) : null, mattersCard, c.id ? timelineCard({ m2: c.id }) : null, c.id ? clientMeetingsCard({ m2_client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }) : null, c.id ? timeCard({ module: 'm2', client: c }) : null, c.id ? amlCard({ module: 'm2', client: c }) : null, contactsCard, ordersCard, historyCard({ client: c.id }))));
 }
 
 // ================= PROGRAM PARTNER: zadania od biura rachunkowego na karcie biura =================
