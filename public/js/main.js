@@ -8,6 +8,7 @@ import { openCmdk, initShortcuts } from './cmdk.js';
 import { getTheme, toggleTheme, onThemeChange, ICON_MOON, ICON_SUN } from './motyw.js';
 import { initPanelLinks, closePanel } from './panel.js';
 import { initUpdates } from './update.js';
+import { initErrLog } from './errlog.js';
 // logo w aplikacji: RKDP – granatowe (logotyp aplikacji), M2 TAX – zwykłe; w motywie ciemnym rozjaśniane w CSS
 const LIGHT_LOGO = src => src.replace('/logo-rkdp.png', '/logo-rdp.svg').replace('/m2tax-logo.png', '/logo-rdp.svg');
 // widoki wczytywane na żądanie – pierwszy ekran ładuje tylko potrzebny kod, reszta dociąga się w tle
@@ -219,7 +220,8 @@ function renderWiecej(main) {
       lastMore.some(x => x[2] === 'zespol') ? row('#/zespol', 'zespol', 'Zespół i ustawienia') : null,
       themeRow,
       row(isPartner() ? '/pomoc/partner/' : '/pomoc/', 'info', 'Pomoc i instrukcje'),
-      row('#/o-aplikacji', 'info', 'O aplikacji i RODO')),
+      row('#/o-aplikacji', 'info', 'O aplikacji i RODO'),
+      me.role === 'admin' ? row('#/bledy', 'info', 'Dziennik błędów aplikacji') : null),
     h('div', { class: 'card wq-list', style: { marginTop: '16px' } },
       row('#/', 'wyloguj', 'Wyloguj się', (e) => { e.preventDefault(); logout(); }, 'wq-out')));
 }
@@ -455,6 +457,7 @@ async function route(opts = {}) {
     if (view === 'obecnosc') c = await renderObecnosc(layout(parts[1] === 'urlopy' ? 'urlopy' : m2only ? 'm2:obecnosc' : 'obecnosc'), parts[1], params);
     else if (view === 'regulamin') c = await renderRegulamin(layout('regulamin'));
     else if (view === 'o-aplikacji') { const m = await import('./views/oaplikacji.js'); c = await m.renderOAplikacji(layout('oaplikacji'), parts[1]); }
+    else if (view === 'bledy' && state.me.role === 'admin') { const m = await import('./views/bledy.js'); c = await m.renderBledy(layout('zespol')); }
     else if (view === 'wiecej') { const m2 = m2only; renderWiecej(layout(m2 ? 'm2:wiecej' : 'wiecej')); }
     else if (view === 'profil') c = await renderProfil(layout(m2only ? 'm2:profil' : 'profil'));
     // zadania zespołu – także dla osób tylko z M2 TAX (np. Marcin): mogą dostawać i zlecać zadania
@@ -600,3 +603,4 @@ start();
 // instalacja jako aplikacja, powiadomienia push, ekran „brak internetu”
 if (document.readyState === 'complete') registerSW(); else window.addEventListener('load', () => registerSW());
 initUpdates();
+initErrLog();

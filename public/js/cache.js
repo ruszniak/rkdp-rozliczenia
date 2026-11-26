@@ -25,7 +25,33 @@ export function autoRefreshRoute(hash = location.hash) {
   const p = path.split('/').filter(Boolean);
   return cacheableRoute(hash) && !p.includes('dokumenty');
 }
-const baseFetch = (...a) => (globalThis.__cacheBaseFetch || fetch)(...a);
+// każde zapytanie ma limit czasu – zawieszone połączenie nie blokuje ekranu w nieskończoność („Wczytywanie…”);
+// długie i przerwane zapytania trafiają do dziennika błędów (bez treści, tylko nazwa tabeli/funkcji i czas)
+const LIMIT = { rest: 30000, auth: 30000, functions: 120000, storage: 180000 };
+const rawFetch = (...a) => (globalThis.__cacheBaseFetch || fetch)(...a);
+async function baseFetch(input, init = {}) {
+  const url = typeof input === 'string' ? input : input.url;
+  const kind = (url.match(/\/(rest|auth|functions|storage)\/v1\//) || [])[1];
+  if (!kind || typeof AbortController === 'undefined') return rawFetch(input, init);
+  const ctl = new AbortController();
+  const outer = init.signal;
+  if (outer) { if (outer.aborted) ctl.abort(outer.reason); else outer.addEventListener('abort', () => ctl.abort(outer.reason), { once: true }); }
+  let timedOut = false;
+  const t0 = performance.now();
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(new DOMException('Przekroczono czas oczekiwania na odpowiedź serwera', 'TimeoutError')); }, LIMIT[kind]);
+  try {
+    const res = await rawFetch(input, { ...init, signal: ctl.signal });
+    const ms = performance.now() - t0;
+    if (ms > 10000) import('./errlog.js').then(m => m.logIssue('slow', `Wolne zapytanie: ${m.shortUrl(url)}`, '', ms)).catch(() => {});
+    return res;
+  } catch (e) {
+    if (timedOut) {
+      import('./errlog.js').then(m => m.logIssue('timeout', `Brak odpowiedzi po ${LIMIT[kind] / 1000} s: ${m.shortUrl(url)}`, '', LIMIT[kind])).catch(() => {});
+      throw new Error('Serwer nie odpowiada – sprawdź połączenie i spróbuj ponownie.');
+    }
+    throw e;
+  } finally { clearTimeout(timer); }
+}
 function hdr(init, name) {
   const hs = init?.headers; if (!hs) return '';
   if (hs instanceof Headers) return hs.get(name) || '';

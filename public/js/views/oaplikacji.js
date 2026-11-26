@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Stabilność: każde zapytanie do serwera ma limit czasu (zamiast niekończącego się „Wczytywanie…” – komunikat, że serwer nie odpowiada), stała wersja biblioteki bazy danych, a błędy i zawieszenia zapisują się same w dzienniku (administrator: Więcej → Dziennik błędów aplikacji).',
     'Wzór umowy dla klienta: „Wyślij wzór” w edytorze umowy / zlecenia (RKDP i M2 TAX) i przy umowie księgowej – e-mail z projektem w PDF do pobrania (link 30 dni) albo „Tylko link” do skopiowania. Bez podpisu – do zapoznania się; działa też bez klienta w bazie (dla przyszłego klienta). Najprościej: Dokumenty i narzędzia → „Generator wzorów umów” – wybierz wzór i „Wyślij klientowi”.',
     'Oferty: przełącznik „Firma: RKDP / M2 TAX” na liście ofert, a „Nowa oferta” pyta, od której firmy ma być oferta.',
     'Umawianie spotkań: link osobisty doradcy (np. app.ruszniak.io/umow/?tylko=michal) – klient widzi tylko tego doradcę i jego rodzaje spotkań. Tylko w takim linku może być „Spotkanie u klienta – w siedzibie firmy” (klient podaje adres); na stronach i w zwykłym linku tej opcji nie ma. W rodzajach spotkań nowe opcje: „Tylko z osobistego linku” i „U klienta”.',
