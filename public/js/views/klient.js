@@ -410,6 +410,7 @@ export async function renderKlient(main, id) {
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, defaultPeriod(), []) }, icon('mail'), 'Wyślij wiadomość'),
         h('a', { class: 'btn btn-outline btn-sm', href: `#/oferty/nowa?klient=${c.id}` }, 'Oferta'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../tools/nowydok.js').then(m => m.nowyDokument({ client: { ...c, ...draft } })).catch(e => fail(e)) }, icon('plus'), 'Nowy dokument'),
+        h('button', { class: 'btn btn-outline btn-sm', 'data-tip': 'Jeden stały link dla klienta: podpisy, pliki do pobrania, wgrywanie dokumentów, spotkania', onclick: () => import('../portal.js').then(m => m.portalDialog({ target: { client_id: c.id }, name: c.name, email: draft.email || c.email, firm: 'rkdp' })).catch(e => fail(e)) }, 'Strona klienta'),
         draft.phone ? h('a', { class: 'btn btn-outline btn-sm', href: 'tel:' + String(draft.phone).replace(/\s/g, '') }, 'Zadzwoń') : null)),
     h('div', { class: 'two' },
       h('div', {}, editHint, form, savebar),

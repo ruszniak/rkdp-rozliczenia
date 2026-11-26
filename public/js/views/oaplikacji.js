@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Strona klienta: na karcie klienta przycisk „Strona klienta” tworzy jeden stały link dla klienta – w jednym miejscu dokumenty do podpisu i do pobrania, wgrywanie dokumentów do rozliczenia, umówione spotkania i kontakt. Link można skopiować, wysłać e-mailem, podejrzeć, wymienić na nowy albo wyłączyć; widać, ile razy klient go otworzył.',
     'Historia klienta: na karcie klienta (RKDP i M2 TAX) jedna oś czasu – e-maile, podpisy, pliki, spotkania, oferty, umowy i sprawy, z filtrem rodzaju.',
     'Z oferty od razu umowa: przycisk „Klient zaakceptował – klient i umowa” zakłada klienta w bazie (jeśli go nie ma) i otwiera umowę z cenami z oferty.',
     'Prościej: „+ Nowy dokument” (Dokumenty i narzędzia oraz karta klienta) – jedno miejsce startu dla umów, zleceń, pełnomocnictw, ofert i protokołów, z wyszukiwarką. W edytorze umowy zamiast sześciu przycisków: „Zapisz”, „Pobierz ▾” i „Wyślij ▾”. Nowe osoby dostają pulpit dopasowany do stanowiska (kadry, księgowość, asystentka).',
