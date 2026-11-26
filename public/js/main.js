@@ -75,11 +75,11 @@ const MODULES = {
     more: [['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/rozmowy', 'Rozmowy – wszystkie wątki o klientach', 'rozmowy'], ['#/dokumenty', 'Dokumenty i narzędzia (JPK, sprawozdania, wzory, kalkulator)', 'sprawozdania'], ['#/terminy', 'Kalendarz obowiązków', 'terminy'],
       ['#/zamkniecie-roku', 'Zamknięcie roku', 'rok'], ['#/informacje', 'Informacja do klientów (e-mail zbiorczy)', 'informacje'], ['#/oferty', 'Oferty', 'oferty'], ['#/aml', 'AML – weryfikacja klientów', 'aml'],
       ['#/doradztwo/dokumenty', 'Pisma procesowe – wzory (RKDP i M2 TAX)', 'm2:dokumenty'], ['#/obecnosc/urlopy', 'Urlopy – wnioski urlopowe', 'urlopy'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'],
-      ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/koszty', 'Koszt księgowych (tylko Ty)', 'koszty', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+      ['#/raport', 'Raport miesięczny', 'raport', 'admin'], ['#/koszty', 'Koszt księgowych (tylko Ty)', 'koszty', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/bledy', 'Dziennik błędów aplikacji', 'bledy', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
   m2: { label: 'M2 TAX', full: 'rdp.app', logo: '/m2tax-logo.png', alt: 'M2 TAX Doradcy Podatkowi', home: '#/doradztwo', need: 'doradztwo',
     // ten sam układ zakładek co w RKDP: Pulpit · Klienci · Sprawy · … · Więcej
     tabs: [['#/doradztwo', 'Pulpit', 'm2:'], ['#/doradztwo/klienci', 'Klienci', 'm2:klienci'], ['#/doradztwo/sprawy', 'Sprawy', 'm2:sprawy']],
-    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia i umowy', 'm2:zlecenia'], ['#/doradztwo/oferty', 'Oferty M2 TAX', 'm2:oferty', 'm2'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/obecnosc/urlopy', 'Urlopy – wnioski urlopowe', 'urlopy'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
+    more: [['#/doradztwo/dokumenty', 'Dokumenty i pisma procesowe', 'm2:dokumenty'], ['#/doradztwo/zlecenia', 'Zlecenia i umowy', 'm2:zlecenia'], ['#/doradztwo/oferty', 'Oferty M2 TAX', 'm2:oferty', 'm2'], ['#/doradztwo/zadania', 'Zadania zespołu', 'm2:zadania'], ['#/spotkania', 'Spotkania i grafik przyjęć', 'spotkania'], ['#/obecnosc/urlopy', 'Urlopy – wnioski urlopowe', 'urlopy'], ['#/czas', 'Czas pracy i rentowność', 'm2:czas', 'admin'], ['#/zespol', 'Zespół i ustawienia', 'zespol', 'admin'], ['#/bledy', 'Dziennik błędów aplikacji', 'bledy', 'admin'], ['/pomoc/', 'Pomoc i instrukcje', 'pomoc'], ['/zainstaluj/', 'Zainstaluj rdp.app na telefonie', 'zainstaluj'], ['#/o-aplikacji', 'O aplikacji i RODO', 'oaplikacji'], ['#/', 'Wyloguj się', 'logout']] },
 };
 // konto „tylko podgląd JPK” – widzi wyłącznie zakładkę JPK
 MODULES.jpk = { label: 'RKDP', full: 'rdp.app · Podgląd JPK', logo: '/logo-rkdp.png', alt: 'RKDP spółka doradztwa podatkowego', home: '#/jpk', need: 'jpk', tabs: [['#/jpk', 'JPK', 'jpk']] };
@@ -221,7 +221,7 @@ function renderWiecej(main) {
       themeRow,
       row(isPartner() ? '/pomoc/partner/' : '/pomoc/', 'info', 'Pomoc i instrukcje'),
       row('#/o-aplikacji', 'info', 'O aplikacji i RODO'),
-      me.role === 'admin' ? row('#/bledy', 'info', 'Dziennik błędów aplikacji') : null),
+      lastMore.some(x => x[2] === 'bledy') ? null : me.role === 'admin' ? row('#/bledy', 'info', 'Dziennik błędów aplikacji') : null),
     h('div', { class: 'card wq-list', style: { marginTop: '16px' } },
       row('#/', 'wyloguj', 'Wyloguj się', (e) => { e.preventDefault(); logout(); }, 'wq-out')));
 }
@@ -269,7 +269,7 @@ function layout(active) {
       ['Codzienna praca', ['pulpit', 'm2:', 'rozliczenia', 'klienci', 'm2:klienci', 'm2:sprawy', 'm2:zadania', 'spotkania', 'rozmowy']],
       ['Dokumenty', ['sprawozdania', 'm2:dokumenty', 'm2:zlecenia', 'm2:oferty', 'oferty', 'informacje']],
       ['Terminy i kontrola', ['terminy', 'rok', 'aml']],
-      ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'koszty', 'zespol']],
+      ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'koszty', 'zespol', 'bledy']],
     ];
     const BOTTOM = ['pomoc', 'zainstaluj', 'oaplikacji'];
     const SHORT = { 'm2:zadania': 'Zadania', zainstaluj: 'Aplikacja na telefon', spotkania: 'Spotkania i grafik', 'm2:dokumenty': 'Pisma procesowe' };
