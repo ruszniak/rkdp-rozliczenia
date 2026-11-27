@@ -3662,3 +3662,37 @@ html body .dk-tile .badge{background:none!important;border:1px solid var(--line-
 
 /* 11. kafelki liczników w Rozliczeniach: bez kolorowych kwadratów z ikoną – sama liczba i opis */
 html body .tiles-bento .tile-ic{display:none!important}
+
+/* ===== Menu po lewej – porządek: grupy bez nadmiaru, zwijane „Zarządzanie”, jedno menu użytkownika na dole ===== */
+@media (min-width:1100px){
+  html.sidebar-on .sn-groups{padding-top:4px}
+  html.sidebar-on .sn-group{margin:0 0 6px}
+  html.sidebar-on .sn-group.sn-first{padding-bottom:6px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.07)}
+  html.sidebar-on .sn-gh{margin:12px 10px 4px!important;font-size:12px!important;font-weight:600!important;color:#7D8590!important}
+  html.sidebar-on .sn-item{min-height:34px;padding:6px 10px!important;font-size:14px!important;border-radius:7px!important;gap:10px!important}
+  html.sidebar-on .sn-item .sn-ico svg{width:17px;height:17px}
+  html.sidebar-on .sn-item.on{font-weight:600}
+  html.sidebar-on .sn-fold{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 20px);border:0;background:none;cursor:pointer;font:inherit;padding:0;text-align:left}
+  html.sidebar-on .sn-fold:hover{color:#C9CDD4!important}
+  html.sidebar-on .sn-fold .sn-chev{display:inline-flex;transition:transform .15s}
+  html.sidebar-on .sn-fold[aria-expanded="true"] .sn-chev{transform:rotate(90deg)}
+  html.sidebar-on .sn-bottom{padding-top:8px!important}
+  html.sidebar-on .sn-me{width:100%;border:0;background:none;font:inherit;cursor:pointer;text-align:left;min-height:44px!important}
+  html.sidebar-on .sn-me .sn-l:not(.sn-chev){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  html.sidebar-on .sn-me .sn-chev{display:inline-flex;color:#7D8590}
+  html.sidebar-on.side-mini .sn-fold-body[hidden]{display:block!important}
+  html.sidebar-on.side-mini .sn-fold{display:none}
+}
+/* menu użytkownika (okienko) – jasne niezależnie od ciemnego paska bocznego */
+.sn-menu{min-width:240px;padding:4px}
+.sn-menu-h{display:flex;flex-direction:column;padding:8px 10px 10px}
+.sn-menu-h b{font-size:14px}
+.sn-menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.sn-menu .opt{display:flex;width:100%;padding:8px 10px;border-radius:7px;text-decoration:none;color:var(--ink);font-size:14px;border:0;background:none;cursor:pointer;text-align:left;font:inherit}
+.sn-menu .opt:hover{background:var(--panel)}
+html body .sn-menu .sn-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px!important;color:var(--ink)!important;border-radius:7px;font-size:14px!important;min-height:0}
+html body .sn-menu .sn-item:hover{background:var(--panel)!important;color:var(--ink)!important}
+html body .sn-menu .sn-item .sn-ico{color:var(--muted)!important}
+html body .sn-menu .sn-sw{background:var(--line-2)!important}
+html body .sn-menu .sn-opt[aria-checked="true"] .sn-sw{background:var(--accent)!important}
+html body .sn-menu .sn-out{color:var(--warn)}

@@ -56,6 +56,7 @@ const prefetchViews = () => {
   if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 3000 }); else setTimeout(go, 1500);
 };
 import { logout as endSession, startIdleWatch, takeLogoutReason } from './session.js';
+import { openPop, closePop } from './pop.js';
 
 const app = document.getElementById('app');
 let cleanup = null;
@@ -267,23 +268,33 @@ function layout(active) {
     if (jpkOnly || partner) return null;
     const all = [...M.tabs, ...moreAll].filter(x => x[2] !== 'logout' && x[2] !== 'navcfg');
     const GROUPS = [
-      ['Codzienna praca', ['pulpit', 'm2:', 'rozliczenia', 'klienci', 'm2:klienci', 'm2:sprawy', 'm2:zadania', 'spotkania', 'rozmowy']],
+      ['', ['pulpit', 'm2:']],
+      ['Praca', ['rozliczenia', 'klienci', 'm2:klienci', 'm2:sprawy', 'm2:zadania', 'spotkania', 'rozmowy']],
       ['Dokumenty', ['sprawozdania', 'm2:dokumenty', 'm2:zlecenia', 'm2:oferty', 'oferty', 'informacje']],
       ['Terminy i kontrola', ['terminy', 'rok', 'aml']],
-      ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'koszty', 'zespol', 'bledy']],
+      ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'koszty', 'zespol', 'bledy'], true],
     ];
     const BOTTOM = ['pomoc', 'zainstaluj', 'oaplikacji'];
-    const SHORT = { bledy: 'Dziennik błędów', 'm2:zadania': 'Zadania', zainstaluj: 'Aplikacja na telefon', spotkania: 'Spotkania i grafik', 'm2:dokumenty': 'Pisma procesowe' };
+    const SHORT = { bledy: 'Dziennik błędów', 'm2:zadania': 'Zadania', zainstaluj: 'Aplikacja na telefon', spotkania: 'Spotkania', 'm2:dokumenty': 'Pisma procesowe', sprawozdania: 'Dokumenty', 'm2:czas': 'Czas pracy', informacje: 'Informacje do klientów', terminy: 'Kalendarz obowiązków', raport: 'Raport miesięczny', koszty: 'Koszt księgowych', zespol: 'Zespół i ustawienia' };
     const short = (l, k) => SHORT[k] || l.split(/ – | \(/)[0];
     const item = ([href, label, key]) => {
       const ico = h('span', { class: 'sn-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS[key] || TAB_ICONS.default;
       return h('a', { href, class: 'sn-item' + (active === key ? ' on' : ''), title: label }, ico, h('span', { class: 'sn-l' }, short(label, key)));
     };
     const used = new Set();
-    const groups = GROUPS.map(([g, keys]) => {
+    // grupa zwijana (Zarządzanie): stan zapamiętany na tym urządzeniu; rozwinięta, gdy otwarty jest jej ekran
+    const fold = (g, on) => { try { if (on === undefined) return localStorage.getItem('rkdp_sn_' + g) === '1'; localStorage.setItem('rkdp_sn_' + g, on ? '1' : '0'); } catch { return false; } };
+    const groups = GROUPS.map(([g, keys, foldable]) => {
       const its = keys.map(k => all.find(x => x[2] === k)).filter(Boolean);
       its.forEach(x => used.add(x[2]));
-      return its.length ? h('div', { class: 'sn-group' }, h('p', { class: 'sn-gh' }, g), ...its.map(item)) : null;
+      if (!its.length) return null;
+      if (!g) return h('div', { class: 'sn-group sn-first' }, ...its.map(item));
+      if (!foldable) return h('div', { class: 'sn-group' }, h('p', { class: 'sn-gh' }, g), ...its.map(item));
+      const open = fold(g) || its.some(x => x[2] === active);
+      const body = h('div', { class: 'sn-fold-body', hidden: !open }, ...its.map(item));
+      const btn = h('button', { type: 'button', class: 'sn-gh sn-fold', 'aria-expanded': String(open), onclick: () => { const on = body.hidden; body.hidden = !on; btn.setAttribute('aria-expanded', String(on)); fold(g, on); } },
+        h('span', {}, g), (() => { const c = h('span', { class: 'sn-chev', 'aria-hidden': 'true' }); c.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>'; return c; })());
+      return h('div', { class: 'sn-group' }, btn, body);
     });
     const rest = all.filter(x => !used.has(x[2]) && !BOTTOM.includes(x[2]));
     if (rest.length) groups.push(h('div', { class: 'sn-group' }, h('p', { class: 'sn-gh' }, 'Inne'), ...rest.map(item)));
@@ -300,8 +311,20 @@ function layout(active) {
       h('div', { class: 'sn-top' }, h('a', { href: M.home, class: 'sn-logo' }, h('img', { src: LIGHT_LOGO(M.logo), alt: M.alt })), mini),
       h('button', { type: 'button', class: 'sn-search', onclick: () => openCmdk() }, (() => { const i = h('span', { class: 'sn-ico' }); i.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'; return i; })(), h('span', { class: 'sn-l' }, 'Szukaj…'), h('kbd', { class: 'sn-l' }, 'Ctrl K')),
       h('nav', { class: 'sn-groups' }, ...groups.filter(Boolean)),
-      h('div', { class: 'sn-bottom' }, ...BOTTOM.map(k => all.find(x => x[2] === k)).filter(Boolean).map(item), autoSw, topBtn,
-        h('a', { href: '#/profil', class: 'sn-item sn-me' + (active === 'profil' ? ' on' : ''), title: me.email }, h('span', { class: 'avatar sn-av' }, ava(me)), h('span', { class: 'sn-l' }, me.full_name))));
+      h('div', { class: 'sn-bottom' }, (() => {
+        // jedno menu użytkownika zamiast kilku luźnych pozycji: profil, pomoc, ustawienia menu, wylogowanie
+        const lnk = (href, label) => h('a', { class: 'opt', href, onclick: () => closePop() }, label);
+        const extra = BOTTOM.map(k => all.find(x => x[2] === k)).filter(Boolean);
+        const btn = h('button', { type: 'button', class: 'sn-item sn-me' + (active === 'profil' ? ' on' : ''), 'aria-haspopup': 'menu', title: me.email,
+          onclick: () => openPop(btn, h('div', { class: 'sn-menu' },
+            h('div', { class: 'sn-menu-h' }, h('b', {}, me.full_name), h('span', { class: 'small muted' }, me.email)),
+            lnk('#/profil', 'Mój profil i powiadomienia'),
+            ...extra.map(x => lnk(x[0], short(x[1], x[2]))),
+            h('hr'), autoSw, topBtn, h('hr'),
+            h('button', { type: 'button', class: 'opt sn-out', onclick: () => { closePop(); logout(); } }, 'Wyloguj'))) },
+          h('span', { class: 'avatar sn-av' }, ava(me)), h('span', { class: 'sn-l' }, me.full_name), (() => { const c = h('span', { class: 'sn-chev sn-l', 'aria-hidden': 'true' }); c.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5-5 5 5"/></svg>'; return c; })());
+        return btn;
+      })()));
   })();
   // partnerzy i konta tylko-JPK nie mają menu po lewej
   if (sideNav) applySide(); else document.documentElement.classList.remove('sidebar-on', 'side-mini', 'side-auto');
