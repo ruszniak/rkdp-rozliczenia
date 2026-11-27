@@ -97,44 +97,118 @@ function row(z, onOpen) {
 }
 
 // ---------- widok #/zlecenia ----------
+// Dwa widoki: „Moje” – według tego, co wymaga Twojego ruchu (decyzje, po terminie, do zrobienia, czekam na innych);
+// „Cały zespół” – według terminu (po terminie, dziś i jutro, ten tydzień, później, bez terminu), z filtrem osób.
+// W każdym wierszu zdjęcie osoby, która ma się zadaniem zająć, i najczęstsze akcje bez otwierania okna.
+const VKEY = 'rkdp_zl_view';
+const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
+const dueTxt = z => {
+  const d = z.due_date; if (!d) return '';
+  if (late(z)) return fmtD(d).slice(0, 5);
+  if (d === today()) return 'dziś';
+  if (d === addDays(1)) return 'jutro';
+  const dt = new Date(d + 'T12:00:00'), diff = (dt - new Date()) / 86400000;
+  return diff < 7 ? dt.toLocaleDateString('pl-PL', { weekday: 'short' }) + ' ' + fmtD(d).slice(0, 5) : fmtD(d).slice(0, 5);
+};
+async function quickAct(z, akcja, msg, reload) {
+  const { error } = await sb.rpc('zlecenie_akcja', { p_id: z.id, p_akcja: akcja, p_tekst: null });
+  if (error) return fail(error);
+  toast(msg);
+  if (['start', 'zglos', 'akceptuj'].includes(akcja)) import('../gcal.js').then(m => m.gcalSyncSoon()).catch(() => {});
+  reload();
+}
+// wiersz zadania: zdjęcie wykonującego · tytuł i opis · termin · akcje
+function qrow(z, { onOpen, reload, meta }) {
+  const me = state.me.id, p = memberById(z.assignee_id) || { full_name: '?' }, mine = z.assignee_id === me || isHelper(z);
+  const acts = [];
+  const b = (label, fn, cls = '') => acts.push(h('button', { type: 'button', class: 'tq-act ' + cls, onclick: e => { e.stopPropagation(); fn(); } }, label));
+  if (z.status === 'zgloszone' && canManage(z) && z.assignee_id !== me) { b('Akceptuj', () => quickAct(z, 'akceptuj', 'Zaakceptowano – zadanie zamknięte', reload), 'ok'); b('Do poprawy', () => onOpen(z)); }
+  else if (z.status === 'pytanie' && canManage(z) && z.assignee_id !== me) b('Odpowiedz', () => onOpen(z), 'ok');
+  else if (mine && z.status === 'nowe') b('Zaczynam', () => quickAct(z, 'start', 'Zaczęte – powodzenia', reload));
+  else if (mine && z.status === 'w_toku') b('Zrobione', () => quickAct(z, 'zglos', 'Zgłoszono wykonanie – zlecający dostał powiadomienie', reload), 'ok');
+  const st = stepsOf(z), done = st.filter(s => s.done).length;
+  const metaTxt = meta(z) + (st.length ? ` · kroki ${done}/${st.length}` : '');
+  const el = h('div', { class: 'tq-row' + (late(z) ? ' is-late' : ''), role: 'button', tabindex: '0', onclick: () => onOpen(z), onkeydown: e => { if (e.key === 'Enter') onOpen(z); } },
+    h('span', { class: 'tq-av avatar', title: 'Zajmuje się: ' + p.full_name }, ava(p)),
+    h('div', { class: 'tq-main' },
+      h('div', { class: 'tq-title' }, h('span', { class: 'tq-dot', style: { background: ST_COLOR[z.status] || '#9CA3AF' }, title: stOf(z)[0] }), h('span', { class: 'tq-t' }, z.title),
+        z.priority === 'pilne' ? h('span', { class: 'tq-hot' }, 'pilne') : null),
+      h('div', { class: 'tq-meta' }, metaTxt)),
+    h('div', { class: 'tq-due' + (late(z) ? ' late' : z.due_date === today() ? ' today' : '') }, dueTxt(z)),
+    acts.length ? h('div', { class: 'tq-acts' }, ...acts) : h('div', { class: 'tq-acts' }));
+  return el;
+}
+const section = (title, rows, note) => rows.length ? h('section', { class: 'tq-sec' }, h('div', { class: 'tq-sh' }, h('b', {}, title), note ? h('span', { class: 'tq-note' }, note) : null, h('span', { class: 'tq-n' }, String(rows.length))), ...rows) : null;
+
 export async function renderZlecenia(main, id, { embed = false } = {}) {
   if (isPartner()) return renderPartner(main, id);
-  const admin = isAdmin();
-  let all = [], filter = admin ? 'aktywne' : 'aktywne';
-  const listBox = h('div', {}, h('div', { class: 'spinner' }, 'Wczytywanie…'));
-  const chips = h('div', { class: 'zl-chips' });
+  const admin = isAdmin(), me = state.me.id;
+  let all = [], view = 'moje', who1 = null;
+  try { view = localStorage.getItem(VKEY) || 'moje'; } catch { /* */ }
+  const listBox = h('div', { class: 'tq' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
+  const chips = h('div', { class: 'zl-chips tq-tabs' });
   const reload = async () => { try { all = await loadAll(); } catch (e) { put(listBox, h('p', { class: 'hint' }, 'Zadania są niedostępne.')); return; } draw(); };
   const open = z => openZlecenie(z.id, reload);
+  const by = idd => (memberById(idd)?.full_name || '').split(' ')[0] || '—';
+  const stLow = z => stOf(z)[0].toLowerCase();
 
   function draw() {
-    const F = admin ? [
-      ['aktywne', 'Aktywne', z => OPEN.includes(z.status)],
-      ['sprawdz', 'Do sprawdzenia', z => z.status === 'zgloszone'],
-      ['pytania', 'Pytania', z => z.status === 'pytanie'],
-      ['po', 'Po terminie', late],
-      ['koniec', 'Zakończone', z => !OPEN.includes(z.status)],
-    ] : [
-      ['aktywne', 'Do zrobienia', z => OPEN.includes(z.status) && (z.assignee_id === state.me.id || isHelper(z))],
-      ['zlecone', 'Zlecone przeze mnie', z => OPEN.includes(z.status) && z.created_by === state.me.id && z.assignee_id !== state.me.id],
-      ['sprawdz', 'Do sprawdzenia', z => z.status === 'zgloszone' && z.created_by === state.me.id && z.assignee_id !== state.me.id],
-      ['koniec', 'Zakończone', z => !OPEN.includes(z.status)]];
-    put(chips, ...F.map(([k, l, f]) => { const n = all.filter(f).length; return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : '') + ((k === 'sprawdz' || k === 'pytania' || k === 'po') && n ? ' hot' : ''), onclick: () => { filter = k; draw(); } }, l, h('span', {}, String(n))); }));
-    const f = F.find(x => x[0] === filter)[2];
-    const rows = all.filter(f).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
-    if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zadań. Kliknij „+ Zadanie”, aby zlecić zadanie.' : 'Nie masz zadań do zrobienia. Kliknij „+ Zadanie”, aby dodać zadanie dla siebie lub kogoś z zespołu.') : 'Brak zadań.')); return; }
-    const by = new Map(); rows.forEach(z => by.set(z.assignee_id, [...(by.get(z.assignee_id) || []), z]));
-    put(listBox, h('div', { class: 'mj-groups' }, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
-      h('section', { class: 'mj-group' }, h('h3', { class: 'mj-gh' }, h('span', { class: 'zl-av' }, ava(memberById(mid) || { full_name: '?' })), who(mid), h('span', { class: 'n' }, `${zs.length}`)),
-        ...zs.map(z => row(z, open))))));
+    const openAll = all.filter(z => OPEN.includes(z.status));
+    const isMine = z => z.assignee_id === me || isHelper(z);
+    const decide = openAll.filter(z => ['zgloszone', 'pytanie'].includes(z.status) && canManage(z) && z.assignee_id !== me);
+    const mineOpen = openAll.filter(z => isMine(z) && !decide.includes(z));
+    const myLate = mineOpen.filter(late), myTodo = mineOpen.filter(z => !late(z)).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
+    const waiting = openAll.filter(z => z.created_by === me && !isMine(z) && !decide.includes(z));
+    const nMine = decide.length + mineOpen.length;
+    const tabs = [['moje', 'Moje', nMine, decide.length || myLate.length], ['zespol', admin ? 'Cały zespół' : 'Wszystkie moje', openAll.length, 0], ['koniec', 'Zakończone', all.length - openAll.length, 0]];
+    put(chips, ...tabs.map(([k, l, n, hot]) => h('button', { type: 'button', class: 'zl-chip' + (view === k ? ' on' : '') + (hot ? ' hot' : ''), onclick: () => { view = k; try { localStorage.setItem(VKEY, k); } catch { /* */ } draw(); } }, l, h('span', {}, String(n)))));
+    if (view === 'moje') {
+      const metaFrom = z => [z.created_by !== me ? `od ${by(z.created_by)}` : 'Twoje', stLow(z), '#' + z.no].join(' · ');
+      const metaDecide = z => [z.status === 'pytanie' ? `${by(z.assignee_id)} pyta` : `${by(z.assignee_id)} zgłosił(a) wykonanie`, '#' + z.no].join(' · ');
+      const metaWait = z => [`u ${by(z.assignee_id)}`, stLow(z), '#' + z.no].join(' · ');
+      const secs = [
+        section('Czeka na Twoją decyzję', decide.map(z => qrow(z, { onOpen: open, reload, meta: metaDecide }))),
+        section('Po terminie', myLate.map(z => qrow(z, { onOpen: open, reload, meta: metaFrom }))),
+        section('Do zrobienia', myTodo.map(z => qrow(z, { onOpen: open, reload, meta: metaFrom }))),
+        section('Zleciłeś – czekasz na innych', waiting.map(z => qrow(z, { onOpen: open, reload, meta: metaWait }))),
+      ].filter(Boolean);
+      put(listBox, secs.length ? h('div', { class: 'tq-box' }, ...secs) : h('p', { class: 'hint tq-empty' }, 'Nic nie czeka na Ciebie. Nowe zadanie dodasz przyciskiem „+ Zadanie”.'));
+      return;
+    }
+    if (view === 'koniec') {
+      const rows = all.filter(z => !OPEN.includes(z.status)).slice(0, 60);
+      const meta = z => [stLow(z), z.accepted_at ? new Date(z.accepted_at).toLocaleDateString('pl-PL') : '', '#' + z.no].filter(Boolean).join(' · ');
+      put(listBox, rows.length ? h('div', { class: 'tq-box' }, section('Zakończone', rows.map(z => qrow(z, { onOpen: open, reload, meta })), rows.length === 60 ? 'ostatnie 60' : '')) : h('p', { class: 'hint tq-empty' }, 'Brak zakończonych zadań.'));
+      return;
+    }
+    // Cały zespół – według terminu, filtr osób (zdjęcia)
+    const people = [...new Set(openAll.map(z => z.assignee_id).filter(Boolean))].map(memberById).filter(Boolean).sort((a, b) => a.full_name.localeCompare(b.full_name, 'pl'));
+    const pf = h('div', { class: 'tq-people' },
+      h('button', { type: 'button', class: 'tq-pp' + (!who1 ? ' on' : ''), onclick: () => { who1 = null; draw(); } }, 'Wszyscy'),
+      ...people.map(p => h('button', { type: 'button', class: 'tq-pp' + (who1 === p.id ? ' on' : ''), title: p.full_name, onclick: () => { who1 = who1 === p.id ? null : p.id; draw(); } },
+        h('span', { class: 'avatar tq-ppav' }, ava(p)), p.full_name.split(' ')[0], h('span', { class: 'tq-n' }, String(openAll.filter(z => z.assignee_id === p.id).length)))));
+    const rows = openAll.filter(z => !who1 || z.assignee_id === who1 || helpersOf(z).includes(who1));
+    const t = today(), t1 = addDays(1), t7 = addDays(7);
+    const sortD = a => a.sort((x, y) => (x.due_date || '').localeCompare(y.due_date || '') || y.created_at.localeCompare(x.created_at));
+    const meta = z => [stLow(z), z.created_by !== z.assignee_id ? `od ${by(z.created_by)}` : '', '#' + z.no].filter(Boolean).join(' · ');
+    const R = arr => sortD(arr).map(z => qrow(z, { onOpen: open, reload, meta }));
+    const secs = [
+      section('Po terminie', R(rows.filter(late))),
+      section('Dziś i jutro', R(rows.filter(z => !late(z) && z.due_date && z.due_date <= t1))),
+      section('Ten tydzień', R(rows.filter(z => !late(z) && z.due_date && z.due_date > t1 && z.due_date <= t7))),
+      section('Później', R(rows.filter(z => !late(z) && z.due_date && z.due_date > t7))),
+      section('Bez terminu', R(rows.filter(z => !z.due_date))),
+    ].filter(Boolean);
+    put(listBox, people.length > 1 ? pf : null, secs.length ? h('div', { class: 'tq-box' }, ...secs) : h('p', { class: 'hint tq-empty' }, 'Brak aktywnych zadań.'));
   }
 
   // na Pulpicie (embed) też otwieramy zadanie z linku / powiadomienia (#/pulpit?zl=<id>)
   if (embed) { put(main, chips, listBox); await reload(); if (id) openZlecenie(id, reload); return; }
-  put(main, 
+  put(main,
     h('div', { class: 'page-head' },
       h('div', {},
-        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, admin ? 'Zadania dla zespołu' : 'Zadania', infoTip(HELP, 'Zadania – jak to działa')),
-        h('p', { class: 'sub' }, admin ? 'Dodatkowe zadania dla pracowników – z akceptacją wykonania.' : 'Twoje zadania i te, które zleciłeś innym. Gdy skończysz, kliknij „Zrobione – zgłaszam”.')),
+        h('h1', { style: { marginTop: '6px', display: 'flex', alignItems: 'center' } }, 'Zadania', infoTip(HELP, 'Zadania – jak to działa')),
+        h('p', { class: 'sub' }, 'Moje – to, co wymaga Twojego ruchu. Cały zespół – wszystko według terminu.')),
       h('button', { class: 'btn btn-primary', type: 'button', onclick: () => newZlecenie(reload) }, icon('plus'), 'Zadanie')),
     chips, listBox);
   await reload();

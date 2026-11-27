@@ -120,6 +120,9 @@
               const c = D.clients.find(x => x.id === e.cid); if (!c) return; const o = out.get(e.cid) || { client_id: e.cid, name: c.name, n: 0, last_at: e.at, mentioned: false, period: e.per }; o.n++; o.mentioned ||= e.m; if (e.at > o.last_at) { o.last_at = e.at; o.period = e.per; } out.set(e.cid, o); });
             return { data: [...out.values()].sort((a, b) => b.last_at.localeCompare(a.last_at)), error: null };
           }
+          if (fn === 'zlecenie_akcja') { const z = (D.zlecenia || []).find(x => x.id === args.p_id); if (!z) return { data: null, error: { message: 'Brak zadania' } };
+            const ST = { start: 'w_toku', zglos: 'zgloszone', akceptuj: 'zaakceptowane', popraw: 'w_toku', pytanie: 'pytanie', zakoncz: 'zaakceptowane', anuluj: 'anulowane', wznow: 'w_toku' };
+            if (ST[args.p_akcja]) z.status = ST[args.p_akcja]; if (args.p_akcja === 'akceptuj' || args.p_akcja === 'zakoncz') z.accepted_at = new Date().toISOString(); return { data: null, error: null }; }
           if (fn === 'leave_decide' || fn === 'leave_cancel') { const r = (D.leave_requests || []).find(x => x.id === args.p_id); if (!r) return { data: null, error: { message: 'Brak wniosku' } };
             if (fn === 'leave_cancel') r.status = 'wycofany'; else { Object.assign(r, { status: args.p_approve ? 'zaakceptowany' : 'odrzucony', decided_by: me.id, decided_at: new Date().toISOString(), decision_note: args.p_note });
               if (args.p_approve) (args.p_days || []).forEach(d => { D.attendance = (D.attendance || []).filter(a => !(a.member_id === r.member_id && a.day === d)); D.attendance.push({ id: 'at-' + d + r.member_id, member_id: r.member_id, day: d, kind: r.kind, break_min: 0, note: 'Wniosek urlopowy' }); }); }
