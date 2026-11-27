@@ -70,8 +70,33 @@ const HELP = `Zadania to dodatkowe zadania w zespole RKDP.
 Widzisz zadania, które masz do zrobienia, i te, które zleciłeś.
 Nie odpowiadaj na maile o zadaniach – odpowiadaj tutaj. Sprawy bieżących rozliczeń klienta (braki dokumentów, problemy z księgowaniem) prowadź w „Rozmowach”.`;
 
+// nieprzeczytane wpisy w zadaniach: komentarze, pytania, zgłoszenia innych osób od ostatniego otwarcia zadania
+const READ_CUTOFF = '2026-11-27T10:15:00Z'; // zadania bez zapisu otwarcia – wszystko sprzed wdrożenia uznane za przeczytane
+let unread = new Map();
+const readNow = new Map(); // otwarte w tej sesji – nie czekamy na zapis w bazie
+export function markRead(id) {
+  if (!state.me?.id || !id) return;
+  unread.delete(id); readNow.set(id, new Date().toISOString());
+  sb.from('zlecenia_reads').upsert({ zlecenie_id: id, member_id: state.me.id, read_at: new Date().toISOString() }).then(() => {}, () => {});
+}
+async function loadUnread() {
+  const me = state.me.id, since = new Date(Date.now() - 60 * 86400000).toISOString();
+  const [{ data: rd }, { data: wp }] = await Promise.all([
+    sb.from('zlecenia_reads').select('zlecenie_id, read_at').eq('member_id', me),
+    sb.from('zlecenia_wpisy').select('zlecenie_id, author_id, kind, created_at').neq('author_id', me).neq('kind', 'status').gt('created_at', since).order('created_at', { ascending: false }).limit(1500),
+  ]);
+  const seen = new Map((rd || []).map(r => [r.zlecenie_id, r.read_at]));
+  const out = new Map();
+  for (const w of wp || []) {
+    const at = [seen.get(w.zlecenie_id) || READ_CUTOFF, readNow.get(w.zlecenie_id) || ''].sort().pop();
+    if (w.created_at > at) { const o = out.get(w.zlecenie_id) || { n: 0, kind: w.kind, by: w.author_id }; o.n++; out.set(w.zlecenie_id, o); }
+  }
+  unread = out;
+}
 async function loadAll() {
+  const ur = loadUnread().catch(() => {});
   const { data, error } = await sb.from('zlecenia').select('*, m2_matters(number), m2_clients(name)').order('created_at', { ascending: false }).limit(500);
+  await ur;
   if (error) throw error;
   return data || [];
 }
@@ -128,17 +153,18 @@ function qrow(z, { onOpen, reload, meta }) {
   else if (mine && z.status === 'w_toku') b('Zrobione', () => quickAct(z, 'zglos', 'Zgłoszono wykonanie – zlecający dostał powiadomienie', reload), 'ok');
   const st = stepsOf(z), done = st.filter(s => s.done).length;
   const metaTxt = meta(z) + (st.length ? ` · kroki ${done}/${st.length}` : '');
-  const el = h('div', { class: 'tq-row' + (late(z) ? ' is-late' : ''), role: 'button', tabindex: '0', onclick: () => onOpen(z), onkeydown: e => { if (e.key === 'Enter') onOpen(z); } },
+  const el = h('div', { class: 'tq-row' + (late(z) ? ' is-late' : '') + (unread.get(z.id) ? ' is-new' : ''), role: 'button', tabindex: '0', onclick: () => onOpen(z), onkeydown: e => { if (e.key === 'Enter') onOpen(z); } },
     h('span', { class: 'tq-av avatar', title: 'Zajmuje się: ' + p.full_name }, ava(p)),
     h('div', { class: 'tq-main' },
       h('div', { class: 'tq-title' }, h('span', { class: 'tq-dot', style: { background: ST_COLOR[z.status] || '#9CA3AF' }, title: stOf(z)[0] }), h('span', { class: 'tq-t' }, z.title),
-        z.priority === 'pilne' ? h('span', { class: 'tq-hot' }, 'pilne') : null),
+        z.priority === 'pilne' ? h('span', { class: 'tq-hot' }, 'pilne') : null,
+        unread.get(z.id) ? h('span', { class: 'tq-new', title: `Nowe od ${(memberById(unread.get(z.id).by)?.full_name || '').split(' ')[0]}` }, unread.get(z.id).n > 1 ? `${unread.get(z.id).n} nowe komentarze` : 'nowy komentarz') : null),
       h('div', { class: 'tq-meta' }, metaTxt)),
     h('div', { class: 'tq-due' + (late(z) ? ' late' : z.due_date === today() ? ' today' : '') }, dueTxt(z)),
     acts.length ? h('div', { class: 'tq-acts' }, ...acts) : h('div', { class: 'tq-acts' }));
   return el;
 }
-const section = (title, rows, note) => rows.length ? h('section', { class: 'tq-sec' }, h('div', { class: 'tq-sh' }, h('b', {}, title), note ? h('span', { class: 'tq-note' }, note) : null, h('span', { class: 'tq-n' }, String(rows.length))), ...rows) : null;
+const section = (title, rows, note) => (rows = [...rows].sort((a, b) => (b.classList.contains('is-new') ? 1 : 0) - (a.classList.contains('is-new') ? 1 : 0)), rows.length) ? h('section', { class: 'tq-sec' }, h('div', { class: 'tq-sh' }, h('b', {}, title), note ? h('span', { class: 'tq-note' }, note) : null, h('span', { class: 'tq-n' }, String(rows.length))), ...rows) : null;
 
 export async function renderZlecenia(main, id, { embed = false } = {}) {
   if (isPartner()) return renderPartner(main, id);
@@ -148,7 +174,7 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
   const listBox = h('div', { class: 'tq' }, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   const chips = h('div', { class: 'zl-chips tq-tabs' });
   const reload = async () => { try { all = await loadAll(); } catch (e) { put(listBox, h('p', { class: 'hint' }, 'Zadania są niedostępne.')); return; } draw(); };
-  const open = z => openZlecenie(z.id, reload);
+  const open = z => { openZlecenie(z.id, reload); draw(); };
   const by = idd => (memberById(idd)?.full_name || '').split(' ')[0] || '—';
   const stLow = z => stOf(z)[0].toLowerCase();
 
@@ -160,7 +186,8 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
     const myLate = mineOpen.filter(late), myTodo = mineOpen.filter(z => !late(z)).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
     const waiting = openAll.filter(z => z.created_by === me && !isMine(z) && !decide.includes(z));
     const nMine = decide.length + mineOpen.length;
-    const tabs = [['moje', 'Moje', nMine, decide.length || myLate.length], ['zespol', admin ? 'Cały zespół' : 'Wszystkie moje', openAll.length, 0], ['koniec', 'Zakończone', all.length - openAll.length, 0]];
+    const newMine = [...decide, ...mineOpen, ...waiting].filter(z => unread.has(z.id)).length;
+    const tabs = [['moje', 'Moje', nMine, decide.length || myLate.length || newMine], ['zespol', admin ? 'Cały zespół' : 'Wszystkie moje', openAll.length, 0], ['koniec', 'Zakończone', all.length - openAll.length, 0]];
     put(chips, ...tabs.map(([k, l, n, hot]) => h('button', { type: 'button', class: 'zl-chip' + (view === k ? ' on' : '') + (hot ? ' hot' : ''), onclick: () => { view = k; try { localStorage.setItem(VKEY, k); } catch { /* */ } draw(); } }, l, h('span', {}, String(n)))));
     if (view === 'moje') {
       const metaFrom = z => [z.created_by !== me ? `od ${by(z.created_by)}` : 'Twoje', stLow(z), '#' + z.no].join(' · ');
@@ -318,6 +345,7 @@ function peopleDialog(z, onDone) {
 // ---------- szczegóły zlecenia ----------
 export async function openZlecenie(id, onChange) {
   let admin = isAdmin();
+  markRead(id);
   const [{ data: z, error }, { data: wp }] = await Promise.all([
     sb.from('zlecenia').select('*, m2_matters(id,number,title), m2_clients(id,name,package_hours)').eq('id', id).maybeSingle(),
     sb.from('zlecenia_wpisy').select('*').eq('zlecenie_id', id).order('created_at'),

@@ -195,7 +195,7 @@
       { id: 'demo-zl8', no: 38, title: 'JPK_CIT – plan kont Beta Logistyka', status: 'nowe', assignee_id: 'demo-kasia', created_by: 'demo-anna', due_date: addDays(12), priority: 'normalne', steps: [], helpers: [], created_at: daysAgo(6) },
       { id: 'demo-zl9', no: 31, title: 'Archiwizacja dokumentów 2020', status: 'zaakceptowane', assignee_id: 'demo-tomek', created_by: 'demo-anna', due_date: addDays(-20), priority: 'normalne', steps: [], helpers: [], created_at: daysAgo(30), accepted_at: daysAgo(18) },
     ],
-    zlecenia_wpisy: [], zlecenia_pliki: [],
+    zlecenia_wpisy: [{ id: 'demo-zw1', zlecenie_id: 'demo-zl6', author_id: 'demo-kasia', kind: 'komentarz', body: 'Dosłałam brakujące wyciągi – są w folderze klienta.', created_at: new Date().toISOString() }], zlecenia_pliki: [], zlecenia_reads: [],
     leave_requests: [
       { id: 'demo-ur1', member_id: 'demo-kasia', kind: 'urlop', date_from: '2026-12-21', date_to: '2026-12-31', days: 7, note: 'Zastępstwo: Tomek – pilne sprawy klientów', status: 'oczekuje', created_at: '2026-11-18T09:12:00Z' },
       { id: 'demo-ur2', member_id: 'demo-tomek', kind: 'urlop_zadanie', date_from: '2026-11-06', date_to: '2026-11-06', days: 1, note: null, status: 'zaakceptowany', decided_by: 'demo-anna', decided_at: '2026-11-06T07:40:00Z', created_at: '2026-11-06T07:31:00Z' },
