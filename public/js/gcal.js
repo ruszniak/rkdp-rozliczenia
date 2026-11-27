@@ -158,7 +158,7 @@ export function gcalAgendaCard({ days = 7 } = {}) {
           h('span', { class: 'gc-t' }, e.allDay ? 'cały dzień' : HM.format(new Date(e.start))),
           h('span', { class: 'gc-n' }, e.title, h('em', { class: 'gc-st' }), e.location ? h('small', {}, e.location) : null),
           e.meet ? h('a', { class: 'gc-meet', href: e.meet, target: '_blank', rel: 'noopener', onclick: ev => ev.stopPropagation() }, 'Meet') : null)))))
-        : [h('p', { class: 'hint', style: { padding: '6px 0' } }, 'Brak wydarzeń w najbliższych dniach. 🙂')])));
+        : [h('p', { class: 'hint', style: { padding: '6px 0' } }, 'Brak wydarzeń w najbliższych dniach.')])));
       markNow(listBox);
     };
     // co minutę: „trwa” przy bieżącym wydarzeniu, „zakończone” (wyszarzone) przy tych, które już minęły

@@ -2,7 +2,7 @@
 // Danych z bazy NIE zapisujemy w pamięci urządzenia. Gdy zasięg zniknie przy otwartej aplikacji, widoki korzystają z kopii w pamięci
 // otwartej aplikacji (cache.js) – po zamknięciu aplikacji kopia znika; otwarcie strony bez sieci pokazuje ekran offline.
 const OFFLINE = '/offline.html';
-const CACHE = 'rkdp-shell-v172';
+const CACHE = 'rkdp-shell-v173';
 const NAV = 'rkdp-nav'; // cel kliknięcia w powiadomienie – odbiera go otwarta aplikacja
 
 self.addEventListener('install', e => {

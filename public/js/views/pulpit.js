@@ -101,7 +101,7 @@ function myDashboard(D, period, hist, signs) {
       .map(x => h('a', { class: 'tk-mini', href: `#/klient/${x.c.id}`, 'data-panel': x.c.id }, h('span', {}, x.c.name),
         h('span', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, x.s.missing ? h('span', { class: 'badge warn' }, 'brak dokumentów') : null, h('span', { class: 'small muted' }, `${x.s.done}/${x.s.total}`)))),
     a.list.length - a.settled > 12 ? h('p', { class: 'hint', style: { marginTop: '8px' } }, `… i ${a.list.length - a.settled - 12} więcej`) : null,
-    a.settled === a.list.length ? empty('Wszyscy Twoi klienci są rozliczeni. 🎉') : null))
+    a.settled === a.list.length ? empty('Wszyscy Twoi klienci są rozliczeni.') : null))
     : [card(`Rozliczenia – ${periodLabel(period)}`, null, empty('Nie jesteś przypisany(-a) jako księgowa ani kadrowa do żadnego klienta.'))];
 
   return {
@@ -188,7 +188,7 @@ function adminDashboard(D, period, hist, alerts, signs) {
         h('tbody', {}, ...team.map(row))))) },
       { key: 'podpisy', title: 'Umowy do podpisu', el: signDashCard(signs) },
       { key: 'uwaga', title: 'Wymaga uwagi', el: card('Wymaga uwagi', null, ...(info.length ? [h('div', { class: 'pl-infos' }, ...info)] : []),
-        ...(attention.length ? attention : [empty('Brak zgłoszeń po terminie i pilnych. 👍')])) },
+        ...(attention.length ? attention : [empty('Brak zgłoszeń po terminie i pilnych.')])) },
       openAlerts.length ? { key: 'monitoring', title: 'Monitoring klientów', el: card(`Monitoring klientów – zmiany (${openAlerts.length})`, null,
         ...openAlerts.slice(0, 8).map(a => h('a', { class: 'tk-mini', href: `#/klient/${a.client_id}`, 'data-panel': a.client_id }, h('div', { style: { minWidth: 0 } }, h('b', {}, D.cname[a.client_id] || 'Klient'), h('div', { class: 'small muted' }, a.summary)),
           h('span', { class: 'small muted', style: { flex: 'none' } }, new Date(a.created_at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }))))) } : null,

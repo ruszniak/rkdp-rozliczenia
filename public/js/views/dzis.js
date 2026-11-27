@@ -69,7 +69,7 @@ export async function renderDzis(box, D, { lite = false, hide = new Set() } = {}
   let showAll = false;
   function drawItems() {
     const open = items.filter(x => ['todo', 'in_progress', 'missing_docs', 'reminded'].includes(x.e.status));
-    if (!open.length) { listBox.replaceChildren(emptyState('Wszystko odhaczone', `Twoje kratki za ${periodLabel(period).toLowerCase()} są zrobione. 🎉`)); return; }
+    if (!open.length) { listBox.replaceChildren(emptyState('Wszystko odhaczone', `Twoje kratki za ${periodLabel(period).toLowerCase()} są zrobione.`)); return; }
     const groups = new Map();
     (showAll ? open : open.slice(0, 40)).forEach(x => { const k = x.due < today ? 'late' : x.due; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
     listBox.replaceChildren(...[...groups.entries()].map(([k, xs]) => h('div', { class: 'dz-g' },

@@ -121,7 +121,7 @@ export async function renderZlecenia(main, id, { embed = false } = {}) {
     put(chips, ...F.map(([k, l, f]) => { const n = all.filter(f).length; return h('button', { type: 'button', class: 'zl-chip' + (filter === k ? ' on' : '') + ((k === 'sprawdz' || k === 'pytania' || k === 'po') && n ? ' hot' : ''), onclick: () => { filter = k; draw(); } }, l, h('span', {}, String(n))); }));
     const f = F.find(x => x[0] === filter)[2];
     const rows = all.filter(f).sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || b.created_at.localeCompare(a.created_at));
-    if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zadań. Kliknij „+ Zadanie”, aby zlecić zadanie.' : 'Nie masz zadań do zrobienia. 👍 Kliknij „+ Zadanie”, aby dodać zadanie dla siebie lub kogoś z zespołu.') : 'Brak zadań.')); return; }
+    if (!rows.length) { put(listBox, h('p', { class: 'hint', style: { padding: '16px 0' } }, filter === 'aktywne' ? (admin ? 'Brak aktywnych zadań. Kliknij „+ Zadanie”, aby zlecić zadanie.' : 'Nie masz zadań do zrobienia. Kliknij „+ Zadanie”, aby dodać zadanie dla siebie lub kogoś z zespołu.') : 'Brak zadań.')); return; }
     const by = new Map(); rows.forEach(z => by.set(z.assignee_id, [...(by.get(z.assignee_id) || []), z]));
     put(listBox, h('div', { class: 'mj-groups' }, ...[...by.entries()].sort((a, b) => who(a[0]).localeCompare(who(b[0]), 'pl')).map(([mid, zs]) =>
       h('section', { class: 'mj-group' }, h('h3', { class: 'mj-gh' }, h('span', { class: 'zl-av' }, ava(memberById(mid) || { full_name: '?' })), who(mid), h('span', { class: 'n' }, `${zs.length}`)),
@@ -367,7 +367,7 @@ export async function openZlecenie(id, onChange) {
     if (admin && closed) A('Otwórz ponownie', () => act('wznow'));
   } else {
   if (closed) {
-    hint = z.status === 'anulowane' ? 'Zadanie anulowane.' : `✓ Zadanie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''} 👍`;
+    hint = z.status === 'anulowane' ? 'Zadanie anulowane.' : `✓ Zadanie zakończone${z.accepted_at ? ' ' + new Date(z.accepted_at).toLocaleDateString('pl-PL') : ''}`;
     if (admin) A('Wznów zadanie', () => act('wznow'));
   } else if (mine) {
     hint = office ? { nowe: 'Pytanie od biura rachunkowego – kliknij „Zaczynam” i włącz licznik czasu.', w_toku: 'Gdy odpowiedź będzie gotowa – „Wyślij odpowiedź do biura”.', pytanie: 'Czekasz na odpowiedź biura – dostaniesz powiadomienie.', zgloszone: 'Odpowiedź wysłana – czeka na zamknięcie przez biuro.' }[z.status]

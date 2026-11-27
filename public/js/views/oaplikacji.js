@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Nowy, spokojniejszy układ (kolory bez zmian): etykiety zwykłą pisownią zamiast WERSALIKÓW, przyciski i pola o mniej zaokrąglonych rogach, sprawy i pytania na pulpicie jako jedna lista, Dokumenty i narzędzia w jednej siatce, kontakty w tabelach bez podkreśleń, liczniki w Rozliczeniach bez kolorowych ikon, krótsze nagłówki na telefonie.',
     'Wyszukiwarka (lupa, Ctrl+K) szuka teraz też umów i zleceń, dokumentów do podpisu, zadań i ofert, a po wpisaniu 3 liter – w treści rozmów i wysłanych e-maili.',
     'Karta klienta: cztery przyciski – Edytuj dane, Rozmowa, Nowy dokument i „Więcej ▾” (wiadomość, oferta, telefon); na telefonie w dwóch rzędach, bez przewijania.',
     'Kalendarz na pulpicie pokazuje się od razu z ostatniego odczytu, a Kalendarz Google odświeża się w tle.',

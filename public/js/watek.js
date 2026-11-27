@@ -322,7 +322,7 @@ export async function openThread({ client, period = defaultPeriod(), focus = nul
       out.push(s.el());
     }
     if (D.more && showHist) out.unshift(h('button', { type: 'button', class: 'chat-a wt-older', onclick: () => { months += 12; reload(true); } }, 'Pokaż starsze zmiany kratek i e-maile'));
-    if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, onlyOpen ? 'Nie ma otwartych uwag ani pytań. 👍' : !showHist && (D.mails.length || D.audit.length) ? 'Brak wiadomości – zmiany statusów i e-maile są w zakładce „Historia”. Napisz uwagę albo zadaj pytanie.' : 'Brak wpisów. Napisz uwagę albo zadaj pytanie.'));
+    if (!stream.length) out.push(h('p', { class: 'hint chat-empty' }, onlyOpen ? 'Nie ma otwartych uwag ani pytań.' : !showHist && (D.mails.length || D.audit.length) ? 'Brak wiadomości – zmiany statusów i e-maile są w zakładce „Historia”. Napisz uwagę albo zadaj pytanie.' : 'Brak wpisów. Napisz uwagę albo zadaj pytanie.'));
     const atBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
     thread.replaceChildren(...out);
     if (focus) { const el = thread.querySelector(`[data-id="${focus}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('wt-flash'); } focus = null; }
@@ -462,7 +462,7 @@ async function unreadMenu(anchor) {
     ...(lastUnread.length ? lastUnread.map(u => h('button', { class: 'opt wt-uitem', onclick: () => { closePop(); openThread({ client: { id: u.client_id }, period: String(u.period).slice(0, 7) }).catch(e => fail(e, 'Nie udało się otworzyć rozmowy')); } },
       h('span', { class: 'wt-uname' }, u.name, u.mentioned ? h('span', { class: 'wt-at' }, ' @Ty') : null),
       h('span', { class: 'small muted' }, `${u.n} nowych · ${new Date(u.last_at).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`)))
-      : [h('p', { class: 'hint', style: { padding: '6px 10px' } }, 'Wszystko przeczytane. 👍')]),
+      : [h('p', { class: 'hint', style: { padding: '6px 10px' } }, 'Wszystko przeczytane.')]),
     h('a', { class: 'opt', href: '#/rozmowy', onclick: () => closePop() }, 'Wszystkie rozmowy →'),
     lastUnread.length ? h('button', { class: 'opt', onclick: async () => { closePop(); const now = new Date().toISOString(); await sb.from('thread_reads').upsert(lastUnread.map(u => ({ member_id: state.me.id, client_id: u.client_id, read_at: now })), { onConflict: 'member_id,client_id' }); refreshUnread(); } }, 'Oznacz wszystkie jako przeczytane') : null));
 }

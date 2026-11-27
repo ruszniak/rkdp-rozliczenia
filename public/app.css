@@ -3590,3 +3590,75 @@ a.tl-row:hover{background:var(--panel);border-radius:8px}
 .offline-bar[hidden]{display:none}
 /* karta klienta na telefonie: 4 przyciski w dwóch rzędach zamiast przewijanego paska */
 @media (max-width:600px){.kc-acts{display:grid;grid-template-columns:1fr 1fr;overflow:visible;margin-left:0;margin-right:0;padding-left:0;padding-right:0}.kc-acts>.btn,.kc-acts>.badge{min-width:0;justify-content:center;padding-left:8px;padding-right:8px;overflow:hidden;text-overflow:ellipsis}}
+/* ===== Układ XI 2026: spokojniejszy interfejs – bez napisów WERSALIKAMI, hierarchia zaokrągleń, listy zamiast stosów kart ===== */
+/* 1. etykiety zwykłą pisownią (bez rozstrzelonych wersalików) */
+html body :is(.eyebrow,.pop label,.ag-date,.dk-group h2,.cmdk-sec,.grid thead th,.table-title .muted,.cp-sec h3,.dz-gh,.wt-pins-h,.wt-card-sub,.inf-gtitle,.oa-lbl,.wq-lbl,.mj-k,.gc-dl,.sp-day-h,.tm-sec h3,.sn-gh,.mm-w span,.zl-wk,.tk-pr){text-transform:none!important;letter-spacing:0!important;font-family:var(--sans)!important}
+html body :is(.eyebrow,.dk-group h2,.cmdk-sec,.cp-sec h3,.dz-gh,.oa-lbl,.wq-lbl,.gc-dl,.sp-day-h,.tm-sec h3,.inf-gtitle){font-size:13px!important;font-weight:600!important;color:var(--muted)!important}
+html body .sn-gh{font-size:12.5px!important;font-weight:600!important;margin-top:14px!important}
+html body .grid thead th{font-size:12.5px!important;font-weight:600!important}
+html body .mj-k{font-size:12.5px!important;font-weight:600!important}
+html body .dk-group h2{font-size:15px!important;color:var(--ink)!important;margin-bottom:12px!important}
+
+/* 2. hierarchia kształtów: przyciski i pola 8 px, karty 12 px, okna 16 px */
+html body :is(.btn,.input,.select,select.input,textarea,.zl-chip,.kl-sel,.hdr-search,.sn-search){border-radius:8px!important}
+html body .btn-sm{border-radius:7px!important}
+html body .card{border-radius:12px}
+html body :is(.modal,.modal-box,.cmdk){border-radius:16px!important}
+html:not([data-theme="dark"]) body .card{box-shadow:none!important;border:1px solid var(--line)!important}
+
+/* 3. nagłówki stron – mniejsze, ciaśniejsze */
+html body main h1{font-size:clamp(24px,2.3vw,30px)!important;letter-spacing:-.02em}
+html body .pl-head h2,html body main>h2{font-size:18px!important}
+
+/* 4. pulpit: sprawy i pytania jako jedna lista z liniami zamiast stosu osobnych kart */
+html body .mj-group{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+html body .mj-gh{margin:0!important;padding:12px 16px 10px!important;border-bottom:1px solid var(--line);font-size:14px!important}
+html body .mj-card{border-radius:0!important;margin:0!important;border:0!important;border-bottom:1px solid var(--line)!important;padding:12px 16px 12px 16px!important;box-shadow:none!important}
+html body .mj-group>.mj-card:last-child,html body .mj-group>:last-child .mj-card{border-bottom:0!important}
+html body .mj-card::before{width:3px!important;top:12px!important;bottom:12px!important;border-radius:0 3px 3px 0}
+html body .mj-card:hover{background:var(--panel)!important;transform:none!important}
+html body .mj-groups{gap:16px!important}
+
+/* 5. tabele: kontakty bez podkreśleń, spokojniejsze wiersze */
+html body .grid td a:not(.btn){text-decoration:none}
+html body .grid td a:not(.btn):hover{text-decoration:underline}
+
+/* 6. kalendarz Google na pulpicie – zaproszenie w jednym, czytelnym bloku */
+html body .gc-cta{display:grid!important;grid-template-columns:auto 1fr auto;align-items:start;gap:4px 12px}
+html body .gc-cta>div{grid-column:2}
+html body .gc-cta>.btn{grid-column:2;justify-self:start;margin-top:8px}
+html body .gc-cta>.icon-btn{grid-column:3;grid-row:1}
+
+/* 7. lista klientów: filtry zawijają się zamiast uciekać poza ekran */
+@media (min-width:821px){html body .kl-chips{flex-wrap:wrap!important;overflow:visible!important}}
+
+/* 8. telefon: nagłówek sekcji z przyciskami w jednej linii */
+@media (max-width:600px){
+  html body .pl-head{flex-wrap:nowrap!important}
+  html body .pl-head h2{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  html body .pl-acts{display:flex;gap:6px;flex:none}
+  html body .pl-acts .mj-add{height:34px!important;padding:0 10px!important;font-size:13px!important}
+}
+html body main table td a[href^="tel:"],html body main table td a[href^="mailto:"]{text-decoration:none;color:inherit}
+html body main table td a[href^="tel:"]:hover,html body main table td a[href^="mailto:"]:hover{text-decoration:underline;color:var(--accent)}
+
+/* 9. Dokumenty i narzędzia: jedna siatka z cienkimi liniami zamiast kafelków-kart */
+html body .dk-grid{gap:1px!important;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+html body .dk-tile{border:0!important;border-radius:0!important;box-shadow:none!important;background:var(--card)!important;padding:16px 18px!important}
+html body .dk-tile:hover{background:var(--panel)!important;transform:none!important}
+html body .dk-tile .badge{background:none!important;border:1px solid var(--line-2);color:var(--muted)!important;font-weight:600}
+
+/* 10. telefon: mniejszy nagłówek, ciaśniejsze odstępy, zwarta karta Kalendarza */
+@media (max-width:600px){
+  html body main h1{font-size:24px!important}
+  html body .pl-head{margin-top:18px!important}
+  html body .gc-cta{grid-template-columns:1fr auto;padding:14px 16px!important}
+  html body .gc-cta>.gc-ico{display:none}
+  html body .gc-cta>div{grid-column:1}
+  html body .gc-cta>.btn{grid-column:1;margin-top:6px}
+  html body .gc-cta>.icon-btn{grid-column:2;width:32px;height:32px}
+  html body .gc-cta .small{font-size:13px}
+}
+
+/* 11. kafelki liczników w Rozliczeniach: bez kolorowych kwadratów z ikoną – sama liczba i opis */
+html body .tiles-bento .tile-ic{display:none!important}

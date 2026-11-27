@@ -151,7 +151,7 @@ export async function renderKlienci(main) {
           h('span', { class: 'kl-ini', style: { background: bg, color: fg } }, initials(c.name).slice(0, 2)),
           h('span', { class: 'kl-t' }, h('b', {}, c.name), h('span', { class: 'kl-m' }, c.status !== 'aktywny' ? CLIENT_STATUS[c.status] + ' · ' + meta : meta, sprEl(c))),
           progEl(c));
-      })))) : [h('p', { class: 'hint', style: { padding: '18px 4px' } }, prefs.who === 'uwaga' ? 'Nikt nie wymaga uwagi. 👍' : 'Brak klientów pasujących do filtrów.')]));
+      })))) : [h('p', { class: 'hint', style: { padding: '18px 4px' } }, prefs.who === 'uwaga' ? 'Nikt nie wymaga uwagi.' : 'Brak klientów pasujących do filtrów.')]));
     idx.replaceChildren(...[...groups.keys()].map(l => h('button', { type: 'button', onclick: () => document.getElementById('kl-l-' + l)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, l)));
     idx.hidden = groups.size < 6;
     // komputer: tabela

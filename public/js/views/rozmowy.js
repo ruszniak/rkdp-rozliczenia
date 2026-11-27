@@ -131,7 +131,7 @@ export async function renderRozmowy(main, params) {
       const rows = src.filter(t => !q || (clients.find(c => c.id === t.client_id)?.name || '').toLowerCase().includes(q) || t.title.toLowerCase().includes(q))
         .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
       list.replaceChildren(...[extra ? h('div', { class: 'rz-view' }, h('b', {}, extra), h('button', { type: 'button', class: 'chat-a', onclick: () => { filter = 'aktywnosc'; history.replaceState(null, '', '#/rozmowy'); draw(); } }, '× pokaż rozmowy')) : null,
-        ...(rows.length ? rows.map(t => taskRow(t, clients.find(c => c.id === t.client_id))) : [h('p', { class: 'hint rz-empty' }, 'Brak zadań w tym widoku. 👍')])].filter(Boolean));
+        ...(rows.length ? rows.map(t => taskRow(t, clients.find(c => c.id === t.client_id))) : [h('p', { class: 'hint rz-empty' }, 'Brak zadań w tym widoku.')])].filter(Boolean));
       return;
     }
     let rows = clients.filter(c => byC.has(c.id) || unread.has(c.id)).map(c => ({ c, x: byC.get(c.id) || { last: null, openT: [], lateT: 0, waitT: 0, q: 0, u: 0 }, u: unread.get(c.id) }));
@@ -145,7 +145,7 @@ export async function renderRozmowy(main, params) {
     shown = rows = rows.filter(r => cMatch(r.c)).sort((a, b) => (b.u ? 1 : 0) - (a.u ? 1 : 0) || (b.x.last?.at || '').localeCompare(a.x.last?.at || ''));
     const internal = tickets.filter(t => !t.client_id && TK_OPEN.includes(t.status) && (!mine || t.assignee_id === me || t.created_by === me));
     list.replaceChildren(...[
-      ...(rows.length ? rows.slice(0, 200).map(clientRow) : [h('p', { class: 'hint rz-empty' }, q ? 'Brak klientów pasujących do wyszukiwania.' : filter === 'nieprzeczytane' ? 'Wszystko przeczytane. 👍' : 'Wszystko załatwione – nie ma otwartych uwag, pytań ani zadań. 👍')]),
+      ...(rows.length ? rows.slice(0, 200).map(clientRow) : [h('p', { class: 'hint rz-empty' }, q ? 'Brak klientów pasujących do wyszukiwania.' : filter === 'nieprzeczytane' ? 'Wszystko przeczytane.' : 'Wszystko załatwione – nie ma otwartych uwag, pytań ani zadań.')]),
       doneCount ? h('button', { type: 'button', class: 'chat-a rz-donebtn', onclick: () => { showDone = !showDone; draw(); } }, showDone ? 'Ukryj załatwione' : `Pokaż załatwione (${doneCount})`) : null,
       internal.length && filter === 'aktywnosc' ? h('div', { class: 'rz-internal' }, h('h2', {}, `Zadania wewnętrzne – bez klienta (${internal.length})`), ...internal.map(t => taskRow(t, null))) : null].filter(Boolean));
     drawBulk();

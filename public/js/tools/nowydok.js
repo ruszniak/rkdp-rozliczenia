@@ -32,7 +32,7 @@ export function nowyDokument({ client = null } = {}) {
     ]],
   ];
   let close = () => {};
-  const q = h('input', { class: 'input', type: 'search', placeholder: 'Szukaj: umowa, UPL, PEL, oferta…', style: { marginBottom: '10px' } });
+  const q = h('input', { class: 'input', type: 'search', placeholder: 'Szukaj: umowa, UPL, PEL, oferta…', style: { marginBottom: '10px', width: '100%' } });
   const box = h('div', {});
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
   const draw = () => {

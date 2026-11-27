@@ -167,7 +167,7 @@ export async function renderMoje(main, params, { embed = false, noTasks = false 
     }
     const rows = items.filter(i => filter === 'all' || (filter === 'pilne' ? i.hot || (i.due && i.due < today()) : i.byMe))
       .sort((a, b) => order(a) - order(b) || (a.due || '9999').localeCompare(b.due || '9999') || (b.created || '').localeCompare(a.created || ''));
-    if (!rows.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, noTasks ? 'Brak terminów i pytań do Ciebie. 👍' : 'Nic na Ciebie nie czeka. 👍')); return; }
+    if (!rows.length) { put(list, h('p', { class: 'hint', style: { padding: '18px 0' } }, noTasks ? 'Brak terminów i pytań do Ciebie.' : 'Nic na Ciebie nie czeka.')); return; }
     put(list, ...GROUPS.map(g => {
       const gr = rows.filter(r => (r.group || 'new') === g[0]);
       if (!gr.length) return null;
