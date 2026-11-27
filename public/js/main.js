@@ -273,7 +273,7 @@ function layout(active) {
       ['Zarządzanie', ['urlopy', 'm2:czas', 'raport', 'koszty', 'zespol', 'bledy']],
     ];
     const BOTTOM = ['pomoc', 'zainstaluj', 'oaplikacji'];
-    const SHORT = { 'm2:zadania': 'Zadania', zainstaluj: 'Aplikacja na telefon', spotkania: 'Spotkania i grafik', 'm2:dokumenty': 'Pisma procesowe' };
+    const SHORT = { bledy: 'Dziennik błędów', 'm2:zadania': 'Zadania', zainstaluj: 'Aplikacja na telefon', spotkania: 'Spotkania i grafik', 'm2:dokumenty': 'Pisma procesowe' };
     const short = (l, k) => SHORT[k] || l.split(/ – | \(/)[0];
     const item = ([href, label, key]) => {
       const ico = h('span', { class: 'sn-ico', 'aria-hidden': 'true' }); ico.innerHTML = TAB_ICONS[key] || TAB_ICONS.default;
