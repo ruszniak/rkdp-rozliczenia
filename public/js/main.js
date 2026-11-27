@@ -1,6 +1,7 @@
 import { h, initials, toast, initTooltips, initMobileTables, ava, modal } from './ui.js';
 import { loadMemberPrefs, saveMemberPrefs } from './data.js';
 import { sb, state, hasModule, isJpkOnly, isPartner, setStaleHandler, autoRefreshRoute, invalidateCache } from './store.js';
+import { setOfflineHandler, clearOfflineCopy } from './cache.js';
 import { renderLogin } from './views/login.js';
 import { TERMS_VERSION } from './regulamin.js';
 import { registerSW, isStandalone, isIOS } from './push.js';
@@ -342,7 +343,7 @@ function layout(active) {
 }
 
 async function logout() {
-  invalidateCache();
+  invalidateCache(); clearOfflineCopy();
   location.hash = '';
   await endSession();
 }
@@ -586,6 +587,20 @@ async function start() {
     lastAuto = Date.now();
     route({ silent: true, keepScroll: true });
   });
+  // brak zasięgu: pasek u góry, widoki z ostatnio wczytanych danych; po powrocie sieci – odświeżenie
+  const offBar = h('div', { class: 'offline-bar', role: 'status', hidden: true });
+  document.body.append(offBar);
+  let offNow = false;
+  const setOff = (on, t) => {
+    if (on === offNow && !(on && t)) return;
+    offNow = on; offBar.hidden = !on; document.body.classList.toggle('is-offline', on);
+    offBar.textContent = on ? `Bez internetu – widzisz dane wczytane wcześniej${t ? ' (' + new Date(t).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) + ')' : ''}. Zmian nie można teraz zapisać.` : '';
+    if (!on) { invalidateCache(); if (!routing) route({ silent: true, keepScroll: true }); }
+  };
+  setOfflineHandler(setOff);
+  window.addEventListener('offline', () => setOff(true));
+  window.addEventListener('online', () => setOff(false));
+  if (navigator.onLine === false) setOff(true);
   route().then(prefetchViews);
   // „Co nowego” dla tej osoby – okno po zalogowaniu (po załadowaniu widoku)
   if (!isPartner()) setTimeout(() => import('./ogloszenia.js').then(m => m.showAnnouncements()).catch(() => {}), 1200);

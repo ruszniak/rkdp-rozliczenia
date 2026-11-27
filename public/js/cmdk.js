@@ -15,6 +15,8 @@ const IC = {
   install: '<path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M5 21h14"/>',
   recent: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   bolt: '<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
+  doc: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+  chat: '<path d="M5 5h14v10H9l-4 4z"/>',
 };
 
 // ostatnio otwierane (na tym urządzeniu)
@@ -106,19 +108,55 @@ async function loadData() {
   q.push(m2 ? sb.from('m2_clients').select('id,name,nip').eq('firm', 'm2').order('name').limit(2000) : null);
   q.push(m2 || rk ? sb.from('m2_matters').select('id,number,title,status,firm').order('opened_at', { ascending: false }).limit(1000) : null);
   q.push(rk || m2 ? sb.from('rkdp_tickets').select('id,no,title,module,status').order('created_at', { ascending: false }).limit(600) : null);
-  const [c, mc, mm, tk] = await Promise.all(q.map(p => p ? p.then(r => r.data || [], () => []) : Promise.resolve([])));
+  q.push(m2 || rk ? sb.from('m2_orders').select('id,number,subject,doc_type,status,client_id,firm').order('created_at', { ascending: false }).limit(800) : null);
+  q.push(rk || m2 ? sb.from('offers').select('id,brand,number,client_name,status').order('created_at', { ascending: false }).limit(500) : null);
+  q.push(rk || m2 ? sb.from('zlecenia').select('id,no,title,status,client_id').order('created_at', { ascending: false }).limit(800) : null);
+  q.push(rk || m2 ? sb.from('sign_requests').select('id,title,status,client_id,m2_client_id,created_at').neq('status', 'anulowano').order('created_at', { ascending: false }).limit(600) : null);
+  const [c, mc, mm, tk, ord, off, zl, sg] = await Promise.all(q.map(p => p ? p.then(r => r.data || [], () => []) : Promise.resolve([])));
+  // nazwy klientów M2 TAX (także tych prowadzonych przez RKDP) – do opisu zleceń i podpisów
+  const m2names = new Map(mc.map(x => [x.id, x.name])), rkNames = new Map(c.map(x => [x.id, x.name]));
+  const missing = [...new Set([...ord.map(o => o.client_id), ...sg.map(x => x.m2_client_id)].filter(id => id && !m2names.has(id)))];
+  if (missing.length) { const { data } = await sb.from('m2_clients').select('id,name').in('id', missing.slice(0, 500)); (data || []).forEach(x => m2names.set(x.id, x.name)); }
+  const DOC = { zlecenie: 'Zlecenie', umowa: 'Umowa', pelnomocnictwo: 'Pełnomocnictwo', pps1: 'PPS-1' };
+  const ZST = { nowe: 'nowe', w_toku: 'w trakcie', pytanie: 'pytanie', zgloszone: 'do sprawdzenia', zaakceptowane: 'zrobione', do_poprawy: 'do poprawy' };
   const out = [
     ...c.map(x => ({ group: 'Klienci RKDP', label: x.name, meta: x.nip ? `NIP ${x.nip}` : (x.status || ''), extra: x.nip, email: x.email, icon: 'client', href: `#/klient/${x.id}`, panel: x.id })),
     ...mc.map(x => ({ group: 'Klienci M2 TAX', label: x.name, meta: x.nip ? `NIP ${x.nip}` : '', extra: x.nip, icon: 'client', href: `#/doradztwo/klient/${x.id}` })),
     ...mm.map(x => ({ group: 'Sprawy doradcze', label: `${x.number} – ${x.title}`, meta: `${x.firm === 'rkdp' ? 'RKDP' : 'M2 TAX'} · ${x.status || ''}`, icon: 'matter', href: `#/doradztwo/sprawa/${x.id}` })),
     ...tk.filter(x => (x.module === 'm2' ? m2 : rk)).map(x => ({ group: 'Zgłoszenia', label: `#${x.no} ${x.title}`, meta: x.status === 'zrobione' ? 'zrobione' : (x.module === 'm2' ? 'M2 TAX' : 'RKDP'), icon: 'ticket', href: x.module === 'm2' ? `#/doradztwo/zgloszenia/${x.id}` : `#/zgloszenia/${x.id}` })),
+    ...ord.map(x => ({ group: 'Umowy i zlecenia', label: `${DOC[x.doc_type] || 'Zlecenie'} ${x.number || ''} – ${m2names.get(x.client_id) || ''}`.replace(/\s+–\s*$/, ''), meta: x.subject || '', extra: x.subject, icon: 'doc', href: `#/doradztwo/zlecenie/${x.id}` })),
+    ...off.map(x => ({ group: 'Oferty', label: `Oferta ${x.number || ''} – ${x.client_name || ''}`, meta: `${x.brand === 'm2' ? 'M2 TAX' : 'RKDP'} · ${x.status || ''}`, icon: 'doc', href: x.brand === 'm2' ? `#/doradztwo/oferty/${x.id}` : `#/oferty/${x.id}` })),
+    ...zl.map(x => ({ group: 'Zadania', label: `${x.no ? '#' + x.no + ' ' : ''}${x.title}`, meta: [rkNames.get(x.client_id), ZST[x.status] || x.status].filter(Boolean).join(' · '), extra: rkNames.get(x.client_id), icon: 'ticket', href: `#/zadania/${x.id}` })),
+    ...sg.map(x => { const nm = rkNames.get(x.client_id) || m2names.get(x.m2_client_id) || ''; return { group: 'Do podpisu i podpisane', label: `${x.title}${nm ? ' – ' + nm : ''}`, meta: x.status === 'podpisano' ? 'podpisano' : x.status === 'wyslano' ? 'czeka na podpis' : x.status, icon: 'doc',
+      href: x.client_id ? `#/klient/${x.client_id}` : x.m2_client_id ? `#/doradztwo/klient/${x.m2_client_id}` : '#/dokumenty' }; }),
   ];
   out.forEach(o => { o._n = norm(`${o.label} ${o.extra || ''}`); });
   cache = out; cacheAt = Date.now();
   return out;
 }
 
-const LIMITS = { 'Polecenia': 6, 'Ostatnio otwierane': 6, 'Przejdź do': 6, 'Narzędzia': 6, 'Akcje': 3, 'Klienci RKDP': 7, 'Klienci M2 TAX': 6, 'Sprawy doradcze': 6, 'Zgłoszenia': 6 };
+const LIMITS = { 'Polecenia': 6, 'Ostatnio otwierane': 6, 'Przejdź do': 6, 'Narzędzia': 6, 'Akcje': 3, 'Klienci RKDP': 7, 'Klienci M2 TAX': 6, 'Sprawy doradcze': 6, 'Zgłoszenia': 6, 'Umowy i zlecenia': 5, 'Oferty': 4, 'Zadania': 5, 'Do podpisu i podpisane': 5, 'W rozmowach i wiadomościach': 6 };
+
+// treść rozmów i wysłanych wiadomości – szukane w bazie po wpisaniu min. 3 znaków
+async function searchText(q) {
+  if (!hasModule('rozliczenia') || isJpkOnly()) return [];
+  const term = q.replace(/[%_,()]/g, ' ').trim();
+  if (term.length < 3) return [];
+  const pat = `%${term}%`;
+  const [pc, cm] = await Promise.all([
+    sb.from('period_comments').select('id,client_id,body,created_at').ilike('body', pat).order('created_at', { ascending: false }).limit(8).then(r => r.data || [], () => []),
+    sb.from('client_messages').select('id,client_id,subject,sent_at').or(`subject.ilike.${pat},body.ilike.${pat}`).order('sent_at', { ascending: false }).limit(6).then(r => r.data || [], () => []),
+  ]);
+  const ids = [...new Set([...pc, ...cm].map(x => x.client_id).filter(Boolean))];
+  const names = new Map();
+  if (ids.length) { const { data } = await sb.from('clients').select('id,name').in('id', ids); (data || []).forEach(x => names.set(x.id, x.name)); }
+  const cut = (t, n = 70) => { t = String(t || '').replace(/\s+/g, ' ').trim(); const i = norm(t).indexOf(norm(term)); const a = Math.max(0, i - 25); return (a ? '…' : '') + t.slice(a, a + n) + (t.length > a + n ? '…' : ''); };
+  const day = d => d ? new Date(d).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' }) : '';
+  return [
+    ...pc.map(x => ({ group: 'W rozmowach i wiadomościach', label: cut(x.body), meta: [names.get(x.client_id), day(x.created_at)].filter(Boolean).join(' · '), icon: 'chat', href: `#/klient/${x.client_id}`, _n: norm(term) })),
+    ...cm.map(x => ({ group: 'W rozmowach i wiadomościach', label: 'E-mail: ' + (x.subject || ''), meta: [names.get(x.client_id), day(x.sent_at)].filter(Boolean).join(' · '), icon: 'chat', href: `#/klient/${x.client_id}`, _n: norm(term) })),
+  ];
+}
 function search(items, query) {
   const toks = norm(query).split(/\s+/).filter(Boolean);
   if (!toks.length) return items.filter(i => !i.href || false);
@@ -134,7 +172,7 @@ function search(items, query) {
   for (const [, it] of scored) { per[it.group] = (per[it.group] || 0) + 1; if (per[it.group] <= (LIMITS[it.group] || 6)) out.push(it); }
   return out;
 }
-const ORDER = ['Polecenia', 'Ostatnio otwierane', 'Akcje', 'Przejdź do', 'Narzędzia', 'Klienci RKDP', 'Klienci M2 TAX', 'Sprawy M2 TAX', 'Zgłoszenia'];
+const ORDER = ['Polecenia', 'Ostatnio otwierane', 'Akcje', 'Klienci RKDP', 'Klienci M2 TAX', 'Umowy i zlecenia', 'Do podpisu i podpisane', 'Sprawy doradcze', 'Zadania', 'Oferty', 'Zgłoszenia', 'W rozmowach i wiadomościach', 'Przejdź do', 'Narzędzia'];
 
 function highlight(label, query) {
   const toks = norm(query).split(/\s+/).filter(Boolean);
@@ -148,7 +186,7 @@ let openEl = null;
 export function openCmdk() {
   if (openEl) { openEl.querySelector('input')?.focus(); return; }
   const prevFocus = document.activeElement;
-  const input = h('input', { type: 'text', placeholder: 'Szukaj albo wpisz polecenie, np. „oznacz pit kowalski”…', 'aria-label': 'Szukaj', autocomplete: 'off', spellcheck: 'false' });
+  const input = h('input', { type: 'text', placeholder: 'Szukaj: klient, umowa, zadanie, treść rozmowy… albo polecenie', 'aria-label': 'Szukaj', autocomplete: 'off', spellcheck: 'false' });
   const list = h('div', { class: 'cmdk-list', role: 'listbox' });
   let items = staticItems(), data = [], shown = [], active = 0;
   const close = () => { back.remove(); openEl = null; document.removeEventListener('keydown', onKey, true); prevFocus?.focus?.(); };
@@ -163,7 +201,7 @@ export function openCmdk() {
   let runFull = false;
   const draw = () => {
     const q = input.value.trim();
-    shown = q ? [...commandItems(q, data), ...search([...items, ...data], q)] : [...recents(), ...items];
+    shown = q ? [...commandItems(q, data), ...search([...items, ...data], q), ...(textHits.q === q ? textHits.items : [])] : [...recents(), ...items];
     shown = [...shown].sort((a, b) => ORDER.indexOf(a.group) - ORDER.indexOf(b.group));
     if (active >= shown.length) active = 0;
     if (!shown.length) { list.replaceChildren(h('div', { class: 'cmdk-empty' }, data.length || !q ? 'Nic nie znaleziono.' : 'Wczytywanie…')); return; }
@@ -183,7 +221,13 @@ export function openCmdk() {
     else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); mark(); }
     else if (e.key === 'Enter' && document.activeElement === input) { e.preventDefault(); runFull = e.shiftKey; run(shown[active]); }
   };
-  input.addEventListener('input', () => { active = 0; draw(); });
+  let textHits = { q: '', items: [] }, textT = null;
+  input.addEventListener('input', () => {
+    active = 0; draw();
+    clearTimeout(textT);
+    const q = input.value.trim();
+    if (q.length >= 3) textT = setTimeout(() => searchText(q).then(items => { if (openEl === back && input.value.trim() === q) { textHits = { q, items }; draw(); } }).catch(() => {}), 350);
+  });
   const back = h('div', { class: 'cmdk-back', onclick: e => { if (e.target === back) close(); } },
     h('div', { class: 'cmdk', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Szybkie wyszukiwanie' },
       h('div', { class: 'cmdk-in' }, (() => { const s = h('span', { 'aria-hidden': 'true' }); s.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'; return s; })(), input, h('kbd', {}, 'Esc')),

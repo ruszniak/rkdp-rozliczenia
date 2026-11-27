@@ -96,6 +96,11 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Wyszukiwarka (lupa, Ctrl+K) szuka teraz też umów i zleceń, dokumentów do podpisu, zadań i ofert, a po wpisaniu 3 liter – w treści rozmów i wysłanych e-maili.',
+    'Karta klienta: cztery przyciski – Edytuj dane, Rozmowa, Nowy dokument i „Więcej ▾” (wiadomość, oferta, telefon); na telefonie w dwóch rzędach, bez przewijania.',
+    'Kalendarz na pulpicie pokazuje się od razu z ostatniego odczytu, a Kalendarz Google odświeża się w tle.',
+    'Bez zasięgu: pasek „Bez internetu”, otwarte wcześniej ekrany dalej widać (bez zapisu w pamięci telefonu), po powrocie sieci wszystko odświeża się samo.',
+    'Poranny plan dnia (powiadomienie o 8:00 w dni robocze): także dzisiejsze spotkania i dokumenty czekające na podpis klienta.',
     'Wygląd: krótsze opisy kafelków w Dokumentach i narzędziach, na telefonie zwarte kafelki i podpisane przyciski „+ Sprawa” / „+ Zadanie” na pulpicie.',
     'Historia klienta: na karcie klienta (RKDP i M2 TAX) jedna oś czasu – e-maile, podpisy, pliki, spotkania, oferty, umowy i sprawy, z filtrem rodzaju.',
     'Z oferty od razu umowa: przycisk „Klient zaakceptował – klient i umowa” zakłada klienta w bazie (jeśli go nie ma) i otwiera umowę z cenami z oferty.',

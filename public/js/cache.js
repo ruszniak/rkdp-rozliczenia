@@ -6,11 +6,20 @@
 const CACHE_MAX_AGE = 10 * 60 * 1000;
 const READ_RPC = new Set(['auth_touch', 'auth_state', 'login_mode', 'terms_status']);
 const cache = new Map(); // key -> { t, status, headers, body }
+// tryb offline: ostatnie odczyty z bazy trzymane TYLKO w pamięci otwartej aplikacji (nic nie trafia do pamięci telefonu);
+// gdy zniknie zasięg, listy i karty już raz otwarte pokazują się z tej kopii – do odczytu
+const lastGood = new Map(); // key -> entry (bez czyszczenia przy zapisach)
+const LAST_MAX = 400;
+const keep = (key, e) => { lastGood.delete(key); lastGood.set(key, e); if (lastGood.size > LAST_MAX) lastGood.delete(lastGood.keys().next().value); };
+let offlineHook = null;
+export const setOfflineHandler = fn => { offlineHook = fn; };
+const isNetErr = e => e instanceof TypeError || (typeof navigator !== 'undefined' && navigator.onLine === false);
 const inflight = new Map();
 let onStale = null;
 let gen = 0; // rośnie przy każdym zapisie – odpowiedź pobrana sprzed zapisu nie trafi do pamięci
 export const setStaleHandler = fn => { onStale = fn; };
 export const invalidateCache = () => { cache.clear(); gen++; };
+export const clearOfflineCopy = () => lastGood.clear();
 // trasy, na których wolno pokazać dane z pamięci (listy i pulpity – bez formularzy edycji)
 export function cacheableRoute(hash = location.hash) {
   const [path] = hash.replace(/^#\/?/, '').split('?');
@@ -78,17 +87,32 @@ export async function cachedFetch(input, init = {}) {
     const rpc = (url.match(/\/rest\/v1\/rpc\/([a-z0-9_]+)/i) || [])[1];
     const write = (isRest && !READ_RPC.has(rpc)) || isStorage || isFn || url.includes('/auth/v1/logout');
     if (write) invalidateCache();
-    const res = await baseFetch(input, init);
+    let res;
+    try { res = await baseFetch(input, init); } catch (e) {
+      if (isNetErr(e) && isRest && !url.includes('/rpc/auth_touch')) { offlineHook?.(true); throw new Error('Brak internetu – zmiana nie została zapisana. Spróbuj ponownie, gdy wróci zasięg.'); }
+      throw e;
+    }
     if (write) invalidateCache();
     return res;
   }
-  if (!isRest || !cacheableRoute()) return baseFetch(input, init);
   const key = [method, url, hdr(init, 'Range'), hdr(init, 'Prefer'), hdr(init, 'Accept'), hdr(init, 'Authorization').slice(-24)].join('|');
+  if (!isRest) return baseFetch(input, init);
+  if (!cacheableRoute()) {
+    try {
+      const e = await grab(url, init);
+      if (e.status >= 200 && e.status < 300) { keep(key, e); offlineHook?.(false); }
+      return toResponse(e);
+    } catch (err) {
+      const old = isNetErr(err) && lastGood.get(key);
+      if (old) { offlineHook?.(true, old.t); return toResponse(old); }
+      throw err;
+    }
+  }
   const hit = cache.get(key);
   const load = () => {
     if (inflight.has(key)) return inflight.get(key);
     const g = gen;
-    const p = grab(url, init).then(e => { if (e.status >= 200 && e.status < 300 && g === gen) cache.set(key, e); return e; }).finally(() => inflight.delete(key));
+    const p = grab(url, init).then(e => { if (e.status >= 200 && e.status < 300) { keep(key, e); offlineHook?.(false); if (g === gen) cache.set(key, e); } return e; }).finally(() => inflight.delete(key));
     inflight.set(key, p);
     return p;
   };
@@ -99,6 +123,10 @@ export async function cachedFetch(input, init = {}) {
     }).catch(() => { /* brak sieci – zostaje wersja z pamięci */ });
     return toResponse(hit);
   }
-  return toResponse(await load());
+  try { return toResponse(await load()); } catch (err) {
+    const old = isNetErr(err) && lastGood.get(key);
+    if (old) { offlineHook?.(true, old.t); return toResponse(old); }
+    throw err;
+  }
 }
 

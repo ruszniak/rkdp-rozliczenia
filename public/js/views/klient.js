@@ -17,6 +17,7 @@ import { poaCard } from '../pelnomocnictwa.js';
 import { amlCard } from '../aml/aml.js';
 import { archiveCard } from '../archiwum.js';
 import { timelineCard } from '../historia.js';
+import { menuButton } from '../pop.js';
 
 const YESNO = { true: 'Tak', false: 'Nie' };
 const isJdg = c => c.legal_form === 'jdg';
@@ -406,11 +407,13 @@ export async function renderKlient(main, id) {
         peopleEl),
       h('div', { class: 'kc-acts' },
         editable ? editBtn : h('span', { class: 'badge' }, 'Tylko podgląd'),
-        h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../watek.js').then(m => m.openThread({ client: c })) }, 'Rozmowa i zadania'),
-        h('button', { class: 'btn btn-outline btn-sm', onclick: () => openDocRequest(c, defaultPeriod(), []) }, icon('mail'), 'Wyślij wiadomość'),
-        h('a', { class: 'btn btn-outline btn-sm', href: `#/oferty/nowa?klient=${c.id}` }, 'Oferta'),
+        h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../watek.js').then(m => m.openThread({ client: c })) }, 'Rozmowa'),
         h('button', { class: 'btn btn-outline btn-sm', onclick: () => import('../tools/nowydok.js').then(m => m.nowyDokument({ client: { ...c, ...draft } })).catch(e => fail(e)) }, icon('plus'), 'Nowy dokument'),
-        draft.phone ? h('a', { class: 'btn btn-outline btn-sm', href: 'tel:' + String(draft.phone).replace(/\s/g, '') }, 'Zadzwoń') : null)),
+        menuButton('Więcej', null, [
+          ['Wyślij wiadomość', 'E-mail do klienta, prośba o dokumenty', () => openDocRequest(c, defaultPeriod(), [])],
+          ['Oferta', 'Nowa oferta dla tego klienta', () => { location.hash = `#/oferty/nowa?klient=${c.id}`; }],
+          draft.phone ? ['Zadzwoń', String(draft.phone), () => { location.href = 'tel:' + String(draft.phone).replace(/\s/g, ''); }] : null,
+        ]))),
     h('div', { class: 'two' },
       h('div', {}, editHint, form, savebar),
       h('div', {}, threadCard(c), timelineCard({ rk: c.id }), clientMeetingsCard({ client_id: c.id, name: c.name, email: c.email || '', phone: c.phone || '' }), doradztwoCard(c), showsZus(c) ? zusCard(c, { editable }) : null, poaCard(c, { editable }), archiveCard(c), amlCard({ module: 'rkdp', client: c }), monitorCard(c), assignBox, histBox, auditBox, deleteBtn ? h('div', { style: { textAlign: 'right' } }, deleteBtn) : null)));

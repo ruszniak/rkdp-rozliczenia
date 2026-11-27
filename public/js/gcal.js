@@ -13,8 +13,20 @@ const call = async (action, extra = {}) => {
   return data;
 };
 const put = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter(x => x != null && x !== false));
+// pamięć w przeglądarce: pulpit pokazuje kalendarz od razu z ostatniego odczytu, a Google odpytuje w tle
+const LS = k => `rkdp_gc_${state.me?.id || 'x'}_${k}`;
+const lsGet = (k, maxAge) => { try { const v = JSON.parse(localStorage.getItem(LS(k)) || 'null'); return v && Date.now() - v.t < maxAge ? v.d : null; } catch { return null; } };
+const lsSet = (k, d) => { try { localStorage.setItem(LS(k), JSON.stringify({ t: Date.now(), d })); } catch { /* */ } };
 let statusP = null;
-export const gcalStatus = (fresh = false) => (statusP && !fresh ? statusP : (statusP = call('status').catch(() => ({ configured: false, connected: false }))));
+const fetchStatus = () => call('status').then(st => { lsSet('st', st); return st; });
+export const gcalStatus = (fresh = false) => {
+  if (statusP && !fresh) return statusP;
+  const cached = fresh ? null : lsGet('st', 7 * 86400000);
+  const live = fetchStatus().catch(() => cached || { configured: false, connected: false });
+  statusP = cached ? Promise.resolve(cached) : live;
+  if (cached) live.then(st => { statusP = Promise.resolve(st); });
+  return statusP;
+};
 
 // po zapisaniu terminu / zadania – zaktualizuj kalendarz za kilka sekund (zbiorczo)
 let syncT = null;
@@ -118,8 +130,19 @@ export function gcalAgendaCard({ days = 7 } = {}) {
     put(box, head, opts.length > 1 ? seg : null, listBox);
     const load = async () => {
       put(seg, ...opts.map(o => h('button', { type: 'button', class: String(o.id) === String(cur) ? 'on' : '', onclick: () => { cur = o.id; try { localStorage.setItem('rkdp_gcal_view', String(cur)); } catch { /* */ } load(); } }, o.name)));
-      put(listBox, h('p', { class: 'hint' }, 'Wczytywanie…'));
-      const { items } = await call('events', cur ? { days, member: cur } : { days });
+      const key = 'ev_' + days + '_' + (cur || 'me');
+      const cached = lsGet(key, 3 * 86400000);
+      if (cached) draw(cached); else put(listBox, h('p', { class: 'hint' }, 'Wczytywanie…'));
+      const want = cur;
+      let items;
+      try { ({ items } = await call('events', cur ? { days, member: cur } : { days })); } catch (e) { if (cached) return; throw e; }
+      lsSet(key, items);
+      if (want !== cur) return;
+      if (!cached || JSON.stringify(cached) !== JSON.stringify(items)) draw(items);
+    };
+    const draw = all => {
+      const today0 = new Date().toLocaleDateString('sv-SE'), nowIso = new Date(Date.now() - 12 * 3600000).toISOString();
+      const items = all.filter(e => e.allDay ? (e.end || e.start) >= today0 : (e.end || e.start) >= nowIso);
       const byDay = new Map();
       for (const e of items) {
         const k = e.allDay ? e.start : new Date(e.start).toLocaleDateString('sv-SE');

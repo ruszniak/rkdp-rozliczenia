@@ -183,18 +183,29 @@ async function flush() {
   return sent;
 }
 
-// poranny przegląd: zgłoszenia na dziś / po terminie oraz terminy spraw M2 na dziś i jutro
-async function daily() {
+// poranny plan dnia (dni robocze, ok. 8:00): zadania, zgłoszenia, terminy M2 TAX, dzisiejsze spotkania i dokumenty czekające na podpis klienta
+// harmonogram wywołuje funkcję o 6:00 i 7:00 UTC – wysyłka tylko wtedy, gdy w Warszawie jest 8:00 (zimą i latem)
+async function daily(force = false) {
+  const hour = +new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Warsaw', hour: '2-digit', hourCycle: 'h23' }).format(new Date());
+  if (!force && hour !== 8) return 0;
   const d0 = today(), d1 = plusDays(1);
-  const [{ data: tickets }, { data: dls }, { data: members }] = await Promise.all([
+  const dayStart = new Date(new Date(d0 + 'T00:00:00Z').getTime() - 2 * 3600000).toISOString(), dayEnd = new Date(new Date(d1 + 'T00:00:00Z').getTime()).toISOString();
+  const week = new Date(Date.now() - 3 * 86400000).toISOString();
+  const [{ data: tickets }, { data: dls }, { data: members }, { data: zl }, { data: mts }, { data: sg }] = await Promise.all([
     db.from('rkdp_tickets').select('id, assignee_id, due_date, status').not('assignee_id', 'is', null).lte('due_date', d0).not('status', 'in', '("zrobione","anulowane")'),
     db.from('m2_deadlines').select('id, assignee_id, due_date, matter_id, title, done').eq('done', false).gte('due_date', d0).lte('due_date', d1),
     db.from('team_members').select('id, active').eq('active', true),
+    db.from('zlecenia').select('id, assignee_id, due_date, status').in('status', ['nowe', 'w_toku', 'pytanie']).not('due_date', 'is', null).lte('due_date', d1),
+    db.from('meetings').select('id, start_at, private, status, all_day').eq('status', 'confirmed').gte('start_at', dayStart).lt('start_at', dayEnd),
+    db.from('sign_requests').select('id, created_by, created_at, expires_at').eq('status', 'wyslano').lt('created_at', week).gt('expires_at', new Date().toISOString()),
   ]);
-  const { data: zl } = await db.from('zlecenia').select('id, assignee_id, due_date, status').in('status', ['nowe', 'w_toku', 'pytanie']).not('due_date', 'is', null).lte('due_date', d1);
+  const meetIds = (mts || []).filter(m => new Date(m.start_at).toLocaleDateString('sv-SE', { timeZone: 'Europe/Warsaw' }) === d0).map(m => m.id);
+  const { data: mm } = meetIds.length ? await db.from('meeting_members').select('meeting_id, member_id, active').in('meeting_id', meetIds) : { data: [] as any[] };
+  const startOf = new Map((mts || []).map(m => [m.id, m.start_at]));
   const matterIds = [...new Set((dls || []).map(x => x.matter_id).filter(Boolean))];
   const { data: matters } = matterIds.length ? await db.from('m2_matters').select('id, lead_id, second_id').in('id', matterIds) : { data: [] as any[] };
   const mMap = new Map((matters || []).map(m => [m.id, m]));
+  const hm = (iso: string) => new Date(iso).toLocaleTimeString('pl-PL', { timeZone: 'Europe/Warsaw', hour: '2-digit', minute: '2-digit' });
   let sent = 0;
   for (const m of members || []) {
     const mine = (tickets || []).filter(t => t.assignee_id === m.id);
@@ -203,7 +214,15 @@ async function daily() {
     const dToday = myDl.filter(x => x.due_date === d0).length, dTom = myDl.length - dToday;
     const myZl = (zl || []).filter(x => x.assignee_id === m.id);
     const zlLate = myZl.filter(x => x.due_date < d0).length, zlSoon = myZl.length - zlLate;
-    const parts = [zlLate ? `${zlLate} zad. po terminie` : '', zlSoon ? `${zlSoon} zad. z terminem dziś/jutro` : '', now ? `${now} zgłosz. na dziś` : '', late ? `${late} po terminie` : '', dToday ? `${dToday} termin(y) M2 dziś` : '', dTom ? `${dTom} termin(y) M2 jutro` : ''].filter(Boolean);
+    const myMeet = (mm || []).filter(x => x.member_id === m.id && x.active !== false).map(x => startOf.get(x.meeting_id)).filter(Boolean).sort() as string[];
+    const mySign = (sg || []).filter(x => x.created_by === m.id).length;
+    const parts = [
+      myMeet.length ? `${myMeet.length === 1 ? 'Spotkanie' : myMeet.length + ' spotkania'} dziś (${myMeet.length === 1 ? 'o ' : 'od '}${hm(myMeet[0])})` : '',
+      zlLate ? `${zlLate} zad. po terminie` : '', zlSoon ? `${zlSoon} zad. z terminem dziś/jutro` : '',
+      now ? `${now} zgłosz. na dziś` : '', late ? `${late} zgłosz. po terminie` : '',
+      dToday ? `${dToday} termin(y) M2 dziś` : '', dTom ? `${dTom} termin(y) M2 jutro` : '',
+      mySign ? `${mySign} dok. czeka na podpis klienta` : '',
+    ].filter(Boolean);
     if (!parts.length) continue;
     sent += await notify([m.id], 'terminy', { title: 'Plan na dziś', body: parts.join(' · '), url: '/#/pulpit?widok=dzis', tag: `daily-${d0}` });
   }
@@ -283,7 +302,7 @@ Deno.serve(async (req) => {
       if (body.event === 'ticket_assigned') return json({ sent: await onTicket(body.id, true, body.actor) });
       if (body.event === 'comment') return json({ sent: await onComment(body.id) });
       if (body.event === 'mention') return json({ sent: await onMention(String(body.id || '')) });
-      if (body.event === 'daily') return json({ sent: await daily() });
+      if (body.event === 'daily') return json({ sent: await daily(!!body.force) });
       if (body.event === 'docs_uploaded' || body.event === 'docs_remind') return json({ sent: await onDocs(String(body.request_id || ''), body.event === 'docs_remind', +body.count || 0) });
       if (body.event === 'monitor_alert') return json({ sent: await onMonitor(body) });
       if (body.event === 'zlecenie') return json({ sent: await onZlecenie(body) });

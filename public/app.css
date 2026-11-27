@@ -3586,3 +3586,7 @@ a.tl-row:hover{background:var(--panel);border-radius:8px}
 }
 .dk-tile .small{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .dk-tile .dk-tags{margin-top:auto}
+.offline-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 8px);z-index:9000;max-width:calc(100vw - 24px);padding:8px 14px;border-radius:10px;background:#3b3f46;color:#fff;font-size:13px;line-height:1.35;box-shadow:0 4px 18px rgba(0,0,0,.25);text-align:center}
+.offline-bar[hidden]{display:none}
+/* karta klienta na telefonie: 4 przyciski w dwóch rzędach zamiast przewijanego paska */
+@media (max-width:600px){.kc-acts{display:grid;grid-template-columns:1fr 1fr;overflow:visible;margin-left:0;margin-right:0;padding-left:0;padding-right:0}.kc-acts>.btn,.kc-acts>.badge{min-width:0;justify-content:center;padding-left:8px;padding-right:8px;overflow:hidden;text-overflow:ellipsis}}
