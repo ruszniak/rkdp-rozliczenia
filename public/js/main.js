@@ -333,9 +333,6 @@ function layout(active) {
       h('div', { class: 'nav-brand' },
         h('a', { href: M.home, class: 'brand-logo' }, h('img', { src: LIGHT_LOGO(M.logo), alt: M.alt })),
         switcher),
-      // logo firmy w górnym pasku (komputer z menu po lewej): RKDP albo M2 TAX
-      h('a', { href: M.home, class: 'hdr-firm', 'aria-label': mod === 'm2' || mod === 'partner' ? 'M2 TAX' : 'RKDP' },
-        h('img', { src: mod === 'm2' || mod === 'partner' ? '/m2tax-znak-light.png' : '/logo-rkdp-znak.png', alt: mod === 'm2' || mod === 'partner' ? 'M2 TAX Doradcy Podatkowi' : 'RKDP spółka doradztwa podatkowego' })),
       h('nav', { class: 'nav-links' },
         ...M.tabs.map(link),
         ...pinned.map(x => { const a = link([x[0], x[1].split(/ – | \(| i |, /)[0], x[2]]); a.classList.add('nav-pin'); a.title = x[1]; return a; }),
