@@ -39,6 +39,39 @@ async function newMode() {
   return !error && data === 'haslo_kod';
 }
 
+// filmy ze strony rkdp.pl (Wrocław) w lewej części ekranu logowania – tylko komputer, bez ruchu przy „ogranicz animacje”;
+// trzy ujęcia na zmianę z płynnym przenikaniem; na telefonie lewej części nie ma, więc nic się nie pobiera
+const CLIPS = ['odra', 'ostrow', 'katedra'];
+function loginVideo(side) {
+  const wide = matchMedia('(min-width: 821px)').matches, calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!wide) return false;
+  const wrap = h('div', { class: 'login-video', 'aria-hidden': 'true' });
+  wrap.style.backgroundImage = `url(/video/${CLIPS[0]}.jpg)`;
+  side.prepend(wrap, h('div', { class: 'login-video-shade', 'aria-hidden': 'true' }));
+  side.classList.add('has-video');
+  if (calm) return true;
+  const mk = i => { const v = document.createElement('video'); v.muted = true; v.defaultMuted = true; v.playsInline = true; v.preload = 'auto';
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.poster = `/video/${CLIPS[i]}.jpg`; v.src = `/video/${CLIPS[i]}-lg.mp4`; return v; };
+  let i = 0, cur = mk(0), timer = null;
+  cur.classList.add('on'); wrap.append(cur);
+  const next = () => {
+    if (!wrap.isConnected) return clearTimeout(timer);
+    const j = (i + 1) % CLIPS.length, nv = mk(j);
+    wrap.append(nv);
+    nv.addEventListener('canplay', () => {
+      nv.play().catch(() => {});
+      requestAnimationFrame(() => nv.classList.add('on'));
+      const old = cur; cur = nv; i = j;
+      setTimeout(() => old.remove(), 1600);
+      timer = setTimeout(next, 9000);
+    }, { once: true });
+    nv.addEventListener('error', () => { nv.remove(); timer = setTimeout(next, 9000); }, { once: true });
+  };
+  cur.addEventListener('playing', () => { timer = setTimeout(next, 9000); }, { once: true });
+  cur.play().catch(() => {});
+  return true;
+}
+
 export async function renderLogin(app, initialError = '') {
   document.body.classList.remove('has-tabbar');
   let email = '', nonce = null;
@@ -226,7 +259,8 @@ export async function renderLogin(app, initialError = '') {
         h('p', {}, 'Statusy księgowań, ZUS, PIT/CIT, VAT i JPK dla każdego klienta, miesiąc po miesiącu. Dostęp tylko dla zespołu RKDP.')),
       h('p', { style: { fontSize: '13px' } }, `© ${new Date().getFullYear()} Właściciel oprogramowania: RKDP spółka doradztwa podatkowego sp. z o.o. Wszelkie prawa zastrzeżone.`, h('br'), 'Dane objęte tajemnicą doradcy podatkowego.')),
     h('section', { class: 'login-main' }, box)));
-  const side = app.querySelector('.login-side'); if (side) liveNetwork(side);
+  const side = app.querySelector('.login-side');
+  if (side) { if (!loginVideo(side)) liveNetwork(side); }
   put(box, h('div', { class: 'spinner' }, 'Wczytywanie…'));
   if (await newMode()) stepPassword(); else legacyEmail();
 }

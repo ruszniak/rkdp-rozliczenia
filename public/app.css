@@ -3781,3 +3781,19 @@ html body .inf-chip.part{border-color:var(--ink)}
 html body .inf-search input{width:100%}
 html body .inf-compose .field{margin-bottom:14px}
 html body .inf-actions .btn-ghost{border:1px solid var(--line-2)}
+
+/* ===== Logowanie (komputer): film z rkdp.pl w lewej części, przyciemniony pod tekst ===== */
+.login-side.has-video{background:#0E1015!important}
+.login-side.has-video .siec-live{display:none}
+.login-video{position:absolute;inset:0;z-index:0;background:#0E1015 center/cover no-repeat}
+.login-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.4s ease}
+.login-video video.on{opacity:1}
+.login-video-shade{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(10,12,16,.55) 0%,rgba(10,12,16,.15) 35%,rgba(10,12,16,.25) 60%,rgba(10,12,16,.85) 100%)}
+.login-side.has-video>*:not(.login-video):not(.login-video-shade):not(.siec-live){position:relative;z-index:1}
+.login-side.has-video h2{text-shadow:0 2px 24px rgba(0,0,0,.35)}
+.login-side.has-video p{color:rgba(255,255,255,.86)!important}
+.login-side.has-video>.login-video,.login-side.has-video>.login-video-shade{position:absolute!important;inset:0;z-index:0!important}
+.login-side.has-video{justify-content:flex-end!important;gap:28px}
+.login-side.has-video>.eyebrow{margin-bottom:auto}
+.login-side.has-video>.login-video-shade{background:linear-gradient(180deg,rgba(10,12,16,.55) 0%,rgba(10,12,16,.05) 30%,rgba(10,12,16,.35) 55%,rgba(10,12,16,.9) 100%)!important}
