@@ -96,6 +96,7 @@ export const RODO = [
 // historia zmian – od pierwszej wersji (najnowsze na górze)
 const NEWS = [
   ['2.8', '23 listopada 2026', [
+    'Informacja do klientów: uporządkowany nagłówek „Odbiorcy” (przyciski w jednym pasku), filtry w stylu reszty aplikacji, wyszukiwarka klientów na całą szerokość.',
     'Zadania: gdy ktoś dopisze komentarz, pytanie albo zgłosi wykonanie, na liście przy zadaniu pojawia się „nowy komentarz” (wiersz podświetlony i na górze sekcji) – znika po otwarciu zadania. Wyszukiwarka przeniesiona do górnego paska, obok przełącznika motywu.',
     'Zadania w nowym układzie: „Moje” (czeka na Twoją decyzję, po terminie, do zrobienia, czekasz na innych) i „Cały zespół” według terminu z filtrem osób; w każdym wierszu zdjęcie osoby, która się zadaniem zajmuje, oraz przyciski Akceptuj / Do poprawy / Odpowiedz / Zaczynam / Zrobione bez otwierania okna.',
     'Menu po lewej uporządkowane: Pulpit osobno, grupy Praca, Dokumenty, Terminy i kontrola, zwijane Zarządzanie, krótsze nazwy; na dole jedno menu pod Twoim imieniem (profil, pomoc, aplikacja na telefon, ustawienia menu, Wyloguj).',

@@ -3764,3 +3764,20 @@ html body .sn-menu .sn-out{color:var(--warn)}
   html.sidebar-on:root body .site-header .hdr-search:hover{border-color:rgba(255,255,255,.22)!important;color:#fff!important}
   html.sidebar-on:root body .site-header .hdr-search kbd{border-color:rgba(255,255,255,.14)!important;color:#8B93A0!important}
 }
+
+/* Informacja do klientów: nagłówki sekcji w jednej linii, przyciski w równym pasku, filtry jak w reszcie aplikacji */
+html body .inf-grid .section-head{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin-bottom:14px}
+html body .inf-grid .section-head h2{font-size:18px!important;white-space:nowrap}
+html body .inf-grid .section-head .row-btns{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+html body .inf-grid .section-head .row-btns select{width:auto;min-width:180px;height:36px;padding-top:0;padding-bottom:0}
+html body .inf-grid .section-head .row-btns .btn{min-height:36px;border:1px solid var(--line-2)}
+html body .inf-gtitle{font-size:13px!important;margin-bottom:8px}
+html body .inf-gsec{margin-bottom:14px}
+html body .inf-chip{border-radius:8px!important;padding:5px 10px;font-size:13px}
+html body .inf-chip span{font-weight:600}
+html body .inf-chip.on{background:var(--ink);border-color:var(--ink);color:var(--card)}
+html body .inf-chip.on span{color:var(--card);opacity:.75}
+html body .inf-chip.part{border-color:var(--ink)}
+html body .inf-search input{width:100%}
+html body .inf-compose .field{margin-bottom:14px}
+html body .inf-actions .btn-ghost{border:1px solid var(--line-2)}
