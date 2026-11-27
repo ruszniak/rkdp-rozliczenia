@@ -3696,3 +3696,13 @@ html body .sn-menu .sn-item .sn-ico{color:var(--muted)!important}
 html body .sn-menu .sn-sw{background:var(--line-2)!important}
 html body .sn-menu .sn-opt[aria-checked="true"] .sn-sw{background:var(--accent)!important}
 html body .sn-menu .sn-out{color:var(--warn)}
+
+/* ===== Rama aplikacji: menu po lewej i górny pasek w jednym kolorze, treść „wsunięta” z zaokrąglonym narożnikiem ===== */
+@media (min-width:1100px){
+  html.sidebar-on{--frame:#171B23}
+  html.sidebar-on:root body .side-nav{background:var(--frame)!important;border-right:0!important}
+  html.sidebar-on:root body .site-header{background:var(--frame)!important;box-shadow:none!important;border-bottom:0!important}
+  html.sidebar-on body .site-header::after{content:"";position:absolute;left:0;bottom:-18px;width:18px;height:18px;pointer-events:none;
+    background:radial-gradient(circle at 100% 100%,transparent 17.5px,var(--frame) 18px)}
+  html.sidebar-on.side-auto body .site-header::after,html.sidebar-on.side-mini body .site-header::after{left:0}
+}
